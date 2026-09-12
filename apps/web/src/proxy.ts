@@ -87,9 +87,11 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets and image files — matching those would
-     * burn a Node invocation per asset for no benefit.
+     * Everything except static assets, image files and crawler metadata —
+     * matching those would burn a Node invocation per asset for no benefit,
+     * and robots.txt must answer crawlers directly rather than redirect them
+     * to /login.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
   ],
 };
