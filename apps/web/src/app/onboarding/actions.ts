@@ -200,18 +200,21 @@ export async function createCommunity(
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
-  const { data, error } = await supabase
+  // No `.select()` here. Returning the new row makes Postgres check the
+  // communities SELECT policy (members only) before the after-insert trigger
+  // has made the founder a member, so the whole insert would be rejected.
+  // Nothing rewrites the slug on insert, so the one we sent is the one stored.
+  const { error } = await supabase
     .from('communities')
-    .insert({ ...parsed.data, created_by: user.id })
-    .select('slug')
-    .single();
+    .insert({ ...parsed.data, created_by: user.id });
 
   if (error) {
     if (error.code === '23505') {
       return { fieldErrors: { slug: 'That address is already taken. Try another.' } };
     }
+    console.error('[onboarding] could not create community', error);
     return { error: 'We could not create the community. Please try again.' };
   }
 
-  redirect(`/app/${data.slug}?welcome=1`);
+  redirect(`/app/${parsed.data.slug}?welcome=1`);
 }
