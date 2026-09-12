@@ -74,6 +74,35 @@ select test.eq(test.visible('select id from public.communities'), 1::bigint,
   'an owner sees only their own society');
 
 -- ---------------------------------------------------------------------------
+-- Founding a society the way the web app does
+-- ---------------------------------------------------------------------------
+-- The founder becomes a member in an after-insert trigger, which runs after
+-- RETURNING has already been checked against the members-only SELECT policy.
+-- So `insert ... returning` (supabase-js `.insert().select()`) is rejected, and
+-- onboarding must insert first and read the society back separately. Hana is a
+-- fresh user so nothing below depends on her.
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('88888888-8888-4888-8888-888888888888', 'hana@example.com', '{"full_name":"Hana Iyer"}');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.raises(
+  $q$insert into public.communities (slug, name, created_by)
+     values ('hill-crest', 'Hill Crest', '88888888-8888-4888-8888-888888888888')
+     returning slug$q$,
+  'a founder cannot read a new society back in the same insert');
+
+insert into public.communities (slug, name, created_by)
+  values ('hill-crest', 'Hill Crest', '88888888-8888-4888-8888-888888888888');
+select test.eq(test.visible($q$select id from public.communities where slug = 'hill-crest'$q$), 1::bigint,
+  'a plain insert succeeds and the founder can read the society straight after');
+select test.eq(
+  (select role::text from public.memberships m
+     join public.communities c on c.id = m.community_id
+    where c.slug = 'hill-crest' and m.user_id = '88888888-8888-4888-8888-888888888888'),
+  'owner', 'and is its owner');
+
+-- ---------------------------------------------------------------------------
 -- Joining by Society ID, with admin approval
 -- ---------------------------------------------------------------------------
 reset role;
