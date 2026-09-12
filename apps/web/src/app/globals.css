@@ -1,0 +1,113 @@
+@import 'tailwindcss';
+
+/*
+ * Samudaya design tokens.
+ *
+ * Semantic names (surface, ink, brand) rather than raw colours, so the whole
+ * palette can be retuned in one place and dark mode is a token swap instead of
+ * a `dark:` variant on every element.
+ */
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+
+  /* A calm green — communal, not corporate, and distinct from the red/amber
+     used for overdue bills and urgent tickets. */
+  --color-brand-50: oklch(0.971 0.021 160);
+  --color-brand-100: oklch(0.94 0.045 161);
+  --color-brand-200: oklch(0.885 0.08 162);
+  --color-brand-300: oklch(0.81 0.115 163);
+  --color-brand-400: oklch(0.72 0.14 164);
+  --color-brand-500: oklch(0.63 0.145 165);
+  --color-brand-600: oklch(0.53 0.13 166);
+  --color-brand-700: oklch(0.44 0.108 167);
+  --color-brand-800: oklch(0.37 0.086 168);
+  --color-brand-900: oklch(0.31 0.07 169);
+  --color-brand-950: oklch(0.2 0.048 170);
+}
+
+:root {
+  --surface: oklch(0.995 0.002 160);
+  --surface-raised: oklch(1 0 0);
+  --surface-sunken: oklch(0.968 0.005 160);
+  --border: oklch(0.9 0.008 160);
+  --border-strong: oklch(0.82 0.012 160);
+  --ink: oklch(0.24 0.015 165);
+  --ink-muted: oklch(0.52 0.014 165);
+  --ink-subtle: oklch(0.64 0.012 165);
+  --accent: var(--color-brand-600);
+  --accent-ink: oklch(1 0 0);
+  --danger: oklch(0.58 0.2 25);
+  --warning: oklch(0.72 0.16 70);
+  --success: oklch(0.6 0.15 150);
+  --info: oklch(0.6 0.13 250);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: oklch(0.19 0.012 165);
+    --surface-raised: oklch(0.235 0.014 165);
+    --surface-sunken: oklch(0.155 0.01 165);
+    --border: oklch(0.32 0.014 165);
+    --border-strong: oklch(0.42 0.016 165);
+    --ink: oklch(0.96 0.005 165);
+    --ink-muted: oklch(0.73 0.012 165);
+    --ink-subtle: oklch(0.6 0.012 165);
+    --accent: var(--color-brand-400);
+    --accent-ink: oklch(0.18 0.03 168);
+    --danger: oklch(0.68 0.18 25);
+    --warning: oklch(0.8 0.14 75);
+    --success: oklch(0.72 0.14 155);
+    --info: oklch(0.7 0.12 250);
+  }
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border-base: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background-color: var(--surface);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible focus for keyboard users on every interactive element, without
+   drawing a ring for mouse clicks. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.375rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

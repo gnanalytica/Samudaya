@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+build
+.turbo
+.expo
+pnpm-lock.yaml
+packages/supabase/src/database.types.ts
+
+# Hand-aligned; Prettier has no SQL parser anyway.
+*.sql
+# Generated.
+apps/web/.next
+apps/mobile/.expo

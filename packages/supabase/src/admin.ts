@@ -1,0 +1,1 @@
+export { createAdminSupabase } from './server';

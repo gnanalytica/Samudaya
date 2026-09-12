@@ -1,0 +1,31 @@
+import Link from 'next/link';
+import { LoginForm } from './login-form';
+
+export const metadata = { title: 'Sign in' };
+
+export default async function LoginPage(props: { searchParams: Promise<{ next?: string }> }) {
+  const { next } = await props.searchParams;
+  const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/app';
+
+  return (
+    <main id="main" className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-12">
+      <Link href="/" className="mb-8 inline-flex items-center gap-2 self-start">
+        <span className="bg-accent text-accent-ink grid size-8 place-items-center rounded-lg text-sm font-bold">
+          स
+        </span>
+        <span className="text-lg font-semibold tracking-tight">Samudaya</span>
+      </Link>
+
+      <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      <p className="text-ink-muted mt-1.5 mb-8 text-sm">
+        New here? Sign in first — you’ll enter your community’s invite code next.
+      </p>
+
+      <LoginForm next={safeNext} />
+
+      <p className="text-ink-subtle mt-8 text-xs">
+        By continuing you agree to your community’s terms of use.
+      </p>
+    </main>
+  );
+}
