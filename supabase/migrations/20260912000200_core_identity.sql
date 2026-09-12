@@ -89,6 +89,9 @@ create trigger on_auth_user_updated
 create table public.communities (
   id              uuid primary key default extensions.gen_random_uuid(),
   slug            text not null unique,
+  -- The "Society ID" an admin shares with residents (e.g. MHR-4827). Knowing
+  -- it only lets someone *ask* to join; an admin still approves the request.
+  join_code       text not null unique default app.random_code(6),
   name            text not null,
   address_line1   text,
   address_line2   text,
@@ -104,7 +107,8 @@ create table public.communities (
   created_by      uuid references public.profiles (id) on delete set null,
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
-  constraint communities_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$')
+  constraint communities_slug_format check (slug ~ '^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$'),
+  constraint communities_join_code_format check (join_code ~ '^[A-Z0-9-]{4,16}$')
 );
 
 create trigger communities_touch_updated_at
@@ -122,13 +126,10 @@ create table public.units (
   floor         integer,
   bedrooms      integer,
   area_sqft     numeric(10, 2),
-  -- Used as the default maintenance charge when generating invoices.
-  monthly_dues  numeric(12, 2) not null default 0,
   notes         text,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
-  constraint units_number_not_blank check (length(btrim(number)) > 0),
-  constraint units_monthly_dues_non_negative check (monthly_dues >= 0)
+  constraint units_number_not_blank check (length(btrim(number)) > 0)
 );
 
 -- A unit label is unique within a community. COALESCE keeps communities that

@@ -74,36 +74,9 @@ create index invite_code_attempts_user_time_idx
   on public.invite_code_attempts (user_id, attempted_at desc);
 
 -- ---------------------------------------------------------------------------
--- Code generation
+-- Code normalisation
 -- ---------------------------------------------------------------------------
 
--- Alphabet excludes 0/O, 1/I/L and U/V confusions, so a code read off a notice
--- board or over the phone survives the trip.
-create or replace function app.random_invite_code(p_len integer default 8)
-returns text
-language plpgsql
-volatile
-set search_path = ''
-as $$
-declare
-  alphabet constant text := '23456789ABCDEFGHJKMNPQRSTVWXYZ';
-  n constant integer := 30;
-  result text := '';
-  bytes bytea;
-  i integer;
-begin
-  bytes := extensions.gen_random_bytes(p_len);
-  for i in 0 .. p_len - 1 loop
-    -- 256 % 30 leaves a negligible modulo bias; brute force is bounded by the
-    -- attempt throttle below, not by per-character uniformity.
-    result := result || substr(alphabet, (get_byte(bytes, i) % n) + 1, 1);
-  end loop;
-  return result;
-end;
-$$;
-
--- Strip whatever shape the human typed ("k7mq-3xpb", "K7MQ 3XPB") down to the
--- canonical stored form.
 create or replace function public.normalize_invite_code(p_code text)
 returns text
 language sql
@@ -159,7 +132,7 @@ begin
   -- admin's request.
   loop
     v_attempt := v_attempt + 1;
-    v_code := app.random_invite_code(8);
+    v_code := app.random_code(8);
     begin
       insert into public.invite_codes (
         community_id, code, label, role, unit_id, relation,
@@ -428,3 +401,238 @@ create policy invite_code_redemptions_admin_read
 create policy invite_code_attempts_self_read
   on public.invite_code_attempts for select to authenticated
   using (user_id = (select auth.uid()));
+
+-- ============================================================================
+-- Join requests
+-- ----------------------------------------------------------------------------
+-- The other way in. A resident who knows the Society ID picks their flat and
+-- asks; an admin approves. Knowing the code alone gets nobody in, which is why
+-- the code can safely be printed on a notice board.
+-- ============================================================================
+
+create table public.join_requests (
+  id            uuid primary key default extensions.gen_random_uuid(),
+  community_id  uuid not null references public.communities (id) on delete cascade,
+  user_id       uuid not null references public.profiles (id) on delete cascade,
+  unit_id       uuid references public.units (id) on delete set null,
+  -- Captured as typed, so an admin can tell "Rahul, A-101, 98765 43210" apart
+  -- from a chancer even before the profile is filled in.
+  claimed_name  text not null,
+  claimed_phone text,
+  relation      public.occupant_relation not null default 'owner',
+  status        public.join_request_status not null default 'pending',
+  reviewed_by   uuid references public.profiles (id) on delete set null,
+  reviewed_at   timestamptz,
+  decline_reason text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  constraint join_requests_name_not_blank check (length(btrim(claimed_name)) > 0),
+  constraint join_requests_phone_e164
+    check (claimed_phone is null or claimed_phone ~ '^\+?[0-9]{7,15}$')
+);
+
+-- One outstanding request per person per community: re-asking should update
+-- the existing row, not queue a second one for the admin to wade through.
+create unique index join_requests_one_pending
+  on public.join_requests (community_id, user_id)
+  where status = 'pending';
+
+create index join_requests_community_idx
+  on public.join_requests (community_id, status, created_at desc);
+
+create trigger join_requests_touch_updated_at
+  before update on public.join_requests
+  for each row execute function app.touch_updated_at();
+
+-- ---------------------------------------------------------------------------
+-- Ask to join, by Society ID
+-- ---------------------------------------------------------------------------
+create or replace function public.request_to_join(
+  p_join_code text,
+  p_unit_id   uuid default null,
+  p_name      text default null,
+  p_phone     text default null,
+  p_relation  public.occupant_relation default 'owner'
+)
+returns table (
+  status       text,
+  request_id   uuid,
+  community_id uuid,
+  community_name text
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+-- This function returns columns named `status` and `community_id`, which would
+-- otherwise shadow the real columns in the ON CONFLICT clause below.
+#variable_conflict use_column
+declare
+  v_uid uuid := (select auth.uid());
+  v_community public.communities;
+  v_existing public.memberships;
+  v_row public.join_requests;
+  v_recent integer;
+begin
+  if v_uid is null then
+    return query select 'unauthenticated'::text, null::uuid, null::uuid, null::text;
+    return;
+  end if;
+
+  -- Reuses the invite-code throttle: guessing a Society ID and guessing an
+  -- invite code are the same attack, and share one budget.
+  select count(*) into v_recent
+    from public.invite_code_attempts a
+   where a.user_id = v_uid
+     and a.succeeded = false
+     and a.attempted_at > now() - interval '15 minutes';
+
+  if v_recent >= 10 then
+    return query select 'rate_limited'::text, null::uuid, null::uuid, null::text;
+    return;
+  end if;
+
+  select * into v_community
+    from public.communities c
+   where c.join_code = upper(regexp_replace(coalesce(p_join_code, ''), '[^A-Za-z0-9-]', '', 'g'));
+
+  if v_community.id is null then
+    insert into public.invite_code_attempts (user_id, code_tried, succeeded)
+    values (v_uid, upper(coalesce(p_join_code, '')), false);
+    return query select 'not_found'::text, null::uuid, null::uuid, null::text;
+    return;
+  end if;
+
+  select * into v_existing
+    from public.memberships m
+   where m.community_id = v_community.id and m.user_id = v_uid;
+
+  if v_existing.id is not null then
+    return query select 'already_member'::text, null::uuid, v_community.id, v_community.name;
+    return;
+  end if;
+
+  if p_unit_id is not null and not exists (
+    select 1 from public.units u where u.id = p_unit_id and u.community_id = v_community.id
+  ) then
+    return query select 'bad_unit'::text, null::uuid, v_community.id, v_community.name;
+    return;
+  end if;
+
+  -- Asking twice just refreshes the pending request.
+  insert into public.join_requests
+    (community_id, user_id, unit_id, claimed_name, claimed_phone, relation)
+  values (
+    v_community.id, v_uid, p_unit_id,
+    coalesce(nullif(btrim(p_name), ''), 'Resident'),
+    nullif(btrim(p_phone), ''),
+    p_relation
+  )
+  on conflict (community_id, user_id) where status = 'pending'
+  do update set unit_id = excluded.unit_id,
+                claimed_name = excluded.claimed_name,
+                claimed_phone = excluded.claimed_phone,
+                relation = excluded.relation,
+                updated_at = now()
+  returning * into v_row;
+
+  insert into public.invite_code_attempts (user_id, code_tried, succeeded)
+  values (v_uid, v_community.join_code, true);
+
+  return query select 'pending'::text, v_row.id, v_community.id, v_community.name;
+end;
+$$;
+
+grant execute on function public.request_to_join(
+  text, uuid, text, text, public.occupant_relation
+) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- Admit (or refuse) a request
+-- ---------------------------------------------------------------------------
+create or replace function public.review_join_request(
+  p_request_id uuid,
+  p_approve    boolean,
+  p_role       public.member_role default 'resident',
+  p_reason     text default null
+)
+returns public.join_requests
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_row public.join_requests;
+  v_membership public.memberships;
+begin
+  select * into v_row from public.join_requests r where r.id = p_request_id for update;
+  if v_row.id is null then
+    raise exception 'No such request' using errcode = 'P0002';
+  end if;
+
+  if not app.is_admin(v_row.community_id) then
+    raise exception 'Only a community admin can review join requests'
+      using errcode = '42501';
+  end if;
+
+  if v_row.status <> 'pending' then
+    return v_row;  -- already decided; treat a repeat click as a no-op
+  end if;
+
+  if p_role = 'owner' then
+    raise exception 'Owner access cannot be granted from a join request'
+      using errcode = '42501';
+  end if;
+
+  if p_approve then
+    insert into public.memberships (community_id, user_id, role, status)
+    values (v_row.community_id, v_row.user_id, p_role, 'active')
+    on conflict (community_id, user_id) do update set status = 'active'
+    returning * into v_membership;
+
+    if v_row.unit_id is not null then
+      insert into public.unit_occupants (unit_id, membership_id, relation, is_primary, moved_in_on)
+      values (
+        v_row.unit_id,
+        v_membership.id,
+        v_row.relation,
+        not exists (
+          select 1 from public.unit_occupants o
+           where o.unit_id = v_row.unit_id and o.is_primary and o.moved_out_on is null
+        ),
+        current_date
+      )
+      on conflict on constraint unit_occupants_unit_membership_key do nothing;
+    end if;
+  end if;
+
+  update public.join_requests
+     -- The arms are unknown literals, which unify to text; without the cast
+     -- the assignment to an enum column fails.
+     set status = (case when p_approve then 'approved' else 'rejected' end)::public.join_request_status,
+         reviewed_by = (select auth.uid()),
+         reviewed_at = now(),
+         decline_reason = case when p_approve then null else p_reason end
+   where id = p_request_id
+   returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+grant execute on function public.review_join_request(uuid, boolean, public.member_role, text)
+  to authenticated, service_role;
+
+alter table public.join_requests enable row level security;
+
+-- You can see your own request, wherever it is in the queue; admins see the
+-- queue for their community.
+create policy join_requests_select_self_or_admin
+  on public.join_requests for select to authenticated
+  using (user_id = (select auth.uid()) or app.is_admin(community_id));
+
+-- Rows are written through request_to_join, which checks the Society ID.
+-- Reviewing goes through review_join_request. Neither is done by direct DML.
+create policy join_requests_withdraw_own
+  on public.join_requests for delete to authenticated
+  using (user_id = (select auth.uid()) and status = 'pending');

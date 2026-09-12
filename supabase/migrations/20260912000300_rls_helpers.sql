@@ -65,7 +65,18 @@ as $$
          );
 $$;
 
--- Can change community configuration, members, codes, billing.
+-- Coordinates events: works the checklist, runs activities, posts notices.
+create or replace function app.is_committee(p_community uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select app.has_role_at_least(p_community, 'committee');
+$$;
+
+-- Can publish events, approve spending, admit residents.
 create or replace function app.is_admin(p_community uuid)
 returns boolean
 language sql
@@ -74,17 +85,6 @@ security definer
 set search_path = ''
 as $$
   select app.has_role_at_least(p_community, 'admin');
-$$;
-
--- Gate/security desk: may work the visitor log but nothing else privileged.
-create or replace function app.is_gate_staff(p_community uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = ''
-as $$
-  select app.member_role_in(p_community) = 'security' or app.is_admin(p_community);
 $$;
 
 -- The caller's membership row id for a community (used to own domain rows).
@@ -161,7 +161,7 @@ grant execute on function
   app.is_member(uuid),
   app.has_role_at_least(uuid, public.member_role),
   app.is_admin(uuid),
-  app.is_gate_staff(uuid),
+  app.is_committee(uuid),
   app.my_membership_id(uuid),
   app.my_community_ids(),
   app.shares_community_with(uuid),

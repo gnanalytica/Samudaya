@@ -32,6 +32,14 @@ describe('the MCP tool registry', () => {
     }
   });
 
+  it('leaves no scope that grants nothing', () => {
+    // Every scope is a checkbox in the admin key form. One that no tool (and,
+    // today, no route) consumes is a promise the API does not keep. If a scope
+    // ever becomes REST-only, widen this test rather than delete it.
+    const claimed = new Set(MCP_TOOLS.map((tool) => tool.scope));
+    for (const scope of API_SCOPES) expect(claimed).toContain(scope);
+  });
+
   it('gives every tool a description worth reading', () => {
     for (const tool of MCP_TOOLS) {
       expect(tool.description.length).toBeGreaterThan(30);
@@ -58,7 +66,11 @@ describe('scope filtering', () => {
 
     expect(visible.length).toBeGreaterThan(0);
     for (const tool of visible) expect(tool.scope.endsWith(':read')).toBe(true);
-    expect(visible.map((t) => t.name)).not.toContain('post_announcement');
+    // The three that reach real people or real money.
+    const names = visible.map((tool) => tool.name);
+    expect(names).not.toContain('post_announcement');
+    expect(names).not.toContain('file_expense');
+    expect(names).not.toContain('create_event');
   });
 
   it('lets a write scope imply its own read scope', () => {
@@ -66,7 +78,7 @@ describe('scope filtering', () => {
     const names = visible.map((tool) => tool.name);
     expect(names).toContain('post_announcement');
     expect(names).toContain('list_announcements');
-    expect(names).not.toContain('list_service_requests');
+    expect(names).not.toContain('list_events');
   });
 
   it('shows nothing at all to a key with no scopes', () => {
@@ -78,17 +90,25 @@ describe('scope filtering', () => {
   });
 
   it('does not leak a tool across resources', () => {
-    const visible = toolsFor(principalWith(['visitors:write']));
-    expect(visible.map((t) => t.name)).toEqual(
-      expect.arrayContaining(['create_visitor_pass', 'list_visitors']),
-    );
-    expect(visible.map((t) => t.name)).not.toContain('list_invoices');
+    const visible = toolsFor(principalWith(['events:write']));
+    const names = visible.map((tool) => tool.name);
+    expect(names).toEqual(expect.arrayContaining(['create_event', 'list_events', 'add_task']));
+    expect(names).not.toContain('get_ledger');
+    expect(names).not.toContain('post_announcement');
+  });
+
+  it('keeps the ledger behind its own scope', () => {
+    const visible = toolsFor(principalWith(['expenses:read']));
+    const names = visible.map((tool) => tool.name);
+    expect(names).toContain('get_ledger');
+    expect(names).not.toContain('file_expense');
   });
 });
 
 describe('findTool', () => {
   it('finds a known tool and refuses an unknown one', () => {
     expect(findTool('list_announcements')?.scope).toBe('announcements:read');
+    expect(findTool('get_ledger')?.scope).toBe('expenses:read');
     expect(findTool('drop_database')).toBeUndefined();
     expect(findTool('')).toBeUndefined();
   });

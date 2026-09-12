@@ -1,39 +1,39 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Bell, CalendarCheck, MessageCircle, Receipt, ShieldCheck, Wrench } from 'lucide-react';
+import { CalendarDays, ClipboardList, MessageCircle, Receipt, Vote, Wallet } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button';
 import { getCurrentUser } from '@/lib/auth';
 
 const FEATURES = [
   {
-    icon: Bell,
-    title: 'Notices that land',
-    body: 'Post once — it reaches the app, the phone and WhatsApp. No more paper on the lift door.',
+    icon: CalendarDays,
+    title: 'One place per event',
+    body: 'Ganesh Chaturthi, sports day, a cultural evening — each carries its own people, tasks, fund and ledger.',
   },
   {
-    icon: Wrench,
-    title: 'Requests that get closed',
-    body: 'Residents raise an issue, staff work it, everyone sees the status. Nothing gets lost in a group chat.',
+    icon: ClipboardList,
+    title: 'A checklist everyone can see',
+    body: 'Twenty-five things to arrange, each with an owner and a date. Residents watch it turn green.',
   },
   {
-    icon: ShieldCheck,
-    title: 'A gate that knows who’s coming',
-    body: 'Pre-approve a guest and they arrive with a code. Security sees the list, logs arrivals and departures.',
-  },
-  {
-    icon: CalendarCheck,
-    title: 'Amenities without arguments',
-    body: 'The clubhouse can only be booked once for a slot — the database refuses a double booking.',
+    icon: Wallet,
+    title: 'A fund with a target',
+    body: 'Residents chip in, the bar fills, and the contributor count is public while individual amounts stay private.',
   },
   {
     icon: Receipt,
-    title: 'Dues in the open',
-    body: 'Invoices per flat, payments recorded, balances that add up.',
+    title: 'Every rupee, with the bill',
+    body: 'Approved spending shows the vendor, who asked, who signed off, and the invoice. Nothing is hidden behind a summary.',
+  },
+  {
+    icon: Vote,
+    title: 'Surplus you cannot quietly move',
+    body: 'What happens to leftover money is fixed before collection. Changing it takes a resident vote that clears a threshold.',
   },
   {
     icon: MessageCircle,
     title: 'Works over WhatsApp',
-    body: 'Residents who will never install an app can still report a leak and check their dues.',
+    body: 'Residents who will never install an app can still check the fund, see the notices and back an idea.',
   },
 ];
 
@@ -60,11 +60,12 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-5xl px-6 pt-12 pb-16 sm:pt-20">
           <p className="text-accent text-sm font-medium">समुदाय · community</p>
           <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-            Everything your residential community runs on, in one place.
+            Plan together. Participate together. Spend transparently.
           </h1>
           <p className="text-ink-muted mt-5 max-w-xl text-lg text-pretty">
-            Notices, complaints, visitors, amenities and maintenance dues — for the committee, the
-            gate and every resident. On the web, on iOS and Android, and over WhatsApp.
+            Samudaya gives every community event its own people, activities, checklist, fund and
+            public ledger — so residents can see exactly what is planned, what was spent, and on
+            what. On the web, on iOS and Android, and over WhatsApp.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <ButtonLink href="/login" size="lg">
@@ -75,7 +76,7 @@ export default async function LandingPage() {
             </ButtonLink>
           </div>
           <p className="text-ink-subtle mt-4 text-sm">
-            Residents join with a code from their admin — nobody gets in by guessing a URL.
+            Residents join with the Society ID their admin shares, and an admin approves each one.
           </p>
         </section>
 

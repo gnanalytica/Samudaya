@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getMemberships, requireUser } from '@/lib/auth';
 import { Card, CardBody } from '@/components/ui/card';
-import { JoinForm } from './join-form';
+import { JoinFlow } from './join-flow';
 import { CreateCommunityForm } from './create-form';
 
 export const metadata = { title: 'Join your community' };
@@ -36,12 +36,18 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ mo
       <p className="text-ink-muted mt-1.5 mb-8 text-sm">
         {creating
           ? 'Create the space your residents will join.'
-          : 'Enter the invite code from your society admin.'}
+          : 'Enter the Society ID your admin shared, or an invite code.'}
       </p>
 
-      <Card>
-        <CardBody>{creating ? <CreateCommunityForm /> : <JoinForm />}</CardBody>
-      </Card>
+      {creating ? (
+        <Card>
+          <CardBody>
+            <CreateCommunityForm />
+          </CardBody>
+        </Card>
+      ) : (
+        <JoinFlow />
+      )}
 
       <p className="text-ink-muted mt-6 text-center text-sm">
         {creating ? (

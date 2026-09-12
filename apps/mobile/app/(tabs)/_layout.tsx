@@ -43,38 +43,25 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
+        options={{ title: 'Home', tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} /> }}
+      />
+      <Tabs.Screen
+        name="events"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} />,
+          title: 'Events',
+          tabBarIcon: ({ color }) => <TabIcon glyph="◈" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="notices"
+        name="community"
         options={{
-          title: 'Notices',
+          title: 'Community',
           tabBarIcon: ({ color }) => <TabIcon glyph="◎" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="requests"
-        options={{
-          title: 'Requests',
-          tabBarIcon: ({ color }) => <TabIcon glyph="✎" color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="visitors"
-        options={{
-          title: 'Visitors',
-          tabBarIcon: ({ color }) => <TabIcon glyph="⚇" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="more"
-        options={{
-          title: 'More',
-          tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} />,
-        }}
+        options={{ title: 'More', tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} /> }}
       />
     </Tabs>
   );

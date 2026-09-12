@@ -1,6 +1,9 @@
-import type { Enums } from '@samudaya/supabase';
+/**
+ * Display helpers. Shared so a rupee total, a date or a receipt number reads
+ * identically on the web, on a phone and in a WhatsApp reply.
+ */
 
-/** `{ block: 'A', number: '101' }` → `A-101`; blockless communities → `101`. */
+/** `{ block: 'A', number: '101' }` → `A-101`; blockless societies → `101`. */
 export function unitLabel(
   unit: { block?: string | null; number?: string | null } | null | undefined,
 ): string {
@@ -15,12 +18,45 @@ export function formatMoney(amount: number | string | null | undefined, currency
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency,
-      maximumFractionDigits: 2,
+      maximumFractionDigits: 0,
     }).format(value);
   } catch {
     // An unknown currency code should not take a page down.
-    return `${currency} ${value.toFixed(2)}`;
+    return `${currency} ${value.toFixed(0)}`;
   }
+}
+
+/** `2026-09-14` → `14 Sep 2026`. Accepts a date-only string without shifting it. */
+export function formatDate(input: string | Date | null | undefined): string {
+  if (!input) return '—';
+  // A bare `2026-09-14` parses as UTC midnight, which is the previous evening
+  // in the Americas. Building the date from its parts keeps it on the day the
+  // committee actually picked.
+  const date =
+    typeof input === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input)
+      ? new Date(
+          Number(input.slice(0, 4)),
+          Number(input.slice(5, 7)) - 1,
+          Number(input.slice(8, 10)),
+        )
+      : new Date(input);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** "in 3 days" / "tomorrow" / "today" — for an event that has not happened yet. */
+export function countdown(input: string | null | undefined, now = new Date()): string {
+  if (!input) return '';
+  const target = new Date(`${input}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return '';
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const days = Math.round((target.getTime() - startOfToday.getTime()) / 86_400_000);
+  if (days === 0) return 'today';
+  if (days === 1) return 'tomorrow';
+  if (days === -1) return 'yesterday';
+  if (days > 1 && days <= 60) return `in ${days} days`;
+  if (days < -1 && days >= -60) return `${Math.abs(days)} days ago`;
+  return '';
 }
 
 /** "just now" / "3 h ago" / "12 Mar" — compact enough for a list row. */
@@ -50,74 +86,22 @@ export function relativeTime(input: string | Date | null | undefined, now = new 
   });
 }
 
-export const REQUEST_STATUS_LABEL: Record<Enums<'request_status'>, string> = {
-  open: 'Open',
-  acknowledged: 'Acknowledged',
-  in_progress: 'In progress',
-  resolved: 'Resolved',
-  closed: 'Closed',
-  rejected: 'Rejected',
-};
-
-export const REQUEST_CATEGORY_LABEL: Record<Enums<'request_category'>, string> = {
-  plumbing: 'Plumbing',
-  electrical: 'Electrical',
-  housekeeping: 'Housekeeping',
-  security: 'Security',
-  common_area: 'Common area',
-  parking: 'Parking',
-  billing: 'Billing',
-  other: 'Other',
-};
-
-export const REQUEST_PRIORITY_LABEL: Record<Enums<'request_priority'>, string> = {
-  low: 'Low',
-  normal: 'Normal',
-  high: 'High',
-  urgent: 'Urgent',
-};
-
-export const VISITOR_KIND_LABEL: Record<Enums<'visitor_kind'>, string> = {
-  guest: 'Guest',
-  delivery: 'Delivery',
-  cab: 'Cab / taxi',
-  service: 'Service visit',
-  staff: 'Domestic staff',
-};
-
-export const VISITOR_STATUS_LABEL: Record<Enums<'visitor_status'>, string> = {
-  expected: 'Expected',
-  arrived: 'Inside',
-  departed: 'Left',
-  denied: 'Denied',
-  expired: 'Expired',
-  cancelled: 'Cancelled',
-};
-
-export const INVOICE_STATUS_LABEL: Record<Enums<'invoice_status'>, string> = {
-  draft: 'Draft',
-  issued: 'Issued',
-  partly_paid: 'Partly paid',
-  paid: 'Paid',
-  overdue: 'Overdue',
-  void: 'Void',
-};
-
-export const AUDIENCE_LABEL: Record<Enums<'announcement_audience'>, string> = {
-  all: 'Everyone',
-  residents: 'Residents',
-  owners: 'Owners',
-  committee: 'Committee only',
-  staff: 'Staff only',
-};
-
-/** Formats a ticket number the way residents see it: `SR-000123`. */
-export function ticketRef(ticketNo: number | string | null | undefined): string {
-  if (ticketNo === null || ticketNo === undefined) return '—';
-  return `SR-${String(ticketNo).padStart(6, '0')}`;
+/** The receipt number a contributor quotes: `GAN-2026-00042`. */
+export function receiptRef(
+  eventSlug: string | null | undefined,
+  receiptNo: number | string | null | undefined,
+): string {
+  if (receiptNo === null || receiptNo === undefined) return '—';
+  const prefix = (eventSlug ?? 'evt')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .toUpperCase()
+    .slice(0, 12);
+  return `${prefix}-${String(receiptNo).padStart(5, '0')}`;
 }
 
-export function invoiceRef(number: number | string | null | undefined): string {
-  if (number === null || number === undefined) return '—';
-  return `INV-${String(number).padStart(6, '0')}`;
+/** Formats a list the way a sentence would: "A, B and C". */
+export function listSentence(items: string[]): string {
+  if (items.length === 0) return '';
+  if (items.length === 1) return items[0]!;
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }

@@ -3,12 +3,16 @@ import type { Database } from '@samudaya/supabase';
 import {
   HELP_TEXT,
   NOT_LINKED_TEXT,
+  TASK_STATUS_DOT,
   UNKNOWN_TEXT,
+  countdown,
+  formatDate,
   formatMoney,
+  fundedPercent,
   normalizeInviteCode,
+  normalizeStats,
   parseCommand,
   relativeTime,
-  ticketRef,
   type InboundMessage,
   type WhatsAppCommand,
 } from '@samudaya/core';
@@ -17,9 +21,13 @@ import {
  * Turns an inbound WhatsApp message into a reply.
  *
  * Runs with the service role — there is no Supabase session behind a phone
- * number — so every query is scoped explicitly to the community the sender
+ * number — so every query is scoped explicitly to the society the sender
  * belongs to. `resolveSender` establishes that scope once, and nothing below
  * queries outside it.
+ *
+ * The bot deliberately cannot spend money or approve anything. It reads, it
+ * files a suggestion, and it hands out a link for actions that deserve a
+ * screen and a confirm button.
  */
 
 type Db = SupabaseClient<Database>;
@@ -29,7 +37,6 @@ type Sender = {
   communityId: string;
   communitySlug: string;
   membershipId: string;
-  unitIds: string[];
   currency: string;
 };
 
@@ -53,20 +60,38 @@ async function resolveSender(db: Db, phone: string): Promise<Sender | null> {
   const { data: membership } = await query.limit(1).maybeSingle();
   if (!membership) return null;
 
-  const { data: occupancies } = await db
-    .from('unit_occupants')
-    .select('unit_id')
-    .eq('membership_id', membership.id)
-    .is('moved_out_on', null);
-
   return {
     userId: link.user_id,
     communityId: membership.community_id,
     communitySlug: membership.communities.slug,
     membershipId: membership.id,
-    unitIds: (occupancies ?? []).map((row) => row.unit_id),
     currency: membership.communities.currency,
   };
+}
+
+/** The soonest published event that has not happened yet. */
+async function nextEvent(db: Db, sender: Sender) {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await db
+    .from('events')
+    .select('id, slug, emoji, name, starts_on, venue, fund_target')
+    .eq('community_id', sender.communityId)
+    .eq('status', 'published')
+    .gte('starts_on', today)
+    .order('starts_on')
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
+
+async function statsFor(db: Db, eventId: string) {
+  const { data } = await db.from('event_stats').select('*').eq('event_id', eventId).maybeSingle();
+  return normalizeStats(data);
+}
+
+function appLink(sender: Sender, path = ''): string {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? '';
+  return `${base}/app/${sender.communitySlug}${path}`;
 }
 
 /**
@@ -83,7 +108,7 @@ async function handleLink(db: Db, phone: string, code: string): Promise<string> 
     .maybeSingle();
 
   if (!linkCode) {
-    return 'That code isn’t right. Open the app → Settings → WhatsApp for a fresh one.';
+    return 'That code isn’t right. Open the app → *More → WhatsApp* for a fresh one.';
   }
   if (linkCode.consumed_at) return 'That code has already been used. Generate a new one.';
   if (new Date(linkCode.expires_at) <= new Date()) {
@@ -108,7 +133,79 @@ async function handleLink(db: Db, phone: string, code: string): Promise<string> 
     .update({ consumed_at: new Date().toISOString() })
     .eq('id', linkCode.id);
 
-  return `This number is linked. ${HELP_TEXT}`;
+  return `This number is linked.\n\n${HELP_TEXT}`;
+}
+
+async function handleEvents(db: Db, sender: Sender): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await db
+    .from('events')
+    .select('id, emoji, name, starts_on, venue')
+    .eq('community_id', sender.communityId)
+    .eq('status', 'published')
+    .gte('starts_on', today)
+    .order('starts_on')
+    .limit(4);
+
+  if (!data?.length) return 'Nothing planned just now.';
+
+  const lines = await Promise.all(
+    data.map(async (event) => {
+      const stats = await statsFor(db, event.id);
+      return [
+        `${event.emoji} *${event.name}*`,
+        `${formatDate(event.starts_on)}${event.venue ? ` · ${event.venue}` : ''}${
+          countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''
+        }`,
+        `${stats.readiness}% ready · ${formatMoney(stats.fundRaised, sender.currency)} raised`,
+      ].join('\n');
+    }),
+  );
+
+  return `*Coming up*\n\n${lines.join('\n\n')}\n\n${appLink(sender, '/events')}`;
+}
+
+async function handleFund(db: Db, sender: Sender): Promise<string> {
+  const event = await nextEvent(db, sender);
+  if (!event) return 'No event is collecting contributions right now.';
+
+  const stats = await statsFor(db, event.id);
+  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+
+  return [
+    `${event.emoji} *${event.name}*`,
+    '',
+    `Raised: *${formatMoney(stats.fundRaised, sender.currency)}* of ${formatMoney(stats.fundTarget, sender.currency)} (${funded}%)`,
+    `Spent: ${formatMoney(stats.spent, sender.currency)}`,
+    `Available: ${formatMoney(stats.available, sender.currency)}`,
+    `${stats.contributors} families have contributed.`,
+    '',
+    `Full ledger, with every bill: ${appLink(sender, `/events/${event.slug}/accounts`)}`,
+  ].join('\n');
+}
+
+/**
+ * Contributing means money, so the bot hands over a link rather than taking
+ * the instruction itself. A mistyped amount in a chat window is not a good
+ * place to move rupees.
+ */
+async function handleContribute(db: Db, sender: Sender, amount: number | null): Promise<string> {
+  const event = await nextEvent(db, sender);
+  if (!event) return 'No event is collecting contributions right now.';
+
+  const link = appLink(
+    sender,
+    `/events/${event.slug}/contribute${amount ? `?amount=${amount}` : ''}`,
+  );
+
+  return [
+    amount
+      ? `To contribute *${formatMoney(amount, sender.currency)}* to ${event.name}:`
+      : `To contribute to *${event.name}*:`,
+    link,
+    '',
+    'You’ll confirm the amount and payment method there.',
+  ].join('\n');
 }
 
 async function handleNotices(db: Db, sender: Sender): Promise<string> {
@@ -133,124 +230,108 @@ async function handleNotices(db: Db, sender: Sender): Promise<string> {
     .join('\n\n');
 }
 
-async function handleReport(db: Db, sender: Sender, text: string): Promise<string> {
-  // The first line becomes the title; anything after it is the detail.
-  const title = text.split('\n')[0]!.slice(0, 160);
+async function handleActivities(db: Db, sender: Sender): Promise<string> {
+  const event = await nextEvent(db, sender);
+  if (!event) return 'Nothing to sign up for just now.';
 
-  const { data, error } = await db
-    .from('service_requests')
-    .insert({
-      community_id: sender.communityId,
-      unit_id: sender.unitIds[0] ?? null,
-      raised_by: sender.membershipId,
-      title,
-      description: text.length > title.length ? text : null,
-      channel: 'whatsapp',
-    })
-    .select('ticket_no')
-    .single();
+  const [{ data: activities }, { data: stats }] = await Promise.all([
+    db
+      .from('event_activities')
+      .select('id, name, emoji')
+      .eq('event_id', event.id)
+      .eq('is_open', true)
+      .order('position')
+      .limit(8),
+    db.from('activity_stats').select('activity_id, interested').eq('event_id', event.id),
+  ]);
 
-  if (error || !data) return 'I couldn’t file that just now. Please try again.';
+  if (!activities?.length) return `No performances are open for ${event.name} yet.`;
 
-  return (
-    `Logged as *${ticketRef(data.ticket_no)}*.\n` +
-    'The committee can see it now. Send *status* to check on it.'
-  );
+  const counts = new Map((stats ?? []).map((row) => [row.activity_id, row.interested ?? 0]));
+
+  return [
+    `*${event.name}* — you can perform in:`,
+    '',
+    ...activities.map(
+      (activity) =>
+        `${activity.emoji} *${activity.name}* — ${counts.get(activity.id) ?? 0} interested`,
+    ),
+    '',
+    `Sign up: ${appLink(sender, `/events/${event.slug}#activities`)}`,
+  ].join('\n');
 }
 
-async function handleStatus(db: Db, sender: Sender): Promise<string> {
-  const { data } = await db
-    .from('service_requests')
-    .select('ticket_no, title, status')
-    .eq('community_id', sender.communityId)
-    .eq('raised_by', sender.membershipId)
-    .in('status', ['open', 'acknowledged', 'in_progress'])
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  if (!data?.length) return 'You have no open requests.';
-
-  return (
-    'Your open requests:\n\n' +
-    data
-      .map(
-        (row) => `*${ticketRef(row.ticket_no)}* — ${row.title}\n_${row.status.replace('_', ' ')}_`,
-      )
-      .join('\n\n')
-  );
-}
-
-async function handleVisitor(db: Db, sender: Sender, name: string): Promise<string> {
-  const now = new Date();
-  const { data, error } = await db
-    .from('visitor_passes')
-    .insert({
-      community_id: sender.communityId,
-      unit_id: sender.unitIds[0] ?? null,
-      created_by: sender.membershipId,
-      visitor_name: name.slice(0, 120),
-      kind: 'guest',
-      expected_at: now.toISOString(),
-      valid_until: new Date(now.getTime() + 12 * 3_600_000).toISOString(),
-      channel: 'whatsapp',
-    })
-    .select('pass_code, visitor_name')
-    .single();
-
-  if (error || !data) return 'I couldn’t create that pass. Please try again.';
-
-  return (
-    `Gate pass for *${data.visitor_name}*: *${data.pass_code}*\n` +
-    'Valid for 12 hours. Ask them to read the code out at the gate.'
-  );
-}
-
-async function handleDues(db: Db, sender: Sender): Promise<string> {
-  if (sender.unitIds.length === 0)
-    return 'No flat is linked to your account, so there are no bills.';
+async function handleVolunteer(db: Db, sender: Sender): Promise<string> {
+  const event = await nextEvent(db, sender);
+  if (!event) return 'Nothing needs hands just now.';
 
   const { data } = await db
-    .from('invoices')
-    .select('number, title, balance_due, due_date, status')
-    .eq('community_id', sender.communityId)
-    .in('unit_id', sender.unitIds)
-    .in('status', ['issued', 'partly_paid', 'overdue'])
-    .order('due_date', { ascending: true })
-    .limit(5);
+    .from('volunteer_role_stats')
+    .select('role_id, still_needed')
+    .eq('event_id', event.id)
+    .gt('still_needed', 0);
 
-  if (!data?.length) return 'Nothing outstanding — you’re all settled up.';
+  if (!data?.length) return `Every role for ${event.name} is fully staffed. Thank you!`;
 
-  const total = data.reduce((sum, invoice) => sum + Number(invoice.balance_due ?? 0), 0);
+  const { data: roles } = await db
+    .from('volunteer_roles')
+    .select('id, name, emoji')
+    .in(
+      'id',
+      data.map((row) => row.role_id).filter((id): id is string => Boolean(id)),
+    );
 
-  return (
-    `Outstanding: *${formatMoney(total, sender.currency)}*\n\n` +
-    data
-      .map(
-        (invoice) =>
-          `${invoice.title} — ${formatMoney(invoice.balance_due, sender.currency)} (due ${invoice.due_date})`,
-      )
-      .join('\n')
-  );
+  const needed = new Map(data.map((row) => [row.role_id, row.still_needed ?? 0]));
+
+  return [
+    `*${event.name}* still needs help with:`,
+    '',
+    ...(roles ?? []).map(
+      (role) => `${role.emoji} *${role.name}* — ${needed.get(role.id) ?? 0} more needed`,
+    ),
+    '',
+    `Sign up: ${appLink(sender, `/events/${event.slug}#volunteer`)}`,
+  ].join('\n');
 }
 
-async function handleAmenities(db: Db, sender: Sender): Promise<string> {
+async function handleTasks(db: Db, sender: Sender): Promise<string> {
   const { data } = await db
-    .from('amenities')
-    .select('name, opens_at, closes_at')
+    .from('event_tasks')
+    .select('name, status, due_on, events(name)')
     .eq('community_id', sender.communityId)
-    .eq('is_active', true)
-    .order('name')
-    .limit(10);
+    .eq('assignee_id', sender.membershipId)
+    .neq('status', 'done')
+    .order('due_on', { nullsFirst: false })
+    .limit(6);
 
-  if (!data?.length) return 'No amenities are set up yet.';
+  if (!data?.length) return 'Nothing is assigned to you right now.';
 
-  return (
-    'Bookable in your community:\n\n' +
-    data
-      .map((a) => `• *${a.name}* (${a.opens_at.slice(0, 5)}–${a.closes_at.slice(0, 5)})`)
-      .join('\n') +
-    '\n\nBooking a slot needs the app — WhatsApp can’t show you a calendar.'
-  );
+  return [
+    '*Assigned to you*',
+    '',
+    ...data.map(
+      (task) =>
+        `${TASK_STATUS_DOT[task.status]} ${task.name}` +
+        `${task.events?.name ? `\n_${task.events.name}` : ''}` +
+        `${task.due_on ? ` · due ${formatDate(task.due_on)}` : ''}${task.events?.name ? '_' : ''}`,
+    ),
+  ].join('\n');
+}
+
+async function handleSuggest(db: Db, sender: Sender, text: string): Promise<string> {
+  const name = text.split('\n')[0]!.slice(0, 120);
+
+  const { error } = await db.from('activity_suggestions').insert({
+    community_id: sender.communityId,
+    name,
+    description: text.length > name.length ? text : null,
+    suggested_by: sender.membershipId,
+    status: 'new',
+  });
+
+  if (error) return 'I couldn’t send that just now. Please try again.';
+
+  return `Sent to the committee: *${name}*\n\nThanks for the idea — your neighbours can back it in the app.`;
 }
 
 async function handleStop(db: Db, phone: string): Promise<string> {
@@ -279,21 +360,24 @@ export async function replyTo(db: Db, message: InboundMessage): Promise<string> 
 
   switch (command.kind) {
     case 'help':
-      return HELP_TEXT;
-    case 'notices':
-      return handleNotices(db, sender);
-    case 'report':
-      return handleReport(db, sender, command.text);
-    case 'status':
-      return handleStatus(db, sender);
-    case 'visitor':
-      return handleVisitor(db, sender, command.name);
-    case 'dues':
-      return handleDues(db, sender);
-    case 'amenities':
-      return handleAmenities(db, sender);
     case 'empty':
       return HELP_TEXT;
+    case 'events':
+      return handleEvents(db, sender);
+    case 'fund':
+      return handleFund(db, sender);
+    case 'contribute':
+      return handleContribute(db, sender, command.amount);
+    case 'notices':
+      return handleNotices(db, sender);
+    case 'activities':
+      return handleActivities(db, sender);
+    case 'volunteer':
+      return handleVolunteer(db, sender);
+    case 'tasks':
+      return handleTasks(db, sender);
+    case 'suggest':
+      return handleSuggest(db, sender, command.text);
     default:
       return UNKNOWN_TEXT;
   }

@@ -58,22 +58,6 @@ export function UnitForms({ slug }: { slug: string }) {
               <Field label="Floor" htmlFor="floor" error={single.fieldErrors?.floor}>
                 {(control) => <Input {...control} name="floor" type="number" placeholder="1" />}
               </Field>
-              <Field
-                label="Monthly dues"
-                htmlFor="monthly_dues"
-                error={single.fieldErrors?.monthly_dues}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    name="monthly_dues"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="3500"
-                  />
-                )}
-              </Field>
             </div>
             <Feedback state={single} />
             <Submit label="Add unit" />
@@ -98,22 +82,6 @@ export function UnitForms({ slug }: { slug: string }) {
                   placeholder={'A,101\nA,102\nB,201'}
                   required
                   className="font-mono text-sm"
-                />
-              )}
-            </Field>
-            <Field
-              label="Monthly dues for all of them"
-              htmlFor="bulk_dues"
-              error={bulk.fieldErrors?.monthly_dues}
-            >
-              {(control) => (
-                <Input
-                  {...control}
-                  name="monthly_dues"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  defaultValue={0}
                 />
               )}
             </Field>

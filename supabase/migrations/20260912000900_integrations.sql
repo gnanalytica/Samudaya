@@ -39,6 +39,12 @@ create trigger api_keys_touch_updated_at
   before update on public.api_keys
   for each row execute function app.touch_updated_at();
 
+-- Deferred from 0450: audit rows can name an API key as the actor, but
+-- api_keys is only created here.
+alter table public.audit_logs
+  add constraint audit_logs_actor_api_key_fkey
+  foreign key (actor_api_key) references public.api_keys (id) on delete set null;
+
 create table public.api_key_secrets (
   api_key_id uuid primary key references public.api_keys (id) on delete cascade,
   key_hash   text not null
@@ -209,24 +215,6 @@ create index notifications_user_idx on public.notifications (user_id, created_at
 create index notifications_unread_idx
   on public.notifications (user_id) where read_at is null;
 
--- ---------------------------------------------------------------------------
--- audit_logs — who did what, from which surface.
--- ---------------------------------------------------------------------------
-create table public.audit_logs (
-  id             uuid primary key default extensions.gen_random_uuid(),
-  community_id   uuid references public.communities (id) on delete cascade,
-  actor_user_id  uuid references public.profiles (id) on delete set null,
-  actor_api_key  uuid references public.api_keys (id) on delete set null,
-  action         text not null,
-  entity_type    text,
-  entity_id      uuid,
-  channel        public.origin_channel not null default 'web',
-  metadata       jsonb not null default '{}'::jsonb,
-  created_at     timestamptz not null default now()
-);
-
-create index audit_logs_community_idx on public.audit_logs (community_id, created_at desc);
-create index audit_logs_entity_idx on public.audit_logs (entity_type, entity_id);
 
 -- ---------------------------------------------------------------------------
 -- WhatsApp link code generation (called from the app by a signed-in resident)
@@ -259,7 +247,7 @@ begin
     v_try := v_try + 1;
     begin
       insert into public.whatsapp_link_codes (code, user_id, community_id)
-      values (app.random_invite_code(6), v_uid, p_community_id)
+      values (app.random_code(6), v_uid, p_community_id)
       returning * into v_row;
       return v_row;
     exception when unique_violation then
@@ -283,7 +271,6 @@ alter table public.whatsapp_link_codes  enable row level security;
 alter table public.whatsapp_messages    enable row level security;
 alter table public.device_push_tokens   enable row level security;
 alter table public.notifications        enable row level security;
-alter table public.audit_logs           enable row level security;
 
 -- Admins manage keys for their own community. The hash column is withheld at
 -- the column level as well, so even an admin's SELECT * cannot return it.
@@ -330,6 +317,3 @@ create policy notifications_update_self
   using (user_id = (select auth.uid()))
   with check (user_id = (select auth.uid()));
 
-create policy audit_logs_admin_read
-  on public.audit_logs for select to authenticated
-  using (community_id is not null and app.is_admin(community_id));

@@ -1,26 +1,43 @@
 import Link from 'next/link';
-import { ArrowRight, Bell, PartyPopper, Plus, Receipt, Users, Wrench } from 'lucide-react';
-import { can, formatMoney, relativeTime, ticketRef, unitLabel } from '@samudaya/core';
+import { ArrowRight, Bell, CalendarDays, HandHeart, Lightbulb, Sparkles } from 'lucide-react';
+import {
+  can,
+  countdown,
+  formatDate,
+  formatMoney,
+  fundedPercent,
+  relativeTime,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
+import { listEvents, getStatsFor } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { RequestStatusBadge, VisitorStatusBadge } from '@/components/status-badge';
+import { ReadinessBar, StatTile } from '@/components/badges';
 
 export default async function DashboardPage(props: PageProps<'/app/[community]'>) {
   const { community: slug } = await props.params;
   const { joined, welcome } = await props.searchParams;
-  const { community, role, profile, unitIds } = await requireCommunity(slug);
+  const { community, role, profile } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
   const base = `/app/${community.slug}`;
   const now = new Date().toISOString();
 
-  // One round trip for the whole dashboard. RLS scopes every one of these to
-  // what this member is allowed to see, so no extra filtering is needed here.
-  const [notices, myRequests, visitors, invoices, units] = await Promise.all([
+  const events = await listEvents(community.id);
+  const published = events.filter((event) => event.status === 'published');
+  // The soonest event that has not happened yet is the one residents care
+  // about; fall back to the most recent if everything is in the past.
+  const today = new Date().toISOString().slice(0, 10);
+  const next =
+    published
+      .filter((event) => event.starts_on >= today)
+      .sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0] ?? published[0];
+
+  const [stats, notices] = await Promise.all([
+    getStatsFor(next ? [next.id] : []),
     supabase
       .from('announcements')
       .select('id, title, body, published_at, is_pinned')
@@ -30,74 +47,38 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
       .order('is_pinned', { ascending: false })
       .order('published_at', { ascending: false })
       .limit(3),
-    supabase
-      .from('service_requests')
-      .select('id, ticket_no, title, status, priority, created_at')
-      .eq('community_id', community.id)
-      .in('status', ['open', 'acknowledged', 'in_progress'])
-      .order('created_at', { ascending: false })
-      .limit(4),
-    supabase
-      .from('visitor_passes')
-      .select('id, visitor_name, kind, status, expected_at, pass_code')
-      .eq('community_id', community.id)
-      .in('status', ['expected', 'arrived'])
-      .gte('valid_until', now)
-      .order('expected_at', { ascending: true })
-      .limit(4),
-    supabase
-      .from('invoices')
-      .select('id, number, title, total, amount_paid, balance_due, due_date, status')
-      .eq('community_id', community.id)
-      .in('status', ['issued', 'partly_paid', 'overdue'])
-      .order('due_date', { ascending: true })
-      .limit(4),
-    supabase
-      .from('units')
-      .select('id, block, number')
-      .eq('community_id', community.id)
-      .in('id', unitIds.length > 0 ? unitIds : ['00000000-0000-0000-0000-000000000000']),
   ]);
 
-  const outstanding = (invoices.data ?? []).reduce(
-    (sum, invoice) => sum + Number(invoice.balance_due ?? 0),
-    0,
-  );
-  const myUnits = (units.data ?? []).map((unit) => unitLabel(unit)).join(', ');
+  const s = next ? stats.get(next.id) : undefined;
+  const funded = fundedPercent(s?.fundRaised ?? 0, s?.fundTarget ?? 0);
   const firstName = profile?.full_name?.split(' ')[0];
 
   return (
     <>
       <PageHeader
         title={firstName ? `Hello, ${firstName}` : community.name}
-        description={myUnits ? `${community.name} · ${myUnits}` : community.name}
-        action={
-          <ButtonLink href={`${base}/requests/new`} size="sm">
-            <Plus className="size-4" aria-hidden="true" />
-            Raise a request
-          </ButtonLink>
-        }
+        description={community.name}
       />
 
       <PageBody>
         {joined || welcome ? (
           <div className="border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-950 mb-5 flex items-start gap-3 rounded-xl border p-4">
-            <PartyPopper className="text-accent mt-0.5 size-5 shrink-0" aria-hidden="true" />
+            <Sparkles className="text-accent mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <div className="text-sm">
               <p className="text-ink font-medium">
                 {welcome ? `${community.name} is ready.` : `You’ve joined ${community.name}.`}
               </p>
               <p className="text-ink-muted mt-0.5">
                 {welcome
-                  ? 'Next: add your units, then create invite codes so residents can join.'
-                  : 'Have a look around — notices, requests and your dues are all here.'}
+                  ? 'Next: add your flats, then create your first event.'
+                  : 'Have a look at what’s coming up, and chip in if you’d like.'}
               </p>
-              {welcome && can(role, 'invites:manage') ? (
+              {welcome && can(role, 'units:manage') ? (
                 <Link
-                  href={`${base}/admin/invites`}
+                  href={`${base}/admin/units`}
                   className="text-accent mt-2 inline-flex items-center gap-1 font-medium underline underline-offset-4"
                 >
-                  Create invite codes
+                  Add flats
                   <ArrowRight className="size-3.5" aria-hidden="true" />
                 </Link>
               ) : null}
@@ -105,165 +86,157 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
           </div>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        {next ? (
+          <>
+            <h2 className="text-ink-soft mb-3 text-sm font-semibold">Next up</h2>
+            <div className="border-border-base bg-surface-raised overflow-hidden rounded-xl border">
+              <div className="from-brand-700 to-brand-900 bg-gradient-to-br p-5 text-white">
+                <div className="text-3xl">{next.emoji}</div>
+                <p className="mt-2 text-lg font-semibold">{next.name}</p>
+                <p className="text-brand-100 mt-0.5 text-sm">
+                  {formatDate(next.starts_on)}
+                  {next.venue ? ` · ${next.venue}` : ''}
+                  {countdown(next.starts_on) ? ` · ${countdown(next.starts_on)}` : ''}
+                </p>
+
+                <div className="text-brand-100 mt-4 flex justify-between text-xs font-medium">
+                  <span>
+                    {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
+                    {formatMoney(s?.fundTarget ?? 0, community.currency)} raised
+                  </span>
+                  <span>{funded}%</span>
+                </div>
+                <div
+                  className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20"
+                  role="progressbar"
+                  aria-valuenow={funded}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Fund progress"
+                >
+                  <div
+                    className="bg-brand-300 h-full rounded-full"
+                    style={{ width: `${funded}%` }}
+                  />
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <ButtonLink
+                    href={`${base}/events/${next.slug}`}
+                    size="sm"
+                    variant="secondary"
+                    className="border-white/25 bg-white/15 text-white hover:bg-white/25"
+                  >
+                    View event
+                  </ButtonLink>
+                  <ButtonLink href={`${base}/events/${next.slug}/contribute`} size="sm">
+                    Contribute
+                  </ButtonLink>
+                </div>
+              </div>
+
+              <div className="border-border-base grid grid-cols-3 gap-3 border-t p-4">
+                <StatTile label="Ready" value={`${s?.readiness ?? 0}%`} />
+                <StatTile label="Performing" value={String(s?.participants ?? 0)} />
+                <StatTile label="Volunteering" value={String(s?.volunteers ?? 0)} />
+              </div>
+
+              <div className="px-4 pb-4">
+                <ReadinessBar percent={s?.readiness ?? 0} />
+                <p className="text-ink-subtle mt-2 text-xs">
+                  {s?.tasksDone ?? 0} of {s?.tasksTotal ?? 0} tasks complete
+                </p>
+              </div>
+            </div>
+
+            <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Get involved</h2>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Link
+                href={`${base}/events/${next.slug}#activities`}
+                className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
+              >
+                <CalendarDays className="text-accent size-5" aria-hidden="true" />
+                <p className="text-ink mt-2 text-sm font-semibold">Perform</p>
+                <p className="text-ink-muted text-xs">Dance, sing, or take the stage.</p>
+              </Link>
+              <Link
+                href={`${base}/events/${next.slug}#volunteer`}
+                className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
+              >
+                <HandHeart className="text-accent size-5" aria-hidden="true" />
+                <p className="text-ink mt-2 text-sm font-semibold">Volunteer</p>
+                <p className="text-ink-muted text-xs">Lend a hand where it’s needed.</p>
+              </Link>
+              <Link
+                href={`${base}/feed#suggest`}
+                className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
+              >
+                <Lightbulb className="text-accent size-5" aria-hidden="true" />
+                <p className="text-ink mt-2 text-sm font-semibold">Suggest something</p>
+                <p className="text-ink-muted text-xs">Send an idea to the committee.</p>
+              </Link>
+            </div>
+          </>
+        ) : (
           <Card>
-            <CardHeader
-              title="Latest notices"
+            <EmptyState
+              icon={<CalendarDays className="size-6" />}
+              title="Nothing planned yet"
+              description={
+                can(role, 'events:prepare')
+                  ? 'Create your first event and residents can start taking part.'
+                  : 'When the committee plans something, it will show up here.'
+              }
               action={
-                <Link href={`${base}/notices`} className="text-accent text-sm hover:underline">
-                  All
-                </Link>
+                can(role, 'events:prepare') ? (
+                  <ButtonLink href={`${base}/admin/events/new`} size="sm">
+                    Create an event
+                  </ButtonLink>
+                ) : undefined
               }
             />
-            {notices.data?.length ? (
-              <ul className="divide-border-base divide-y">
-                {notices.data.map((notice) => (
-                  <li key={notice.id} className="px-5 py-3">
-                    <Link href={`${base}/notices`} className="group block">
-                      <p className="text-ink group-hover:text-accent flex items-center gap-2 text-sm font-medium">
-                        {notice.is_pinned ? (
-                          <span
-                            className="bg-accent inline-block size-1.5 rounded-full"
-                            aria-label="Pinned"
-                          />
-                        ) : null}
-                        {notice.title}
-                      </p>
-                      <p className="text-ink-muted mt-0.5 line-clamp-2 text-sm">{notice.body}</p>
-                      <p className="text-ink-subtle mt-1 text-xs">
-                        {relativeTime(notice.published_at)}
-                      </p>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
+          </Card>
+        )}
+
+        <Card className="mt-8">
+          <CardHeader
+            title="Latest notices"
+            action={
+              <Link href={`${base}/notices`} className="text-accent text-sm hover:underline">
+                All
+              </Link>
+            }
+          />
+          {notices.data?.length ? (
+            <ul className="divide-border-base divide-y">
+              {notices.data.map((notice) => (
+                <li key={notice.id} className="px-5 py-3">
+                  <p className="text-ink flex items-center gap-2 text-sm font-medium">
+                    {notice.is_pinned ? (
+                      <span
+                        className="bg-accent inline-block size-1.5 rounded-full"
+                        aria-label="Pinned"
+                      />
+                    ) : null}
+                    {notice.title}
+                  </p>
+                  <p className="text-ink-muted mt-0.5 line-clamp-2 text-sm">{notice.body}</p>
+                  <p className="text-ink-subtle mt-1 text-xs">
+                    {relativeTime(notice.published_at)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <CardBody>
               <EmptyState
                 icon={<Bell className="size-6" />}
                 title="No notices yet"
                 description="Announcements from the committee will show up here."
               />
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Open requests"
-              action={
-                <Link href={`${base}/requests`} className="text-accent text-sm hover:underline">
-                  All
-                </Link>
-              }
-            />
-            {myRequests.data?.length ? (
-              <ul className="divide-border-base divide-y">
-                {myRequests.data.map((request) => (
-                  <li key={request.id}>
-                    <Link
-                      href={`${base}/requests/${request.id}`}
-                      className="hover:bg-surface-sunken flex items-center justify-between gap-3 px-5 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-ink truncate text-sm font-medium">{request.title}</p>
-                        <p className="text-ink-subtle mt-0.5 font-mono text-xs">
-                          {ticketRef(request.ticket_no)} · {relativeTime(request.created_at)}
-                        </p>
-                      </div>
-                      <RequestStatusBadge status={request.status} />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={<Wrench className="size-6" />}
-                title="Nothing open"
-                description="Report a leak, a broken light or anything else that needs fixing."
-                action={
-                  <ButtonLink href={`${base}/requests/new`} size="sm" variant="secondary">
-                    Raise a request
-                  </ButtonLink>
-                }
-              />
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Expected visitors"
-              action={
-                <Link href={`${base}/visitors`} className="text-accent text-sm hover:underline">
-                  All
-                </Link>
-              }
-            />
-            {visitors.data?.length ? (
-              <ul className="divide-border-base divide-y">
-                {visitors.data.map((visitor) => (
-                  <li
-                    key={visitor.id}
-                    className="flex items-center justify-between gap-3 px-5 py-3"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-ink truncate text-sm font-medium">
-                        {visitor.visitor_name}
-                      </p>
-                      <p className="text-ink-subtle mt-0.5 text-xs">
-                        {relativeTime(visitor.expected_at)} · code{' '}
-                        <span className="font-mono">{visitor.pass_code}</span>
-                      </p>
-                    </div>
-                    <VisitorStatusBadge status={visitor.status} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={<Users className="size-6" />}
-                title="No one expected"
-                description="Pre-approve a guest and they’ll get a code for the gate."
-                action={
-                  <ButtonLink href={`${base}/visitors/new`} size="sm" variant="secondary">
-                    Invite a visitor
-                  </ButtonLink>
-                }
-              />
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader
-              title="Dues"
-              action={
-                <Link href={`${base}/billing`} className="text-accent text-sm hover:underline">
-                  All
-                </Link>
-              }
-            />
-            {invoices.data?.length ? (
-              <CardBody className="space-y-3">
-                <div>
-                  <p className="text-ink text-2xl font-semibold tracking-tight">
-                    {formatMoney(outstanding, community.currency)}
-                  </p>
-                  <p className="text-ink-muted text-sm">
-                    across {invoices.data.length}{' '}
-                    {invoices.data.length === 1 ? 'invoice' : 'invoices'}
-                  </p>
-                </div>
-                <ButtonLink href={`${base}/billing`} size="sm" variant="secondary">
-                  View bills
-                </ButtonLink>
-              </CardBody>
-            ) : (
-              <EmptyState
-                icon={<Receipt className="size-6" />}
-                title="Nothing outstanding"
-                description="You’re all settled up."
-              />
-            )}
-          </Card>
-        </div>
+            </CardBody>
+          )}
+        </Card>
       </PageBody>
     </>
   );

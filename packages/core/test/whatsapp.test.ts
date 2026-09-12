@@ -14,26 +14,42 @@ describe('parseCommand', () => {
     expect(parseCommand('JOIN  xyz789')).toEqual({ kind: 'link', code: 'xyz789' });
   });
 
-  it('keeps the whole complaint text, punctuation and all', () => {
-    expect(parseCommand('report Water leaking in B-204, since Monday!')).toEqual({
-      kind: 'report',
-      text: 'Water leaking in B-204, since Monday!',
+  it('pulls a rupee amount out of a contribution, however it is written', () => {
+    expect(parseCommand('contribute 2000')).toEqual({ kind: 'contribute', amount: 2000 });
+    expect(parseCommand('pay ₹2,000')).toEqual({ kind: 'contribute', amount: 2000 });
+    expect(parseCommand('donate 500.50')).toEqual({ kind: 'contribute', amount: 500.5 });
+  });
+
+  it('accepts a bare contribute, since the bot can just send the link', () => {
+    expect(parseCommand('contribute')).toEqual({ kind: 'contribute', amount: null });
+  });
+
+  it('ignores a nonsense amount rather than guessing one', () => {
+    expect(parseCommand('contribute lots')).toEqual({ kind: 'contribute', amount: null });
+    expect(parseCommand('contribute 0')).toEqual({ kind: 'contribute', amount: null });
+  });
+
+  it('keeps the whole suggestion text, punctuation and all', () => {
+    expect(parseCommand('suggest A weekend badminton tournament, open to all!')).toEqual({
+      kind: 'suggest',
+      text: 'A weekend badminton tournament, open to all!',
     });
   });
 
   it('treats a bare verb that needs an argument as unparsable', () => {
-    for (const input of ['report', 'link', 'visitor']) {
+    for (const input of ['suggest', 'link']) {
       expect(parseCommand(input).kind).toBe('unknown');
     }
   });
 
   it('maps synonyms onto the same command', () => {
-    expect(parseCommand('complaint tap broken').kind).toBe('report');
-    expect(parseCommand('issue tap broken').kind).toBe('report');
+    expect(parseCommand('upcoming').kind).toBe('events');
+    expect(parseCommand('next').kind).toBe('events');
+    expect(parseCommand('raised').kind).toBe('fund');
+    expect(parseCommand('accounts').kind).toBe('fund');
     expect(parseCommand('announcements').kind).toBe('notices');
-    expect(parseCommand('news').kind).toBe('notices');
-    expect(parseCommand('balance').kind).toBe('dues');
-    expect(parseCommand('facilities').kind).toBe('amenities');
+    expect(parseCommand('cultural').kind).toBe('activities');
+    expect(parseCommand('checklist').kind).toBe('tasks');
   });
 
   it('distinguishes empty input from unrecognised input', () => {

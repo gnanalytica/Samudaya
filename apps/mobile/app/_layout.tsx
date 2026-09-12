@@ -13,6 +13,7 @@ function RootStack() {
   // Runs inside the provider so it re-registers whenever the signed-in user
   // changes, and does nothing at all while signed out.
   usePushRegistration(user?.id ?? null);
+
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -26,16 +27,10 @@ function RootStack() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="sign-in" options={{ headerShown: false }} />
-        <Stack.Screen name="join" options={{ title: 'Join a community' }} />
+        <Stack.Screen name="join" options={{ title: 'Join your community' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="new-request"
-          options={{ title: 'Raise a request', presentation: 'modal' }}
-        />
-        <Stack.Screen
-          name="new-visitor"
-          options={{ title: 'Invite a visitor', presentation: 'modal' }}
-        />
+        <Stack.Screen name="event/[slug]" options={{ title: 'Event' }} />
+        <Stack.Screen name="contribute" options={{ title: 'Contribute', presentation: 'modal' }} />
       </Stack>
     </>
   );

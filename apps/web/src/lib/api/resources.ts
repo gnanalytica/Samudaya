@@ -1,12 +1,15 @@
-import {
-  createAnnouncementSchema,
-  createServiceRequestSchema,
-  createVisitorPassSchema,
-  addRequestCommentSchema,
-  updateServiceRequestSchema,
-} from '@samudaya/core';
 import type { ZodError } from 'zod';
-import type { Enums } from '@samudaya/supabase';
+import {
+  contributeSchema,
+  createActivitySchema,
+  createAnnouncementSchema,
+  createEventSchema,
+  createExpenseSchema,
+  createTaskSchema,
+  normalizeStats,
+  suggestActivitySchema,
+  updateTaskSchema,
+} from '@samudaya/core';
 import type { ApiPrincipal } from './auth';
 
 /**
@@ -37,25 +40,10 @@ const notFound = (): Outcome<never> => ({ ok: false, reason: 'not_found' });
 
 const withCommunity = (principal: ApiPrincipal) => principal.communityId;
 
-const REQUEST_STATUSES: Enums<'request_status'>[] = [
-  'open',
-  'acknowledged',
-  'in_progress',
-  'resolved',
-  'closed',
-  'rejected',
-];
-
-/** Keeps an arbitrary `?status=` string from reaching the query untyped. */
-function parseStatuses(value: string | null | undefined): Enums<'request_status'>[] {
-  if (!value) return [];
-  return value
-    .split(',')
-    .map((part) => part.trim())
-    .filter((part): part is Enums<'request_status'> =>
-      (REQUEST_STATUSES as string[]).includes(part),
-    );
-}
+// Single string literals: supabase-js infers the row type from the select
+// text, and `+` concatenation widens it to `string`, collapsing the result.
+const EVENT_FIELDS =
+  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, description, status, fund_target, fund_rule, fund_rule_note, published_at, closed_at';
 
 export async function whoami(principal: ApiPrincipal) {
   const { data: community } = await principal.db
@@ -72,11 +60,320 @@ export async function whoami(principal: ApiPrincipal) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+export async function listEvents(
+  principal: ApiPrincipal,
+  options: { limit: number; status?: string | null },
+) {
+  let query = principal.db
+    .from('events')
+    .select(EVENT_FIELDS)
+    .eq('community_id', withCommunity(principal))
+    .order('starts_on', { ascending: false })
+    .limit(options.limit);
+
+  const statuses = (options.status ?? '')
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part): part is 'draft' | 'published' | 'completed' | 'cancelled' =>
+      ['draft', 'published', 'completed', 'cancelled'].includes(part),
+    );
+  if (statuses.length > 0) query = query.in('status', statuses);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // The derived numbers are what an agent actually wants; fetching them
+  // separately would make every caller do the join by hand.
+  const stats = await statsFor(
+    principal,
+    (data ?? []).map((event) => event.id),
+  );
+  return (data ?? []).map((event) => ({ ...event, stats: stats.get(event.id) ?? null }));
+}
+
+async function statsFor(principal: ApiPrincipal, eventIds: string[]) {
+  if (eventIds.length === 0) return new Map<string, ReturnType<typeof normalizeStats>>();
+  const { data } = await principal.db
+    .from('event_stats')
+    .select('*')
+    .eq('community_id', withCommunity(principal))
+    .in('event_id', eventIds);
+  const map = new Map<string, ReturnType<typeof normalizeStats>>();
+  for (const row of data ?? []) if (row.event_id) map.set(row.event_id, normalizeStats(row));
+  return map;
+}
+
+export async function getEvent(principal: ApiPrincipal, slugOrId: string) {
+  const isUuid = /^[0-9a-f-]{36}$/i.test(slugOrId);
+  const { data, error } = await principal.db
+    .from('events')
+    .select(EVENT_FIELDS)
+    .eq('community_id', withCommunity(principal))
+    .eq(isUuid ? 'id' : 'slug', slugOrId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const stats = await statsFor(principal, [data.id]);
+  return { ...data, stats: stats.get(data.id) ?? null };
+}
+
+export async function createEvent(
+  principal: ApiPrincipal,
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const parsed = createEventSchema.safeParse({
+    ...(body as Record<string, unknown>),
+    community_id: withCommunity(principal),
+  });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { data, error } = await principal.db
+    .from('events')
+    // Always a draft. Publishing is an admin decision made in the app, not
+    // something an integration should be able to do in one call.
+    .insert({ ...parsed.data, status: 'draft', created_by: principal.userId })
+    .select(EVENT_FIELDS)
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, data };
+}
+
+// ---------------------------------------------------------------------------
+// Checklist
+// ---------------------------------------------------------------------------
+
+export async function listTasks(principal: ApiPrincipal, eventId: string) {
+  const { data, error } = await principal.db
+    .from('event_tasks')
+    .select('id, name, notes, status, due_on, completed_at, memberships(profiles(full_name))')
+    .eq('community_id', withCommunity(principal))
+    .eq('event_id', eventId)
+    .order('position');
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createTask(
+  principal: ApiPrincipal,
+  eventId: string,
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const event = await getEvent(principal, eventId);
+  if (!event) return notFound();
+
+  const parsed = createTaskSchema.safeParse({
+    ...(body as Record<string, unknown>),
+    event_id: event.id,
+  });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { data, error } = await principal.db
+    .from('event_tasks')
+    .insert({ ...parsed.data, community_id: withCommunity(principal) })
+    .select('id, name, status, due_on')
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, data };
+}
+
+export async function updateTask(
+  principal: ApiPrincipal,
+  taskId: string,
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const parsed = updateTaskSchema.safeParse({ ...(body as Record<string, unknown>), id: taskId });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { id: _id, ...changes } = parsed.data;
+  const { data, error } = await principal.db
+    .from('event_tasks')
+    .update(changes)
+    .eq('id', taskId)
+    .eq('community_id', withCommunity(principal))
+    .select('id, name, status, due_on, completed_at')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? { ok: true as const, data } : notFound();
+}
+
+// ---------------------------------------------------------------------------
+// Fund
+// ---------------------------------------------------------------------------
+
+export async function getLedger(principal: ApiPrincipal, eventId: string) {
+  const event = await getEvent(principal, eventId);
+  if (!event) return null;
+
+  const { data, error } = await principal.db
+    .from('expenses')
+    .select(
+      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
+    )
+    .eq('community_id', withCommunity(principal))
+    .eq('event_id', event.id)
+    .order('spent_on', { ascending: false });
+
+  if (error) throw error;
+  return {
+    event: { id: event.id, slug: event.slug, name: event.name },
+    stats: event.stats,
+    expenses: data,
+  };
+}
+
+export async function createExpense(
+  principal: ApiPrincipal,
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const raw = body as Record<string, unknown>;
+  const event = await getEvent(principal, String(raw.event_id ?? ''));
+  if (!event) return notFound();
+
+  const parsed = createExpenseSchema.safeParse({ ...raw, event_id: event.id });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { data, error } = await principal.db
+    .from('expenses')
+    .insert({
+      ...parsed.data,
+      community_id: withCommunity(principal),
+      requested_by: principal.membershipId,
+      // Always pending. Approval goes through review_expense, which refuses
+      // self-approval — an integration cannot bypass that by asking nicely.
+      status: 'pending',
+    })
+    .select('id, name, amount, vendor, status')
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, data };
+}
+
+export async function contribute(
+  principal: ApiPrincipal,
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const raw = body as Record<string, unknown>;
+  const event = await getEvent(principal, String(raw.event_id ?? ''));
+  if (!event) return notFound();
+
+  const parsed = contributeSchema.safeParse({ ...raw, event_id: event.id, channel: 'api' });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { data, error } = await principal.db
+    .from('contributions')
+    .insert({
+      event_id: event.id,
+      community_id: withCommunity(principal),
+      membership_id: principal.membershipId,
+      amount: parsed.data.amount,
+      method: parsed.data.method,
+      status: 'succeeded',
+      channel: 'api',
+    })
+    .select('id, amount, receipt_no, paid_at')
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, data };
+}
+
+// ---------------------------------------------------------------------------
+// Taking part
+// ---------------------------------------------------------------------------
+
+export async function listActivities(principal: ApiPrincipal, eventId: string) {
+  const event = await getEvent(principal, eventId);
+  if (!event) return null;
+
+  const [activities, stats] = await Promise.all([
+    principal.db
+      .from('event_activities')
+      .select('id, name, emoji, description, capacity, is_open, practice_dates')
+      .eq('community_id', withCommunity(principal))
+      .eq('event_id', event.id)
+      .order('position'),
+    principal.db
+      .from('activity_stats')
+      .select('activity_id, interested')
+      .eq('community_id', withCommunity(principal))
+      .eq('event_id', event.id),
+  ]);
+
+  const counts = new Map((stats.data ?? []).map((row) => [row.activity_id, row.interested ?? 0]));
+  return (activities.data ?? []).map((activity) => ({
+    ...activity,
+    interested: counts.get(activity.id) ?? 0,
+  }));
+}
+
+export async function createActivity(
+  principal: ApiPrincipal,
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const raw = body as Record<string, unknown>;
+  const event = await getEvent(principal, String(raw.event_id ?? ''));
+  if (!event) return notFound();
+
+  const parsed = createActivitySchema.safeParse({ ...raw, event_id: event.id });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { data, error } = await principal.db
+    .from('event_activities')
+    .insert({ ...parsed.data, community_id: withCommunity(principal) })
+    .select('id, name, emoji, description')
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, data };
+}
+
+export async function listVolunteerRoles(principal: ApiPrincipal, eventId: string) {
+  const event = await getEvent(principal, eventId);
+  if (!event) return null;
+
+  const { data, error } = await principal.db
+    .from('volunteer_role_stats')
+    .select('role_id, target_count, signed_up, still_needed')
+    .eq('community_id', withCommunity(principal))
+    .eq('event_id', event.id);
+
+  if (error) throw error;
+
+  const { data: roles } = await principal.db
+    .from('volunteer_roles')
+    .select('id, name, emoji, description, target_count')
+    .eq('community_id', withCommunity(principal))
+    .eq('event_id', event.id)
+    .order('position');
+
+  const counts = new Map((data ?? []).map((row) => [row.role_id, row]));
+  return (roles ?? []).map((role) => ({
+    ...role,
+    signed_up: counts.get(role.id)?.signed_up ?? 0,
+    still_needed: counts.get(role.id)?.still_needed ?? role.target_count,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Community voice
+// ---------------------------------------------------------------------------
+
 export async function listAnnouncements(principal: ApiPrincipal, limit: number) {
   const now = new Date().toISOString();
   const { data, error } = await principal.db
     .from('announcements')
-    .select('id, title, body, audience, is_pinned, published_at, expires_at')
+    .select('id, title, body, audience, is_pinned, published_at, expires_at, event_id')
     .eq('community_id', withCommunity(principal))
     .lte('published_at', now)
     .or(`expires_at.is.null,expires_at.gt.${now}`)
@@ -88,7 +385,10 @@ export async function listAnnouncements(principal: ApiPrincipal, limit: number) 
   return data;
 }
 
-export async function createAnnouncement(principal: ApiPrincipal, body: unknown) {
+export async function createAnnouncement(
+  principal: ApiPrincipal,
+  body: unknown,
+): Promise<Outcome<unknown>> {
   const parsed = createAnnouncementSchema.safeParse({
     ...(body as Record<string, unknown>),
     community_id: withCommunity(principal),
@@ -105,155 +405,49 @@ export async function createAnnouncement(principal: ApiPrincipal, body: unknown)
   return { ok: true as const, data };
 }
 
-const REQUEST_FIELDS =
-  'id, ticket_no, title, description, category, status, priority, created_at, resolved_at, channel, units(block, number)';
-
-export async function listRequests(
+export async function suggestActivity(
   principal: ApiPrincipal,
-  options: { limit: number; status?: string | null },
-) {
-  let query = principal.db
-    .from('service_requests')
-    .select(REQUEST_FIELDS)
+  body: unknown,
+): Promise<Outcome<unknown>> {
+  const parsed = suggestActivitySchema.safeParse({
+    ...(body as Record<string, unknown>),
+    community_id: withCommunity(principal),
+  });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const { data, error } = await principal.db
+    .from('activity_suggestions')
+    .insert({ ...parsed.data, suggested_by: principal.membershipId, status: 'new' })
+    .select('id, name, description, status')
+    .single();
+
+  if (error) throw error;
+  return { ok: true as const, data };
+}
+
+export async function listPolls(principal: ApiPrincipal, limit: number) {
+  const { data: polls, error } = await principal.db
+    .from('polls')
+    .select('id, question, detail, status, closes_at, event_id')
     .eq('community_id', withCommunity(principal))
     .order('created_at', { ascending: false })
-    .limit(options.limit);
-
-  const statuses = parseStatuses(options.status);
-  if (statuses.length > 0) query = query.in('status', statuses);
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
-}
-
-export async function getRequest(principal: ApiPrincipal, id: string) {
-  const { data, error } = await principal.db
-    .from('service_requests')
-    .select(REQUEST_FIELDS)
-    .eq('community_id', withCommunity(principal))
-    .eq('id', id)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
-}
-
-export async function createRequest(principal: ApiPrincipal, body: unknown) {
-  const parsed = createServiceRequestSchema.safeParse({
-    ...(body as Record<string, unknown>),
-    community_id: withCommunity(principal),
-    channel: 'api',
-  });
-  if (!parsed.success) return invalid(parsed.error);
-
-  const { data, error } = await principal.db
-    .from('service_requests')
-    .insert({ ...parsed.data, raised_by: principal.membershipId })
-    .select(REQUEST_FIELDS)
-    .single();
-
-  if (error) throw error;
-  return { ok: true as const, data };
-}
-
-export async function updateRequest(principal: ApiPrincipal, id: string, body: unknown) {
-  const parsed = updateServiceRequestSchema.safeParse({
-    ...(body as Record<string, unknown>),
-    id,
-  });
-  if (!parsed.success) return invalid(parsed.error);
-
-  const { id: _id, ...changes } = parsed.data;
-  const { data, error } = await principal.db
-    .from('service_requests')
-    .update(changes)
-    .eq('id', id)
-    .eq('community_id', withCommunity(principal))
-    .select(REQUEST_FIELDS)
-    .maybeSingle();
-
-  if (error) throw error;
-  return { ok: true as const, data };
-}
-
-export async function addRequestComment(principal: ApiPrincipal, id: string, body: unknown) {
-  const parsed = addRequestCommentSchema.safeParse({
-    ...(body as Record<string, unknown>),
-    request_id: id,
-  });
-  if (!parsed.success) return invalid(parsed.error);
-
-  // The request must belong to this community before anything is written to it.
-  const target = await getRequest(principal, id);
-  if (!target) return notFound();
-
-  const { data, error } = await principal.db
-    .from('service_request_comments')
-    .insert({ ...parsed.data, author_id: principal.membershipId, channel: 'api' })
-    .select('id, body, is_internal, created_at')
-    .single();
-
-  if (error) throw error;
-  return { ok: true as const, data };
-}
-
-export async function listVisitors(principal: ApiPrincipal, limit: number) {
-  const { data, error } = await principal.db
-    .from('visitor_passes')
-    .select(
-      'id, visitor_name, kind, status, pass_code, expected_at, valid_until, units(block, number)',
-    )
-    .eq('community_id', withCommunity(principal))
-    .order('expected_at', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
-  return data;
-}
+  if (!polls?.length) return [];
 
-export async function createVisitorPass(principal: ApiPrincipal, body: unknown) {
-  const parsed = createVisitorPassSchema.safeParse({
-    ...(body as Record<string, unknown>),
-    community_id: withCommunity(principal),
-    channel: 'api',
-  });
-  if (!parsed.success) return invalid(parsed.error);
+  const { data: results } = await principal.db
+    .from('poll_results')
+    .select('poll_id, option_id, label, emoji, votes, total_votes')
+    .in(
+      'poll_id',
+      polls.map((poll) => poll.id),
+    );
 
-  const { data, error } = await principal.db
-    .from('visitor_passes')
-    .insert({ ...parsed.data, created_by: principal.membershipId })
-    .select('id, visitor_name, kind, status, pass_code, expected_at, valid_until')
-    .single();
-
-  if (error) throw error;
-  return { ok: true as const, data };
-}
-
-export async function listAmenities(principal: ApiPrincipal) {
-  const { data, error } = await principal.db
-    .from('amenities')
-    .select('id, name, description, capacity, opens_at, closes_at, booking_fee, requires_approval')
-    .eq('community_id', withCommunity(principal))
-    .eq('is_active', true)
-    .order('name');
-
-  if (error) throw error;
-  return data;
-}
-
-export async function listBookings(principal: ApiPrincipal, limit: number) {
-  const { data, error } = await principal.db
-    .from('amenity_bookings')
-    .select('id, starts_at, ends_at, status, guests, amenities(name)')
-    .eq('community_id', withCommunity(principal))
-    .gte('ends_at', new Date().toISOString())
-    .in('status', ['pending', 'confirmed'])
-    .order('starts_at')
-    .limit(limit);
-
-  if (error) throw error;
-  return data;
+  return polls.map((poll) => ({
+    ...poll,
+    options: (results ?? []).filter((row) => row.poll_id === poll.id),
+  }));
 }
 
 export async function listMembers(principal: ApiPrincipal, limit: number) {
@@ -263,20 +457,6 @@ export async function listMembers(principal: ApiPrincipal, limit: number) {
     .eq('community_id', withCommunity(principal))
     .eq('status', 'active')
     .order('joined_at', { ascending: false })
-    .limit(limit);
-
-  if (error) throw error;
-  return data;
-}
-
-export async function listInvoices(principal: ApiPrincipal, limit: number) {
-  const { data, error } = await principal.db
-    .from('invoices')
-    .select(
-      'id, number, title, total, amount_paid, balance_due, due_date, status, units(block, number)',
-    )
-    .eq('community_id', withCommunity(principal))
-    .order('due_date', { ascending: false })
     .limit(limit);
 
   if (error) throw error;

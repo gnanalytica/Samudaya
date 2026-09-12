@@ -1,5 +1,5 @@
 import { Building2, Trash2 } from 'lucide-react';
-import { formatMoney, unitLabel } from '@samudaya/core';
+import { unitLabel } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
@@ -17,9 +17,7 @@ export default async function UnitsPage(props: PageProps<'/app/[community]/admin
 
   const { data: units } = await supabase
     .from('units')
-    .select(
-      'id, block, number, floor, monthly_dues, unit_occupants(id, memberships(profiles(full_name)))',
-    )
+    .select('id, block, number, floor, unit_occupants(id, memberships(profiles(full_name)))')
     .eq('community_id', community.id)
     .order('block', { nullsFirst: true })
     .order('number')
@@ -46,9 +44,6 @@ export default async function UnitsPage(props: PageProps<'/app/[community]/admin
                       <th scope="col" className="px-5 py-2.5 font-medium">
                         Residents
                       </th>
-                      <th scope="col" className="px-5 py-2.5 text-right font-medium">
-                        Monthly dues
-                      </th>
                       <th scope="col" className="px-5 py-2.5">
                         <span className="sr-only">Actions</span>
                       </th>
@@ -64,9 +59,6 @@ export default async function UnitsPage(props: PageProps<'/app/[community]/admin
                           <td className="text-ink px-5 py-3 font-medium">{unitLabel(unit)}</td>
                           <td className="text-ink-muted px-5 py-3">
                             {occupants.length ? occupants.join(', ') : 'Vacant'}
-                          </td>
-                          <td className="text-ink-muted px-5 py-3 text-right">
-                            {formatMoney(unit.monthly_dues, community.currency)}
                           </td>
                           <td className="px-5 py-3 text-right">
                             {/* Deleting a unit cascades to its occupancy rows, so

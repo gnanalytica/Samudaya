@@ -43,10 +43,27 @@ contains() {
 status() { curl -s -o /dev/null -w '%{http_code}' "$@"; }
 
 cd "$ROOT/apps/web"
+
+# A server left behind by an earlier run would answer on this port and the
+# whole suite would silently test a stale build. Refuse to start rather than
+# report green against yesterday's code.
+if curl -sf -o /dev/null --max-time 2 "$BASE/api/health" 2>/dev/null; then
+  echo "✗ something is already serving $BASE — stop it first, or run with PORT=<free port>."
+  exit 1
+fi
+
 echo "▸ starting the server on :$PORT"
-PORT="$PORT" npx next start -p "$PORT" > "$LOG" 2>&1 &
+# `npx` spawns the real server as a child and exits-by-exec unpredictably, so
+# signalling only the job leaves next-server holding the port — which is exactly
+# how one run poisons the next. setsid puts it in its own process group so the
+# whole tree goes down together.
+setsid env PORT="$PORT" npx next start -p "$PORT" > "$LOG" 2>&1 &
 SERVER_PID=$!
-trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+cleanup() {
+  kill -- "-$SERVER_PID" 2>/dev/null || kill "$SERVER_PID" 2>/dev/null || true
+  wait "$SERVER_PID" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 for _ in $(seq 1 60); do
   if curl -sf "$BASE/api/health" > /dev/null 2>&1; then break; fi
@@ -67,7 +84,7 @@ check "GET /app redirects a signed-out visitor" 307 \
   "$(status -o /dev/null "$BASE/app")"
 
 echo "▸ REST API refuses anonymous callers"
-for path in /api/v1/me /api/v1/announcements /api/v1/requests /api/v1/visitors /api/v1/invoices; do
+for path in /api/v1/me /api/v1/events /api/v1/announcements /api/v1/polls /api/v1/members; do
   check "GET $path is 401" 401 "$(status "$BASE$path")"
 done
 contains "401 carries a machine-readable code" '"unauthorized"' \
@@ -78,6 +95,11 @@ contains "401 advertises the auth scheme" 'Bearer' \
 echo "▸ API keys"
 check "a bogus API key is rejected" 401 \
   "$(status -H 'Authorization: Bearer sam_live_0000000000000000000000000000000000' "$BASE/api/v1/me")"
+
+echo "▸ routes that no longer exist are gone, not quietly serving"
+for path in /api/v1/requests /api/v1/visitors /api/v1/invoices /api/v1/amenities; do
+  check "GET $path is 404" 404 "$(status "$BASE$path")"
+done
 
 echo "▸ MCP"
 check "GET /api/mcp is 405 (POST-only transport)" 405 "$(status "$BASE/api/mcp")"

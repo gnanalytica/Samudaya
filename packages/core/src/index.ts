@@ -1,4 +1,5 @@
 export * from './roles';
+export * from './events';
 export * from './invite-codes';
 export * from './schemas';
 export * from './api-keys';

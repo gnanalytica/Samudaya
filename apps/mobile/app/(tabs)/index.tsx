@@ -1,20 +1,22 @@
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { formatMoney, relativeTime, ticketRef } from '@samudaya/core';
+import { countdown, formatDate, formatMoney, fundedPercent, normalizeStats } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
+import { fetchEvents, fetchStats, pickNextEvent } from '../../src/lib/events';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
-  Badge,
   Body,
   Button,
   Caption,
   Card,
+  EmptyState,
   Heading,
   Loading,
   Screen,
   Title,
 } from '../../src/components/ui';
+import { Meter, StatTile } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function Home() {
@@ -22,47 +24,22 @@ export default function Home() {
   const { profile, activeCommunity } = useAuth();
 
   const { data, loading, refreshing, refresh } = useCommunityData('home', async (communityId) => {
-    const now = new Date().toISOString();
-    const [notices, requests, visitors, invoices] = await Promise.all([
+    const events = await fetchEvents(communityId);
+    const next = pickNextEvent(events);
+    const [stats, notices] = await Promise.all([
+      next ? fetchStats([next.id]) : Promise.resolve(new Map()),
       supabase
         .from('announcements')
         .select('id, title, body, published_at')
         .eq('community_id', communityId)
-        .lte('published_at', now)
-        .or(`expires_at.is.null,expires_at.gt.${now}`)
         .order('is_pinned', { ascending: false })
         .order('published_at', { ascending: false })
         .limit(2),
-      supabase
-        .from('service_requests')
-        .select('id, ticket_no, title, status')
-        .eq('community_id', communityId)
-        .in('status', ['open', 'acknowledged', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(3),
-      supabase
-        .from('visitor_passes')
-        .select('id, visitor_name, pass_code, expected_at')
-        .eq('community_id', communityId)
-        .in('status', ['expected', 'arrived'])
-        .gte('valid_until', now)
-        .order('expected_at')
-        .limit(3),
-      supabase
-        .from('invoices')
-        .select('id, balance_due')
-        .eq('community_id', communityId)
-        .in('status', ['issued', 'partly_paid', 'overdue']),
     ]);
-
     return {
+      next: next ?? null,
+      stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
       notices: notices.data ?? [],
-      requests: requests.data ?? [],
-      visitors: visitors.data ?? [],
-      outstanding: (invoices.data ?? []).reduce(
-        (sum, invoice) => sum + Number(invoice.balance_due ?? 0),
-        0,
-      ),
     };
   });
 
@@ -75,6 +52,10 @@ export default function Home() {
   }
 
   const firstName = profile?.full_name?.split(' ')[0];
+  const currency = activeCommunity?.currency ?? 'INR';
+  const next = data?.next;
+  const stats = data?.stats ?? normalizeStats(null);
+  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
 
   return (
     <Screen>
@@ -82,36 +63,76 @@ export default function Home() {
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <View style={{ gap: spacing.xs }}>
+        <View style={{ gap: 2 }}>
           <Title>{firstName ? `Hello, ${firstName}` : 'Home'}</Title>
           <Caption>{activeCommunity?.name ?? ''}</Caption>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <Card style={{ flex: 1, gap: spacing.xs }}>
-            <Caption>OUTSTANDING</Caption>
-            <Heading>
-              {formatMoney(data?.outstanding ?? 0, activeCommunity?.currency ?? 'INR')}
-            </Heading>
-          </Card>
-          <Card style={{ flex: 1, gap: spacing.xs }}>
-            <Caption>OPEN REQUESTS</Caption>
-            <Heading>{String(data?.requests.length ?? 0)}</Heading>
-          </Card>
-        </View>
+        {next ? (
+          <>
+            <Card style={{ gap: spacing.md }}>
+              <View style={{ gap: 2 }}>
+                <Body>{next.emoji}</Body>
+                <Heading>{next.name}</Heading>
+                <Caption>
+                  {formatDate(next.starts_on)}
+                  {next.venue ? ` · ${next.venue}` : ''}
+                  {countdown(next.starts_on) ? ` · ${countdown(next.starts_on)}` : ''}
+                </Caption>
+              </View>
 
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <View style={{ flex: 1 }}>
-            <Button label="Raise a request" onPress={() => router.push('/new-request')} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label="Invite a visitor"
-              variant="secondary"
-              onPress={() => router.push('/new-visitor')}
+              <View style={{ gap: spacing.xs }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Caption>
+                    {formatMoney(stats.fundRaised, currency)} of{' '}
+                    {formatMoney(stats.fundTarget, currency)}
+                  </Caption>
+                  <Caption>{funded}%</Caption>
+                </View>
+                <Meter percent={funded} tone="success" label="Fund progress" />
+              </View>
+
+              <View style={{ gap: spacing.xs }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Caption>
+                    Readiness · {stats.tasksDone}/{stats.tasksTotal} tasks
+                  </Caption>
+                  <Caption>{stats.readiness}%</Caption>
+                </View>
+                <Meter percent={stats.readiness} label="Event readiness" />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="View event"
+                    variant="secondary"
+                    onPress={() => router.push(`/event/${next.slug}`)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    label="Contribute"
+                    onPress={() => router.push(`/contribute?event=${next.slug}`)}
+                  />
+                </View>
+              </View>
+            </Card>
+
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <StatTile label="PERFORMING" value={String(stats.participants)} />
+              <StatTile label="VOLUNTEERING" value={String(stats.volunteers)} />
+              <StatTile label="CONTRIBUTED" value={String(stats.contributors)} />
+            </View>
+          </>
+        ) : (
+          <Card>
+            <EmptyState
+              title="Nothing planned yet"
+              description="When the committee plans an event, it will show up here."
             />
-          </View>
-        </View>
+          </Card>
+        )}
 
         {data?.notices.length ? (
           <Card style={{ gap: spacing.md }}>
@@ -119,43 +140,7 @@ export default function Home() {
             {data.notices.map((notice) => (
               <View key={notice.id} style={{ gap: 2 }}>
                 <Body>{notice.title}</Body>
-                <Caption>{relativeTime(notice.published_at)}</Caption>
-              </View>
-            ))}
-          </Card>
-        ) : null}
-
-        {data?.requests.length ? (
-          <Card style={{ gap: spacing.md }}>
-            <Heading>Your open requests</Heading>
-            {data.requests.map((request) => (
-              <View
-                key={request.id}
-                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Body>{request.title}</Body>
-                  <Caption>{ticketRef(request.ticket_no)}</Caption>
-                </View>
-                <Badge label={request.status.replace('_', ' ')} tone="info" />
-              </View>
-            ))}
-          </Card>
-        ) : null}
-
-        {data?.visitors.length ? (
-          <Card style={{ gap: spacing.md }}>
-            <Heading>Expected visitors</Heading>
-            {data.visitors.map((visitor) => (
-              <View
-                key={visitor.id}
-                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Body>{visitor.visitor_name}</Body>
-                  <Caption>{relativeTime(visitor.expected_at)}</Caption>
-                </View>
-                <Badge label={visitor.pass_code} tone="success" />
+                <Caption>{notice.body.slice(0, 120)}</Caption>
               </View>
             ))}
           </Card>

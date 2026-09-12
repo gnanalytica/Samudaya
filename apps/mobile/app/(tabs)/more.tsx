@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ROLE_LABEL, formatMoney, invoiceRef } from '@samudaya/core';
+import { ROLE_LABEL, formatDate, formatMoney, receiptRef } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -16,30 +16,41 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
+import { StatTile } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
-import { useTheme } from '../../src/lib/use-theme';
 
 export default function More() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const { profile, activeCommunity, role, memberships, setActiveCommunity, signOut } = useAuth();
+  const { profile, activeCommunity, role, memberships, membershipId, setActiveCommunity, signOut } =
+    useAuth();
 
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
 
-  const { data, loading, refreshing, refresh } = useCommunityData('more', async (communityId) => {
-    const [invoices, link] = await Promise.all([
+  const { data, loading, refreshing, refresh } = useCommunityData('more', async () => {
+    const [contributions, activities, volunteering, link] = await Promise.all([
       supabase
-        .from('invoices')
-        .select('id, number, title, balance_due, due_date, status')
-        .eq('community_id', communityId)
-        .in('status', ['issued', 'partly_paid', 'overdue'])
-        .order('due_date')
-        .limit(10),
+        .from('contributions')
+        .select('id, amount, receipt_no, paid_at, events(slug, name, emoji)')
+        .eq('membership_id', membershipId ?? '')
+        .eq('status', 'succeeded')
+        .order('paid_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('activity_participants')
+        .select('activity_id, event_activities(name, emoji, events(name))')
+        .eq('membership_id', membershipId ?? ''),
+      supabase
+        .from('event_volunteers')
+        .select('role_id, volunteer_roles(name, emoji, events(name))')
+        .eq('membership_id', membershipId ?? ''),
       supabase.from('whatsapp_links').select('phone, verified_at').maybeSingle(),
     ]);
+
     return {
-      invoices: invoices.data ?? [],
+      contributions: contributions.data ?? [],
+      activities: activities.data ?? [],
+      volunteering: volunteering.data ?? [],
       linkedPhone: link.data?.verified_at ? link.data.phone : null,
     };
   });
@@ -66,11 +77,8 @@ export default function More() {
     );
   }
 
-  const outstanding = (data?.invoices ?? []).reduce(
-    (sum, invoice) => sum + Number(invoice.balance_due ?? 0),
-    0,
-  );
   const currency = activeCommunity?.currency ?? 'INR';
+  const totalGiven = (data?.contributions ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
 
   return (
     <Screen>
@@ -78,7 +86,7 @@ export default function More() {
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <View style={{ gap: spacing.xs }}>
+        <View style={{ gap: 2 }}>
           <Title>{profile?.full_name ?? 'You'}</Title>
           <Caption>
             {activeCommunity?.name}
@@ -86,28 +94,58 @@ export default function More() {
           </Caption>
         </View>
 
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <StatTile label="CONTRIBUTED" value={formatMoney(totalGiven, currency)} />
+          <StatTile label="PERFORMING" value={String(data?.activities.length ?? 0)} />
+          <StatTile label="HELPING" value={String(data?.volunteering.length ?? 0)} />
+        </View>
+
         <Card style={{ gap: spacing.md }}>
-          <Heading>Dues</Heading>
-          <Title>{formatMoney(outstanding, currency)}</Title>
-          {data?.invoices.length ? (
-            data.invoices.map((invoice) => (
+          <Heading>Your contributions</Heading>
+          {data?.contributions.length ? (
+            data.contributions.map((contribution) => (
               <View
-                key={invoice.id}
+                key={contribution.id}
                 style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
               >
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Body>{invoice.title}</Body>
+                  <Body>
+                    {contribution.events?.emoji} {contribution.events?.name}
+                  </Body>
                   <Caption>
-                    {invoiceRef(invoice.number)} · due {invoice.due_date}
+                    {receiptRef(contribution.events?.slug, contribution.receipt_no)} ·{' '}
+                    {formatDate(contribution.paid_at.slice(0, 10))}
                   </Caption>
                 </View>
-                <Body>{formatMoney(invoice.balance_due, currency)}</Body>
+                <Body>{formatMoney(contribution.amount, currency)}</Body>
               </View>
             ))
           ) : (
-            <Body muted>Nothing outstanding — you’re all settled up.</Body>
+            <Caption>Nothing yet. Your receipts will show up here.</Caption>
           )}
         </Card>
+
+        {data?.activities.length || data?.volunteering.length ? (
+          <Card style={{ gap: spacing.md }}>
+            <Heading>You’re taking part in</Heading>
+            {data.activities.map((row) => (
+              <View key={row.activity_id} style={{ gap: 2 }}>
+                <Body>
+                  {row.event_activities?.emoji} {row.event_activities?.name}
+                </Body>
+                <Caption>{row.event_activities?.events?.name}</Caption>
+              </View>
+            ))}
+            {data.volunteering.map((row) => (
+              <View key={row.role_id} style={{ gap: 2 }}>
+                <Body>
+                  {row.volunteer_roles?.emoji} {row.volunteer_roles?.name}
+                </Body>
+                <Caption>{row.volunteer_roles?.events?.name} · volunteering</Caption>
+              </View>
+            ))}
+          </Card>
+        ) : null}
 
         <Card style={{ gap: spacing.md }}>
           <View
@@ -132,7 +170,7 @@ export default function More() {
           ) : (
             <>
               <Body muted>
-                Report issues and check dues over WhatsApp, without opening the app.
+                Check the fund, see notices and back an idea without opening the app.
               </Body>
               <Button label="Get a link code" onPress={requestLinkCode} loading={linking} />
             </>
@@ -183,7 +221,7 @@ export default function More() {
           <Body muted>Sign out</Body>
         </Pressable>
         {/* Clears the tab bar so the last row is never half-hidden behind it. */}
-        <View style={{ height: spacing.xl, backgroundColor: colors.surface }} />
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </Screen>
   );

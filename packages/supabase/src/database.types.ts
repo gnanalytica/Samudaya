@@ -9,138 +9,120 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export type Database = {
   public: {
     Tables: {
-      amenities: {
+      activity_participants: {
         Row: {
           id: string
-          community_id: string
-          name: string
-          description: string | null
-          capacity: number | null
-          opens_at: string
-          closes_at: string
-          slot_minutes: number
-          max_hours_per_booking: number
-          requires_approval: boolean
-          booking_fee: number
-          is_active: boolean
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          community_id: string
-          name: string
-          description?: string | null
-          capacity?: number | null
-          opens_at?: string
-          closes_at?: string
-          slot_minutes?: number
-          max_hours_per_booking?: number
-          requires_approval?: boolean
-          booking_fee?: number
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          community_id?: string
-          name?: string
-          description?: string | null
-          capacity?: number | null
-          opens_at?: string
-          closes_at?: string
-          slot_minutes?: number
-          max_hours_per_booking?: number
-          requires_approval?: boolean
-          booking_fee?: number
-          is_active?: boolean
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "amenities_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      amenity_bookings: {
-        Row: {
-          id: string
-          amenity_id: string
-          community_id: string
+          activity_id: string
           membership_id: string
-          unit_id: string | null
-          starts_at: string
-          ends_at: string
-          guests: number
-          status: Database["public"]["Enums"]["booking_status"]
-          notes: string | null
+          performance_type: string | null
+          age_group: string | null
+          experience: string | null
+          special_requirements: string | null
           channel: Database["public"]["Enums"]["origin_channel"]
-          created_at: string
-          updated_at: string
+          joined_at: string
         }
         Insert: {
           id?: string
-          amenity_id: string
-          community_id: string
+          activity_id: string
           membership_id: string
-          unit_id?: string | null
-          starts_at: string
-          ends_at: string
-          guests?: number
-          status?: Database["public"]["Enums"]["booking_status"]
-          notes?: string | null
+          performance_type?: string | null
+          age_group?: string | null
+          experience?: string | null
+          special_requirements?: string | null
           channel?: Database["public"]["Enums"]["origin_channel"]
-          created_at?: string
-          updated_at?: string
+          joined_at?: string
         }
         Update: {
           id?: string
-          amenity_id?: string
-          community_id?: string
+          activity_id?: string
           membership_id?: string
-          unit_id?: string | null
-          starts_at?: string
-          ends_at?: string
-          guests?: number
-          status?: Database["public"]["Enums"]["booking_status"]
-          notes?: string | null
+          performance_type?: string | null
+          age_group?: string | null
+          experience?: string | null
+          special_requirements?: string | null
           channel?: Database["public"]["Enums"]["origin_channel"]
-          created_at?: string
-          updated_at?: string
+          joined_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "amenity_bookings_amenity_id_fkey"
-            columns: ["amenity_id"]
+            foreignKeyName: "activity_participants_activity_id_fkey"
+            columns: ["activity_id"]
             isOneToOne: false
-            referencedRelation: "amenities"
+            referencedRelation: "event_activities"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "amenity_bookings_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "amenity_bookings_membership_id_fkey"
+            foreignKeyName: "activity_participants_membership_id_fkey"
             columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
+          }
+        ]
+      }
+      activity_suggestions: {
+        Row: {
+          id: string
+          community_id: string
+          event_id: string | null
+          name: string
+          description: string | null
+          expected_participants: number | null
+          wants_to_coordinate: boolean
+          status: Database["public"]["Enums"]["suggestion_status"]
+          suggested_by: string | null
+          review_note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          event_id?: string | null
+          name: string
+          description?: string | null
+          expected_participants?: number | null
+          wants_to_coordinate?: boolean
+          status?: Database["public"]["Enums"]["suggestion_status"]
+          suggested_by?: string | null
+          review_note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          event_id?: string | null
+          name?: string
+          description?: string | null
+          expected_participants?: number | null
+          wants_to_coordinate?: boolean
+          status?: Database["public"]["Enums"]["suggestion_status"]
+          suggested_by?: string | null
+          review_note?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_suggestions_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "amenity_bookings_unit_id_fkey"
-            columns: ["unit_id"]
+            foreignKeyName: "activity_suggestions_event_id_fkey"
+            columns: ["event_id"]
             isOneToOne: false
-            referencedRelation: "units"
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_suggestions_suggested_by_fkey"
+            columns: ["suggested_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           }
         ]
@@ -183,13 +165,13 @@ export type Database = {
           id: string
           community_id: string
           author_id: string | null
+          event_id: string | null
           title: string
           body: string
           audience: Database["public"]["Enums"]["announcement_audience"]
           is_pinned: boolean
           published_at: string
           expires_at: string | null
-          attachments: Json
           created_at: string
           updated_at: string
         }
@@ -197,13 +179,13 @@ export type Database = {
           id?: string
           community_id: string
           author_id?: string | null
+          event_id?: string | null
           title: string
           body: string
           audience?: Database["public"]["Enums"]["announcement_audience"]
           is_pinned?: boolean
           published_at?: string
           expires_at?: string | null
-          attachments?: Json
           created_at?: string
           updated_at?: string
         }
@@ -211,13 +193,13 @@ export type Database = {
           id?: string
           community_id?: string
           author_id?: string | null
+          event_id?: string | null
           title?: string
           body?: string
           audience?: Database["public"]["Enums"]["announcement_audience"]
           is_pinned?: boolean
           published_at?: string
           expires_at?: string | null
-          attachments?: Json
           created_at?: string
           updated_at?: string
         }
@@ -234,6 +216,13 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
@@ -393,6 +382,7 @@ export type Database = {
         Row: {
           id: string
           slug: string
+          join_code: string
           name: string
           address_line1: string | null
           address_line2: string | null
@@ -411,6 +401,7 @@ export type Database = {
         Insert: {
           id?: string
           slug: string
+          join_code?: string
           name: string
           address_line1?: string | null
           address_line2?: string | null
@@ -429,6 +420,7 @@ export type Database = {
         Update: {
           id?: string
           slug?: string
+          join_code?: string
           name?: string
           address_line1?: string | null
           address_line2?: string | null
@@ -450,6 +442,89 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      contributions: {
+        Row: {
+          id: string
+          event_id: string
+          community_id: string
+          membership_id: string | null
+          unit_id: string | null
+          amount: number
+          currency: string
+          method: Database["public"]["Enums"]["payment_method"]
+          status: Database["public"]["Enums"]["contribution_status"]
+          receipt_no: number
+          reference: string | null
+          gateway_payload: Json
+          channel: Database["public"]["Enums"]["origin_channel"]
+          paid_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          community_id: string
+          membership_id?: string | null
+          unit_id?: string | null
+          amount: number
+          currency?: string
+          method?: Database["public"]["Enums"]["payment_method"]
+          status?: Database["public"]["Enums"]["contribution_status"]
+          receipt_no?: number
+          reference?: string | null
+          gateway_payload?: Json
+          channel?: Database["public"]["Enums"]["origin_channel"]
+          paid_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          community_id?: string
+          membership_id?: string | null
+          unit_id?: string | null
+          amount?: number
+          currency?: string
+          method?: Database["public"]["Enums"]["payment_method"]
+          status?: Database["public"]["Enums"]["contribution_status"]
+          receipt_no?: number
+          reference?: string | null
+          gateway_payload?: Json
+          channel?: Database["public"]["Enums"]["origin_channel"]
+          paid_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contributions_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
             referencedColumns: ["id"]
           }
         ]
@@ -488,6 +563,447 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      event_activities: {
+        Row: {
+          id: string
+          event_id: string
+          community_id: string
+          name: string
+          emoji: string
+          description: string | null
+          coordinator_id: string | null
+          practice_dates: string[]
+          capacity: number | null
+          is_open: boolean
+          position: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          community_id: string
+          name: string
+          emoji?: string
+          description?: string | null
+          coordinator_id?: string | null
+          practice_dates?: string[]
+          capacity?: number | null
+          is_open?: boolean
+          position?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          community_id?: string
+          name?: string
+          emoji?: string
+          description?: string | null
+          coordinator_id?: string | null
+          practice_dates?: string[]
+          capacity?: number | null
+          is_open?: boolean
+          position?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_activities_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_activities_coordinator_id_fkey"
+            columns: ["coordinator_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_activities_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      event_tasks: {
+        Row: {
+          id: string
+          event_id: string
+          community_id: string
+          name: string
+          notes: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          assignee_id: string | null
+          due_on: string | null
+          position: number
+          completed_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          community_id: string
+          name: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          assignee_id?: string | null
+          due_on?: string | null
+          position?: number
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          community_id?: string
+          name?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          assignee_id?: string | null
+          due_on?: string | null
+          position?: number
+          completed_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_tasks_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_tasks_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      event_volunteers: {
+        Row: {
+          id: string
+          role_id: string
+          membership_id: string
+          note: string | null
+          channel: Database["public"]["Enums"]["origin_channel"]
+          signed_up_at: string
+        }
+        Insert: {
+          id?: string
+          role_id: string
+          membership_id: string
+          note?: string | null
+          channel?: Database["public"]["Enums"]["origin_channel"]
+          signed_up_at?: string
+        }
+        Update: {
+          id?: string
+          role_id?: string
+          membership_id?: string
+          note?: string | null
+          channel?: Database["public"]["Enums"]["origin_channel"]
+          signed_up_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_volunteers_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_volunteers_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "volunteer_roles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      events: {
+        Row: {
+          id: string
+          community_id: string
+          slug: string
+          emoji: string
+          name: string
+          starts_on: string
+          ends_on: string | null
+          venue: string | null
+          organizer: string | null
+          description: string | null
+          status: Database["public"]["Enums"]["event_status"]
+          expected_attendance: number | null
+          fund_target: number
+          fund_rule: Database["public"]["Enums"]["fund_rule"]
+          fund_rule_note: string | null
+          published_at: string | null
+          closed_at: string | null
+          closing_summary: Json | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          slug: string
+          emoji?: string
+          name: string
+          starts_on: string
+          ends_on?: string | null
+          venue?: string | null
+          organizer?: string | null
+          description?: string | null
+          status?: Database["public"]["Enums"]["event_status"]
+          expected_attendance?: number | null
+          fund_target?: number
+          fund_rule?: Database["public"]["Enums"]["fund_rule"]
+          fund_rule_note?: string | null
+          published_at?: string | null
+          closed_at?: string | null
+          closing_summary?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          slug?: string
+          emoji?: string
+          name?: string
+          starts_on?: string
+          ends_on?: string | null
+          venue?: string | null
+          organizer?: string | null
+          description?: string | null
+          status?: Database["public"]["Enums"]["event_status"]
+          expected_attendance?: number | null
+          fund_target?: number
+          fund_rule?: Database["public"]["Enums"]["fund_rule"]
+          fund_rule_note?: string | null
+          published_at?: string | null
+          closed_at?: string | null
+          closing_summary?: Json | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      expenses: {
+        Row: {
+          id: string
+          event_id: string
+          community_id: string
+          name: string
+          category: string | null
+          amount: number
+          currency: string
+          vendor: string | null
+          paid_by: string | null
+          method: Database["public"]["Enums"]["payment_method"]
+          status: Database["public"]["Enums"]["expense_status"]
+          bill_url: string | null
+          requested_by: string | null
+          approved_by: string | null
+          approved_at: string | null
+          review_note: string | null
+          spent_on: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          community_id: string
+          name: string
+          category?: string | null
+          amount: number
+          currency?: string
+          vendor?: string | null
+          paid_by?: string | null
+          method?: Database["public"]["Enums"]["payment_method"]
+          status?: Database["public"]["Enums"]["expense_status"]
+          bill_url?: string | null
+          requested_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          review_note?: string | null
+          spent_on?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          community_id?: string
+          name?: string
+          category?: string | null
+          amount?: number
+          currency?: string
+          vendor?: string | null
+          paid_by?: string | null
+          method?: Database["public"]["Enums"]["payment_method"]
+          status?: Database["public"]["Enums"]["expense_status"]
+          bill_url?: string | null
+          requested_by?: string | null
+          approved_by?: string | null
+          approved_at?: string | null
+          review_note?: string | null
+          spent_on?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      fund_reallocations: {
+        Row: {
+          id: string
+          community_id: string
+          from_event_id: string
+          to_event_id: string | null
+          to_label: string | null
+          amount: number
+          reason: string
+          threshold_pct: number
+          status: Database["public"]["Enums"]["proposal_status"]
+          closes_at: string | null
+          resolved_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          from_event_id: string
+          to_event_id?: string | null
+          to_label?: string | null
+          amount: number
+          reason: string
+          threshold_pct?: number
+          status?: Database["public"]["Enums"]["proposal_status"]
+          closes_at?: string | null
+          resolved_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          from_event_id?: string
+          to_event_id?: string | null
+          to_label?: string | null
+          amount?: number
+          reason?: string
+          threshold_pct?: number
+          status?: Database["public"]["Enums"]["proposal_status"]
+          closes_at?: string | null
+          resolved_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fund_reallocations_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_reallocations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_reallocations_from_event_id_fkey"
+            columns: ["from_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_reallocations_to_event_id_fkey"
+            columns: ["to_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
@@ -659,117 +1175,79 @@ export type Database = {
           }
         ]
       }
-      invoice_items: {
-        Row: {
-          id: string
-          invoice_id: string
-          description: string
-          quantity: number
-          unit_price: number
-          amount: number | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          invoice_id: string
-          description: string
-          quantity?: number
-          unit_price?: number
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          invoice_id?: string
-          description?: string
-          quantity?: number
-          unit_price?: number
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_items_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      invoices: {
+      join_requests: {
         Row: {
           id: string
           community_id: string
-          unit_id: string
-          number: number
-          title: string
-          period_start: string | null
-          period_end: string | null
-          issue_date: string
-          due_date: string
-          status: Database["public"]["Enums"]["invoice_status"]
-          currency: string
-          subtotal: number
-          tax: number
-          total: number
-          amount_paid: number
-          balance_due: number | null
-          notes: string | null
+          user_id: string
+          unit_id: string | null
+          claimed_name: string
+          claimed_phone: string | null
+          relation: Database["public"]["Enums"]["occupant_relation"]
+          status: Database["public"]["Enums"]["join_request_status"]
+          reviewed_by: string | null
+          reviewed_at: string | null
+          decline_reason: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           community_id: string
-          unit_id: string
-          number?: number
-          title?: string
-          period_start?: string | null
-          period_end?: string | null
-          issue_date?: string
-          due_date?: string
-          status?: Database["public"]["Enums"]["invoice_status"]
-          currency?: string
-          subtotal?: number
-          tax?: number
-          total?: number
-          amount_paid?: number
-          notes?: string | null
+          user_id: string
+          unit_id?: string | null
+          claimed_name: string
+          claimed_phone?: string | null
+          relation?: Database["public"]["Enums"]["occupant_relation"]
+          status?: Database["public"]["Enums"]["join_request_status"]
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          decline_reason?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           community_id?: string
-          unit_id?: string
-          number?: number
-          title?: string
-          period_start?: string | null
-          period_end?: string | null
-          issue_date?: string
-          due_date?: string
-          status?: Database["public"]["Enums"]["invoice_status"]
-          currency?: string
-          subtotal?: number
-          tax?: number
-          total?: number
-          amount_paid?: number
-          notes?: string | null
+          user_id?: string
+          unit_id?: string | null
+          claimed_name?: string
+          claimed_phone?: string | null
+          relation?: Database["public"]["Enums"]["occupant_relation"]
+          status?: Database["public"]["Enums"]["join_request_status"]
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          decline_reason?: string | null
           created_at?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "invoices_community_id_fkey"
+            foreignKeyName: "join_requests_community_id_fkey"
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invoices_unit_id_fkey"
+            foreignKeyName: "join_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "join_requests_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "join_requests_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           }
         ]
@@ -883,82 +1361,144 @@ export type Database = {
           }
         ]
       }
-      payments: {
+      poll_options: {
+        Row: {
+          id: string
+          poll_id: string
+          label: string
+          emoji: string | null
+          position: number
+        }
+        Insert: {
+          id?: string
+          poll_id: string
+          label: string
+          emoji?: string | null
+          position?: number
+        }
+        Update: {
+          id?: string
+          poll_id?: string
+          label?: string
+          emoji?: string | null
+          position?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_options_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      poll_votes: {
+        Row: {
+          id: string
+          poll_id: string
+          option_id: string
+          membership_id: string
+          channel: Database["public"]["Enums"]["origin_channel"]
+          voted_at: string
+        }
+        Insert: {
+          id?: string
+          poll_id: string
+          option_id: string
+          membership_id: string
+          channel?: Database["public"]["Enums"]["origin_channel"]
+          voted_at?: string
+        }
+        Update: {
+          id?: string
+          poll_id?: string
+          option_id?: string
+          membership_id?: string
+          channel?: Database["public"]["Enums"]["origin_channel"]
+          voted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poll_votes_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_option_id_fkey"
+            columns: ["option_id"]
+            isOneToOne: false
+            referencedRelation: "poll_options"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poll_votes_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "polls"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      polls: {
         Row: {
           id: string
           community_id: string
-          invoice_id: string | null
-          unit_id: string | null
-          paid_by: string | null
-          amount: number
-          currency: string
-          method: Database["public"]["Enums"]["payment_method"]
-          status: Database["public"]["Enums"]["payment_status"]
-          reference: string | null
-          gateway_payload: Json
-          paid_at: string
+          event_id: string | null
+          question: string
+          detail: string | null
+          status: Database["public"]["Enums"]["proposal_status"]
+          closes_at: string | null
+          created_by: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           community_id: string
-          invoice_id?: string | null
-          unit_id?: string | null
-          paid_by?: string | null
-          amount: number
-          currency?: string
-          method?: Database["public"]["Enums"]["payment_method"]
-          status?: Database["public"]["Enums"]["payment_status"]
-          reference?: string | null
-          gateway_payload?: Json
-          paid_at?: string
+          event_id?: string | null
+          question: string
+          detail?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          closes_at?: string | null
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           community_id?: string
-          invoice_id?: string | null
-          unit_id?: string | null
-          paid_by?: string | null
-          amount?: number
-          currency?: string
-          method?: Database["public"]["Enums"]["payment_method"]
-          status?: Database["public"]["Enums"]["payment_status"]
-          reference?: string | null
-          gateway_payload?: Json
-          paid_at?: string
+          event_id?: string | null
+          question?: string
+          detail?: string | null
+          status?: Database["public"]["Enums"]["proposal_status"]
+          closes_at?: string | null
+          created_by?: string | null
           created_at?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "payments_community_id_fkey"
+            foreignKeyName: "polls_community_id_fkey"
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "payments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_paid_by_fkey"
-            columns: ["paid_by"]
+            foreignKeyName: "polls_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "payments_unit_id_fkey"
-            columns: ["unit_id"]
+            foreignKeyName: "polls_event_id_fkey"
+            columns: ["event_id"]
             isOneToOne: false
-            referencedRelation: "units"
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
@@ -1007,139 +1547,77 @@ export type Database = {
           }
         ]
       }
-      service_request_comments: {
+      reallocation_votes: {
         Row: {
           id: string
-          request_id: string
-          author_id: string | null
-          body: string
-          is_internal: boolean
+          reallocation_id: string
+          membership_id: string
+          approve: boolean
           channel: Database["public"]["Enums"]["origin_channel"]
-          created_at: string
+          voted_at: string
         }
         Insert: {
           id?: string
-          request_id: string
-          author_id?: string | null
-          body: string
-          is_internal?: boolean
+          reallocation_id: string
+          membership_id: string
+          approve: boolean
           channel?: Database["public"]["Enums"]["origin_channel"]
-          created_at?: string
+          voted_at?: string
         }
         Update: {
           id?: string
-          request_id?: string
-          author_id?: string | null
-          body?: string
-          is_internal?: boolean
+          reallocation_id?: string
+          membership_id?: string
+          approve?: boolean
           channel?: Database["public"]["Enums"]["origin_channel"]
-          created_at?: string
+          voted_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "service_request_comments_author_id_fkey"
-            columns: ["author_id"]
+            foreignKeyName: "reallocation_votes_membership_id_fkey"
+            columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "service_request_comments_request_id_fkey"
-            columns: ["request_id"]
+            foreignKeyName: "reallocation_votes_reallocation_id_fkey"
+            columns: ["reallocation_id"]
             isOneToOne: false
-            referencedRelation: "service_requests"
+            referencedRelation: "fund_reallocations"
             referencedColumns: ["id"]
           }
         ]
       }
-      service_requests: {
+      suggestion_interests: {
         Row: {
-          id: string
-          community_id: string
-          ticket_no: number
-          unit_id: string | null
-          raised_by: string | null
-          assigned_to: string | null
-          category: Database["public"]["Enums"]["request_category"]
-          priority: Database["public"]["Enums"]["request_priority"]
-          status: Database["public"]["Enums"]["request_status"]
-          title: string
-          description: string | null
-          attachments: Json
-          channel: Database["public"]["Enums"]["origin_channel"]
-          acknowledged_at: string | null
-          resolved_at: string | null
-          closed_at: string | null
+          suggestion_id: string
+          membership_id: string
           created_at: string
-          updated_at: string
         }
         Insert: {
-          id?: string
-          community_id: string
-          ticket_no?: number
-          unit_id?: string | null
-          raised_by?: string | null
-          assigned_to?: string | null
-          category?: Database["public"]["Enums"]["request_category"]
-          priority?: Database["public"]["Enums"]["request_priority"]
-          status?: Database["public"]["Enums"]["request_status"]
-          title: string
-          description?: string | null
-          attachments?: Json
-          channel?: Database["public"]["Enums"]["origin_channel"]
-          acknowledged_at?: string | null
-          resolved_at?: string | null
-          closed_at?: string | null
+          suggestion_id: string
+          membership_id: string
           created_at?: string
-          updated_at?: string
         }
         Update: {
-          id?: string
-          community_id?: string
-          ticket_no?: number
-          unit_id?: string | null
-          raised_by?: string | null
-          assigned_to?: string | null
-          category?: Database["public"]["Enums"]["request_category"]
-          priority?: Database["public"]["Enums"]["request_priority"]
-          status?: Database["public"]["Enums"]["request_status"]
-          title?: string
-          description?: string | null
-          attachments?: Json
-          channel?: Database["public"]["Enums"]["origin_channel"]
-          acknowledged_at?: string | null
-          resolved_at?: string | null
-          closed_at?: string | null
+          suggestion_id?: string
+          membership_id?: string
           created_at?: string
-          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "service_requests_assigned_to_fkey"
-            columns: ["assigned_to"]
+            foreignKeyName: "suggestion_interests_membership_id_fkey"
+            columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "service_requests_community_id_fkey"
-            columns: ["community_id"]
+            foreignKeyName: "suggestion_interests_suggestion_id_fkey"
+            columns: ["suggestion_id"]
             isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_requests_raised_by_fkey"
-            columns: ["raised_by"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_requests_unit_id_fkey"
-            columns: ["unit_id"]
-            isOneToOne: false
-            referencedRelation: "units"
+            referencedRelation: "activity_suggestions"
             referencedColumns: ["id"]
           }
         ]
@@ -1204,7 +1682,6 @@ export type Database = {
           floor: number | null
           bedrooms: number | null
           area_sqft: number | null
-          monthly_dues: number
           notes: string | null
           created_at: string
           updated_at: string
@@ -1217,7 +1694,6 @@ export type Database = {
           floor?: number | null
           bedrooms?: number | null
           area_sqft?: number | null
-          monthly_dues?: number
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -1230,7 +1706,6 @@ export type Database = {
           floor?: number | null
           bedrooms?: number | null
           area_sqft?: number | null
-          monthly_dues?: number
           notes?: string | null
           created_at?: string
           updated_at?: string
@@ -1245,142 +1720,66 @@ export type Database = {
           }
         ]
       }
-      visitor_events: {
+      volunteer_roles: {
         Row: {
           id: string
-          pass_id: string
+          event_id: string
           community_id: string
-          status: Database["public"]["Enums"]["visitor_status"]
-          recorded_by: string | null
-          note: string | null
-          occurred_at: string
-        }
-        Insert: {
-          id?: string
-          pass_id: string
-          community_id: string
-          status: Database["public"]["Enums"]["visitor_status"]
-          recorded_by?: string | null
-          note?: string | null
-          occurred_at?: string
-        }
-        Update: {
-          id?: string
-          pass_id?: string
-          community_id?: string
-          status?: Database["public"]["Enums"]["visitor_status"]
-          recorded_by?: string | null
-          note?: string | null
-          occurred_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "visitor_events_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "visitor_events_pass_id_fkey"
-            columns: ["pass_id"]
-            isOneToOne: false
-            referencedRelation: "visitor_passes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "visitor_events_recorded_by_fkey"
-            columns: ["recorded_by"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
-      visitor_passes: {
-        Row: {
-          id: string
-          community_id: string
-          unit_id: string | null
-          created_by: string | null
-          visitor_name: string
-          visitor_phone: string | null
-          kind: Database["public"]["Enums"]["visitor_kind"]
-          purpose: string | null
-          vehicle_number: string | null
-          party_size: number
-          pass_code: string
-          status: Database["public"]["Enums"]["visitor_status"]
-          expected_at: string
-          valid_until: string
-          checked_in_at: string | null
-          checked_out_at: string | null
-          channel: Database["public"]["Enums"]["origin_channel"]
+          name: string
+          emoji: string
+          description: string | null
+          target_count: number
+          coordinator_id: string | null
+          position: number
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
+          event_id: string
           community_id: string
-          unit_id?: string | null
-          created_by?: string | null
-          visitor_name: string
-          visitor_phone?: string | null
-          kind?: Database["public"]["Enums"]["visitor_kind"]
-          purpose?: string | null
-          vehicle_number?: string | null
-          party_size?: number
-          pass_code?: string
-          status?: Database["public"]["Enums"]["visitor_status"]
-          expected_at?: string
-          valid_until?: string
-          checked_in_at?: string | null
-          checked_out_at?: string | null
-          channel?: Database["public"]["Enums"]["origin_channel"]
+          name: string
+          emoji?: string
+          description?: string | null
+          target_count?: number
+          coordinator_id?: string | null
+          position?: number
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
+          event_id?: string
           community_id?: string
-          unit_id?: string | null
-          created_by?: string | null
-          visitor_name?: string
-          visitor_phone?: string | null
-          kind?: Database["public"]["Enums"]["visitor_kind"]
-          purpose?: string | null
-          vehicle_number?: string | null
-          party_size?: number
-          pass_code?: string
-          status?: Database["public"]["Enums"]["visitor_status"]
-          expected_at?: string
-          valid_until?: string
-          checked_in_at?: string | null
-          checked_out_at?: string | null
-          channel?: Database["public"]["Enums"]["origin_channel"]
+          name?: string
+          emoji?: string
+          description?: string | null
+          target_count?: number
+          coordinator_id?: string | null
+          position?: number
           created_at?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "visitor_passes_community_id_fkey"
+            foreignKeyName: "volunteer_roles_community_id_fkey"
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "visitor_passes_created_by_fkey"
-            columns: ["created_by"]
+            foreignKeyName: "volunteer_roles_coordinator_id_fkey"
+            columns: ["coordinator_id"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "visitor_passes_unit_id_fkey"
-            columns: ["unit_id"]
+            foreignKeyName: "volunteer_roles_event_id_fkey"
+            columns: ["event_id"]
             isOneToOne: false
-            referencedRelation: "units"
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
@@ -1537,7 +1936,88 @@ export type Database = {
       }
     }
     Views: {
+      activity_stats: {
+        Row: {
+          activity_id: string | null
+          event_id: string | null
+          community_id: string | null
+          interested: number | null
+        }
+        Relationships: [
 
+        ]
+      }
+      event_stats: {
+        Row: {
+          event_id: string | null
+          community_id: string | null
+          fund_target: number | null
+          fund_raised: number | null
+          contributors: number | null
+          spent: number | null
+          available: number | null
+          pending_expenses: number | null
+          tasks_total: number | null
+          tasks_done: number | null
+          readiness: number | null
+          participants: number | null
+          volunteers: number | null
+        }
+        Relationships: [
+
+        ]
+      }
+      poll_results: {
+        Row: {
+          poll_id: string | null
+          option_id: string | null
+          label: string | null
+          emoji: string | null
+          position: number | null
+          votes: number | null
+          total_votes: number | null
+        }
+        Relationships: [
+
+        ]
+      }
+      reallocation_results: {
+        Row: {
+          reallocation_id: string | null
+          community_id: string | null
+          approve_votes: number | null
+          reject_votes: number | null
+          total_votes: number | null
+          eligible: number | null
+          threshold_pct: number | null
+        }
+        Relationships: [
+
+        ]
+      }
+      suggestion_stats: {
+        Row: {
+          suggestion_id: string | null
+          community_id: string | null
+          interested: number | null
+        }
+        Relationships: [
+
+        ]
+      }
+      volunteer_role_stats: {
+        Row: {
+          role_id: string | null
+          event_id: string | null
+          community_id: string | null
+          target_count: number | null
+          signed_up: number | null
+          still_needed: number | null
+        }
+        Relationships: [
+
+        ]
+      }
     }
     Functions: {
       create_invite_code: {
@@ -1592,6 +2072,38 @@ export type Database = {
         unit_id: string | null
       }[]
       }
+      request_to_join: {
+        Args: {
+        p_join_code: string
+        p_unit_id?: string
+        p_name?: string
+        p_phone?: string
+        p_relation?: Database["public"]["Enums"]["occupant_relation"]
+      }
+        Returns: {
+        status: string | null
+        request_id: string | null
+        community_id: string | null
+        community_name: string | null
+      }[]
+      }
+      review_expense: {
+        Args: {
+        p_expense_id: string
+        p_decision: Database["public"]["Enums"]["expense_status"]
+        p_note?: string
+      }
+        Returns: Database["public"]["Tables"]["expenses"]["Row"]
+      }
+      review_join_request: {
+        Args: {
+        p_request_id: string
+        p_approve: boolean
+        p_role?: Database["public"]["Enums"]["member_role"]
+        p_reason?: string
+      }
+        Returns: Database["public"]["Tables"]["join_requests"]["Row"]
+      }
       verify_api_key: {
         Args: {
         p_prefix: string
@@ -1604,22 +2116,37 @@ export type Database = {
         acts_as: string | null
       }[]
       }
+      vote_on_reallocation: {
+        Args: {
+        p_reallocation_id: string
+        p_approve: boolean
+        p_channel?: Database["public"]["Enums"]["origin_channel"]
+      }
+        Returns: {
+        status: string | null
+        approve_votes: number | null
+        reject_votes: number | null
+        eligible: number | null
+        resolved: boolean | null
+        approved: boolean | null
+      }[]
+      }
     }
     Enums: {
-      announcement_audience: "all" | "residents" | "owners" | "committee" | "staff"
-      booking_status: "pending" | "confirmed" | "cancelled" | "rejected"
-      invoice_status: "draft" | "issued" | "partly_paid" | "paid" | "overdue" | "void"
-      member_role: "resident" | "security" | "committee" | "admin" | "owner"
+      announcement_audience: "all" | "residents" | "committee"
+      contribution_status: "pending" | "succeeded" | "failed" | "refunded"
+      event_status: "draft" | "published" | "completed" | "cancelled"
+      expense_status: "pending" | "approved" | "rejected" | "changes_requested"
+      fund_rule: "carry_next_edition" | "carry_related" | "general_fund" | "refund" | "donate"
+      join_request_status: "pending" | "approved" | "rejected"
+      member_role: "resident" | "committee" | "admin" | "owner"
       membership_status: "pending" | "active" | "suspended"
       occupant_relation: "owner" | "tenant" | "family" | "other"
       origin_channel: "web" | "mobile" | "whatsapp" | "api" | "system"
       payment_method: "upi" | "card" | "netbanking" | "bank_transfer" | "cash" | "cheque" | "other"
-      payment_status: "pending" | "succeeded" | "failed" | "refunded"
-      request_category: "plumbing" | "electrical" | "housekeeping" | "security" | "common_area" | "parking" | "billing" | "other"
-      request_priority: "low" | "normal" | "high" | "urgent"
-      request_status: "open" | "acknowledged" | "in_progress" | "resolved" | "closed" | "rejected"
-      visitor_kind: "guest" | "delivery" | "cab" | "service" | "staff"
-      visitor_status: "expected" | "arrived" | "departed" | "denied" | "expired" | "cancelled"
+      proposal_status: "voting" | "approved" | "rejected" | "withdrawn"
+      suggestion_status: "new" | "reviewing" | "accepted" | "declined"
+      task_status: "todo" | "in_progress" | "done" | "blocked"
     }
     CompositeTypes: {
       [_ in never]: never

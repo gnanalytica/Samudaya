@@ -16,7 +16,6 @@ export async function addUnit(_prev: ActionState, formData: FormData): Promise<A
     number: formData.get('number'),
     floor: formData.get('floor') || undefined,
     bedrooms: formData.get('bedrooms') || undefined,
-    monthly_dues: formData.get('monthly_dues') || 0,
   });
 
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
@@ -44,7 +43,6 @@ export async function addUnitsBulk(_prev: ActionState, formData: FormData): Prom
   const context = await requireCapability(slug, 'units:manage');
 
   const raw = String(formData.get('units') ?? '');
-  const dues = Number(formData.get('monthly_dues') ?? 0);
 
   const rows = raw
     .split('\n')
@@ -60,7 +58,6 @@ export async function addUnitsBulk(_prev: ActionState, formData: FormData): Prom
     .map((row) => ({
       ...row,
       community_id: context.community.id,
-      monthly_dues: Number.isFinite(dues) ? dues : 0,
     }));
 
   if (rows.length === 0) return { fieldErrors: { units: 'Add at least one unit.' } };

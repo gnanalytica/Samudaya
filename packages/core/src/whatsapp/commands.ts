@@ -10,12 +10,14 @@
 export type WhatsAppCommand =
   | { kind: 'help' }
   | { kind: 'link'; code: string }
+  | { kind: 'events' }
+  | { kind: 'fund' }
+  | { kind: 'contribute'; amount: number | null }
   | { kind: 'notices' }
-  | { kind: 'report'; text: string }
-  | { kind: 'status' }
-  | { kind: 'visitor'; name: string }
-  | { kind: 'dues' }
-  | { kind: 'amenities' }
+  | { kind: 'activities' }
+  | { kind: 'volunteer' }
+  | { kind: 'tasks' }
+  | { kind: 'suggest'; text: string }
   | { kind: 'stop' }
   | { kind: 'empty' }
   | { kind: 'unknown'; input: string };
@@ -33,6 +35,23 @@ const ALIASES: Record<string, WhatsAppCommand['kind']> = {
   join: 'link',
   connect: 'link',
 
+  events: 'events',
+  event: 'events',
+  next: 'events',
+  upcoming: 'events',
+
+  fund: 'fund',
+  funds: 'fund',
+  raised: 'fund',
+  collection: 'fund',
+  accounts: 'fund',
+  spent: 'fund',
+
+  contribute: 'contribute',
+  pay: 'contribute',
+  donate: 'contribute',
+  contribution: 'contribute',
+
   notices: 'notices',
   notice: 'notices',
   announcements: 'notices',
@@ -40,38 +59,36 @@ const ALIASES: Record<string, WhatsAppCommand['kind']> = {
   news: 'notices',
   updates: 'notices',
 
-  report: 'report',
-  complaint: 'report',
-  complain: 'report',
-  issue: 'report',
-  problem: 'report',
-  raise: 'report',
+  activities: 'activities',
+  activity: 'activities',
+  cultural: 'activities',
+  perform: 'activities',
 
-  status: 'status',
-  tickets: 'status',
-  requests: 'status',
-  my: 'status',
+  volunteer: 'volunteer',
+  volunteering: 'volunteer',
+  help_out: 'volunteer',
 
-  visitor: 'visitor',
-  guest: 'visitor',
-  visit: 'visitor',
+  tasks: 'tasks',
+  task: 'tasks',
+  todo: 'tasks',
+  checklist: 'tasks',
 
-  dues: 'dues',
-  balance: 'dues',
-  bill: 'dues',
-  bills: 'dues',
-  payment: 'dues',
-  payments: 'dues',
-
-  amenities: 'amenities',
-  amenity: 'amenities',
-  facilities: 'amenities',
-  book: 'amenities',
+  suggest: 'suggest',
+  suggestion: 'suggest',
+  idea: 'suggest',
 
   stop: 'stop',
   unsubscribe: 'stop',
   optout: 'stop',
 };
+
+/** Pulls a rupee amount out of "contribute 2000" or "pay ₹2,000". */
+function parseAmount(text: string): number | null {
+  const match = text.replace(/[,₹]/g, '').match(/\d+(?:\.\d{1,2})?/);
+  if (!match) return null;
+  const value = Number.parseFloat(match[0]);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
 
 export function parseCommand(raw: string | null | undefined): WhatsAppCommand {
   const text = (raw ?? '').trim();
@@ -84,10 +101,12 @@ export function parseCommand(raw: string | null | undefined): WhatsAppCommand {
 
   switch (kind) {
     case 'help':
+    case 'events':
+    case 'fund':
     case 'notices':
-    case 'status':
-    case 'dues':
-    case 'amenities':
+    case 'activities':
+    case 'volunteer':
+    case 'tasks':
     case 'stop':
       return { kind };
 
@@ -96,15 +115,13 @@ export function parseCommand(raw: string | null | undefined): WhatsAppCommand {
       return { kind: 'link', code: remainder };
     }
 
-    case 'report': {
-      // "report" on its own is not actionable — we need to know what broke.
-      if (!remainder) return { kind: 'unknown', input: text };
-      return { kind: 'report', text: remainder };
-    }
+    // "contribute" on its own is fine — the bot replies with a payment link.
+    case 'contribute':
+      return { kind: 'contribute', amount: parseAmount(remainder) };
 
-    case 'visitor': {
+    case 'suggest': {
       if (!remainder) return { kind: 'unknown', input: text };
-      return { kind: 'visitor', name: remainder };
+      return { kind: 'suggest', text: remainder };
     }
 
     default:
@@ -115,12 +132,14 @@ export function parseCommand(raw: string | null | undefined): WhatsAppCommand {
 export const HELP_TEXT = [
   '*Samudaya* — here’s what I can do:',
   '',
+  '• *events* — what’s coming up',
+  '• *fund* — how much is raised and spent',
+  '• *contribute 2000* — get a link to chip in',
   '• *notices* — latest announcements',
-  '• *report <what’s wrong>* — raise a service request',
-  '• *status* — your open requests',
-  '• *visitor <name>* — create a gate pass',
-  '• *dues* — your outstanding bills',
-  '• *amenities* — what you can book',
+  '• *activities* — what you can perform in',
+  '• *volunteer* — where help is needed',
+  '• *tasks* — what’s assigned to you',
+  '• *suggest <your idea>* — send it to the committee',
   '• *link <code>* — connect this number to your account',
   '• *stop* — stop receiving messages',
 ].join('\n');
@@ -128,7 +147,7 @@ export const HELP_TEXT = [
 export const NOT_LINKED_TEXT = [
   'This number isn’t linked to a Samudaya account yet.',
   '',
-  'Open the app, go to *Settings → WhatsApp*, and send me the code it shows:',
+  'Open the app, go to *More → WhatsApp*, and send me the code it shows:',
   '`link ABC123`',
 ].join('\n');
 

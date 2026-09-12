@@ -1,14 +1,13 @@
 import {
   Bell,
-  CalendarCheck,
+  CalendarDays,
+  ClipboardList,
   KeyRound,
   LayoutDashboard,
-  Receipt,
   Settings,
-  ShieldCheck,
   Ticket,
   Users,
-  Wrench,
+  UserPlus,
   Building2,
   type LucideIcon,
 } from 'lucide-react';
@@ -31,32 +30,26 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
       section: 'Community',
       items: [
         { href: base, label: 'Home', icon: LayoutDashboard, primary: true },
-        { href: `${base}/notices`, label: 'Notices', icon: Bell, primary: true },
-        { href: `${base}/requests`, label: 'Requests', icon: Wrench, primary: true },
-        { href: `${base}/visitors`, label: 'Visitors', icon: Users, primary: true },
-        { href: `${base}/amenities`, label: 'Amenities', icon: CalendarCheck },
-        { href: `${base}/billing`, label: 'Dues', icon: Receipt, primary: true },
-      ],
-    },
-    {
-      section: 'Operations',
-      items: [
-        {
-          href: `${base}/gate`,
-          label: 'Gate desk',
-          icon: ShieldCheck,
-          capability: 'gate:operate',
-        },
+        { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
+        { href: `${base}/feed`, label: 'Community', icon: Users, primary: true },
+        { href: `${base}/notices`, label: 'Notices', icon: Bell },
+        { href: `${base}/me`, label: 'My activity', icon: ClipboardList, primary: true },
       ],
     },
     {
       section: 'Administration',
       items: [
         {
-          href: `${base}/admin/invites`,
-          label: 'Invite codes',
-          icon: Ticket,
-          capability: 'invites:manage',
+          href: `${base}/admin`,
+          label: 'Admin console',
+          icon: ClipboardList,
+          capability: 'events:prepare',
+        },
+        {
+          href: `${base}/admin/requests`,
+          label: 'Join requests',
+          icon: UserPlus,
+          capability: 'joinrequests:review',
         },
         {
           href: `${base}/admin/members`,
@@ -66,9 +59,15 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
         },
         {
           href: `${base}/admin/units`,
-          label: 'Units',
+          label: 'Flats',
           icon: Building2,
           capability: 'units:manage',
+        },
+        {
+          href: `${base}/admin/invites`,
+          label: 'Invite codes',
+          icon: Ticket,
+          capability: 'invites:manage',
         },
         {
           href: `${base}/admin/api-keys`,

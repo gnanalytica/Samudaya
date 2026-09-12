@@ -1,9 +1,19 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({
+  className,
+  children,
+  id,
+}: {
+  className?: string;
+  children: ReactNode;
+  /** For anchor links, e.g. jumping to #suggest from the dashboard. */
+  id?: string;
+}) {
   return (
     <div
+      id={id}
       className={cn('border-border-base bg-surface-raised rounded-xl border shadow-sm', className)}
     >
       {children}

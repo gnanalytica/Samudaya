@@ -1,21 +1,23 @@
 # Samudaya
 
-**समुदाय** — a platform for running a residential community: notices, service
-requests, visitors, amenities and maintenance dues, for the committee, the gate
-and every resident.
+**समुदाय** — _plan together, participate together, spend transparently._
+
+A platform for the events a residential community runs: Ganesh Chaturthi, a
+sports day, a cultural evening. Each one carries its own people, activities,
+checklist, fund and public ledger.
 
 One codebase, four surfaces:
 
 | Surface       | What it is                                                        |
 | ------------- | ----------------------------------------------------------------- |
-| **Web**       | Next.js 16 app — resident portal, gate desk, and admin console    |
+| **Web**       | Next.js 16 app — resident portal and admin console                |
 | **Mobile**    | Expo / React Native — iOS and Android from the same source        |
-| **WhatsApp**  | A bot residents message to report issues and check dues           |
+| **WhatsApp**  | A bot for the fund, notices, activities and your own tasks        |
 | **API & MCP** | REST for integrations, MCP so an AI assistant can use it as tools |
 
-Nobody joins by guessing a URL. An admin mints an **invite code**; a resident
-signs in with Google and enters it once. The code decides their role and,
-optionally, the flat they are attached to.
+Nobody joins by guessing a URL. An admin shares the **Society ID**; a resident
+signs in with Google, picks their flat, and the admin approves them. For people
+the committee already knows, an **invite code** skips the waiting step.
 
 ---
 
@@ -26,7 +28,7 @@ apps/
   web/        Next.js 16 (App Router) — UI, REST API, MCP server, WhatsApp webhook
   mobile/     Expo SDK 57 + expo-router — iOS, Android
 packages/
-  core/       Domain rules: roles, zod schemas, invite codes, WhatsApp parsing
+  core/       Domain rules: roles, event maths, zod schemas, WhatsApp parsing
   supabase/   Typed Supabase clients + generated database types
   config/     Shared TypeScript config
 supabase/
@@ -35,15 +37,36 @@ supabase/
 scripts/      db-test.sh, smoke-test.sh, gen-db-types.mjs, seed.ts
 ```
 
+### The shape of it
+
+```
+Event
+├── Checklist        tasks with owner and due date → drives "Readiness %"
+├── Fund             target, contributions, contributor count
+├── Activities       cultural acts residents sign up to perform in
+├── Volunteer roles  jobs residents sign up to do
+├── Expenses         vendor, amount, attached bill, approval trail
+└── Closure          surplus rule → published transparency report
+```
+
 ### Where the rules actually live
 
 **In PostgreSQL.** Every table has row-level security; the web app, the mobile
 app, the API and the bot all go through it. The TypeScript in
 `packages/core/src/roles.ts` decides what to _show_ a user — it is not what
-stops them. That separation is deliberate and tested: `supabase/tests` asserts
-that a resident cannot promote themselves, that a member of one community sees
-nothing of another's, that a gate guard cannot read maintenance tickets, and
-that the last owner cannot be removed.
+stops them. That separation is tested rather than asserted: `supabase/tests`
+proves that
+
+- a resident sees every **approved** rupee of spending, with the vendor and the
+  bill, and does not see an expense still under review;
+- a resident's own contribution amount is private while the society total and
+  contributor count are public;
+- nobody approves an expense they filed themselves;
+- a closed event's ledger cannot be reopened or edited;
+- moving money between funds needs a resident vote that clears a threshold, and
+  writes an audit row in the same transaction as the deciding vote;
+- one member, one vote — and a ballot is readable only by the person who cast it;
+- nothing leaks between societies.
 
 Two places bypass RLS on purpose, both server-side only:
 
@@ -52,7 +75,7 @@ Two places bypass RLS on purpose, both server-side only:
   queries live in one file, `apps/web/src/lib/api/resources.ts`, so the scoping
   cannot be forgotten piecemeal.
 - **The WhatsApp webhook** — a phone number is not a session. `lib/whatsapp/bot.ts`
-  resolves the sender to one community first and scopes everything to it.
+  resolves the sender to one society first and scopes everything to it.
 
 ---
 
@@ -99,8 +122,16 @@ opens the Expo dev server.
 ### 5. First run
 
 1. Sign in, then choose **Create a community** — you become its owner.
-2. **Admin → Units**: paste your flat list (`A,101` one per line).
-3. **Admin → Invite codes**: create a code and send it to a resident.
+2. **Admin → Flats**: paste your flat list (`A,101` one per line).
+3. Share the **Society ID** from the admin console; residents ask to join and
+   you approve them under **Admin → Join requests**.
+4. **Create event** walks through seven steps — details, budget, requirements,
+   activities, checklist, surplus rule, preview — and leaves you a draft to
+   publish when you are ready.
+
+`pnpm db:seed` fills a development project with a society mid-flight: a
+part-raised fund, a part-done checklist, approved spending with bills, and one
+expense waiting for you to approve.
 
 ---
 
@@ -124,12 +155,14 @@ A resident links their number from **Settings → WhatsApp**: the app shows a
 code, they send `link ABC123` to the bot. After that:
 
 ```
+events           what's coming up
+fund             how much is raised and spent
+contribute 2000  a link to chip in
 notices          latest announcements
-report <text>    raise a service request
-status           your open requests
-visitor <name>   create a gate pass, returns the gate code
-dues             outstanding bills
-amenities        what is bookable
+activities       what you can perform in
+volunteer        where help is needed
+tasks            what's assigned to you
+suggest <idea>   send it to the committee
 stop             opt out
 ```
 
@@ -160,7 +193,7 @@ client role can read.
 The same keys work against the REST API:
 
 ```bash
-curl https://<your-host>/api/v1/requests?status=open \
+curl https://<your-host>/api/v1/events?status=published \
   -H "Authorization: Bearer sam_live_…"
 ```
 
@@ -208,9 +241,11 @@ node scripts/gen-db-types.mjs "postgresql://postgres@127.0.0.1:55432/samudaya_te
 ## What is deliberately not done yet
 
 - **Payments** are recorded, not collected. There is no gateway integration —
-  `payments.gateway_payload` is there for when you add one.
+  `contributions.gateway_payload` is there for when you add one, and the flow
+  already writes a receipt number the contributor can quote.
 - **Push notifications** register a device token but nothing sends to it yet;
   the sending side wants a scheduled job or an edge function.
-- **File attachments** on requests and notices have a `jsonb` column reserved
-  but no Supabase Storage bucket wired up.
-- **Polls and documents** are in neither the schema nor the UI.
+- **Bill uploads** store a path on the expense, but the Supabase Storage bucket
+  and the upload widget are not wired up — today an admin pastes the path.
+- **Closing an event** publishes the report and freezes the ledger, but there is
+  no PDF export yet.
