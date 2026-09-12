@@ -51,9 +51,11 @@
       "typedRoutes": true
     },
     "extra": {
+      "router": {},
       "eas": {
-        "projectId": "00000000-0000-0000-0000-000000000000"
+        "projectId": "9b6cc471-e599-4981-ac3b-5ffac89c9fc4"
       }
-    }
+    },
+    "owner": "gnanalytica"
   }
 }
