@@ -7,6 +7,9 @@ jobs:
       platform: android
       profile: production
   build_ios:
+    # Temporarily disabled until iOS signing credentials are set up in EAS.
+    # Delete this `if` line to turn iOS builds back on.
+    if: false
     type: build # This job type creates a production build for iOS
     params:
       platform: ios
