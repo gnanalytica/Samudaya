@@ -24,7 +24,15 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
       <LoginForm next={safeNext} />
 
       <p className="text-ink-subtle mt-8 text-xs">
-        By continuing you agree to your community’s terms of use.
+        By continuing you agree to the{' '}
+        <Link href="/terms" className="underline underline-offset-4">
+          Terms &amp; Conditions
+        </Link>{' '}
+        and acknowledge the{' '}
+        <Link href="/privacy" className="underline underline-offset-4">
+          Privacy Policy
+        </Link>
+        .
       </p>
     </main>
   );

@@ -17,6 +17,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/',
   '/login',
+  '/privacy',
+  '/terms',
   '/auth',
   '/api/webhooks',
   '/api/v1',

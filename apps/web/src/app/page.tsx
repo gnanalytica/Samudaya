@@ -96,9 +96,17 @@ export default async function LandingPage() {
       <footer className="text-ink-subtle mx-auto max-w-5xl px-6 py-10 text-sm">
         <div className="border-border-base flex flex-wrap items-center justify-between gap-4 border-t pt-6">
           <span>Samudaya</span>
-          <Link href="/login" className="underline underline-offset-4">
-            Sign in
-          </Link>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link href="/privacy" className="underline underline-offset-4">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="underline underline-offset-4">
+              Terms &amp; Conditions
+            </Link>
+            <Link href="/login" className="underline underline-offset-4">
+              Sign in
+            </Link>
+          </nav>
         </div>
       </footer>
     </div>
