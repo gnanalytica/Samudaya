@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../src/lib/auth';
 import { Body, Button, Caption, Input, Screen, Title } from '../src/components/ui';
@@ -9,12 +10,15 @@ import { useTheme } from '../src/lib/use-theme';
 export default function SignIn() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { signInWithGoogle, signInWithEmail } = useAuth();
+  const { signInWithGoogle, signInWithEmail, user, loading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState<'google' | 'email' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+
+  // Once a session exists, let the index route pick sign-in, join or the tabs.
+  if (user && !loading) return <Redirect href="/" />;
 
   const handleGoogle = async () => {
     setBusy('google');

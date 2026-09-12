@@ -21,6 +21,27 @@ import { supabase } from './supabase';
 // Lets the auth browser close itself when it redirects back.
 WebBrowser.maybeCompleteAuthSession();
 
+/** The path the OAuth and magic-link redirects come back to; see app/auth-callback.tsx. */
+export const authRedirectUri = () => makeRedirectUri({ scheme: 'samudaya', path: 'auth-callback' });
+
+const exchanges = new Map<string, Promise<{ error?: string }>>();
+
+/**
+ * Trades an auth code for a session. On Android the same code can arrive twice:
+ * as the in-app browser's result and as a deep link the router opens at
+ * /auth-callback. A code is single-use, so both paths share the first attempt.
+ */
+export function completeSignIn(code: string) {
+  let pending = exchanges.get(code);
+  if (!pending) {
+    pending = supabase.auth
+      .exchangeCodeForSession(code)
+      .then(({ error }) => (error ? { error: error.message } : {}));
+    exchanges.set(code, pending);
+  }
+  return pending;
+}
+
 export type Membership = Tables<'memberships'> & { communities: Tables<'communities'> | null };
 
 type AuthValue = {
@@ -81,9 +102,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (active) setLoading(false);
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, next) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
-      if (next?.user) {
+      if (next?.user && event === 'SIGNED_IN') {
+        // Hold routing until memberships are known, or a member who just
+        // signed in would be sent to /join for a moment.
+        setLoading(true);
+        void loadMemberships(next.user.id).finally(() => {
+          if (active) setLoading(false);
+        });
+      } else if (next?.user) {
         void loadMemberships(next.user.id);
       } else {
         setProfile(null);
@@ -99,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadMemberships]);
 
   const signInWithGoogle = useCallback(async () => {
-    const redirectTo = makeRedirectUri({ scheme: 'samudaya', path: 'auth-callback' });
+    const redirectTo = authRedirectUri();
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -117,15 +145,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const code = typeof queryParams?.code === 'string' ? queryParams.code : null;
     if (!code) return { error: 'Google did not return a sign-in code.' };
 
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-    return exchangeError ? { error: exchangeError.message } : {};
+    return completeSignIn(code);
   }, []);
 
   const signInWithEmail = useCallback(async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: {
-        emailRedirectTo: makeRedirectUri({ scheme: 'samudaya', path: 'auth-callback' }),
+        emailRedirectTo: authRedirectUri(),
       },
     });
     return error ? { error: error.message } : { sent: true };
