@@ -53,7 +53,9 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
     <>
       <PageHeader
         title={profile?.full_name ?? 'My activity'}
-        description={[community.name, ROLE_LABEL[role], myUnits].filter(Boolean).join(' · ')}
+        description={[community.name, membership.title, ROLE_LABEL[role], myUnits]
+          .filter(Boolean)
+          .join(' · ')}
       />
       <PageBody>
         <div className="grid grid-cols-3 gap-3">

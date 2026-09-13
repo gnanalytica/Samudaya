@@ -126,6 +126,7 @@ export default async function AccountsPage(
                           <>
                             <br />
                             approved by {expense.approver.profiles.full_name}
+                            {expense.approver.title ? ` (${expense.approver.title})` : null}
                           </>
                         ) : null}
                       </td>

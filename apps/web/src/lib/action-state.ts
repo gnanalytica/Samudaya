@@ -24,6 +24,18 @@ export function fieldErrors(error: ZodError): Record<string, string> {
 }
 
 /**
+ * Guard messages raised by the database that are already written for people,
+ * so they are shown as-is instead of a generic permission error.
+ */
+const KNOWN_DB_MESSAGES = [
+  'Only an owner or an existing spending approver can change who approves spending',
+  'Only an owner or an existing spending approver can change this setting',
+  'Only admins and owners can be spending approvers',
+  'Mark at least one spending approver before restricting approval',
+  'Only designated spending approvers can approve expenses in this community',
+];
+
+/**
  * Turns a PostgREST error into something a resident can act on.
  *
  * RLS denials surface as 42501; a violated exclusion constraint (two bookings
@@ -32,6 +44,8 @@ export function fieldErrors(error: ZodError): Record<string, string> {
  */
 export function friendlyDbError(error: { code?: string; message?: string } | null): string {
   if (!error) return 'Something went wrong. Please try again.';
+  const known = KNOWN_DB_MESSAGES.find((message) => error.message?.includes(message));
+  if (known) return known.endsWith('.') ? known : `${known}.`;
   switch (error.code) {
     case '42501':
       return 'You don’t have permission to do that.';

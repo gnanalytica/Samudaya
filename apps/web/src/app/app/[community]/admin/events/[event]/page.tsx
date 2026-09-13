@@ -4,6 +4,7 @@ import {
   FUND_RULE_LABEL,
   TASK_STATUS_LABEL,
   can,
+  canApproveSpending,
   formatDate,
   formatMoney,
   fundedPercent,
@@ -71,6 +72,13 @@ export default async function ManageEventPage(
 
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
   const pending = expenses.filter((expense) => expense.status === 'pending');
+  // Mirrors review_expense: when the society restricts approval, an admin who is
+  // not a designated approver can still reject or ask for changes.
+  const mayApprove = canApproveSpending(
+    role,
+    membership.approves_spending,
+    community.restrict_spending_approval,
+  );
   const closed = event.status === 'completed';
 
   return (
@@ -298,7 +306,11 @@ export default async function ManageEventPage(
               <Card className="border-warning/40">
                 <CardHeader
                   title="Awaiting your decision"
-                  description="Approving puts it in the resident ledger. You cannot approve your own."
+                  description={
+                    mayApprove
+                      ? 'Approving puts it in the resident ledger. You cannot approve your own.'
+                      : 'Approving puts it in the resident ledger. Only designated approvers can approve here.'
+                  }
                 />
                 <ul className="divide-border-base divide-y">
                   {pending.map((expense) => {
@@ -328,7 +340,7 @@ export default async function ManageEventPage(
 
                           {isAdmin ? (
                             <div className="flex flex-wrap gap-2">
-                              {(requestedByMe
+                              {(requestedByMe || !mayApprove
                                 ? (['changes_requested', 'rejected'] as const)
                                 : (['approved', 'changes_requested', 'rejected'] as const)
                               ).map((decision) => (
@@ -361,9 +373,13 @@ export default async function ManageEventPage(
                             <Badge tone="warning">Waiting for an admin</Badge>
                           )}
                         </div>
-                        {requestedByMe ? (
+                        {isAdmin && requestedByMe ? (
                           <p className="text-ink-subtle mt-2 text-xs">
                             You submitted this, so another admin has to approve it.
+                          </p>
+                        ) : isAdmin && !mayApprove ? (
+                          <p className="text-ink-subtle mt-2 text-xs">
+                            Only designated approvers (e.g. Treasurer) can approve spending here.
                           </p>
                         ) : null}
                       </li>
@@ -389,7 +405,9 @@ export default async function ManageEventPage(
                         <p className="text-ink-subtle mt-0.5 text-xs">
                           {expense.vendor ?? '—'}
                           {expense.approver?.profiles?.full_name
-                            ? ` · approved by ${expense.approver.profiles.full_name}`
+                            ? ` · approved by ${expense.approver.profiles.full_name}${
+                                expense.approver.title ? ` (${expense.approver.title})` : ''
+                              }`
                             : ''}
                           {expense.review_note ? ` · “${expense.review_note}”` : ''}
                         </p>

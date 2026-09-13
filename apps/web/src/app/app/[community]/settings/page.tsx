@@ -11,7 +11,7 @@ export const metadata = { title: 'Settings' };
 
 export default async function SettingsPage(props: PageProps<'/app/[community]/settings'>) {
   const { community: slug } = await props.params;
-  const { community, role, profile, user, unitIds } = await requireCommunity(slug);
+  const { community, role, membership, profile, user, unitIds } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
   const [link, units] = await Promise.all([
@@ -53,6 +53,12 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
                   <dt className="text-ink-muted">Community</dt>
                   <dd className="text-ink text-right font-medium">{community.name}</dd>
                 </div>
+                {membership.title ? (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-ink-muted">Title</dt>
+                    <dd className="text-ink text-right font-medium">{membership.title}</dd>
+                  </div>
+                ) : null}
                 <div className="flex justify-between gap-4">
                   <dt className="text-ink-muted">Role</dt>
                   <dd className="text-ink text-right font-medium">{ROLE_LABEL[role]}</dd>
@@ -63,6 +69,11 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
                 </div>
               </dl>
               <p className="text-ink-subtle mt-3 text-xs">{ROLE_DESCRIPTION[role]}</p>
+              {membership.approves_spending ? (
+                <p className="text-ink-subtle mt-1 text-xs">
+                  You are a designated spending approver.
+                </p>
+              ) : null}
             </CardBody>
           </Card>
 

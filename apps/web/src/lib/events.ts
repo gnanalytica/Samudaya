@@ -137,7 +137,7 @@ export const getExpenses = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('expenses')
     .select(
-      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
+      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(title, profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
