@@ -278,10 +278,12 @@ export async function contribute(
       membership_id: principal.membershipId,
       amount: parsed.data.amount,
       method: parsed.data.method,
-      status: 'succeeded',
+      // A payment reported through an integration waits for staff to confirm
+      // it against the bank statement, like one reported in the app.
+      status: 'pending',
       channel: 'api',
     })
-    .select('id, amount, receipt_no, paid_at')
+    .select('id, amount, status, receipt_no, paid_at')
     .single();
 
   if (error) throw error;

@@ -523,6 +523,51 @@ export async function recordPayment(_prev: ActionState, formData: FormData): Pro
   return { ...EMPTY_STATE, success: 'Payment recorded.' };
 }
 
+const reviewPaymentSchema = z
+  .object({
+    contribution_id: uuid,
+    decision: z.enum(['confirm', 'reject']),
+    note: z.string().trim().max(300).optional(),
+  })
+  .refine((value) => value.decision === 'confirm' || Boolean(value.note), {
+    message: 'Say why it could not be confirmed',
+    path: ['note'],
+  });
+
+/**
+ * Staff confirm a payment a resident reported against the bank statement, or
+ * turn it down with a reason. Only confirmed payments count towards the fund.
+ */
+export async function reviewPayment(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  await requireCapability(communitySlug, 'payments:record');
+
+  const parsed = reviewPaymentSchema.safeParse({
+    contribution_id: formData.get('contribution_id'),
+    decision: formData.get('decision'),
+    note: formData.get('note') || undefined,
+  });
+  if (!parsed.success) {
+    return { error: fieldErrors(parsed.error).note ?? 'That decision could not be recorded.' };
+  }
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.rpc('review_contribution', {
+    p_contribution_id: parsed.data.contribution_id,
+    p_confirm: parsed.data.decision === 'confirm',
+    p_note: parsed.data.note ?? undefined,
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  refreshEvent(communitySlug, eventSlug);
+  revalidatePath(`/app/${communitySlug}`);
+  return {
+    ...EMPTY_STATE,
+    success: parsed.data.decision === 'confirm' ? 'Confirmed. It now counts.' : 'Turned down.',
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Join requests
 // ---------------------------------------------------------------------------

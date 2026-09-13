@@ -42,7 +42,17 @@ const KNOWN_DB_MESSAGES = [
   'Only the committee can change roles',
   'You cannot raise your own role',
   'A community must keep at least one committee member',
+  'Only staff or the committee can confirm payments',
+  'This payment has already been reviewed',
+  'Say why the payment could not be confirmed',
 ];
+
+/** Constraint names worth their own explanation. */
+const CONSTRAINT_MESSAGES: Record<string, string> = {
+  contributions_upi_reference_unique: 'That UPI reference has already been reported.',
+  communities_upi_vpa_format: 'Enter a UPI ID like society@okaxis.',
+  communities_upi_payee_length: 'Keep the payee name under 80 characters.',
+};
 
 /**
  * Turns a PostgREST error into something a resident can act on.
@@ -55,6 +65,8 @@ export function friendlyDbError(error: { code?: string; message?: string } | nul
   if (!error) return 'Something went wrong. Please try again.';
   const known = KNOWN_DB_MESSAGES.find((message) => error.message?.includes(message));
   if (known) return known.endsWith('.') ? known : `${known}.`;
+  const constraint = Object.keys(CONSTRAINT_MESSAGES).find((name) => error.message?.includes(name));
+  if (constraint) return CONSTRAINT_MESSAGES[constraint]!;
   switch (error.code) {
     case '42501':
       return 'You don’t have permission to do that.';

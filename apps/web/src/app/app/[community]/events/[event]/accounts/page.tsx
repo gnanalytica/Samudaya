@@ -42,6 +42,8 @@ export default async function AccountsPage(
       .select('id, amount, method, receipt_no, paid_at')
       .eq('event_id', event.id)
       .eq('membership_id', membership.id)
+      // Receipts are for confirmed payments; reported ones are still waiting.
+      .eq('status', 'succeeded')
       .order('paid_at', { ascending: false }),
   ]);
 

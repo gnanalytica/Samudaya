@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
+import { FileUpload } from '@/components/file-upload';
 import {
   addActivity,
   addBudgetLine,
@@ -13,6 +14,7 @@ import {
   correctExpense,
   recordPayment,
   reviewExpense,
+  reviewPayment,
   submitExpense,
   updateEventDetails,
   type CloseState,
@@ -22,14 +24,16 @@ function Submit({
   label,
   busy,
   variant,
+  disabled,
 }: {
   label: string;
   busy: string;
   variant?: 'primary' | 'secondary' | 'danger';
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant={variant} disabled={pending}>
+    <Button type="submit" size="sm" variant={variant} disabled={pending || disabled}>
       {pending ? busy : label}
     </Button>
   );
@@ -53,15 +57,21 @@ export function Feedback({ state }: { state: ActionState }) {
   return null;
 }
 
-/** Resets itself on success so staff can add several in a row. */
+/**
+ * Resets itself after each submission so staff can add several in a row.
+ * `version` changes too, for controlled pieces a native reset cannot clear
+ * (such as an uploaded file's path).
+ */
 function useResettingAction(fn: (prev: ActionState, formData: FormData) => Promise<ActionState>) {
   const [state, action] = useActionState<ActionState, FormData>(fn, EMPTY_STATE);
+  const [version, setVersion] = useState(0);
   const ref = useRef<HTMLFormElement>(null);
   const wrapped = async (formData: FormData) => {
     await action(formData);
     ref.current?.reset();
+    setVersion((current) => current + 1);
   };
-  return { state, action: wrapped, ref };
+  return { state, action: wrapped, ref, version };
 }
 
 function Hidden({ slug, eventSlug }: { slug: string; eventSlug: string }) {
@@ -238,12 +248,17 @@ const METHODS = [
 export function ExpenseForm({
   slug,
   eventSlug,
+  communityId,
+  eventId,
   expense,
 }: {
   slug: string;
   eventSlug: string;
+  communityId: string;
+  eventId: string;
   expense?: ExpenseDraft;
 }) {
+  const [uploading, setUploading] = useState(false);
   const creating = !expense;
   const created = useResettingAction(submitExpense);
   const [corrected, correctAction] = useActionState<ActionState, FormData>(
@@ -333,24 +348,22 @@ export function ExpenseForm({
           )}
         </Field>
       </div>
-      <Field
+      <FileUpload
+        key={creating ? `new-${created.version}` : expense.id}
+        bucket="bills"
+        folder={`${communityId}/${eventId}`}
+        name="bill_url"
         label="Bill"
-        htmlFor={`ex-bill-${id}`}
-        hint="Link to the bill (Drive, photo link) or its stored file path."
-      >
-        {(control) => (
-          <Input
-            {...control}
-            name="bill_url"
-            placeholder="https://… or bills/pandal.pdf"
-            defaultValue={expense?.bill_url ?? ''}
-          />
-        )}
-      </Field>
+        hint="A photo or PDF of the bill, up to 10 MB. Residents see it once the committee approves."
+        maxBytes={10 * 1_048_576}
+        defaultPath={expense?.bill_url}
+        onUploadingChange={setUploading}
+      />
       <Feedback state={state} />
       <Submit
         label={creating ? 'Upload bill' : 'Save correction'}
         busy={creating ? 'Uploading…' : 'Saving…'}
+        disabled={uploading}
       />
     </form>
   );
@@ -393,6 +406,42 @@ export function ReviewExpenseForm({
         </Button>
         <Button type="submit" name="decision" value="rejected" size="sm" variant="ghost">
           Reject
+        </Button>
+      </div>
+      <Feedback state={state} />
+    </form>
+  );
+}
+
+/** Staff confirm a reported UPI payment, or turn it down with a reason. */
+export function ReviewPaymentForm({
+  slug,
+  eventSlug,
+  contributionId,
+}: {
+  slug: string;
+  eventSlug: string;
+  contributionId: string;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(reviewPayment, EMPTY_STATE);
+  return (
+    <form action={action} className="space-y-2">
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <input type="hidden" name="contribution_id" value={contributionId} />
+      <label htmlFor={`pay-note-${contributionId}`} className="sr-only">
+        Reason, if turning it down
+      </label>
+      <Input
+        id={`pay-note-${contributionId}`}
+        name="note"
+        placeholder="Reason, if it is not on the bank statement"
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" name="decision" value="confirm" size="sm">
+          Confirm
+        </Button>
+        <Button type="submit" name="decision" value="reject" size="sm" variant="ghost">
+          Turn down
         </Button>
       </div>
       <Feedback state={state} />

@@ -30,7 +30,8 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventStatusBadge, FundBar, StatTile } from '@/components/badges';
+import { EventStatusBadge, FundBar, PaymentStatusBadge, StatTile } from '@/components/badges';
+import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
 import { cancelRegistration, voteOnSuggestion } from '../actions';
 import { RegisterForm, SuggestionForm } from './participation-forms';
@@ -40,8 +41,9 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const { community, role, membership } = await requireCommunity(slug);
   const event = await requireEvent(community.id, eventSlug);
 
-  const [stats, budget, expenses, activities, registrations, suggestions, mine] = await Promise.all(
-    [
+  const supabase = await getSupabase();
+  const [stats, budget, expenses, activities, registrations, suggestions, mine, myPayments] =
+    await Promise.all([
       getEventStats(event.id),
       getBudgetLines(event.id),
       getExpenses(event.id),
@@ -49,8 +51,13 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
       getRegistrations(event.id),
       getSuggestions(event.id, membership.id),
       getMyParticipation(event.id, membership.id),
-    ],
-  );
+      supabase
+        .from('contributions')
+        .select('id, amount, status, review_note')
+        .eq('event_id', event.id)
+        .eq('membership_id', membership.id)
+        .order('paid_at', { ascending: false }),
+    ]);
 
   const base = `/app/${community.slug}`;
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
@@ -166,6 +173,22 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 </ButtonLink>
               ) : null}
             </div>
+            {myPayments.data?.length ? (
+              <ul className="border-border-base mt-4 space-y-2 border-t pt-3">
+                {myPayments.data.map((payment) => (
+                  <li key={payment.id} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-ink-muted">You paid</span>
+                    <span className="text-ink font-medium">
+                      {formatMoney(payment.amount, community.currency)}
+                    </span>
+                    <PaymentStatusBadge status={payment.status} />
+                    {payment.status === 'failed' && payment.review_note ? (
+                      <span className="text-danger text-xs">{payment.review_note}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </CardBody>
         </Card>
 

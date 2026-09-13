@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
-  contributeSchema,
   joinActivitySchema,
+  reportPaymentSchema,
   suggestActivitySchema,
   suggestionKindSchema,
   uuid,
@@ -23,8 +23,13 @@ import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/l
  * the database checks it again — these are convenience, not the boundary.
  */
 
-export type ContributeState = ActionState & { receipt?: string; amount?: number };
+export type ContributeState = ActionState & { reported?: { amount: number; reference: string } };
 
+/**
+ * A resident reports a UPI payment they made to the society's UPI ID. It is
+ * saved as pending and counts towards the fund only once staff confirm the
+ * reference against the bank statement.
+ */
 export async function contribute(
   _prev: ContributeState,
   formData: FormData,
@@ -45,41 +50,52 @@ export async function contribute(
   if (event.status !== 'published') {
     return { error: 'This event is not accepting contributions.' };
   }
+  if (!context.community.upi_vpa) {
+    return { error: 'Your society has not set up UPI payments yet. Ask the committee.' };
+  }
 
-  const parsed = contributeSchema.safeParse({
+  const parsed = reportPaymentSchema.safeParse({
     event_id: event.id,
     amount: formData.get('amount'),
-    method: formData.get('method') || 'upi',
-    channel: 'web',
+    reference: formData.get('reference'),
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
-  // This records the contribution. Wiring a real payment gateway means taking
-  // its webhook and inserting the row with `status: 'pending'` until the
-  // gateway confirms — the schema already carries `gateway_payload` for that.
-  const { data, error } = await supabase
-    .from('contributions')
-    .insert({
-      event_id: event.id,
-      community_id: context.community.id,
-      membership_id: context.membership.id,
-      unit_id: context.unitIds[0] ?? null,
-      amount: parsed.data.amount,
-      method: parsed.data.method,
-      status: 'succeeded',
-      channel: 'web',
-    })
-    .select('receipt_no')
-    .single();
+  // Screenshots live under this resident's own folder; storage policies refuse
+  // anything else, so only accept a path that points there.
+  const proof = String(formData.get('proof_path') ?? '').trim();
+  const proofFolder = `${context.community.id}/${context.membership.id}/`;
+  if (proof && !proof.startsWith(proofFolder)) {
+    return { error: 'That screenshot could not be attached. Please upload it again.' };
+  }
 
-  if (error) return { error: friendlyDbError(error) };
+  const { error } = await supabase.from('contributions').insert({
+    event_id: event.id,
+    community_id: context.community.id,
+    membership_id: context.membership.id,
+    unit_id: context.unitIds[0] ?? null,
+    amount: parsed.data.amount,
+    method: 'upi',
+    reference: parsed.data.reference,
+    proof_path: proof || null,
+    status: 'pending',
+    channel: 'web',
+  });
+
+  if (error) {
+    const message = friendlyDbError(error);
+    return message.startsWith('That UPI reference')
+      ? { fieldErrors: { reference: message } }
+      : { error: message };
+  }
 
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
-  revalidatePath(`/app/${slug}`);
+  revalidatePath(`/app/${slug}/events/${eventSlug}/contribute`);
+  revalidatePath(`/app/${slug}/admin/events/${eventSlug}`);
+  revalidatePath(`/app/${slug}/me`);
   return {
     ...EMPTY_STATE,
-    receipt: String(data.receipt_no),
-    amount: parsed.data.amount,
+    reported: { amount: parsed.data.amount, reference: parsed.data.reference },
   };
 }
 

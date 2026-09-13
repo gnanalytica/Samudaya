@@ -10,6 +10,7 @@ import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { EventStatusBadge, FundBar, StatTile } from '@/components/badges';
+import { SocietyUpiForm } from './upi-form';
 
 export const metadata = { title: 'Console' };
 
@@ -250,6 +251,29 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
             </p>
           </CardBody>
         </Card>
+
+        {can(role, 'roles:manage') ? (
+          <Card className="mt-5">
+            <CardHeader
+              title="Payments"
+              description="Residents pay straight to this UPI ID from their UPI app, then report the UPI reference. Staff confirm each one against the bank statement before it counts."
+            />
+            <CardBody>
+              <SocietyUpiForm
+                slug={community.slug}
+                vpa={community.upi_vpa}
+                payeeName={community.upi_payee_name}
+              />
+            </CardBody>
+          </Card>
+        ) : community.upi_vpa ? (
+          <Card className="mt-5">
+            <CardHeader title="Payments" description="Residents pay to this UPI ID." />
+            <CardBody>
+              <p className="text-ink font-mono text-sm">{community.upi_vpa}</p>
+            </CardBody>
+          </Card>
+        ) : null}
       </PageBody>
     </>
   );

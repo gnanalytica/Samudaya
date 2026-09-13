@@ -19,8 +19,14 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventStatusBadge, ExpenseStatusBadge, FundBar, StatTile } from '@/components/badges';
-import { BillLink } from '@/components/bill-link';
+import {
+  EventStatusBadge,
+  ExpenseStatusBadge,
+  FundBar,
+  PaymentStatusBadge,
+  StatTile,
+} from '@/components/badges';
+import { BillLink, StoredFileLink } from '@/components/bill-link';
 import {
   AddActivityForm,
   AddBudgetLineForm,
@@ -29,6 +35,7 @@ import {
   ExpenseForm,
   RecordPaymentForm,
   ReviewExpenseForm,
+  ReviewPaymentForm,
 } from './forms';
 import { removeBudgetLine, setEventStatus, updateActivity, updateBudgetLine } from '../actions';
 
@@ -79,8 +86,10 @@ export default async function ManageEventPage(
   const open = expenses.filter((e) => e.status === 'pending' || e.status === 'changes_requested');
   const decided = expenses.filter((e) => e.status === 'approved' || e.status === 'rejected');
   const categories = budgetVsSpent(budget, expenses);
+  const confirmedPayments = payments.filter((payment) => payment.status === 'succeeded');
+  const waitingPayments = payments.filter((payment) => payment.status === 'pending');
   const flatsPaid = new Set(
-    payments.filter((payment) => payment.units).map((payment) => unitLabel(payment.units)),
+    confirmedPayments.filter((payment) => payment.units).map((payment) => unitLabel(payment.units)),
   ).size;
 
   return (
@@ -432,6 +441,8 @@ export default async function ManageEventPage(
                             <ExpenseForm
                               slug={slug}
                               eventSlug={event.slug}
+                              communityId={community.id}
+                              eventId={event.id}
                               expense={{
                                 id: expense.id,
                                 name: expense.name,
@@ -494,7 +505,12 @@ export default async function ManageEventPage(
               <Card>
                 <CardHeader title="Upload a bill" />
                 <CardBody>
-                  <ExpenseForm slug={slug} eventSlug={event.slug} />
+                  <ExpenseForm
+                    slug={slug}
+                    eventSlug={event.slug}
+                    communityId={community.id}
+                    eventId={event.id}
+                  />
                 </CardBody>
               </Card>
             ) : null}
@@ -508,9 +524,54 @@ export default async function ManageEventPage(
                 label="Collected"
                 value={formatMoney(stats.fundRaised, community.currency)}
               />
-              <StatTile label="Payments" value={String(payments.length)} />
+              <StatTile label="Confirmed payments" value={String(confirmedPayments.length)} />
               <StatTile label="Flats paid" value={String(flatsPaid)} />
             </div>
+            {waitingPayments.length ? (
+              <Card>
+                <CardHeader
+                  title={`Waiting for confirmation (${waitingPayments.length})`}
+                  description="Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count."
+                />
+                <ul className="divide-border-base divide-y">
+                  {waitingPayments.map((payment) => (
+                    <li key={payment.id} className="space-y-3 px-5 py-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-ink text-sm font-semibold">
+                            {unitLabel(payment.units) || 'No flat'} ·{' '}
+                            {formatMoney(payment.amount, community.currency)}
+                          </p>
+                          <p className="text-ink-subtle mt-0.5 text-xs">
+                            {[
+                              payment.memberships?.profiles?.full_name,
+                              payment.method.toUpperCase(),
+                              formatDate(payment.paid_at.slice(0, 10)),
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                          <p className="text-ink mt-1 font-mono text-xs">
+                            UPI reference {payment.reference ?? '—'}
+                          </p>
+                          <StoredFileLink
+                            bucket="payment-proofs"
+                            path={payment.proof_path}
+                            label="View screenshot"
+                          />
+                        </div>
+                        <Badge tone="warning">Waiting</Badge>
+                      </div>
+                      <ReviewPaymentForm
+                        slug={slug}
+                        eventSlug={event.slug}
+                        contributionId={payment.id}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ) : null}
             {event.status === 'published' && can(role, 'payments:record') ? (
               <Card>
                 <CardHeader
@@ -557,6 +618,9 @@ export default async function ManageEventPage(
                         <th scope="col" className="px-5 py-2.5 font-medium">
                           Date
                         </th>
+                        <th scope="col" className="px-5 py-2.5 font-medium">
+                          Status
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-border-base divide-y">
@@ -579,6 +643,12 @@ export default async function ManageEventPage(
                           </td>
                           <td className="text-ink-subtle px-5 py-3 text-xs">
                             {formatDate(payment.paid_at.slice(0, 10))}
+                          </td>
+                          <td className="px-5 py-3">
+                            <PaymentStatusBadge status={payment.status} />
+                            {payment.status === 'failed' && payment.review_note ? (
+                              <p className="text-ink-subtle mt-1 text-xs">{payment.review_note}</p>
+                            ) : null}
                           </td>
                         </tr>
                       ))}

@@ -1,22 +1,47 @@
-import { FileText } from 'lucide-react';
+import { FileText, ImageIcon } from 'lucide-react';
+import { fileUrl, type StorageBucket } from '@/lib/storage';
 
-/** Opens the bill when it is a link; says one is attached when it is a stored path. */
-export function BillLink({ url }: { url: string | null }) {
-  if (!url) return null;
-  return /^https?:\/\//.test(url) ? (
+/**
+ * Opens a stored file through a short-lived signed link. Row-level security on
+ * Storage decides whether the viewer may open it, so a resident sees a bill
+ * only once it is approved and a payment screenshot only if it is theirs.
+ */
+export async function StoredFileLink({
+  bucket,
+  path,
+  label,
+}: {
+  bucket: StorageBucket;
+  path: string | null | undefined;
+  label: string;
+}) {
+  if (!path) return null;
+  const href = await fileUrl(bucket, path);
+  const Icon = bucket === 'payment-proofs' ? ImageIcon : FileText;
+
+  if (!href) {
+    return (
+      <span className="text-ink-subtle mt-1 inline-flex items-center gap-1 text-xs">
+        <Icon className="size-3.5" aria-hidden="true" />
+        {bucket === 'bills' ? 'Bill not available' : 'Screenshot not available'}
+      </span>
+    );
+  }
+
+  return (
     <a
-      href={url}
+      href={href}
       target="_blank"
       rel="noreferrer"
       className="text-accent mt-1 inline-flex items-center gap-1 text-xs hover:underline"
     >
-      <FileText className="size-3.5" aria-hidden="true" />
-      View bill
+      <Icon className="size-3.5" aria-hidden="true" />
+      {label}
     </a>
-  ) : (
-    <span className="text-ink-muted mt-1 inline-flex items-center gap-1 text-xs">
-      <FileText className="size-3.5" aria-hidden="true" />
-      Bill attached
-    </span>
   );
+}
+
+/** A bill attached to an expense: an uploaded file or, in older rows, a link. */
+export function BillLink({ url }: { url: string | null }) {
+  return <StoredFileLink bucket="bills" path={url} label="View bill" />;
 }

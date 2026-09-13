@@ -16,7 +16,7 @@ import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatTile } from '@/components/badges';
+import { PaymentStatusBadge, StatTile } from '@/components/badges';
 
 export const metadata = { title: 'My activity' };
 
@@ -36,9 +36,10 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
   const [contributions, registrations, suggestions, campaigns, units] = await Promise.all([
     supabase
       .from('contributions')
-      .select('id, amount, method, receipt_no, paid_at, events(slug, name, emoji)')
+      .select(
+        'id, amount, method, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
+      )
       .eq('membership_id', membership.id)
-      .eq('status', 'succeeded')
       .order('paid_at', { ascending: false })
       .limit(50),
     supabase
@@ -63,7 +64,10 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
       : Promise.resolve({ data: [] as { block: string | null; number: string }[] }),
   ]);
 
-  const totalGiven = (contributions.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
+  // Only confirmed payments count; reported ones are still waiting for staff.
+  const totalGiven = (contributions.data ?? [])
+    .filter((row) => row.status === 'succeeded')
+    .reduce((sum, row) => sum + Number(row.amount), 0);
   const myUnits = (units.data ?? []).map((unit) => unitLabel(unit)).join(', ');
   const roleLabel = ROLE_LABEL[normalizeRole(role) ?? 'resident'];
 
@@ -90,7 +94,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
         </div>
 
         <Card className="mt-5">
-          <CardHeader title="Your contributions" />
+          <CardHeader title="Your payments" />
           {contributions.data?.length ? (
             <ul className="divide-border-base divide-y">
               {contributions.data.map((contribution) => (
@@ -104,15 +108,23 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                     </p>
                     <p className="text-ink-subtle mt-0.5 text-xs">
                       <span className="font-mono">
-                        {receiptRef(contribution.events?.slug, contribution.receipt_no)}
+                        {contribution.status === 'succeeded'
+                          ? receiptRef(contribution.events?.slug, contribution.receipt_no)
+                          : (contribution.reference ?? 'UPI payment')}
                       </span>
                       {' · '}
                       {formatDate(contribution.paid_at.slice(0, 10))}
                     </p>
+                    {contribution.status === 'failed' && contribution.review_note ? (
+                      <p className="text-danger mt-1 text-xs">{contribution.review_note}</p>
+                    ) : null}
                   </div>
-                  <span className="text-ink shrink-0 text-sm font-semibold">
-                    {formatMoney(contribution.amount, community.currency)}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-ink text-sm font-semibold">
+                      {formatMoney(contribution.amount, community.currency)}
+                    </span>
+                    <PaymentStatusBadge status={contribution.status} />
+                  </div>
                 </li>
               ))}
             </ul>

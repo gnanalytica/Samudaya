@@ -24,6 +24,18 @@ const EXPENSE_TONES: Record<Enums<'expense_status'>, Tone> = {
   changes_requested: 'info',
 };
 
+const PAYMENT: Record<Enums<'contribution_status'>, { tone: Tone; label: string }> = {
+  pending: { tone: 'warning', label: 'Waiting for confirmation' },
+  succeeded: { tone: 'success', label: 'Confirmed' },
+  failed: { tone: 'danger', label: 'Not confirmed' },
+  refunded: { tone: 'neutral', label: 'Refunded' },
+};
+
+/** Where a payment stands: reported payments count only once staff confirm them. */
+export const PaymentStatusBadge = ({ status }: { status: Enums<'contribution_status'> }) => (
+  <Badge tone={PAYMENT[status].tone}>{PAYMENT[status].label}</Badge>
+);
+
 export const EventStatusBadge = ({ status }: { status: Enums<'event_status'> }) => (
   <Badge tone={EVENT_TONES[status]}>{EVENT_STATUS_LABEL[status]}</Badge>
 );
