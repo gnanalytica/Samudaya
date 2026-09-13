@@ -1,138 +1,130 @@
 import type { Enums } from '@samudaya/supabase';
 
-export type MemberRole = Enums<'member_role'>;
-
 /**
- * Mirrors app.role_rank() in the database. The database is the authority —
- * these constants exist so the UI can hide what the user cannot do, not so it
- * can decide what they may do.
+ * The database enum still carries the retired 'admin' label (Postgres cannot
+ * drop enum values); a check constraint keeps it off every membership, and
+ * {@link normalizeRole} folds it into committee should one ever appear.
  */
+export type MemberRole = Enums<'member_role'>;
+export type Role = Exclude<MemberRole, 'admin'>;
+
+/** Mirrors app.role_rank() in the database, which is the authority. */
 export const ROLE_RANK: Record<MemberRole, number> = {
   resident: 10,
-  committee: 20,
+  staff: 20,
   admin: 30,
-  owner: 40,
+  committee: 40,
 };
 
-export const ROLE_LABEL: Record<MemberRole, string> = {
+export const ROLES: Role[] = ['resident', 'staff', 'committee'];
+
+export const ROLE_LABEL: Record<Role, string> = {
   resident: 'Resident',
-  committee: 'Committee member',
-  admin: 'Administrator',
-  owner: 'Owner',
+  staff: 'Staff',
+  committee: 'Committee',
 };
 
-export const ROLE_DESCRIPTION: Record<MemberRole, string> = {
+export const ROLE_DESCRIPTION: Record<Role, string> = {
   resident:
-    'Contribute to events, join activities, volunteer, and see exactly where the money goes.',
-  committee: 'Runs events: the checklist, activities, volunteers, and submitting expenses.',
-  admin: 'Publishes events, approves spending, admits residents, and closes events.',
-  owner: 'Full control, including transferring ownership.',
+    'Views events, contributes, suggests activities and ideas, votes, sees where the money goes, and proposes fundraising campaigns.',
+  staff:
+    'Runs the society day to day: uploads and corrects bills, admits and removes residents, creates and manages events, and tracks which flat paid for what.',
+  committee:
+    'Everything staff can do, plus the final say: approves or rejects bills, fundraising campaigns and suggestions, closes events, and assigns roles.',
 };
 
-/** Roles an admin can hand out. Ownership is transferred, never granted. */
-export const ASSIGNABLE_ROLES: MemberRole[] = ['resident', 'committee', 'admin'];
+/** Roles the committee can hand out. */
+export const ASSIGNABLE_ROLES: Role[] = ['resident', 'staff', 'committee'];
 
-export function hasRoleAtLeast(role: MemberRole | null | undefined, min: MemberRole): boolean {
-  if (!role) return false;
-  return ROLE_RANK[role] >= ROLE_RANK[min];
+export function normalizeRole(role: MemberRole | null | undefined): Role | null {
+  if (!role) return null;
+  return role === 'admin' ? 'committee' : role;
 }
 
-export const isAdmin = (role: MemberRole | null | undefined) => hasRoleAtLeast(role, 'admin');
+export function hasRoleAtLeast(role: MemberRole | null | undefined, min: MemberRole): boolean {
+  const normalized = normalizeRole(role);
+  if (!normalized) return false;
+  return ROLE_RANK[normalized] >= ROLE_RANK[min];
+}
+
+export const isStaff = (role: MemberRole | null | undefined) => hasRoleAtLeast(role, 'staff');
 export const isCommittee = (role: MemberRole | null | undefined) =>
   hasRoleAtLeast(role, 'committee');
 
+/** Residents and committee take part; staff are operators and do not. */
+export const canParticipate = (role: MemberRole | null | undefined) => {
+  const normalized = normalizeRole(role);
+  return normalized === 'resident' || normalized === 'committee';
+};
+
 /**
- * What each role may do, for driving navigation and disabling controls.
- * Every one of these is independently enforced by RLS.
+ * What each role may do, for driving navigation and disabling controls. Every
+ * one of these is independently enforced by row-level security.
  */
 export type Capability =
-  | 'events:prepare'
-  | 'events:publish'
-  | 'announcements:post'
+  // Everyone admitted
+  | 'events:view'
+  | 'analytics:view'
+  // Residents and committee (not staff)
+  | 'contribute'
+  | 'vote'
+  | 'suggest'
+  | 'campaigns:propose'
+  | 'activities:register'
+  // Staff and committee
+  | 'events:manage'
+  | 'budget:manage'
+  | 'activities:manage'
   | 'expenses:submit'
-  | 'expenses:approve'
-  | 'polls:create'
-  | 'reallocation:propose'
-  | 'members:manage'
+  | 'payments:view'
+  | 'payments:record'
   | 'joinrequests:review'
-  | 'invites:manage'
-  | 'units:manage'
-  | 'apikeys:manage'
-  | 'settings:manage';
+  | 'residents:remove'
+  // Committee only
+  | 'expenses:approve'
+  | 'campaigns:approve'
+  | 'suggestions:approve'
+  | 'events:close'
+  | 'roles:manage';
 
-const CAPABILITIES: Record<Capability, MemberRole> = {
-  // Committee prepares an event and works it…
-  'events:prepare': 'committee',
-  'announcements:post': 'committee',
-  'expenses:submit': 'committee',
-  'polls:create': 'committee',
-  // …but only an admin puts it in front of the society, signs off spending,
-  // or proposes moving money between funds.
-  'events:publish': 'admin',
-  'expenses:approve': 'admin',
-  'reallocation:propose': 'admin',
-  'members:manage': 'admin',
-  'joinrequests:review': 'admin',
-  'invites:manage': 'admin',
-  'units:manage': 'admin',
-  'apikeys:manage': 'admin',
-  'settings:manage': 'admin',
+type Rule = 'member' | 'participant' | 'staff' | 'committee';
+
+const CAPABILITIES: Record<Capability, Rule> = {
+  'events:view': 'member',
+  'analytics:view': 'member',
+
+  contribute: 'participant',
+  vote: 'participant',
+  suggest: 'participant',
+  'campaigns:propose': 'participant',
+  'activities:register': 'participant',
+
+  'events:manage': 'staff',
+  'budget:manage': 'staff',
+  'activities:manage': 'staff',
+  'expenses:submit': 'staff',
+  'payments:view': 'staff',
+  'payments:record': 'staff',
+  'joinrequests:review': 'staff',
+  'residents:remove': 'staff',
+
+  'expenses:approve': 'committee',
+  'campaigns:approve': 'committee',
+  'suggestions:approve': 'committee',
+  'events:close': 'committee',
+  'roles:manage': 'committee',
 };
 
 export function can(role: MemberRole | null | undefined, capability: Capability): boolean {
   if (!role) return false;
-  return hasRoleAtLeast(role, CAPABILITIES[capability]);
-}
-
-/**
- * Titles offered when naming a member's position. A title is a label only; the
- * role still decides permissions. A paid estate supervisor, for instance, is a
- * committee member titled "Supervisor". Any other title up to 40 characters is
- * allowed.
- */
-export const SUGGESTED_TITLES = [
-  'President',
-  'Vice President',
-  'Secretary',
-  'Treasurer',
-  'Joint Secretary',
-  'Cultural Secretary',
-  'Sports Secretary',
-  'Committee Member',
-  'Supervisor',
-  'Estate Manager',
-] as const;
-
-export const TITLE_MAX_LENGTH = 40;
-
-/** How a member is described: their title when set, otherwise their role. */
-export function positionLabel(role: MemberRole | null | undefined, title?: string | null): string {
-  const trimmed = title?.trim();
-  if (trimmed) return trimmed;
-  return role ? ROLE_LABEL[role] : '';
-}
-
-/**
- * Whether this member may approve spending right now. Mirrors
- * app.can_approve_spending(): any admin, unless the community restricts approval
- * to designated approvers. The database re-checks on every approval.
- */
-export function canApproveSpending(
-  role: MemberRole | null | undefined,
-  approvesSpending: boolean | null | undefined,
-  restrictSpendingApproval: boolean | null | undefined,
-): boolean {
-  if (!isAdmin(role)) return false;
-  return !restrictSpendingApproval || Boolean(approvesSpending);
-}
-
-/**
- * Who may change the approver list or the restriction: an owner, or an admin who
- * is already an approver. Mirrors app.manages_spending_approval().
- */
-export function canManageSpendingApproval(
-  role: MemberRole | null | undefined,
-  approvesSpending: boolean | null | undefined,
-): boolean {
-  return role === 'owner' || (isAdmin(role) && Boolean(approvesSpending));
+  switch (CAPABILITIES[capability]) {
+    case 'member':
+      return true;
+    case 'participant':
+      return canParticipate(role);
+    case 'staff':
+      return isStaff(role);
+    case 'committee':
+      return isCommittee(role);
+  }
 }

@@ -14,12 +14,21 @@ export const phoneSchema = z
   .trim()
   .regex(/^\+[1-9]\d{7,14}$/, 'Use the international format, e.g. +919876543210');
 
-export const memberRoleSchema = z.enum(['resident', 'committee', 'admin', 'owner']);
-export const assignableRoleSchema = z.enum(['resident', 'committee', 'admin']);
+export const memberRoleSchema = z.enum(['resident', 'staff', 'committee']);
+/** Every role can be assigned; the database keeps at least one committee member. */
+export const assignableRoleSchema = z.enum(['resident', 'staff', 'committee']);
 export const occupantRelationSchema = z.enum(['owner', 'tenant', 'family', 'other']);
 export const audienceSchema = z.enum(['all', 'residents', 'committee']);
 export const taskStatusSchema = z.enum(['todo', 'in_progress', 'done', 'blocked']);
-export const eventStatusSchema = z.enum(['draft', 'published', 'completed', 'cancelled']);
+export const eventStatusSchema = z.enum([
+  'proposed',
+  'draft',
+  'published',
+  'completed',
+  'cancelled',
+]);
+export const eventKindSchema = z.enum(['event', 'campaign']);
+export const suggestionKindSchema = z.enum(['activity', 'idea']);
 export const fundRuleSchema = z.enum([
   'carry_next_edition',
   'carry_related',

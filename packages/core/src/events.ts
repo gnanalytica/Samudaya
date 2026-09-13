@@ -12,6 +12,7 @@ export type ExpenseStatus = Enums<'expense_status'>;
 export type FundRule = Enums<'fund_rule'>;
 
 export const EVENT_STATUS_LABEL: Record<EventStatus, string> = {
+  proposed: 'Awaiting committee approval',
   draft: 'Draft',
   published: 'Upcoming',
   completed: 'Completed',

@@ -20,6 +20,7 @@ export type Database = {
           special_requirements: string | null
           channel: Database["public"]["Enums"]["origin_channel"]
           joined_at: string
+          participant_name: string | null
         }
         Insert: {
           id?: string
@@ -31,6 +32,7 @@ export type Database = {
           special_requirements?: string | null
           channel?: Database["public"]["Enums"]["origin_channel"]
           joined_at?: string
+          participant_name?: string | null
         }
         Update: {
           id?: string
@@ -42,6 +44,7 @@ export type Database = {
           special_requirements?: string | null
           channel?: Database["public"]["Enums"]["origin_channel"]
           joined_at?: string
+          participant_name?: string | null
         }
         Relationships: [
           {
@@ -74,6 +77,7 @@ export type Database = {
           review_note: string | null
           created_at: string
           updated_at: string
+          kind: string
         }
         Insert: {
           id?: string
@@ -88,6 +92,7 @@ export type Database = {
           review_note?: string | null
           created_at?: string
           updated_at?: string
+          kind?: string
         }
         Update: {
           id?: string
@@ -102,6 +107,7 @@ export type Database = {
           review_note?: string | null
           created_at?: string
           updated_at?: string
+          kind?: string
         }
         Relationships: [
           {
@@ -374,6 +380,54 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      budget_lines: {
+        Row: {
+          id: string
+          event_id: string
+          community_id: string
+          category: string
+          amount: number
+          notes: string | null
+          position: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          event_id: string
+          community_id: string
+          category: string
+          amount: number
+          notes?: string | null
+          position?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          event_id?: string
+          community_id?: string
+          category?: string
+          amount?: number
+          notes?: string | null
+          position?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_lines_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_lines_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
@@ -772,6 +826,7 @@ export type Database = {
           created_by: string | null
           created_at: string
           updated_at: string
+          kind: string
         }
         Insert: {
           id?: string
@@ -795,6 +850,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          kind?: string
         }
         Update: {
           id?: string
@@ -818,6 +874,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          kind?: string
         }
         Relationships: [
           {
@@ -1631,6 +1688,45 @@ export type Database = {
           }
         ]
       }
+      suggestion_votes: {
+        Row: {
+          id: string
+          suggestion_id: string
+          membership_id: string
+          support: boolean
+          voted_at: string
+        }
+        Insert: {
+          id?: string
+          suggestion_id: string
+          membership_id: string
+          support: boolean
+          voted_at?: string
+        }
+        Update: {
+          id?: string
+          suggestion_id?: string
+          membership_id?: string
+          support?: boolean
+          voted_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suggestion_votes_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suggestion_votes_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "activity_suggestions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       unit_occupants: {
         Row: {
           id: string
@@ -2113,6 +2209,16 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["join_requests"]["Row"]
       }
+      society_units: {
+        Args: {
+        p_join_code: string
+      }
+        Returns: {
+        id: string | null
+        block: string | null
+        number: string | null
+      }[]
+      }
       verify_api_key: {
         Args: {
         p_prefix: string
@@ -2144,11 +2250,11 @@ export type Database = {
     Enums: {
       announcement_audience: "all" | "residents" | "committee"
       contribution_status: "pending" | "succeeded" | "failed" | "refunded"
-      event_status: "draft" | "published" | "completed" | "cancelled"
+      event_status: "proposed" | "draft" | "published" | "completed" | "cancelled"
       expense_status: "pending" | "approved" | "rejected" | "changes_requested"
       fund_rule: "carry_next_edition" | "carry_related" | "general_fund" | "refund" | "donate"
       join_request_status: "pending" | "approved" | "rejected"
-      member_role: "resident" | "committee" | "admin" | "owner"
+      member_role: "resident" | "staff" | "admin" | "committee"
       membership_status: "pending" | "active" | "suspended"
       occupant_relation: "owner" | "tenant" | "family" | "other"
       origin_channel: "web" | "mobile" | "whatsapp" | "api" | "system"

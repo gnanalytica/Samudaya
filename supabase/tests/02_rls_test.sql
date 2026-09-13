@@ -47,8 +47,9 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- Two societies
 -- ---------------------------------------------------------------------------
-select test.act_as('11111111-1111-4111-8111-111111111111');
-
+-- Societies are set up by the platform team (the service role here), with the
+-- first committee member named as created_by.
+reset role;
 insert into public.communities (id, slug, join_code, name, created_by) values
   ('aaaaaaaa-0000-4000-8000-000000000001', 'green-valley', 'MHR4827',
    'My Home Residency', '11111111-1111-4111-8111-111111111111');
@@ -57,7 +58,9 @@ select test.eq(
   (select role::text from public.memberships
     where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
       and user_id = '11111111-1111-4111-8111-111111111111'),
-  'owner', 'the founder becomes owner of the society they create');
+  'committee', 'the named founder joins the society as committee');
+
+select test.act_as('11111111-1111-4111-8111-111111111111');
 
 insert into public.units (id, community_id, block, number) values
   ('bbbbbbbb-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001', 'A', '101'),
@@ -65,22 +68,17 @@ insert into public.units (id, community_id, block, number) values
   ('bbbbbbbb-0000-4000-8000-000000000003', 'aaaaaaaa-0000-4000-8000-000000000001', 'B', '201');
 
 reset role;
-select test.act_as('77777777-7777-4777-8777-777777777777');
 insert into public.communities (id, slug, join_code, name, created_by) values
   ('aaaaaaaa-0000-4000-8000-000000000002', 'lake-view', 'LKV1234',
    'Lake View Residency', '77777777-7777-4777-8777-777777777777');
+select test.act_as('77777777-7777-4777-8777-777777777777');
 
 select test.eq(test.visible('select id from public.communities'), 1::bigint,
-  'an owner sees only their own society');
+  'a committee member sees only their own society');
 
 -- ---------------------------------------------------------------------------
--- Founding a society the way the web app does
+-- Only the platform team creates societies
 -- ---------------------------------------------------------------------------
--- The founder becomes a member in an after-insert trigger, which runs after
--- RETURNING has already been checked against the members-only SELECT policy.
--- So `insert ... returning` (supabase-js `.insert().select()`) is rejected, and
--- onboarding must insert first and read the society back separately. Hana is a
--- fresh user so nothing below depends on her.
 reset role;
 insert into auth.users (id, email, raw_user_meta_data) values
   ('88888888-8888-4888-8888-888888888888', 'hana@example.com', '{"full_name":"Hana Iyer"}');
@@ -88,19 +86,15 @@ insert into auth.users (id, email, raw_user_meta_data) values
 select test.act_as('88888888-8888-4888-8888-888888888888');
 select test.raises(
   $q$insert into public.communities (slug, name, created_by)
-     values ('hill-crest', 'Hill Crest', '88888888-8888-4888-8888-888888888888')
-     returning slug$q$,
-  'a founder cannot read a new society back in the same insert');
+     values ('hill-crest', 'Hill Crest', '88888888-8888-4888-8888-888888888888')$q$,
+  'a signed-in user cannot create a society');
 
-insert into public.communities (slug, name, created_by)
-  values ('hill-crest', 'Hill Crest', '88888888-8888-4888-8888-888888888888');
+reset role;
+insert into public.communities (slug, join_code, name, created_by)
+  values ('hill-crest', 'HILL2026', 'Hill Crest', '88888888-8888-4888-8888-888888888888');
+select test.act_as('88888888-8888-4888-8888-888888888888');
 select test.eq(test.visible($q$select id from public.communities where slug = 'hill-crest'$q$), 1::bigint,
-  'a plain insert succeeds and the founder can read the society straight after');
-select test.eq(
-  (select role::text from public.memberships m
-     join public.communities c on c.id = m.community_id
-    where c.slug = 'hill-crest' and m.user_id = '88888888-8888-4888-8888-888888888888'),
-  'owner', 'and is its owner');
+  'the committee member the platform named can see the society');
 
 -- ---------------------------------------------------------------------------
 -- Joining by Society ID, with admin approval
@@ -128,7 +122,7 @@ select test.eq(
 reset role;
 select test.eq((select count(*)::int from public.join_requests
                  where user_id = '33333333-3333-4333-8333-333333333333'), 1,
-  'and does not create a second row for the admin to wade through');
+  'and does not create a second row for staff to wade through');
 
 -- A resident cannot admit themselves.
 select test.act_as('33333333-3333-4333-8333-333333333333');
@@ -140,7 +134,7 @@ reset role;
 select test.act_as('11111111-1111-4111-8111-111111111111');
 select test.eq(
   (select status::text from public.review_join_request((select request_id from t_req), true, 'resident')),
-  'approved', 'an admin approves the request');
+  'approved', 'the committee admits the request');
 
 reset role;
 select test.act_as('33333333-3333-4333-8333-333333333333');
@@ -155,9 +149,9 @@ select test.eq(
 -- Bring the rest in directly, as an admin would with a pre-approved code.
 reset role;
 insert into public.memberships (community_id, user_id, role, status) values
-  ('aaaaaaaa-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222', 'admin', 'active'),
+  ('aaaaaaaa-0000-4000-8000-000000000001', '22222222-2222-4222-8222-222222222222', 'committee', 'active'),
   ('aaaaaaaa-0000-4000-8000-000000000001', '44444444-4444-4444-8444-444444444444', 'resident', 'active'),
-  ('aaaaaaaa-0000-4000-8000-000000000001', '55555555-5555-4555-8555-555555555555', 'committee', 'active');
+  ('aaaaaaaa-0000-4000-8000-000000000001', '55555555-5555-4555-8555-555555555555', 'staff', 'active');
 
 insert into public.unit_occupants (unit_id, membership_id, relation, is_primary)
 select 'bbbbbbbb-0000-4000-8000-000000000002', m.id, 'owner', true
@@ -184,11 +178,11 @@ select test.eq(test.visible('select id from public.events'), 0::bigint,
 reset role;
 select test.act_as('55555555-5555-4555-8555-555555555555');
 select test.eq(test.visible('select id from public.events'), 1::bigint,
-  'the committee can see the draft they are preparing');
+  'staff can see the draft they are preparing');
 select test.raises(
-  $q$update public.events set status = 'published'
+  $q$update public.events set status = 'completed'
       where id = 'cccccccc-0000-4000-8000-000000000001'$q$,
-  'a committee member cannot publish an event to the whole society');
+  'staff cannot close an event; that is a committee decision');
 
 reset role;
 select test.act_as('11111111-1111-4111-8111-111111111111');
@@ -311,7 +305,7 @@ reset role;
 select test.act_as('55555555-5555-4555-8555-555555555555');
 select test.raises(
   $q$select public.review_expense('dddddddd-0000-4000-8000-000000000001', 'approved')$q$,
-  'a committee member cannot approve an expense at all');
+  'staff cannot approve a bill at all');
 
 reset role;
 select test.act_as('11111111-1111-4111-8111-111111111111');
@@ -321,11 +315,11 @@ select 'dddddddd-0000-4000-8000-000000000009', 'cccccccc-0000-4000-8000-00000000
        app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001');
 select test.raises(
   $q$select public.review_expense('dddddddd-0000-4000-8000-000000000009', 'approved')$q$,
-  'an admin cannot approve an expense they requested themselves');
+  'a committee member cannot approve a bill they raised themselves');
 
 select test.eq(
   (select status::text from public.review_expense('dddddddd-0000-4000-8000-000000000001', 'approved')),
-  'approved', 'an admin approves somebody else''s expense');
+  'approved', 'the committee approves somebody else''s bill');
 
 reset role;
 select test.act_as('33333333-3333-4333-8333-333333333333');
@@ -457,7 +451,7 @@ select test.raises(
        (community_id, from_event_id, to_label, amount, reason)
      values ('aaaaaaaa-0000-4000-8000-000000000001',
              'cccccccc-0000-4000-8000-000000000001', 'General fund', 1000, 'because')$q$,
-  'only an admin may propose moving money between funds');
+  'staff may not propose moving money between funds');
 
 -- Five active members, so 60% needs three approvals.
 reset role;
@@ -514,10 +508,15 @@ select test.ok(
   (select closed_at is not null from public.events where id = 'cccccccc-0000-4000-8000-000000000001'),
   'closing an event stamps closed_at');
 
+-- Bala did not raise this bill, so only the closed ledger can stop him.
+reset role;
+select test.act_as('22222222-2222-4222-8222-222222222222');
 select test.raises(
   $q$select public.review_expense('dddddddd-0000-4000-8000-000000000009', 'approved')$q$,
   'a closed event''s ledger cannot take new approvals');
 
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
 select test.raises(
   $q$update public.events set status = 'published'
       where id = 'cccccccc-0000-4000-8000-000000000001'$q$,
@@ -558,73 +557,225 @@ select test.eq(test.visible('select * from public.event_stats'), 0::bigint,
   'not even aggregate numbers');
 
 -- ---------------------------------------------------------------------------
--- Titles and designated spending approvers (Hill Crest, founded by Hana)
+-- Three roles in Hill Crest: Hana (committee), Sam (staff), Ria and Tom
+-- (residents of the same flat), Neil (resident waiting to be admitted)
 -- ---------------------------------------------------------------------------
--- Ivan is an admin, Kiran is an admin who becomes Treasurer, Jaya is the
--- committee Supervisor who raises a bill.
 reset role;
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('99999999-9999-4999-8999-999999999999', 'ivan@example.com',  '{"full_name":"Ivan Dsouza"}'),
-  ('abababab-abab-4bab-8bab-abababababab', 'kiran@example.com', '{"full_name":"Kiran Rao"}'),
-  ('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', 'jaya@example.com',  '{"full_name":"Jaya Pillai"}');
+  ('99999999-9999-4999-8999-999999999999', 'sam@example.com',  '{"full_name":"Sam Supervisor"}'),
+  ('abababab-abab-4bab-8bab-abababababab', 'ria@example.com',  '{"full_name":"Ria Menon"}'),
+  ('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', 'tom@example.com',  '{"full_name":"Tom Menon"}'),
+  ('efefefef-efef-4fef-8fef-efefefefefef', 'neil@example.com', '{"full_name":"Neil Das"}');
+insert into public.units (id, community_id, block, number)
+select 'b2b2b2b2-0000-4000-8000-000000000001', c.id, 'A', '1104' from public.communities c where c.slug = 'hill-crest';
 insert into public.memberships (community_id, user_id, role, status)
 select c.id, u.id::uuid, u.role::public.member_role, 'active'
   from public.communities c,
-       (values ('99999999-9999-4999-8999-999999999999', 'admin'),
-               ('abababab-abab-4bab-8bab-abababababab', 'admin'),
-               ('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', 'committee')) as u(id, role)
+       (values ('99999999-9999-4999-8999-999999999999', 'staff'),
+               ('abababab-abab-4bab-8bab-abababababab', 'resident'),
+               ('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', 'resident')) as u(id, role)
  where c.slug = 'hill-crest';
-insert into public.events (id, community_id, slug, name, starts_on, status)
-select 'cccccccc-0000-4000-8000-0000000000aa', c.id, 'hill-diwali', 'Hill Crest Diwali', '2026-11-07', 'published'
+insert into public.events (id, community_id, slug, name, starts_on, status, fund_target)
+select 'cccccccc-0000-4000-8000-0000000000aa', c.id, 'hill-diwali', 'Hill Crest Diwali', '2026-11-07', 'published', 50000
   from public.communities c where c.slug = 'hill-crest';
-insert into public.expenses (id, event_id, community_id, name, amount, vendor, requested_by)
-select 'dddddddd-0000-4000-8000-0000000000aa', 'cccccccc-0000-4000-8000-0000000000aa', m.community_id,
-       'Diyas', 2500, 'Clay Crafts', m.id
-  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+insert into public.event_activities (id, event_id, community_id, name)
+select 'eeeeeeee-0000-4000-8000-0000000000aa', 'cccccccc-0000-4000-8000-0000000000aa', c.id, 'Rangoli'
+  from public.communities c where c.slug = 'hill-crest';
 
+-- Joining with the one society code; staff admit.
+select test.act_as('efefefef-efef-4fef-8fef-efefefefefef');
+select test.eq((select count(*) from public.society_units('HILL2026')), 1::bigint,
+  'someone with the society code can pick from its flats before joining');
+select test.eq((select count(*) from public.society_units('WRONG1')), 0::bigint,
+  'a wrong code shows no flats');
+select test.eq(test.visible('select id from public.units'), 0::bigint,
+  'and flats stay hidden from non-members otherwise');
+create temporary table t_neil as
+select * from public.request_to_join('HILL2026', 'b2b2b2b2-0000-4000-8000-000000000001', 'Neil Das', '9845012345', 'tenant');
+grant select on t_neil to authenticated;
+select test.eq((select status from t_neil), 'pending', 'a new resident submits the society code and their details');
+select test.eq(test.visible($q$select id from public.events where slug = 'hill-diwali'$q$), 0::bigint,
+  'and sees nothing until admitted');
+
+reset role;
 select test.act_as('99999999-9999-4999-8999-999999999999');
-update public.memberships set title = 'Supervisor'
- where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+select test.raises(
+  format($q$select public.review_join_request('%s', true, 'staff')$q$, (select request_id from t_neil)),
+  'staff cannot admit someone as staff');
 select test.eq(
-  (select title from public.memberships where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'),
-  'Supervisor', 'an admin can give a member a title');
+  (select status::text from public.review_join_request((select request_id from t_neil), true)),
+  'approved', 'staff admit a new resident');
+
+reset role;
+select test.act_as('efefefef-efef-4fef-8fef-efefefefefef');
+select test.eq(test.visible($q$select id from public.events where slug = 'hill-diwali'$q$), 1::bigint,
+  'once admitted, the resident sees events');
+
+-- Staff remove residents, but never committee or other staff.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+delete from public.memberships where user_id = 'efefefef-efef-4fef-8fef-efefefefefef';
+select test.eq(
+  (select count(*)::int from public.memberships where user_id = 'efefefef-efef-4fef-8fef-efefefefefef'),
+  0, 'staff remove a resident');
+delete from public.memberships where user_id = '88888888-8888-4888-8888-888888888888';
+reset role;
+select test.eq(
+  (select count(*)::int from public.memberships where user_id = '88888888-8888-4888-8888-888888888888'),
+  1, 'but cannot remove a committee member');
+select test.act_as('99999999-9999-4999-8999-999999999999');
 select test.raises(
-  $q$update public.memberships set approves_spending = true
-      where user_id = '99999999-9999-4999-8999-999999999999'$q$,
-  'an admin who is not an approver cannot make themselves a spending approver');
+  $q$update public.memberships set role = 'staff'
+      where user_id = 'abababab-abab-4bab-8bab-abababababab'$q$,
+  'and cannot change anyone''s role');
+
+-- Money: residents contribute, staff do not; staff see and record every flat.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.contributions (event_id, community_id, membership_id, unit_id, amount)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 'b2b2b2b2-0000-4000-8000-000000000001', 2001
+  from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
 select test.raises(
-  $q$update public.communities set restrict_spending_approval = true where slug = 'hill-crest'$q$,
-  'nor switch on approver-only spending');
+  $q$insert into public.contributions (event_id, community_id, membership_id, amount)
+     select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 500
+       from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999'$q$,
+  'staff cannot contribute as a participant');
+insert into public.contributions (event_id, community_id, unit_id, amount, method, channel)
+select 'cccccccc-0000-4000-8000-0000000000aa', e.community_id, 'b2b2b2b2-0000-4000-8000-000000000001', 1500, 'cash', 'system'
+  from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+select test.eq(test.visible($q$select id from public.contributions where event_id = 'cccccccc-0000-4000-8000-0000000000aa'$q$),
+  2::bigint, 'staff record cash against a flat and see every flat''s payments');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(test.visible($q$select id from public.contributions where event_id = 'cccccccc-0000-4000-8000-0000000000aa'$q$),
+  0::bigint, 'a resident does not see other people''s payments');
+
+-- Bills: staff raise them, only committee decides.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.expenses (id, event_id, community_id, name, category, amount, vendor, requested_by)
+select 'dddddddd-0000-4000-8000-0000000000aa', 'cccccccc-0000-4000-8000-0000000000aa', m.community_id,
+       'Diyas', 'decoration', 2500, 'Clay Crafts', m.id
+  from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999';
+update public.expenses set amount = 2400, bill_url = 'bills/diyas-corrected.pdf'
+ where id = 'dddddddd-0000-4000-8000-0000000000aa';
+select test.eq((select amount from public.expenses where id = 'dddddddd-0000-4000-8000-0000000000aa'),
+  2400::numeric(12,2), 'staff correct a pending bill and re-upload it');
+select test.raises(
+  $q$select public.review_expense('dddddddd-0000-4000-8000-0000000000aa', 'approved')$q$,
+  'staff cannot approve a bill');
 
 reset role;
 select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select status::text from public.review_expense('dddddddd-0000-4000-8000-0000000000aa', 'approved')),
+  'approved', 'the committee approves it');
+
+-- Budget: staff plan it, residents read it.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.budget_lines (event_id, community_id, category, amount)
+select 'cccccccc-0000-4000-8000-0000000000aa', e.community_id, 'Decoration', 12000
+  from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(test.visible('select id from public.budget_lines'), 1::bigint, 'residents see the budget');
 select test.raises(
-  $q$update public.communities set restrict_spending_approval = true where slug = 'hill-crest'$q$,
-  'restricting approval needs at least one approver first');
+  $q$insert into public.budget_lines (event_id, community_id, category, amount)
+     select 'cccccccc-0000-4000-8000-0000000000aa', e.community_id, 'Sweets', 5000
+       from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa'$q$,
+  'but cannot change it');
+
+-- Several people from one flat register for an activity.
+insert into public.activity_participants (activity_id, membership_id, participant_name)
+select 'eeeeeeee-0000-4000-8000-0000000000aa', m.id, n
+  from public.memberships m, (values ('Ria Menon'), ('Aarav Menon')) v(n)
+ where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.activity_participants (activity_id, membership_id)
+select 'eeeeeeee-0000-4000-8000-0000000000aa', m.id
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+reset role;
+select test.eq(
+  (select count(*)::int from public.activity_participants where activity_id = 'eeeeeeee-0000-4000-8000-0000000000aa'),
+  3, 'two family members and a flatmate from the same flat all register');
+
+-- Campaigns: a resident proposes, only the committee approves.
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.events (id, community_id, slug, name, starts_on, kind, status, fund_target, created_by)
+select 'cccccccc-0000-4000-8000-0000000000bb', c.id, 'park-benches', 'New benches for the park', '2026-12-01',
+       'campaign', 'proposed', 40000, 'abababab-abab-4bab-8bab-abababababab'
+  from public.communities c where c.slug = 'hill-crest';
+select test.eq(test.visible($q$select id from public.events where slug = 'park-benches'$q$), 1::bigint,
+  'a resident proposes a fundraising campaign and sees it');
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(test.visible($q$select id from public.events where slug = 'park-benches'$q$), 0::bigint,
+  'other residents do not see it until approved');
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
 select test.raises(
-  $q$update public.memberships set approves_spending = true
-      where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$,
-  'a committee member cannot be a spending approver');
-update public.memberships set approves_spending = true, title = 'Treasurer'
- where user_id = 'abababab-abab-4bab-8bab-abababababab';
-update public.communities set restrict_spending_approval = true where slug = 'hill-crest';
-select test.ok(
-  (select restrict_spending_approval from public.communities where slug = 'hill-crest'),
-  'the owner designates a Treasurer and restricts approval to approvers');
+  $q$update public.events set status = 'published' where slug = 'park-benches'$q$,
+  'staff cannot approve a campaign');
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+update public.events set status = 'published' where slug = 'park-benches';
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(test.visible($q$select id from public.events where slug = 'park-benches'$q$), 1::bigint,
+  'once the committee approves, every resident sees it');
+
+-- Suggestions: residents suggest, committee opens voting, one vote each.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.activity_suggestions (id, community_id, event_id, kind, name, suggested_by)
+select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.community_id, 'cccccccc-0000-4000-8000-0000000000aa', 'activity',
+       'Lantern walk', m.id
+  from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+select test.raises(
+  $q$insert into public.suggestion_votes (suggestion_id, membership_id, support)
+     select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.id, true
+       from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab'$q$,
+  'nobody votes on a suggestion before the committee approves it');
 
 reset role;
 select test.act_as('99999999-9999-4999-8999-999999999999');
 select test.raises(
-  $q$select public.review_expense('dddddddd-0000-4000-8000-0000000000aa', 'approved')$q$,
-  'once restricted, an ordinary admin cannot approve spending');
-select test.raises(
-  $q$update public.communities set restrict_spending_approval = false where slug = 'hill-crest'$q$,
-  'and cannot lift the restriction');
+  $q$update public.activity_suggestions set status = 'accepted'
+      where id = 'f1f1f1f1-0000-4000-8000-0000000000aa'$q$,
+  'staff cannot approve a suggestion');
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+update public.activity_suggestions set status = 'accepted' where id = 'f1f1f1f1-0000-4000-8000-0000000000aa';
 
 reset role;
 select test.act_as('abababab-abab-4bab-8bab-abababababab');
-select test.eq(
-  (select status::text from public.review_expense('dddddddd-0000-4000-8000-0000000000aa', 'approved')),
-  'approved', 'the designated Treasurer approves it');
+insert into public.suggestion_votes (suggestion_id, membership_id, support)
+select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.id, true
+  from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.suggestion_votes (suggestion_id, membership_id, support)
+select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.id, false
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+select test.raises(
+  $q$insert into public.suggestion_votes (suggestion_id, membership_id, support)
+     select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.id, true
+       from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$,
+  'one vote per person, even from the same flat');
+reset role;
+select test.eq((select count(*)::int from public.suggestion_votes where suggestion_id = 'f1f1f1f1-0000-4000-8000-0000000000aa'),
+  2, 'two people in the same flat each get a vote');
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.raises(
+  $q$insert into public.suggestion_votes (suggestion_id, membership_id, support)
+     select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.id, true
+       from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999'$q$,
+  'staff do not vote');
 
 reset role;
