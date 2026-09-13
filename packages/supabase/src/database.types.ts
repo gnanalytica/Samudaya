@@ -2402,6 +2402,12 @@ export type Database = {
         number: string | null
       }[]
       }
+      todo_count: {
+        Args: {
+        p_community_id: string
+      }
+        Returns: number
+      }
       todo_items: {
         Args: {
         p_community_id: string

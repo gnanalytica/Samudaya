@@ -3,14 +3,7 @@
 import { useActionState, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ChevronDown, Plus, X } from 'lucide-react';
-import {
-  COPY,
-  DEFAULT_FUND_RULE,
-  formatMoney,
-  type FundRule,
-  FUND_RULES,
-  FUND_RULE_LABEL,
-} from '@samudaya/core';
+import { COPY, DEFAULT_FUND_RULE, formatMoney, FUND_RULES, FUND_RULE_LABEL } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';

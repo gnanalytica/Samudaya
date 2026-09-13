@@ -43,3 +43,13 @@ export const getTodoItems = cache(
     );
   },
 );
+
+/** Just the size of the queue, for badges. Matches getTodoItems() row for row. */
+export const getTodoCount = cache(
+  async (communityId: string, role: MemberRole): Promise<number> => {
+    if (!can(role, 'events:manage')) return 0;
+    const supabase = await getSupabase();
+    const { data } = await supabase.rpc('todo_count', { p_community_id: communityId });
+    return data ?? 0;
+  },
+);

@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificationAppRoute, type NotificationData } from '@samudaya/core';
 import { useAuth } from './auth';
 import { supabase } from './supabase';
+import { TODO_KEY } from './todo';
 
 /**
  * In-app notifications and push taps.
@@ -62,6 +63,7 @@ export function useUnreadCount() {
     queryKey: [UNREAD_KEY, user?.id ?? null],
     enabled: Boolean(user),
     refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
     queryFn: async () => {
       const { count } = await supabase
         .from('notifications')
@@ -126,10 +128,12 @@ export function usePushTapHandler(ready: boolean) {
 
     void Notifications.getLastNotificationResponseAsync().then(handle);
     const tapped = Notifications.addNotificationResponseReceivedListener(handle);
-    // A push that arrives while the app is open should show up in the inbox.
+    // A push that arrives while the app is open should show up in the inbox,
+    // and usually means something new is waiting in the To do queue.
     const received = Notifications.addNotificationReceivedListener(() => {
       void queryClient.invalidateQueries({ queryKey: [NOTIFICATIONS_KEY] });
       void queryClient.invalidateQueries({ queryKey: [UNREAD_KEY] });
+      void queryClient.invalidateQueries({ queryKey: [TODO_KEY] });
     });
 
     return () => {

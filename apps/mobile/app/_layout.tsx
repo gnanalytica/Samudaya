@@ -1,4 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { COPY } from '@samudaya/core';
@@ -77,6 +78,18 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// React Query only knows about browser tabs. Tell it when the app goes to the
+// background and comes back, so badge polls stop while nobody is looking and
+// counts refresh the moment the app is reopened.
+if (Platform.OS !== 'web') {
+  focusManager.setEventListener((setFocused) => {
+    const subscription = AppState.addEventListener('change', (state) =>
+      setFocused(state === 'active'),
+    );
+    return () => subscription.remove();
+  });
+}
 
 export default function RootLayout() {
   return (

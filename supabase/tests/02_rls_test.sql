@@ -1085,3 +1085,36 @@ select test.eq(
   0::bigint, 'another society''s committee sees nothing');
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- todo_count() is the badge: it must always agree with todo_items()
+-- ---------------------------------------------------------------------------
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  public.todo_count((select id from public.communities where slug = 'hill-crest'))::bigint,
+  (select count(*) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
+  'staff badge count matches their To do list');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  public.todo_count((select id from public.communities where slug = 'hill-crest'))::bigint,
+  (select count(*) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
+  'committee badge count matches their To do list');
+select test.ok(
+  public.todo_count((select id from public.communities where slug = 'hill-crest')) > 0,
+  'the committee badge is not trivially zero');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(
+  public.todo_count((select id from public.communities where slug = 'hill-crest')),
+  0, 'residents have no badge');
+
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(
+  public.todo_count((select id from public.communities where slug = 'hill-crest')),
+  0, 'another society''s committee gets no count');
+
+reset role;

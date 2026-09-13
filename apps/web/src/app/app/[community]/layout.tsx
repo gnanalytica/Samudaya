@@ -5,26 +5,29 @@ import { BottomNav, SidebarNav } from '@/components/sidebar-nav';
 import { NotificationBell } from '@/components/notification-bell';
 import { ProfileMenu } from '@/components/profile-menu';
 import { getSupabase } from '@/lib/supabase/server';
-import { getTodoItems } from '@/lib/todo';
+import { getTodoCount } from '@/lib/todo';
 
 export default async function CommunityLayout(props: LayoutProps<'/app/[community]'>) {
   const { community: slug } = await props.params;
+  // Membership list for the switcher starts alongside the community check;
+  // both are cached per request, so the redirect path reuses it too.
+  const membershipsPromise = getMemberships();
   // Redirects to onboarding or another community if this one is not theirs.
   const { community, role, profile } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
-  // RLS limits this to the member's own notifications; the To do queue is
-  // empty for residents without a round trip.
-  const [memberships, { count: unread }, todo] = await Promise.all([
-    getMemberships(),
+  // RLS limits this to the member's own notifications. The badge only needs a
+  // number, so it asks todo_count() rather than building the whole queue.
+  const [memberships, { count: unread }, todoCount] = await Promise.all([
+    membershipsPromise,
     supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('community_id', community.id)
       .is('read_at', null),
-    getTodoItems(community.id, role),
+    getTodoCount(community.id, role),
   ]);
-  const counts = { todo: todo.length };
+  const counts = { todo: todoCount };
   const name = profile?.full_name ?? 'You';
 
   return (

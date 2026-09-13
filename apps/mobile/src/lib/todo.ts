@@ -46,7 +46,11 @@ export async function fetchTodoItems(communityId: string): Promise<TodoItem[]> {
   );
 }
 
-/** The queue, polled gently so the Manage tab's count stays roughly current. */
+/**
+ * The queue, polled gently so the Manage tab's count stays roughly current.
+ * Polling pauses while the app is in the background and catches up as soon as
+ * it returns; a push that arrives while open refreshes it straight away.
+ */
 export function useTodoItems() {
   const { activeCommunity, role } = useAuth();
   const communityId = activeCommunity?.id ?? null;
@@ -55,6 +59,7 @@ export function useTodoItems() {
     queryFn: () => fetchTodoItems(communityId as string),
     enabled: communityId !== null && can(role, 'events:manage'),
     refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 }
 

@@ -67,11 +67,13 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // getUser() revalidates the token with Supabase. getSession() would only read
-  // the cookie, which the client controls, so it must not gate anything.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() refreshes an expiring session and verifies the token's
+  // signature against the project's published signing keys, which are cached,
+  // so this costs no call to Supabase on most requests. getSession() would
+  // only read the cookie, which the client controls, so it must not gate
+  // anything. Pages still call getUser() before showing private data.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? data.claims : null;
 
   const { pathname } = request.nextUrl;
 

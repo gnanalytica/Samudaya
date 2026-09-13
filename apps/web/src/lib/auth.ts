@@ -83,29 +83,27 @@ export const getCommunityContext = cache(async (slug: string): Promise<Community
 
   const supabase = await getSupabase();
 
-  // RLS already restricts `communities` to ones the caller belongs to, so an
+  // One round trip for the community and the caller's membership in it. RLS
+  // already restricts `communities` to ones the caller belongs to, so an
   // unknown slug and a slug they have no business seeing look identical here.
-  const { data: community } = await supabase
-    .from('communities')
-    .select('*')
-    .eq('slug', slug)
-    .maybeSingle();
-  if (!community) return null;
-
-  const { data: membership } = await supabase
+  const { data: row } = await supabase
     .from('memberships')
-    .select('*')
-    .eq('community_id', community.id)
+    .select('*, communities!inner(*)')
     .eq('user_id', user.id)
     .eq('status', 'active')
+    .eq('communities.slug', slug)
     .maybeSingle();
-  if (!membership) return null;
+  if (!row?.communities) return null;
+  const { communities: community, ...membership } = row;
 
-  const { data: occupancies } = await supabase
-    .from('unit_occupants')
-    .select('unit_id, units!inner(community_id)')
-    .eq('membership_id', membership.id)
-    .is('moved_out_on', null);
+  const [{ data: occupancies }, profile] = await Promise.all([
+    supabase
+      .from('unit_occupants')
+      .select('unit_id, units!inner(community_id)')
+      .eq('membership_id', membership.id)
+      .is('moved_out_on', null),
+    getProfile(),
+  ]);
 
   const unitIds = (occupancies ?? [])
     .filter((row) => row.units?.community_id === community.id)
@@ -113,7 +111,7 @@ export const getCommunityContext = cache(async (slug: string): Promise<Community
 
   return {
     user,
-    profile: await getProfile(),
+    profile,
     community,
     membership,
     role: membership.role,
