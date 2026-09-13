@@ -30,6 +30,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { KeyValue, Meter, StatTile } from '../../src/components/event-ui';
+import { ViewFileChip } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
 
 type Detail = NonNullable<Awaited<ReturnType<typeof fetchEventDetail>>>;
@@ -128,6 +129,46 @@ export default function EventDetail() {
               label="Contribute"
               onPress={() => router.push(`/contribute?event=${event.slug}`)}
             />
+          ) : null}
+          {data.myPayments.length ? (
+            <View style={{ gap: spacing.xs }}>
+              <Body>Your payments</Body>
+              {data.myPayments.map((payment) => (
+                <View key={payment.id} style={{ gap: 2 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: spacing.sm,
+                    }}
+                  >
+                    <Caption>
+                      {formatMoney(payment.amount, currency)}
+                      {payment.reference ? ` · UPI ref ${payment.reference}` : ''}
+                    </Caption>
+                    <Badge
+                      label={
+                        payment.status === 'succeeded'
+                          ? 'Confirmed'
+                          : payment.status === 'failed'
+                            ? 'Not confirmed'
+                            : 'Waiting for confirmation'
+                      }
+                      tone={
+                        payment.status === 'succeeded'
+                          ? 'success'
+                          : payment.status === 'failed'
+                            ? 'danger'
+                            : 'warning'
+                      }
+                    />
+                  </View>
+                  {payment.status === 'failed' && payment.review_note ? (
+                    <Caption>{payment.review_note}</Caption>
+                  ) : null}
+                </View>
+              ))}
+            </View>
           ) : null}
           {can(role, 'payments:view') ? (
             <Button
@@ -234,8 +275,8 @@ function BudgetAndSpending({ data, currency }: { data: Detail; currency: string 
                     .filter(Boolean)
                     .join(' · ')}
                   {expense.spent_on ? ` · ${formatDate(expense.spent_on)}` : ''}
-                  {expense.bill_url ? ' · 📎 bill' : ''}
                 </Caption>
+                <ViewFileChip bucket="bills" value={expense.bill_url} label="View bill" />
               </View>
               <Body>{formatMoney(expense.amount, currency)}</Body>
             </View>

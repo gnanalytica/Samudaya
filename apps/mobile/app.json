@@ -47,6 +47,14 @@
           "resizeMode": "contain",
           "backgroundColor": "#0F766E"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Samudaya uses your photos to attach bills and payment screenshots.",
+          "cameraPermission": "Samudaya uses the camera to photograph bills and payment receipts.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

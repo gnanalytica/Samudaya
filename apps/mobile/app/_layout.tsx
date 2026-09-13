@@ -39,6 +39,7 @@ function RootStack() {
         <Stack.Screen name="admin/bills" options={{ title: 'Bills' }} />
         <Stack.Screen name="admin/bill" options={{ title: 'Bill' }} />
         <Stack.Screen name="admin/payments" options={{ title: 'Payments' }} />
+        <Stack.Screen name="admin/upi" options={{ title: 'Society UPI ID' }} />
         <Stack.Screen name="admin/queue" options={{ title: 'Committee decisions' }} />
       </Stack>
     </>

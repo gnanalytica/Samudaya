@@ -19,6 +19,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { KeyValue } from '../../src/components/event-ui';
+import { ViewFileChip } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
 
 const METHODS = [
@@ -66,7 +67,7 @@ export default function Payments() {
         supabase
           .from('contributions')
           .select(
-            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, units(block, number), memberships(profiles(full_name))',
+            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name))',
           )
           .eq('community_id', communityId)
           .order('paid_at', { ascending: false })
@@ -105,9 +106,14 @@ export default function Payments() {
 
   const events = data?.events ?? [];
   const current = events.find((event) => event.slug === slug) ?? events[0];
-  const rows = (data?.contributions ?? []).filter(
-    (row) => row.event_id === current?.id && row.status === 'succeeded',
-  );
+  const eventRows = (data?.contributions ?? []).filter((row) => row.event_id === current?.id);
+  const rows = eventRows.filter((row) => row.status === 'succeeded');
+  const waiting = eventRows.filter((row) => row.status === 'pending');
+  const refreshAll = () => {
+    void queryClient.invalidateQueries({ queryKey: ['admin:payments'] });
+    // Totals on the event pages change once a payment is confirmed.
+    void queryClient.invalidateQueries();
+  };
   const total = rows.reduce((sum, row) => sum + Number(row.amount), 0);
   const flatsPaid = new Set(
     rows.map((row) => (row.units ? unitLabel(row.units) : null)).filter(Boolean),
@@ -151,6 +157,7 @@ export default function Payments() {
                 </Heading>
                 <KeyValue label="Collected" value={formatMoney(total, currency)} />
                 <KeyValue label="Payments" value={String(rows.length)} />
+                <KeyValue label="Waiting for confirmation" value={String(waiting.length)} />
                 <KeyValue
                   label="Flats paid"
                   value={unitCount ? `${flatsPaid.size} of ${unitCount}` : String(flatsPaid.size)}
@@ -165,8 +172,7 @@ export default function Payments() {
                     onCancel={() => setRecording(false)}
                     onDone={() => {
                       setRecording(false);
-                      void queryClient.invalidateQueries({ queryKey: ['admin:payments'] });
-                      void queryClient.invalidateQueries({ queryKey: ['events'] });
+                      refreshAll();
                     }}
                   />
                 ) : (
@@ -174,8 +180,27 @@ export default function Payments() {
                 )
               ) : null}
 
+              {waiting.length ? (
+                <Card style={{ gap: spacing.md }}>
+                  <Heading>Waiting for confirmation</Heading>
+                  <Caption>
+                    Residents reported these UPI payments. Match each reference with the society’s
+                    bank statement before confirming; only confirmed payments count.
+                  </Caption>
+                  {waiting.map((row) => (
+                    <PendingPayment
+                      key={row.id}
+                      row={row}
+                      currency={currency}
+                      mayReview={can(role, 'payments:record')}
+                      onDone={refreshAll}
+                    />
+                  ))}
+                </Card>
+              ) : null}
+
               <Card style={{ gap: spacing.md }}>
-                <Heading>Payments</Heading>
+                <Heading>Confirmed payments</Heading>
                 {rows.length ? (
                   rows.map((row) => (
                     <View
@@ -189,8 +214,8 @@ export default function Payments() {
                       <View style={{ flex: 1, gap: 2 }}>
                         <Body>
                           {row.units ? `Flat ${unitLabel(row.units)}` : 'No flat'}
-                          {row.memberships?.profiles?.full_name
-                            ? ` · ${row.memberships.profiles.full_name}`
+                          {row.payer?.profiles?.full_name
+                            ? ` · ${row.payer.profiles.full_name}`
                             : ' · recorded by staff'}
                         </Body>
                         <Caption>
@@ -211,6 +236,113 @@ export default function Payments() {
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+  );
+}
+
+type PendingRow = {
+  id: string;
+  amount: number;
+  method: string;
+  reference: string | null;
+  paid_at: string;
+  proof_path: string | null;
+  units: { block: string | null; number: string } | null;
+  payer: { profiles: { full_name: string | null } | null } | null;
+};
+
+function PendingPayment({
+  row,
+  currency,
+  mayReview,
+  onDone,
+}: {
+  row: PendingRow;
+  currency: string;
+  mayReview: boolean;
+  onDone: () => void;
+}) {
+  const [declining, setDeclining] = useState(false);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState<'confirm' | 'decline' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const review = async (confirm: boolean) => {
+    if (!confirm && !note.trim()) {
+      setError('Say why it could not be confirmed, e.g. no matching credit in the bank statement.');
+      return;
+    }
+    setBusy(confirm ? 'confirm' : 'decline');
+    setError(null);
+    const { error: rpcError } = await supabase.rpc('review_contribution', {
+      p_contribution_id: row.id,
+      p_confirm: confirm,
+      p_note: note.trim() || undefined,
+    });
+    setBusy(null);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    onDone();
+  };
+
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Body>
+            {row.units ? `Flat ${unitLabel(row.units)}` : 'No flat'}
+            {row.payer?.profiles?.full_name ? ` · ${row.payer.profiles.full_name}` : ''}
+          </Body>
+          <Caption>
+            {METHOD_LABEL[row.method] ?? row.method}
+            {row.reference ? ` · Ref ${row.reference}` : ''} ·{' '}
+            {formatDate(row.paid_at.slice(0, 10))}
+          </Caption>
+        </View>
+        <Body>{formatMoney(row.amount, currency)}</Body>
+      </View>
+      <ViewFileChip bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
+      {mayReview ? (
+        declining ? (
+          <View style={{ gap: spacing.sm }}>
+            <Input
+              label="Why can’t it be confirmed?"
+              value={note}
+              onChangeText={setNote}
+              placeholder="No matching credit in the bank statement"
+              multiline
+            />
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Button label="Cancel" variant="secondary" onPress={() => setDeclining(false)} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button
+                  label="Turn down"
+                  onPress={() => void review(false)}
+                  loading={busy === 'decline'}
+                />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button
+                label="Confirm"
+                onPress={() => void review(true)}
+                loading={busy === 'confirm'}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button label="Turn down" variant="secondary" onPress={() => setDeclining(true)} />
+            </View>
+          </View>
+        )
+      ) : null}
+      <ErrorText message={error} />
+    </View>
   );
 }
 

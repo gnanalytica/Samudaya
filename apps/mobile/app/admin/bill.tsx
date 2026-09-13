@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { can, formatMoney } from '@samudaya/core';
+import { billPath, can, formatMoney } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -18,6 +18,8 @@ import {
   Title,
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
+import { FilePickerField, ViewFileChip } from '../../src/components/file-ui';
+import { uploadFile, type PickedFile } from '../../src/lib/storage';
 import { spacing } from '../../src/lib/theme';
 
 const METHODS = [
@@ -128,7 +130,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
   const [spentOn, setSpentOn] = useState(
     existing?.spent_on ?? new Date().toISOString().slice(0, 10),
   );
-  const [billRef, setBillRef] = useState(existing?.bill_url ?? '');
+  const [billFile, setBillFile] = useState<PickedFile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -155,8 +157,31 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
     }
     if (!activeCommunity || !membershipId) return;
 
+    if (!existing?.bill_url && !billFile) {
+      setError('Attach a photo or PDF of the bill.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
+
+    // Upload first so a failed upload never leaves a bill pointing nowhere. A
+    // correction uploads a new file rather than overwriting the old one.
+    let billUrl = existing?.bill_url ?? null;
+    if (billFile) {
+      const uploaded = await uploadFile(
+        'bills',
+        billPath(activeCommunity.id, eventId, billFile.name),
+        billFile,
+      );
+      if ('error' in uploaded) {
+        setBusy(false);
+        setError(uploaded.error);
+        return;
+      }
+      billUrl = uploaded.path;
+    }
+
     const fields = {
       event_id: eventId,
       name: name.trim(),
@@ -165,7 +190,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
       vendor: vendor.trim() || null,
       method,
       spent_on: spentOn,
-      bill_url: billRef.trim() || null,
+      bill_url: billUrl,
     };
 
     const { error: saveError } = existing
@@ -289,13 +314,19 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               placeholder="2026-09-12"
               autoCapitalize="none"
             />
-            <Input
-              label="Bill (invoice number or link)"
-              value={billRef}
-              onChangeText={setBillRef}
-              placeholder="INV-2231 or a Drive link to the photo"
-              autoCapitalize="none"
+            <FilePickerField
+              label="Bill"
+              file={billFile}
+              onChange={setBillFile}
+              existingLabel={
+                existing?.bill_url
+                  ? 'A bill is attached. Pick a new file to replace it.'
+                  : 'Photograph the bill or attach the PDF.'
+              }
             />
+            {existing?.bill_url && !billFile ? (
+              <ViewFileChip bucket="bills" value={existing.bill_url} label="View current bill" />
+            ) : null}
           </Card>
 
           <ErrorText message={error} />

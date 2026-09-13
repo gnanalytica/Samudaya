@@ -47,7 +47,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
   const event = await fetchEventBySlug(communityId, slug);
   if (!event) return null;
 
-  const [stats, budget, expenses, activities, activityStats, registrations, suggestions] =
+  const [stats, budget, expenses, activities, activityStats, registrations, suggestions, payments] =
     await Promise.all([
       supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
       supabase
@@ -79,6 +79,13 @@ export async function fetchEventDetail(communityId: string, slug: string, member
         .eq('event_id', event.id)
         .in('status', ['new', 'reviewing', 'accepted'])
         .order('created_at', { ascending: false }),
+      // The viewer's own payments for this event, confirmed or not.
+      supabase
+        .from('contributions')
+        .select('id, amount, status, reference, review_note, paid_at')
+        .eq('event_id', event.id)
+        .eq('membership_id', membershipId)
+        .order('paid_at', { ascending: false }),
     ]);
 
   const suggestionRows = suggestions.data ?? [];
@@ -115,6 +122,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
       registered: counts.get(activity.id) ?? 0,
     })),
     registrations: registrations.data ?? [],
+    myPayments: payments.data ?? [],
     // Residents see suggestions open for voting, plus their own awaiting the
     // committee. Staff and committee see everything still in play.
     suggestions: suggestionRows.map((row) => ({

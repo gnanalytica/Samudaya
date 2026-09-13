@@ -19,6 +19,7 @@ import {
   Screen,
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
+import { ViewFileChip } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
 
 type Filter = 'pending' | 'changes_requested' | 'approved' | 'rejected';
@@ -210,6 +211,7 @@ function BillCard({
           <Badge label={EXPENSE_STATUS_LABEL[bill.status as keyof typeof EXPENSE_STATUS_LABEL]} />
         ) : null}
       </View>
+      <ViewFileChip bucket="bills" value={bill.bill_url} label="View bill" />
       {bill.review_note ? <Body muted>Note: {bill.review_note}</Body> : null}
 
       {mayEdit ? (

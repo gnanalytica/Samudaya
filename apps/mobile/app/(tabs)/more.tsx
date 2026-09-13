@@ -13,6 +13,7 @@ import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
+  Badge,
   Body,
   Button,
   Caption,
@@ -40,9 +41,10 @@ export default function More() {
       const [contributions, registrations] = await Promise.all([
         supabase
           .from('contributions')
-          .select('id, amount, receipt_no, paid_at, events(slug, name, emoji)')
+          .select(
+            'id, amount, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
+          )
           .eq('membership_id', membershipId ?? '')
-          .eq('status', 'succeeded')
           .order('paid_at', { ascending: false })
           .limit(20),
         supabase
@@ -66,7 +68,10 @@ export default function More() {
   }
 
   const currency = activeCommunity?.currency ?? 'INR';
-  const totalGiven = (data?.contributions ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
+  // Only confirmed payments count; reports waiting for staff show separately.
+  const totalGiven = (data?.contributions ?? [])
+    .filter((row) => row.status === 'succeeded')
+    .reduce((sum, row) => sum + Number(row.amount), 0);
 
   return (
     <Screen>
@@ -111,9 +116,16 @@ export default function More() {
             />
             <LinkRow
               label="Payments"
-              detail="Which flat paid for which event; record cash and UPI"
+              detail="Confirm reported UPI payments; record cash; see which flat paid"
               onPress={() => router.push('/admin/payments')}
             />
+            {can(role, 'roles:manage') ? (
+              <LinkRow
+                label="Society UPI ID"
+                detail={activeCommunity?.upi_vpa ?? 'Not set — residents can’t pay by UPI yet'}
+                onPress={() => router.push('/admin/upi')}
+              />
+            ) : null}
             {can(role, 'campaigns:approve') ? (
               <LinkRow
                 label="Committee decisions"
@@ -149,9 +161,19 @@ export default function More() {
                         {contribution.events?.emoji} {contribution.events?.name}
                       </Body>
                       <Caption>
-                        {receiptRef(contribution.events?.slug, contribution.receipt_no)} ·{' '}
-                        {formatDate(contribution.paid_at.slice(0, 10))}
+                        {contribution.status === 'succeeded'
+                          ? receiptRef(contribution.events?.slug, contribution.receipt_no)
+                          : contribution.reference
+                            ? `UPI ref ${contribution.reference}`
+                            : 'Reported'}{' '}
+                        · {formatDate(contribution.paid_at.slice(0, 10))}
                       </Caption>
+                      <View style={{ flexDirection: 'row' }}>
+                        <PaymentStatus status={contribution.status} />
+                      </View>
+                      {contribution.status === 'failed' && contribution.review_note ? (
+                        <Caption>{contribution.review_note}</Caption>
+                      ) : null}
                     </View>
                     <Body>{formatMoney(contribution.amount, currency)}</Body>
                   </View>
@@ -226,4 +248,12 @@ export default function More() {
       </ScrollView>
     </Screen>
   );
+}
+
+/** Where a resident's reported payment stands. */
+function PaymentStatus({ status }: { status: string }) {
+  if (status === 'succeeded') return <Badge label="Confirmed" tone="success" />;
+  if (status === 'failed') return <Badge label="Not confirmed" tone="danger" />;
+  if (status === 'refunded') return <Badge label="Refunded" />;
+  return <Badge label="Waiting for confirmation" tone="warning" />;
 }
