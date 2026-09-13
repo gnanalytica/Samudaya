@@ -221,6 +221,9 @@ async function seedSociety() {
           community_id: cid,
           user_id: data.user.id,
           role: person.role,
+          title: person.title ?? null,
+          // The Treasurer signs off spending; see the approver restriction.
+          approves_spending: person.title === 'Treasurer',
           status: 'active',
           joined_at: daysAgo(120 - index * 3),
         })
