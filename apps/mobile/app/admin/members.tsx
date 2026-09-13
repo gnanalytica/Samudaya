@@ -1,15 +1,7 @@
 import { useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, Switch, View } from 'react-native';
+import { Pressable, RefreshControl, SectionList, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  ROLE_LABEL,
-  canManageSpendingApproval,
-  isAdmin,
-  isCommittee,
-  positionLabel,
-  type MemberRole,
-} from '@samudaya/core';
+import { ROLE_LABEL, ROLES, can, normalizeRole, unitLabel, type Role } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -20,45 +12,39 @@ import {
   Card,
   EmptyState,
   Heading,
+  Input,
   Loading,
   Screen,
 } from '../../src/components/ui';
-import { ErrorText } from '../../src/components/admin-ui';
 import { spacing } from '../../src/lib/theme';
-import { useTheme } from '../../src/lib/use-theme';
 
-const ROLE_ORDER: Record<MemberRole, number> = { owner: 0, admin: 1, committee: 2, resident: 3 };
-
-/** Everyone in the society with their position. Admins can open a member to edit them. */
+/**
+ * Everyone admitted to the society, grouped by role, with their flat. Staff can
+ * open a resident to remove them; the committee can also change roles.
+ */
 export default function Members() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const queryClient = useQueryClient();
-  const { activeCommunity, role, approvesSpending, refresh: refreshAuth } = useAuth();
-
-  const [savingRestriction, setSavingRestriction] = useState(false);
-  const [restrictionError, setRestrictionError] = useState<string | null>(null);
+  const { role } = useAuth();
+  const [search, setSearch] = useState('');
 
   const { data, loading, refreshing, refresh } = useCommunityData(
     'admin:members',
     async (communityId) => {
       const { data: rows } = await supabase
         .from('memberships')
-        .select('id, role, title, approves_spending, joined_at, profiles(full_name)')
+        .select(
+          'id, role, joined_at, profiles(full_name, email), unit_occupants(relation, units(block, number))',
+        )
         .eq('community_id', communityId)
         .eq('status', 'active');
-      return (rows ?? []).sort(
-        (a, b) =>
-          ROLE_ORDER[a.role] - ROLE_ORDER[b.role] ||
-          (a.profiles?.full_name ?? '').localeCompare(b.profiles?.full_name ?? ''),
-      );
+      return rows ?? [];
     },
   );
 
-  if (!isCommittee(role)) {
+  if (!can(role, 'residents:remove')) {
     return (
       <Screen>
-        <EmptyState title="Committee only" description="The member list is for the committee." />
+        <EmptyState title="Staff and committee only" />
       </Screen>
     );
   }
@@ -71,99 +57,77 @@ export default function Members() {
     );
   }
 
-  const admin = isAdmin(role);
-  const managesApproval = canManageSpendingApproval(role, approvesSpending);
-  const restricted = Boolean(activeCommunity?.restrict_spending_approval);
-  const approverCount = (data ?? []).filter((member) => member.approves_spending).length;
+  const query = search.trim().toLowerCase();
+  const rows = (data ?? [])
+    .map((row) => {
+      const occupancy = row.unit_occupants[0];
+      return {
+        id: row.id,
+        role: normalizeRole(row.role) ?? 'resident',
+        name: row.profiles?.full_name ?? row.profiles?.email ?? 'Unnamed',
+        flat: occupancy?.units ? unitLabel(occupancy.units) : null,
+        relation: occupancy?.relation ?? null,
+      };
+    })
+    .filter(
+      (row) =>
+        !query ||
+        row.name.toLowerCase().includes(query) ||
+        (row.flat ?? '').toLowerCase().includes(query),
+    )
+    .sort((a, b) => (a.flat ?? '~').localeCompare(b.flat ?? '~') || a.name.localeCompare(b.name));
 
-  const toggleRestriction = async (next: boolean) => {
-    if (!activeCommunity) return;
-    setSavingRestriction(true);
-    setRestrictionError(null);
-    const { error } = await supabase
-      .from('communities')
-      .update({ restrict_spending_approval: next })
-      .eq('id', activeCommunity.id);
-    setSavingRestriction(false);
-    if (error) {
-      setRestrictionError(error.message);
-      return;
-    }
-    // The flag lives on the community loaded into auth context.
-    await refreshAuth();
-    void queryClient.invalidateQueries({ queryKey: ['admin:approvals'] });
-  };
+  const order: Role[] = [...ROLES].reverse();
+  const sections = order
+    .map((value) => ({
+      title: `${ROLE_LABEL[value]} (${rows.filter((row) => row.role === value).length})`,
+      data: rows.filter((row) => row.role === value),
+    }))
+    .filter((section) => section.data.length > 0);
 
   return (
     <Screen>
-      <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+      <SectionList
+        sections={sections}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
-      >
-        <Card style={{ gap: spacing.sm }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: spacing.md,
-            }}
-          >
-            <View style={{ flex: 1, gap: 2 }}>
-              <Heading>Only designated approvers can approve spending</Heading>
-              <Caption>
-                {approverCount === 0
-                  ? 'No approvers yet. Mark one (e.g. the Treasurer) before switching this on.'
-                  : `${approverCount} designated approver${approverCount === 1 ? '' : 's'}.`}
-              </Caption>
-            </View>
-            <Switch
-              value={restricted}
-              onValueChange={(next) => void toggleRestriction(next)}
-              disabled={!managesApproval || savingRestriction}
-              trackColor={{ true: colors.accent, false: colors.border }}
-            />
+        stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          <Input value={search} onChangeText={setSearch} placeholder="Search by name or flat" />
+        }
+        ListEmptyComponent={<EmptyState title="Nobody matches" />}
+        renderSectionHeader={({ section }) => (
+          <View style={{ paddingTop: spacing.lg, paddingBottom: spacing.xs }}>
+            <Heading>{section.title}</Heading>
           </View>
-          {!managesApproval ? (
-            <Caption>Only an owner or an existing spending approver can change this.</Caption>
-          ) : null}
-          <ErrorText message={restrictionError} />
-        </Card>
-
-        <Heading>Members ({data?.length ?? 0})</Heading>
-        <Card style={{ gap: 0, paddingVertical: spacing.sm }}>
-          {(data ?? []).map((member, index) => {
-            const label = positionLabel(member.role, member.title);
-            return (
-              <Pressable
-                key={member.id}
-                accessibilityRole={admin ? 'button' : undefined}
-                onPress={admin ? () => router.push(`/admin/member/${member.id}`) : undefined}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing.md,
-                  paddingVertical: spacing.md,
-                  borderTopWidth: index === 0 ? 0 : 0.5,
-                  borderTopColor: colors.border,
-                  opacity: pressed ? 0.7 : 1,
-                })}
-              >
+        )}
+        renderItem={({ item }) => {
+          const editable = item.role === 'resident' || can(role, 'roles:manage');
+          return (
+            <Pressable
+              accessibilityRole="button"
+              disabled={!editable}
+              onPress={() => router.push(`/admin/member/${item.id}`)}
+              style={{ marginBottom: spacing.sm }}
+            >
+              <Card style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Body>{member.profiles?.full_name ?? 'Member'}</Body>
+                  <Body>{item.name}</Body>
                   <Caption>
-                    {label}
-                    {member.title ? ` · ${ROLE_LABEL[member.role]}` : ''}
+                    {item.flat ? `Flat ${item.flat}` : 'No flat on record'}
+                    {item.relation ? ` · ${item.relation}` : ''}
                   </Caption>
                 </View>
-                {member.approves_spending ? <Badge label="Approver" tone="success" /> : null}
-                {admin ? <Caption>›</Caption> : null}
-              </Pressable>
-            );
-          })}
-        </Card>
-        <View style={{ height: spacing.xl }} />
-      </ScrollView>
+                {item.role !== 'resident' ? (
+                  <Badge label={ROLE_LABEL[item.role]} tone="info" />
+                ) : null}
+                {editable ? <Caption>›</Caption> : null}
+              </Card>
+            </Pressable>
+          );
+        }}
+      />
     </Screen>
   );
 }

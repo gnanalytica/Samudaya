@@ -2,23 +2,24 @@ import { normalizeStats } from '@samudaya/core';
 import { supabase } from './supabase';
 
 /**
- * Event reads for the mobile app. Mirrors apps/web/src/lib/events.ts —
- * both go through the same RLS, so what a resident can see is identical
- * whichever surface they use.
+ * Event reads for the mobile app. Every query goes through row-level security,
+ * so a resident, a staff member and the committee each get exactly what the
+ * database lets them see: residents never see drafts or other people's
+ * proposed campaigns, and only staff and committee see bills under review.
  */
 
 // A single string literal: supabase-js infers the row type from the select
 // text, and `+` concatenation widens it to `string`.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, starts_on, venue, organizer, description, status, fund_target, fund_rule, fund_rule_note, closed_at';
+  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, description, status, kind, fund_target, fund_rule, fund_rule_note, closed_at, created_by';
 
 export async function fetchEvents(communityId: string) {
   const { data } = await supabase
     .from('events')
     .select(EVENT_FIELDS)
     .eq('community_id', communityId)
-    .order('starts_on', { ascending: false })
-    .limit(50);
+    .order('starts_on', { ascending: true })
+    .limit(100);
   return data ?? [];
 }
 
@@ -40,74 +41,117 @@ export async function fetchEventBySlug(communityId: string, slug: string) {
   return data;
 }
 
+export type Tally = { support: number; against: number; mine: boolean | null };
+
 export async function fetchEventDetail(communityId: string, slug: string, membershipId: string) {
   const event = await fetchEventBySlug(communityId, slug);
   if (!event) return null;
 
-  const [stats, tasks, activities, activityStats, roles, roleStats, expenses, mine, myVolunteer] =
+  const [stats, budget, expenses, activities, activityStats, registrations, suggestions] =
     await Promise.all([
       supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
       supabase
-        .from('event_tasks')
-        .select('id, name, status')
+        .from('budget_lines')
+        .select('id, category, amount, notes')
         .eq('event_id', event.id)
         .order('position'),
-      supabase
-        .from('event_activities')
-        .select('id, name, emoji, description, is_open')
-        .eq('event_id', event.id)
-        .order('position'),
-      supabase.from('activity_stats').select('activity_id, interested').eq('event_id', event.id),
-      supabase
-        .from('volunteer_roles')
-        .select('id, name, emoji, target_count')
-        .eq('event_id', event.id)
-        .order('position'),
-      supabase
-        .from('volunteer_role_stats')
-        .select('role_id, signed_up, still_needed')
-        .eq('event_id', event.id),
-      // RLS returns approved rows only to a resident, which is the ledger.
+      // Residents only ever get approved rows back; that is the public ledger.
       supabase
         .from('expenses')
-        .select('id, name, amount, vendor, bill_url, status')
+        .select('id, name, category, amount, vendor, bill_url, spent_on, status')
         .eq('event_id', event.id)
         .eq('status', 'approved')
         .order('spent_on', { ascending: false }),
       supabase
+        .from('event_activities')
+        .select('id, name, emoji, description, is_open, capacity')
+        .eq('event_id', event.id)
+        .order('position'),
+      supabase.from('activity_stats').select('activity_id, interested').eq('event_id', event.id),
+      supabase
         .from('activity_participants')
-        .select('activity_id, event_activities!inner(event_id)')
+        .select('id, activity_id, participant_name, event_activities!inner(event_id)')
         .eq('membership_id', membershipId)
         .eq('event_activities.event_id', event.id),
       supabase
-        .from('event_volunteers')
-        .select('role_id, volunteer_roles!inner(event_id)')
-        .eq('membership_id', membershipId)
-        .eq('volunteer_roles.event_id', event.id),
+        .from('activity_suggestions')
+        .select('id, kind, name, description, status, suggested_by, created_at')
+        .eq('event_id', event.id)
+        .in('status', ['new', 'reviewing', 'accepted'])
+        .order('created_at', { ascending: false }),
     ]);
 
-  const interest = new Map(
+  const suggestionRows = suggestions.data ?? [];
+  const votes = suggestionRows.length
+    ? await supabase
+        .from('suggestion_votes')
+        .select('suggestion_id, membership_id, support')
+        .in(
+          'suggestion_id',
+          suggestionRows.map((row) => row.id),
+        )
+    : { data: [] as { suggestion_id: string; membership_id: string; support: boolean }[] };
+
+  const tallies = new Map<string, Tally>();
+  for (const vote of votes.data ?? []) {
+    const tally = tallies.get(vote.suggestion_id) ?? { support: 0, against: 0, mine: null };
+    if (vote.support) tally.support += 1;
+    else tally.against += 1;
+    if (vote.membership_id === membershipId) tally.mine = vote.support;
+    tallies.set(vote.suggestion_id, tally);
+  }
+
+  const counts = new Map(
     (activityStats.data ?? []).map((row) => [row.activity_id, row.interested ?? 0]),
   );
-  const roleCounts = new Map((roleStats.data ?? []).map((row) => [row.role_id, row]));
 
   return {
     event,
     stats: normalizeStats(stats.data),
-    tasks: tasks.data ?? [],
+    budget: budget.data ?? [],
+    expenses: expenses.data ?? [],
     activities: (activities.data ?? []).map((activity) => ({
       ...activity,
-      interested: interest.get(activity.id) ?? 0,
+      registered: counts.get(activity.id) ?? 0,
     })),
-    roles: (roles.data ?? []).map((role) => ({
-      ...role,
-      signedUp: roleCounts.get(role.id)?.signed_up ?? 0,
-      stillNeeded: roleCounts.get(role.id)?.still_needed ?? role.target_count,
+    registrations: registrations.data ?? [],
+    // Residents see suggestions open for voting, plus their own awaiting the
+    // committee. Staff and committee see everything still in play.
+    suggestions: suggestionRows.map((row) => ({
+      ...row,
+      tally: tallies.get(row.id) ?? { support: 0, against: 0, mine: null },
     })),
-    expenses: expenses.data ?? [],
-    joinedActivities: new Set((mine.data ?? []).map((row) => row.activity_id)),
-    joinedRoles: new Set((myVolunteer.data ?? []).map((row) => row.role_id)),
   };
+}
+
+/**
+ * Planned against actual spend per category. Categories are matched
+ * case-insensitively; anything spent outside the budget gets its own row.
+ */
+export function budgetVsSpent(
+  budget: { category: string; amount: number }[],
+  expenses: { category: string | null; amount: number }[],
+) {
+  const rows = new Map<string, { category: string; planned: number; spent: number }>();
+  const key = (value: string | null) => (value ?? 'Other').trim().toLowerCase();
+
+  for (const line of budget) {
+    const existing = rows.get(key(line.category));
+    rows.set(key(line.category), {
+      category: existing?.category ?? line.category,
+      planned: (existing?.planned ?? 0) + Number(line.amount),
+      spent: existing?.spent ?? 0,
+    });
+  }
+  for (const expense of expenses) {
+    const existing = rows.get(key(expense.category));
+    rows.set(key(expense.category), {
+      category: existing?.category ?? expense.category ?? 'Other',
+      planned: existing?.planned ?? 0,
+      spent: (existing?.spent ?? 0) + Number(expense.amount),
+    });
+  }
+  return [...rows.values()].sort((a, b) => b.planned + b.spent - (a.planned + a.spent));
 }
 
 /** The soonest published event that has not happened yet. */
@@ -119,4 +163,15 @@ export function pickNextEvent<T extends { status: string; starts_on: string }>(e
       .filter((event) => event.starts_on >= today)
       .sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0] ?? published[0]
   );
+}
+
+/** A URL-safe slug that is unlikely to collide with another event's. */
+export function makeSlug(name: string) {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return `${base || 'campaign'}-${suffix}`;
 }

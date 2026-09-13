@@ -1,7 +1,8 @@
-import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { Pressable, RefreshControl, SectionList, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   EVENT_STATUS_LABEL,
+  can,
   countdown,
   formatDate,
   formatMoney,
@@ -10,13 +11,23 @@ import {
 import { useAuth } from '../../src/lib/auth';
 import { fetchEvents, fetchStats } from '../../src/lib/events';
 import { useCommunityData } from '../../src/lib/use-community-data';
-import { Badge, Body, Caption, Card, EmptyState, Loading, Screen } from '../../src/components/ui';
+import {
+  Badge,
+  Body,
+  Button,
+  Caption,
+  Card,
+  EmptyState,
+  Heading,
+  Loading,
+  Screen,
+} from '../../src/components/ui';
 import { Meter } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function Events() {
   const router = useRouter();
-  const { activeCommunity } = useAuth();
+  const { activeCommunity, role, user } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
   const { data, loading, refreshing, refresh } = useCommunityData('events', async (communityId) => {
@@ -33,25 +44,79 @@ export default function Events() {
     );
   }
 
+  const rows = data ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  const inPlay = (row: (typeof rows)[number]) =>
+    row.status === 'published' || row.status === 'draft';
+
+  const sections = [
+    {
+      title: 'Proposals waiting for the committee',
+      data: rows.filter(
+        (row) =>
+          row.status === 'proposed' &&
+          (row.created_by === user?.id ||
+            can(role, 'campaigns:approve') ||
+            can(role, 'events:manage')),
+      ),
+    },
+    {
+      title: 'Upcoming events',
+      data: rows.filter((row) => row.kind === 'event' && inPlay(row) && row.starts_on >= today),
+    },
+    {
+      title: 'Fundraising campaigns',
+      data: rows.filter((row) => row.kind === 'campaign' && inPlay(row)),
+    },
+    {
+      title: 'Past events',
+      data: rows
+        .filter(
+          (row) =>
+            row.kind === 'event' &&
+            (row.status === 'completed' || (inPlay(row) && row.starts_on < today)),
+        )
+        .reverse(),
+    },
+  ].filter((section) => section.data.length > 0);
+
   return (
     <Screen>
-      <FlatList
-        data={data ?? []}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+        stickySectionHeadersEnabled={false}
+        ListHeaderComponent={
+          can(role, 'campaigns:propose') ? (
+            <View style={{ marginBottom: spacing.sm }}>
+              <Button
+                label="Start a fundraising campaign"
+                variant="secondary"
+                onPress={() => router.push('/campaign/new')}
+              />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <EmptyState
             title="No events yet"
-            description="When the committee plans something, it will appear here."
+            description="When the society plans something, it will appear here."
           />
         }
+        renderSectionHeader={({ section }) => (
+          <View style={{ paddingTop: spacing.md, paddingBottom: spacing.xs }}>
+            <Heading>{section.title}</Heading>
+          </View>
+        )}
         renderItem={({ item }) => {
           const funded = fundedPercent(item.stats?.fundRaised ?? 0, item.stats?.fundTarget ?? 0);
           return (
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push(`/event/${item.slug}`)}
+              style={{ marginBottom: spacing.md }}
             >
               <Card style={{ gap: spacing.md }}>
                 <View
@@ -79,30 +144,26 @@ export default function Events() {
                         ? 'info'
                         : item.status === 'completed'
                           ? 'success'
-                          : 'neutral'
+                          : item.status === 'proposed'
+                            ? 'warning'
+                            : 'neutral'
                     }
                   />
                 </View>
 
-                {item.status !== 'cancelled' ? (
-                  <View style={{ gap: spacing.sm }}>
-                    <View style={{ gap: 2 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Caption>Readiness</Caption>
-                        <Caption>{item.stats?.readiness ?? 0}%</Caption>
-                      </View>
-                      <Meter percent={item.stats?.readiness ?? 0} label="Event readiness" />
+                {item.status !== 'cancelled' && item.status !== 'proposed' ? (
+                  <View style={{ gap: 2 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Caption>
+                        {formatMoney(item.stats?.fundRaised ?? 0, currency)} of{' '}
+                        {formatMoney(item.stats?.fundTarget ?? item.fund_target, currency)}
+                      </Caption>
+                      <Caption>{funded}%</Caption>
                     </View>
-                    <View style={{ gap: 2 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Caption>
-                          {formatMoney(item.stats?.fundRaised ?? 0, currency)} raised
-                        </Caption>
-                        <Caption>{funded}%</Caption>
-                      </View>
-                      <Meter percent={funded} tone="success" label="Fund progress" />
-                    </View>
+                    <Meter percent={funded} tone="success" label="Fund progress" />
                   </View>
+                ) : item.status === 'proposed' ? (
+                  <Caption>Target {formatMoney(item.fund_target, currency)}</Caption>
                 ) : null}
               </Card>
             </Pressable>

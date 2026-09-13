@@ -1,11 +1,21 @@
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { countdown, formatDate, formatMoney, fundedPercent, normalizeStats } from '@samudaya/core';
+import {
+  ROLE_LABEL,
+  can,
+  countdown,
+  formatDate,
+  formatMoney,
+  fundedPercent,
+  normalizeRole,
+  normalizeStats,
+} from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { fetchEvents, fetchStats, pickNextEvent } from '../../src/lib/events';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
+  Badge,
   Body,
   Button,
   Caption,
@@ -16,32 +26,53 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
+import { LinkRow } from '../../src/components/admin-ui';
 import { Meter, StatTile } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function Home() {
   const router = useRouter();
-  const { profile, activeCommunity } = useAuth();
+  const { profile, activeCommunity, role } = useAuth();
+  const staffView = can(role, 'events:manage');
 
-  const { data, loading, refreshing, refresh } = useCommunityData('home', async (communityId) => {
-    const events = await fetchEvents(communityId);
-    const next = pickNextEvent(events);
-    const [stats, notices] = await Promise.all([
-      next ? fetchStats([next.id]) : Promise.resolve(new Map()),
-      supabase
-        .from('announcements')
-        .select('id, title, body, published_at')
-        .eq('community_id', communityId)
-        .order('is_pinned', { ascending: false })
-        .order('published_at', { ascending: false })
-        .limit(2),
-    ]);
-    return {
-      next: next ?? null,
-      stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
-      notices: notices.data ?? [],
-    };
-  });
+  const { data, loading, refreshing, refresh } = useCommunityData(
+    `home:${role}`,
+    async (communityId) => {
+      const events = await fetchEvents(communityId);
+      const next = pickNextEvent(events);
+      const [stats, requests, bills, proposals] = await Promise.all([
+        next ? fetchStats([next.id]) : Promise.resolve(new Map()),
+        staffView
+          ? supabase
+              .from('join_requests')
+              .select('id', { count: 'exact', head: true })
+              .eq('community_id', communityId)
+              .eq('status', 'pending')
+          : Promise.resolve({ count: 0 }),
+        staffView
+          ? supabase
+              .from('expenses')
+              .select('id', { count: 'exact', head: true })
+              .eq('community_id', communityId)
+              .in('status', ['pending', 'changes_requested'])
+          : Promise.resolve({ count: 0 }),
+        can(role, 'campaigns:approve')
+          ? supabase
+              .from('events')
+              .select('id', { count: 'exact', head: true })
+              .eq('community_id', communityId)
+              .eq('status', 'proposed')
+          : Promise.resolve({ count: 0 }),
+      ]);
+      return {
+        next: next ?? null,
+        stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
+        pendingRequests: requests.count ?? 0,
+        openBills: bills.count ?? 0,
+        proposals: proposals.count ?? 0,
+      };
+    },
+  );
 
   if (loading && !data) {
     return (
@@ -56,6 +87,7 @@ export default function Home() {
   const next = data?.next;
   const stats = data?.stats ?? normalizeStats(null);
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const normalized = normalizeRole(role);
 
   return (
     <Screen>
@@ -65,14 +97,47 @@ export default function Home() {
       >
         <View style={{ gap: 2 }}>
           <Title>{firstName ? `Hello, ${firstName}` : 'Home'}</Title>
-          <Caption>{activeCommunity?.name ?? ''}</Caption>
+          <Caption>
+            {activeCommunity?.name ?? ''}
+            {normalized ? ` · ${ROLE_LABEL[normalized]}` : ''}
+          </Caption>
         </View>
+
+        {staffView ? (
+          <Card style={{ gap: spacing.xs }}>
+            <Heading>Needs attention</Heading>
+            <LinkRow
+              label={`Join requests (${data?.pendingRequests ?? 0})`}
+              detail="New residents waiting to be admitted"
+              onPress={() => router.push('/admin/requests')}
+            />
+            <LinkRow
+              label={`Bills in progress (${data?.openBills ?? 0})`}
+              detail={
+                can(role, 'expenses:approve')
+                  ? 'Waiting for committee approval or corrections'
+                  : 'Pending approval or sent back for corrections'
+              }
+              onPress={() => router.push('/admin/bills')}
+            />
+            {can(role, 'campaigns:approve') ? (
+              <LinkRow
+                label={`Committee decisions (${data?.proposals ?? 0} campaigns)`}
+                detail="Proposed campaigns and new suggestions"
+                onPress={() => router.push('/admin/queue')}
+              />
+            ) : null}
+          </Card>
+        ) : null}
 
         {next ? (
           <>
             <Card style={{ gap: spacing.md }}>
               <View style={{ gap: 2 }}>
-                <Body>{next.emoji}</Body>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Body>{next.emoji}</Body>
+                  {next.kind === 'campaign' ? <Badge label="Campaign" tone="info" /> : null}
+                </View>
                 <Heading>{next.name}</Heading>
                 <Caption>
                   {formatDate(next.starts_on)}
@@ -92,57 +157,52 @@ export default function Home() {
                 <Meter percent={funded} tone="success" label="Fund progress" />
               </View>
 
-              <View style={{ gap: spacing.xs }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Caption>
-                    Readiness · {stats.tasksDone}/{stats.tasksTotal} tasks
-                  </Caption>
-                  <Caption>{stats.readiness}%</Caption>
-                </View>
-                <Meter percent={stats.readiness} label="Event readiness" />
-              </View>
-
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
                 <View style={{ flex: 1 }}>
                   <Button
                     label="View event"
-                    variant="secondary"
+                    variant={can(role, 'contribute') ? 'secondary' : 'primary'}
                     onPress={() => router.push(`/event/${next.slug}`)}
                   />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label="Contribute"
-                    onPress={() => router.push(`/contribute?event=${next.slug}`)}
-                  />
-                </View>
+                {can(role, 'contribute') ? (
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      label="Contribute"
+                      onPress={() => router.push(`/contribute?event=${next.slug}`)}
+                    />
+                  </View>
+                ) : null}
               </View>
             </Card>
 
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <StatTile label="PERFORMING" value={String(stats.participants)} />
-              <StatTile label="VOLUNTEERING" value={String(stats.volunteers)} />
-              <StatTile label="CONTRIBUTED" value={String(stats.contributors)} />
+              <StatTile label="RAISED" value={formatMoney(stats.fundRaised, currency)} />
+              <StatTile label="SPENT" value={formatMoney(stats.spent, currency)} />
+              <StatTile label="FAMILIES" value={String(stats.contributors)} />
             </View>
           </>
         ) : (
           <Card>
             <EmptyState
               title="Nothing planned yet"
-              description="When the committee plans an event, it will show up here."
+              description="When the society plans an event, it will show up here."
             />
           </Card>
         )}
 
-        {data?.notices.length ? (
-          <Card style={{ gap: spacing.md }}>
-            <Heading>Latest notices</Heading>
-            {data.notices.map((notice) => (
-              <View key={notice.id} style={{ gap: 2 }}>
-                <Body>{notice.title}</Body>
-                <Caption>{notice.body.slice(0, 120)}</Caption>
-              </View>
-            ))}
+        {can(role, 'campaigns:propose') ? (
+          <Card style={{ gap: spacing.sm }}>
+            <Heading>Raising money for something?</Heading>
+            <Body muted>
+              Propose a fundraising campaign. The committee reviews it before residents can
+              contribute.
+            </Body>
+            <Button
+              label="Start a campaign"
+              variant="secondary"
+              onPress={() => router.push('/campaign/new')}
+            />
           </Card>
         ) : null}
       </ScrollView>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { formatMoney, receiptRef } from '@samudaya/core';
+import { can, formatMoney, receiptRef } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
 import { fetchEventBySlug } from '../src/lib/events';
@@ -11,6 +11,7 @@ import {
   Button,
   Caption,
   Card,
+  EmptyState,
   Heading,
   Input,
   Loading,
@@ -27,7 +28,7 @@ export default function Contribute() {
   const { event: eventSlug } = useLocalSearchParams<{ event: string }>();
   const router = useRouter();
   const { colors } = useTheme();
-  const { activeCommunity, membershipId } = useAuth();
+  const { activeCommunity, membershipId, role } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
   const [amount, setAmount] = useState<number | null>(null);
@@ -40,6 +41,18 @@ export default function Contribute() {
   const { data: event, loading } = useCommunityData(`contribute:${eventSlug}`, (communityId) =>
     fetchEventBySlug(communityId, String(eventSlug)),
   );
+
+  // Staff are operators and do not contribute; the database refuses it too.
+  if (!can(role, 'contribute')) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Staff don’t contribute"
+          description="Record a payment a flat made from Admin → Payments instead."
+        />
+      </Screen>
+    );
+  }
 
   if (loading && !event) {
     return (

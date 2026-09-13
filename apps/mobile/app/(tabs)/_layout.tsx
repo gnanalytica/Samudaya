@@ -52,13 +52,9 @@ export default function TabsLayout() {
           tabBarIcon: ({ color }) => <TabIcon glyph="◈" color={color} />,
         }}
       />
-      <Tabs.Screen
-        name="community"
-        options={{
-          title: 'Community',
-          tabBarIcon: ({ color }) => <TabIcon glyph="◎" color={color} />,
-        }}
-      />
+      {/* Notices and polls are switched off for the pilot; the screen stays in
+          the codebase but is kept out of the tab bar. */}
+      <Tabs.Screen name="community" options={{ href: null }} />
       <Tabs.Screen
         name="more"
         options={{ title: 'More', tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} /> }}

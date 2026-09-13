@@ -1,19 +1,18 @@
-import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  ROLE_DESCRIPTION,
   ROLE_LABEL,
+  can,
   formatDate,
   formatMoney,
-  isAdmin,
-  isCommittee,
+  normalizeRole,
   receiptRef,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
-  Badge,
   Body,
   Button,
   Caption,
@@ -29,62 +28,34 @@ import { spacing } from '../../src/lib/theme';
 
 export default function More() {
   const router = useRouter();
-  const {
-    profile,
-    activeCommunity,
-    role,
-    title,
-    approvesSpending,
-    memberships,
-    membershipId,
-    setActiveCommunity,
-    signOut,
-  } = useAuth();
+  const { profile, activeCommunity, role, memberships, membershipId, setActiveCommunity, signOut } =
+    useAuth();
+  const normalized = normalizeRole(role);
+  const participant = can(role, 'contribute');
 
-  const [linkCode, setLinkCode] = useState<string | null>(null);
-  const [linking, setLinking] = useState(false);
-
-  const { data, loading, refreshing, refresh } = useCommunityData('more', async () => {
-    const [contributions, activities, volunteering, link] = await Promise.all([
-      supabase
-        .from('contributions')
-        .select('id, amount, receipt_no, paid_at, events(slug, name, emoji)')
-        .eq('membership_id', membershipId ?? '')
-        .eq('status', 'succeeded')
-        .order('paid_at', { ascending: false })
-        .limit(20),
-      supabase
-        .from('activity_participants')
-        .select('activity_id, event_activities(name, emoji, events(name))')
-        .eq('membership_id', membershipId ?? ''),
-      supabase
-        .from('event_volunteers')
-        .select('role_id, volunteer_roles(name, emoji, events(name))')
-        .eq('membership_id', membershipId ?? ''),
-      supabase.from('whatsapp_links').select('phone, verified_at').maybeSingle(),
-    ]);
-
-    return {
-      contributions: contributions.data ?? [],
-      activities: activities.data ?? [],
-      volunteering: volunteering.data ?? [],
-      linkedPhone: link.data?.verified_at ? link.data.phone : null,
-    };
-  });
-
-  const requestLinkCode = async () => {
-    if (!activeCommunity) return;
-    setLinking(true);
-    const { data: code, error } = await supabase.rpc('create_whatsapp_link_code', {
-      p_community_id: activeCommunity.id,
-    });
-    setLinking(false);
-    if (error || !code) {
-      Alert.alert('Could not create a code', 'Please try again in a moment.');
-      return;
-    }
-    setLinkCode(code.code);
-  };
+  const { data, loading, refreshing, refresh } = useCommunityData(
+    `more:${membershipId}`,
+    async () => {
+      if (!participant) return { contributions: [], registrations: [] };
+      const [contributions, registrations] = await Promise.all([
+        supabase
+          .from('contributions')
+          .select('id, amount, receipt_no, paid_at, events(slug, name, emoji)')
+          .eq('membership_id', membershipId ?? '')
+          .eq('status', 'succeeded')
+          .order('paid_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('activity_participants')
+          .select('id, participant_name, event_activities(name, emoji, events(name))')
+          .eq('membership_id', membershipId ?? ''),
+      ]);
+      return {
+        contributions: contributions.data ?? [],
+        registrations: registrations.data ?? [],
+      };
+    },
+  );
 
   if (loading && !data) {
     return (
@@ -107,120 +78,109 @@ export default function More() {
           <Title>{profile?.full_name ?? 'You'}</Title>
           <Caption>
             {activeCommunity?.name}
-            {title ? ` · ${title}` : ''}
-            {role ? ` · ${ROLE_LABEL[role]}` : ''}
-            {approvesSpending ? ' · Spending approver' : ''}
+            {normalized ? ` · ${ROLE_LABEL[normalized]}` : ''}
           </Caption>
+          {normalized ? <Caption>{ROLE_DESCRIPTION[normalized]}</Caption> : null}
         </View>
 
-        {isCommittee(role) ? (
+        {can(role, 'events:manage') ? (
           <Card style={{ gap: spacing.xs }}>
-            <Heading>Admin</Heading>
-            {isAdmin(role) ? (
-              <LinkRow
-                label="Approvals"
-                detail="Expenses waiting for sign-off and join requests"
-                onPress={() => router.push('/admin/approvals')}
-              />
-            ) : null}
+            <Heading>{can(role, 'roles:manage') ? 'Committee' : 'Staff'}</Heading>
             <LinkRow
-              label="Members"
+              label="Join requests"
+              detail="Admit new residents"
+              onPress={() => router.push('/admin/requests')}
+            />
+            <LinkRow
+              label="Residents"
               detail={
-                isAdmin(role)
-                  ? 'Roles, titles and spending approvers'
-                  : 'Who is in the society and their positions'
+                can(role, 'roles:manage')
+                  ? 'Remove residents and assign roles'
+                  : 'Everyone in the society; remove residents who have left'
               }
               onPress={() => router.push('/admin/members')}
             />
-          </Card>
-        ) : null}
-
-        <View style={{ flexDirection: 'row', gap: spacing.md }}>
-          <StatTile label="CONTRIBUTED" value={formatMoney(totalGiven, currency)} />
-          <StatTile label="PERFORMING" value={String(data?.activities.length ?? 0)} />
-          <StatTile label="HELPING" value={String(data?.volunteering.length ?? 0)} />
-        </View>
-
-        <Card style={{ gap: spacing.md }}>
-          <Heading>Your contributions</Heading>
-          {data?.contributions.length ? (
-            data.contributions.map((contribution) => (
-              <View
-                key={contribution.id}
-                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Body>
-                    {contribution.events?.emoji} {contribution.events?.name}
-                  </Body>
-                  <Caption>
-                    {receiptRef(contribution.events?.slug, contribution.receipt_no)} ·{' '}
-                    {formatDate(contribution.paid_at.slice(0, 10))}
-                  </Caption>
-                </View>
-                <Body>{formatMoney(contribution.amount, currency)}</Body>
-              </View>
-            ))
-          ) : (
-            <Caption>Nothing yet. Your receipts will show up here.</Caption>
-          )}
-        </Card>
-
-        {data?.activities.length || data?.volunteering.length ? (
-          <Card style={{ gap: spacing.md }}>
-            <Heading>You’re taking part in</Heading>
-            {data.activities.map((row) => (
-              <View key={row.activity_id} style={{ gap: 2 }}>
-                <Body>
-                  {row.event_activities?.emoji} {row.event_activities?.name}
-                </Body>
-                <Caption>{row.event_activities?.events?.name}</Caption>
-              </View>
-            ))}
-            {data.volunteering.map((row) => (
-              <View key={row.role_id} style={{ gap: 2 }}>
-                <Body>
-                  {row.volunteer_roles?.emoji} {row.volunteer_roles?.name}
-                </Body>
-                <Caption>{row.volunteer_roles?.events?.name} · volunteering</Caption>
-              </View>
-            ))}
-          </Card>
-        ) : null}
-
-        <Card style={{ gap: spacing.md }}>
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-          >
-            <Heading>WhatsApp</Heading>
-            <Badge
-              label={data?.linkedPhone ? 'Linked' : 'Not linked'}
-              tone={data?.linkedPhone ? 'success' : 'neutral'}
+            <LinkRow
+              label="Bills"
+              detail={
+                can(role, 'expenses:approve')
+                  ? 'Approve, reject or send back bills'
+                  : 'Upload bills and correct the ones sent back'
+              }
+              onPress={() => router.push('/admin/bills')}
             />
-          </View>
-          {data?.linkedPhone ? (
-            <Body muted>
-              Linked to {data.linkedPhone}. Send “help” to the bot to see what it can do.
-            </Body>
-          ) : linkCode ? (
-            <View style={{ gap: spacing.xs }}>
-              <Caption>SEND THIS TO THE COMMUNITY BOT</Caption>
-              <Title>link {linkCode}</Title>
-              <Caption>From the number you want to link. Good for 15 minutes.</Caption>
+            <LinkRow
+              label="Payments"
+              detail="Which flat paid for which event; record cash and UPI"
+              onPress={() => router.push('/admin/payments')}
+            />
+            {can(role, 'campaigns:approve') ? (
+              <LinkRow
+                label="Committee decisions"
+                detail="Proposed campaigns and new suggestions"
+                onPress={() => router.push('/admin/queue')}
+              />
+            ) : null}
+            <Caption>Creating and editing events is on the website for now.</Caption>
+          </Card>
+        ) : null}
+
+        {participant ? (
+          <>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <StatTile label="CONTRIBUTED" value={formatMoney(totalGiven, currency)} />
+              <StatTile label="REGISTRATIONS" value={String(data?.registrations.length ?? 0)} />
             </View>
-          ) : (
-            <>
-              <Body muted>
-                Check the fund, see notices and back an idea without opening the app.
-              </Body>
-              <Button label="Get a link code" onPress={requestLinkCode} loading={linking} />
-            </>
-          )}
-        </Card>
+
+            <Card style={{ gap: spacing.md }}>
+              <Heading>Your contributions</Heading>
+              {data?.contributions.length ? (
+                data.contributions.map((contribution) => (
+                  <View
+                    key={contribution.id}
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: spacing.md,
+                    }}
+                  >
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Body>
+                        {contribution.events?.emoji} {contribution.events?.name}
+                      </Body>
+                      <Caption>
+                        {receiptRef(contribution.events?.slug, contribution.receipt_no)} ·{' '}
+                        {formatDate(contribution.paid_at.slice(0, 10))}
+                      </Caption>
+                    </View>
+                    <Body>{formatMoney(contribution.amount, currency)}</Body>
+                  </View>
+                ))
+              ) : (
+                <Caption>Nothing yet. Your receipts will show up here.</Caption>
+              )}
+            </Card>
+
+            {data?.registrations.length ? (
+              <Card style={{ gap: spacing.md }}>
+                <Heading>Registered for</Heading>
+                {data.registrations.map((row) => (
+                  <View key={row.id} style={{ gap: 2 }}>
+                    <Body>
+                      {row.event_activities?.emoji} {row.event_activities?.name}
+                      {row.participant_name ? ` · ${row.participant_name}` : ''}
+                    </Body>
+                    <Caption>{row.event_activities?.events?.name}</Caption>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
+          </>
+        ) : null}
 
         {memberships.length > 1 ? (
           <Card style={{ gap: spacing.md }}>
-            <Heading>Switch community</Heading>
+            <Heading>Switch society</Heading>
             {memberships.map((membership) => {
               const isActive = membership.community_id === activeCommunity?.id;
               return (
@@ -235,7 +195,7 @@ export default function More() {
                     paddingVertical: spacing.sm,
                   }}
                 >
-                  <Body>{membership.communities?.name ?? 'Community'}</Body>
+                  <Body>{membership.communities?.name ?? 'Society'}</Body>
                   {isActive ? <Body muted>Current</Body> : null}
                 </Pressable>
               );
@@ -244,7 +204,7 @@ export default function More() {
         ) : null}
 
         <Button
-          label="Join another community"
+          label="Join another society"
           variant="secondary"
           onPress={() => router.push('/join')}
         />

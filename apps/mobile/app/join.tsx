@@ -1,228 +1,229 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import {
-  ROLE_LABEL,
-  formatInviteCode,
-  isRedeemSuccess,
-  joinMessage,
-  normalizeJoinCode,
-  redeemMessage,
-  unitLabel,
-  type MemberRole,
-} from '@samudaya/core';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { formatDate, joinMessage, normalizeJoinCode, unitLabel } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
-import { Body, Button, Caption, Card, Heading, Input, Screen, Title } from '../src/components/ui';
-import { radius, spacing } from '../src/lib/theme';
-import { useTheme } from '../src/lib/use-theme';
+import {
+  Badge,
+  Body,
+  Button,
+  Caption,
+  Card,
+  Heading,
+  Input,
+  Loading,
+  Screen,
+  Title,
+} from '../src/components/ui';
+import { Chip, ChipRow, ErrorText } from '../src/components/admin-ui';
+import { spacing } from '../src/lib/theme';
 
+const RELATIONS = [
+  { value: 'owner', label: 'Owner' },
+  { value: 'tenant', label: 'Tenant' },
+  { value: 'family', label: 'Family member' },
+] as const;
+
+type Relation = (typeof RELATIONS)[number]['value'];
 type Unit = { id: string; block: string | null; number: string };
 
 /**
- * Two ways in, matching the web app.
+ * One way in: the society code the committee shares, plus a few details.
  *
- * Society ID: ask to join, an admin approves. Knowing the ID alone gets nobody
- * in, which is why it can be printed on a notice board.
- *
- * Invite code: already approved, so it lets the resident straight in.
+ * Nothing is sent until the details are complete, so staff never see a
+ * half-filled request. The request then waits for staff or the committee;
+ * until they admit it the app shows only this pending screen.
  */
 export default function Join() {
   const router = useRouter();
-  const { colors } = useTheme();
-  const { refresh, signOut, memberships } = useAuth();
+  const queryClient = useQueryClient();
+  const { user, refresh, signOut, memberships } = useAuth();
 
-  const [mode, setMode] = useState<'society' | 'invite'>('society');
+  const [step, setStep] = useState<'code' | 'details'>('code');
+  const [editing, setEditing] = useState(false);
   const [code, setCode] = useState('');
+  const [name, setName] = useState(user?.user_metadata?.full_name ?? '');
+  const [phone, setPhone] = useState('');
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [block, setBlock] = useState<string | null>(null);
+  const [flatQuery, setFlatQuery] = useState('');
+  const [unitId, setUnitId] = useState<string | null>(null);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [relation, setRelation] = useState<Relation>('owner');
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Society ID path
-  const [found, setFound] = useState<{ id: string; name: string; code: string } | null>(null);
-  const [units, setUnits] = useState<Unit[]>([]);
-  const [unitId, setUnitId] = useState<string>('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [submitted, setSubmitted] = useState<string | null>(null);
-
-  // Invite path
-  const [preview, setPreview] = useState<{
-    code: string;
-    communityName: string;
-    role: MemberRole;
-    unitLabel: string | null;
-  } | null>(null);
-
-  const lookUpSociety = async () => {
-    const normalized = normalizeJoinCode(code);
-    if (normalized.length < 4) {
-      setError('Enter the Society ID your admin gave you.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-
-    const { data, error: rpcError } = await supabase.rpc('request_to_join', {
-      p_join_code: normalized,
-      p_name: 'Resident',
-    });
-    setBusy(false);
-
-    if (rpcError) {
-      setError('We could not check that ID. Please try again.');
-      return;
-    }
-
-    const row = data?.[0];
-    if (!row?.status) {
-      setError(joinMessage('not_found'));
-      return;
-    }
-    if (row.status === 'already_member') {
-      await refresh();
-      router.replace('/(tabs)');
-      return;
-    }
-    if (row.status !== 'pending') {
-      setError(joinMessage(row.status));
-      return;
-    }
-
-    const { data: unitRows } = await supabase
-      .from('units')
-      .select('id, block, number')
-      .eq('community_id', row.community_id ?? '')
-      .order('block', { nullsFirst: true })
-      .order('number');
-
-    setFound({
-      id: row.community_id ?? '',
-      name: row.community_name ?? 'this community',
-      code: normalized,
-    });
-    setUnits(unitRows ?? []);
-  };
-
-  const sendRequest = async () => {
-    if (!found) return;
-    if (name.trim().length < 2) {
-      setError('Tell us your name.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-
-    const { data, error: rpcError } = await supabase.rpc('request_to_join', {
-      p_join_code: found.code,
-      p_unit_id: unitId || undefined,
-      p_name: name.trim(),
-      p_phone: phone.trim() || undefined,
-    });
-    setBusy(false);
-
-    if (rpcError || !data?.[0]?.status) {
-      setError('We could not send that request. Please try again.');
-      return;
-    }
-    if (data[0].status !== 'pending') {
-      setError(joinMessage(data[0].status ?? 'not_found'));
-      return;
-    }
-
-    await supabase.auth.updateUser({ data: { full_name: name.trim() } });
-    setSubmitted(found.name);
-  };
-
-  const checkInvite = async () => {
-    const normalized = normalizeJoinCode(code);
-    if (normalized.length < 4) {
-      setError('Enter the code your admin gave you.');
-      return;
-    }
-    setBusy(true);
-    setError(null);
-
-    const { data, error: rpcError } = await supabase.rpc('preview_invite_code', {
-      p_code: normalized,
-    });
-    setBusy(false);
-
-    if (rpcError) {
-      setError('We could not check that code. Please try again.');
-      return;
-    }
-    const row = data?.[0];
-    if (!row?.status || row.status !== 'ok') {
-      setError(redeemMessage(row?.status ?? 'not_found'));
-      return;
-    }
-    setPreview({
-      code: normalized,
-      communityName: row.community_name ?? 'this community',
-      role: (row.role ?? 'resident') as MemberRole,
-      unitLabel: row.unit_label,
-    });
-  };
-
-  const redeemInvite = async () => {
-    if (!preview) return;
-    setBusy(true);
-    setError(null);
-
-    const { data, error: rpcError } = await supabase.rpc('redeem_invite_code', {
-      p_code: preview.code,
-      p_channel: 'mobile',
-    });
-
-    if (rpcError || !data?.[0]?.status || !isRedeemSuccess(data[0].status)) {
-      setBusy(false);
-      setError(redeemMessage(data?.[0]?.status ?? 'not_found'));
-      return;
-    }
-
-    // Pull the new membership in before navigating, or the tabs would render
-    // against an empty community list.
-    await refresh();
-    setBusy(false);
-    router.replace('/(tabs)');
-  };
-
-  const tab = (selected: boolean) => ({
-    flex: 1,
-    textAlign: 'center' as const,
-    paddingVertical: 10,
-    borderRadius: radius.sm,
-    overflow: 'hidden' as const,
-    fontSize: 14,
-    fontWeight: selected ? ('600' as const) : ('400' as const),
-    backgroundColor: selected ? colors.surfaceSunken : 'transparent',
-    color: selected ? colors.ink : colors.inkMuted,
+  const latest = useQuery({
+    queryKey: ['join:latest', user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('join_requests')
+        .select('id, claimed_name, claimed_phone, relation, status, decline_reason, created_at')
+        .eq('user_id', user?.id ?? '')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
   });
 
-  if (submitted) {
+  const checkAgain = async () => {
+    setChecking(true);
+    await refresh();
+    await latest.refetch();
+    setChecking(false);
+  };
+
+  if (latest.isPending && user?.id) {
     return (
       <Screen>
-        <View style={{ flex: 1, justifyContent: 'center', padding: spacing.xl, gap: spacing.md }}>
-          <Card style={{ alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xxl }}>
-            <Title>Request sent</Title>
+        <Loading />
+      </Screen>
+    );
+  }
+
+  const request = latest.data;
+  const admitted = memberships.length > 0;
+
+  if (request?.status === 'pending' && !editing) {
+    return (
+      <Screen>
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            padding: spacing.xl,
+            gap: spacing.lg,
+          }}
+          refreshControl={<RefreshControl refreshing={checking} onRefresh={checkAgain} />}
+        >
+          <Card style={{ gap: spacing.md, paddingVertical: spacing.xl }}>
+            <View style={{ flexDirection: 'row' }}>
+              <Badge label="Waiting for approval" tone="warning" />
+            </View>
+            <Title>Your request is with the society</Title>
             <Body muted>
-              Your request to join {submitted} is with the society admin. You’ll get in as soon as
-              they approve it.
+              Staff or the committee will check your details and admit you. You’ll see events and
+              everything else as soon as they do.
             </Body>
+            <View style={{ gap: 2 }}>
+              <Caption>SENT {formatDate(request.created_at.slice(0, 10)).toUpperCase()}</Caption>
+              <Body>{request.claimed_name}</Body>
+              <Caption>
+                {RELATIONS.find((item) => item.value === request.relation)?.label ??
+                  request.relation}
+                {request.claimed_phone ? ` · ${request.claimed_phone}` : ''}
+              </Caption>
+            </View>
           </Card>
-          {memberships.length > 0 ? (
+          <Button label="Check again" onPress={() => void checkAgain()} loading={checking} />
+          {admitted ? (
             <Button
               label="Back to my community"
               variant="secondary"
               onPress={() => router.replace('/(tabs)')}
             />
-          ) : (
-            <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
-          )}
-        </View>
+          ) : null}
+          <Button
+            label="Change my details"
+            variant="secondary"
+            onPress={() => {
+              setEditing(true);
+              setStep('code');
+            }}
+          />
+          <Button label="Sign out" variant="secondary" onPress={() => void signOut()} />
+        </ScrollView>
       </Screen>
     );
   }
+
+  const continueToDetails = async () => {
+    const normalized = normalizeJoinCode(code);
+    if (normalized.length < 4) {
+      setError('Enter the society code your committee shared.');
+      return;
+    }
+    setLookingUp(true);
+    setError(null);
+    // A valid code returns the society's flats; a wrong one returns nothing and
+    // counts toward the same attempt limit as a join request.
+    const { data, error: rpcError } = await supabase.rpc('society_units', {
+      p_join_code: normalized,
+    });
+    setLookingUp(false);
+    if (rpcError) {
+      setError(
+        /too many/i.test(rpcError.message)
+          ? rpcError.message
+          : 'We could not check that code. Please try again.',
+      );
+      return;
+    }
+    const rows = (data ?? []).filter((row): row is Unit => Boolean(row.id) && Boolean(row.number));
+    if (!rows.length) {
+      setError(joinMessage('not_found'));
+      return;
+    }
+    setUnits(rows);
+    const blocks = [...new Set(rows.map((row) => row.block ?? ''))];
+    setBlock(blocks.length === 1 ? (blocks[0] ?? null) : null);
+    setUnitId((current) => (rows.some((row) => row.id === current) ? current : null));
+    setStep('details');
+  };
+
+  const submit = async () => {
+    // Same normalisation as the web app: a 10-digit Indian mobile gets +91.
+    const digits = phone.replace(/[\s-]/g, '');
+    const cleanPhone = /^[6-9]\d{9}$/.test(digits) ? `+91${digits}` : digits;
+    if (name.trim().length < 2) {
+      setError('Enter your full name.');
+      return;
+    }
+    if (!/^\+?[0-9]{7,15}$/.test(cleanPhone)) {
+      setError('Enter a valid phone number.');
+      return;
+    }
+    if (!unitId) {
+      setError('Pick your flat.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+
+    const { data, error: rpcError } = await supabase.rpc('request_to_join', {
+      p_join_code: normalizeJoinCode(code),
+      p_unit_id: unitId,
+      p_name: name.trim(),
+      p_phone: cleanPhone,
+      p_relation: relation,
+    });
+    setBusy(false);
+
+    const status = data?.[0]?.status;
+    if (rpcError || !status) {
+      setError('We could not send that request. Please try again.');
+      return;
+    }
+    if (status === 'already_member') {
+      await refresh();
+      router.replace('/(tabs)');
+      return;
+    }
+    if (status !== 'pending') {
+      setError(joinMessage(status));
+      if (status === 'not_found') setStep('code');
+      return;
+    }
+
+    await supabase.auth.updateUser({ data: { full_name: name.trim() } });
+    setEditing(false);
+    await queryClient.invalidateQueries({ queryKey: ['join:latest'] });
+  };
 
   return (
     <Screen>
@@ -235,89 +236,47 @@ export default function Join() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={{ gap: 2 }}>
-            <Title>Join your community</Title>
-            <Body muted>Use the Society ID your admin shared, or an invite code.</Body>
+            <Title>Join your society</Title>
+            <Body muted>
+              {step === 'code'
+                ? 'Enter the society code your committee shared. Everyone in the society uses the same code.'
+                : 'Tell staff who you are. They check these details before letting you in.'}
+            </Body>
           </View>
 
-          {!found && !preview ? (
-            <View
-              accessibilityRole="tablist"
-              style={{
-                flexDirection: 'row',
-                gap: 4,
-                padding: 4,
-                borderRadius: radius.md,
-                backgroundColor: colors.surfaceRaised,
-              }}
-            >
-              <Text
-                accessibilityRole="tab"
-                accessibilityState={{ selected: mode === 'society' }}
-                onPress={() => {
-                  setMode('society');
-                  setError(null);
-                }}
-                style={tab(mode === 'society')}
-              >
-                Society ID
-              </Text>
-              <Text
-                accessibilityRole="tab"
-                accessibilityState={{ selected: mode === 'invite' }}
-                onPress={() => {
-                  setMode('invite');
-                  setError(null);
-                }}
-                style={tab(mode === 'invite')}
-              >
-                Invite code
-              </Text>
-            </View>
+          {request?.status === 'rejected' && !editing ? (
+            <Card style={{ gap: spacing.xs }}>
+              <Heading>Your last request was declined</Heading>
+              <Body muted>
+                {request.decline_reason ?? 'Check your details with the committee and try again.'}
+              </Body>
+            </Card>
           ) : null}
 
-          {found ? (
+          {step === 'code' ? (
+            <Card style={{ gap: spacing.md }}>
+              <Input
+                label="Society code"
+                value={code}
+                onChangeText={(value) => setCode(value.toUpperCase())}
+                placeholder="VJ4FQW"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                style={{ textAlign: 'center', letterSpacing: 3, fontSize: 18 }}
+              />
+              <Button
+                label="Continue"
+                onPress={() => void continueToDetails()}
+                loading={lookingUp}
+              />
+            </Card>
+          ) : (
             <Card style={{ gap: spacing.lg }}>
               <View style={{ gap: 2 }}>
-                <Caption>JOINING</Caption>
-                <Heading>{found.name}</Heading>
+                <Caption>SOCIETY CODE</Caption>
+                <Heading>{normalizeJoinCode(code)}</Heading>
               </View>
-
-              <Input label="Your name" value={name} onChangeText={setName} autoCapitalize="words" />
-
-              <View style={{ gap: spacing.sm }}>
-                <Body>Your flat</Body>
-                {units.length ? (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                    {units.slice(0, 40).map((unit) => {
-                      const selected = unitId === unit.id;
-                      return (
-                        <Text
-                          key={unit.id}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          onPress={() => setUnitId(selected ? '' : unit.id)}
-                          style={{
-                            paddingHorizontal: spacing.md,
-                            paddingVertical: 8,
-                            borderRadius: radius.pill,
-                            overflow: 'hidden',
-                            fontSize: 13,
-                            backgroundColor: selected ? colors.accent : colors.surfaceSunken,
-                            color: selected ? colors.accentInk : colors.inkMuted,
-                          }}
-                        >
-                          {unitLabel(unit)}
-                        </Text>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Caption>
-                    This society hasn’t added its flats yet. You can still ask to join.
-                  </Caption>
-                )}
-              </View>
-
+              <Input label="Full name" value={name} onChangeText={setName} autoCapitalize="words" />
               <Input
                 label="Phone"
                 value={phone}
@@ -325,75 +284,46 @@ export default function Join() {
                 keyboardType="phone-pad"
                 placeholder="9876543210"
               />
-
-              <Button label="Ask to join" onPress={sendRequest} loading={busy} />
-            </Card>
-          ) : preview ? (
-            <Card style={{ gap: spacing.md }}>
-              <View style={{ gap: 2 }}>
-                <Caption>YOU’RE JOINING</Caption>
-                <Heading>{preview.communityName}</Heading>
-              </View>
-              <View style={{ gap: spacing.xs }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Body muted>Your role</Body>
-                  <Body>{ROLE_LABEL[preview.role]}</Body>
-                </View>
-                {preview.unitLabel ? (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Body muted>Flat</Body>
-                    <Body>{preview.unitLabel}</Body>
-                  </View>
-                ) : null}
-              </View>
-              <Button
-                label={`Join ${preview.communityName}`}
-                onPress={redeemInvite}
-                loading={busy}
+              <FlatPicker
+                units={units}
+                block={block}
+                onBlock={setBlock}
+                query={flatQuery}
+                onQuery={setFlatQuery}
+                unitId={unitId}
+                onPick={setUnitId}
               />
+              <View style={{ gap: spacing.sm }}>
+                <Body>You are the</Body>
+                <ChipRow>
+                  {RELATIONS.map((item) => (
+                    <Chip
+                      key={item.value}
+                      label={item.label}
+                      selected={relation === item.value}
+                      onPress={() => setRelation(item.value)}
+                    />
+                  ))}
+                </ChipRow>
+                <Caption>
+                  Several people from one flat can each join with their own account.
+                </Caption>
+              </View>
+              <Button label="Send request" onPress={() => void submit()} loading={busy} />
               <Button
-                label="Use a different code"
+                label="Change society code"
                 variant="secondary"
-                onPress={() => {
-                  setPreview(null);
-                  setCode('');
-                }}
+                onPress={() => setStep('code')}
                 disabled={busy}
               />
             </Card>
-          ) : (
-            <Card style={{ gap: spacing.md }}>
-              <Input
-                label={mode === 'society' ? 'Society ID' : 'Invite code'}
-                value={code}
-                onChangeText={(value) =>
-                  setCode(mode === 'society' ? value.toUpperCase() : formatInviteCode(value))
-                }
-                placeholder={mode === 'society' ? 'MHR4827' : 'ABCD-1234'}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                style={{ textAlign: 'center', letterSpacing: 3, fontSize: 18 }}
-              />
-              <Button
-                label="Continue"
-                onPress={mode === 'society' ? lookUpSociety : checkInvite}
-                loading={busy}
-              />
-              <Caption>
-                {mode === 'society'
-                  ? 'A Society ID only lets you ask. Your admin approves who gets in.'
-                  : 'An invite code is already approved, so it lets you in immediately.'}
-              </Caption>
-            </Card>
           )}
 
-          {error ? (
-            <Text accessibilityRole="alert" style={{ color: colors.danger, fontSize: 13 }}>
-              {error}
-            </Text>
-          ) : null}
+          <ErrorText message={error} />
 
-          {memberships.length > 0 ? (
+          {editing ? (
+            <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
+          ) : admitted ? (
             <Button
               label="Back to my community"
               variant="secondary"
@@ -405,5 +335,91 @@ export default function Join() {
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
+  );
+}
+
+/**
+ * Picks one flat out of a few hundred: choose the tower, then type to narrow
+ * the flat numbers. Shows at most 60 matches so the list stays quick.
+ */
+function FlatPicker({
+  units,
+  block,
+  onBlock,
+  query,
+  onQuery,
+  unitId,
+  onPick,
+}: {
+  units: Unit[];
+  block: string | null;
+  onBlock: (block: string | null) => void;
+  query: string;
+  onQuery: (query: string) => void;
+  unitId: string | null;
+  onPick: (unitId: string | null) => void;
+}) {
+  const chosen = units.find((unit) => unit.id === unitId);
+  const blocks = [...new Set(units.map((unit) => unit.block ?? ''))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true }),
+  );
+
+  if (chosen) {
+    return (
+      <View style={{ gap: spacing.sm }}>
+        <Body>Your flat</Body>
+        <ChipRow>
+          <Chip label={`Flat ${unitLabel(chosen)}`} selected onPress={() => onPick(null)} />
+          <Chip label="Change" onPress={() => onPick(null)} />
+        </ChipRow>
+      </View>
+    );
+  }
+
+  const needle = query.trim().toUpperCase().replace(/[\s-]/g, '');
+  const matches = units
+    .filter((unit) => block === null || (unit.block ?? '') === block)
+    .filter(
+      (unit) => !needle || unitLabel(unit).toUpperCase().replace(/[\s-]/g, '').includes(needle),
+    )
+    .sort((a, b) => unitLabel(a).localeCompare(unitLabel(b), undefined, { numeric: true }));
+
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Body>Your flat</Body>
+      {blocks.length > 1 ? (
+        <ChipRow>
+          {blocks.map((value) => (
+            <Chip
+              key={value || 'none'}
+              label={value ? `Tower ${value}` : 'No tower'}
+              selected={block === value}
+              onPress={() => onBlock(block === value ? null : value)}
+            />
+          ))}
+        </ChipRow>
+      ) : null}
+      <Input
+        value={query}
+        onChangeText={onQuery}
+        placeholder={block ? `Flat number in Tower ${block}` : 'Type your flat, e.g. A1104'}
+        autoCapitalize="characters"
+        autoCorrect={false}
+      />
+      {matches.length ? (
+        <ChipRow>
+          {matches.slice(0, 60).map((unit) => (
+            <Chip key={unit.id} label={unitLabel(unit)} onPress={() => onPick(unit.id)} />
+          ))}
+        </ChipRow>
+      ) : (
+        <Caption>No flat matches. Check the tower and number.</Caption>
+      )}
+      {matches.length > 60 ? (
+        <Caption>
+          Showing 60 of {matches.length}. Pick a tower or type your flat number to narrow it.
+        </Caption>
+      ) : null}
+    </View>
   );
 }

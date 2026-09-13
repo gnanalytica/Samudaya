@@ -1,17 +1,15 @@
 import { useState } from 'react';
-import { ScrollView, Switch, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ASSIGNABLE_ROLES,
   ROLE_DESCRIPTION,
   ROLE_LABEL,
-  SUGGESTED_TITLES,
-  TITLE_MAX_LENGTH,
-  canManageSpendingApproval,
-  isAdmin,
-  positionLabel,
-  type MemberRole,
+  can,
+  normalizeRole,
+  unitLabel,
+  type Role,
 } from '@samudaya/core';
 import { useAuth } from '../../../src/lib/auth';
 import { supabase } from '../../../src/lib/supabase';
@@ -23,114 +21,136 @@ import {
   Card,
   EmptyState,
   Heading,
-  Input,
   Loading,
   Screen,
   Title,
 } from '../../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../../src/components/admin-ui';
 import { spacing } from '../../../src/lib/theme';
-import { useTheme } from '../../../src/lib/use-theme';
 
 /**
- * Edit one member: role, title and spending-approver flag. Guards in the
- * database stop self-promotion, owner changes by non-owners, and approver
- * changes by anyone other than an owner or an existing approver.
+ * One member. Staff can remove a resident who has left; the committee can also
+ * change anyone's role. The database enforces both, and keeps at least one
+ * committee member in every society.
  */
 export default function EditMember() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { role: myRole, approvesSpending: iApprove, membershipId: myMembershipId } = useAuth();
+  const { role, membershipId, refresh: refreshAuth } = useAuth();
 
-  const { data: member, loading } = useCommunityData(`admin:member:${id}`, async (communityId) => {
-    const { data } = await supabase
+  const { data, loading } = useCommunityData(`admin:member:${id}`, async (communityId) => {
+    const { data: row } = await supabase
       .from('memberships')
-      .select('id, role, title, approves_spending, profiles(full_name)')
+      .select(
+        'id, role, joined_at, profiles(full_name, email), unit_occupants(relation, units(block, number))',
+      )
       .eq('community_id', communityId)
-      .eq('id', id)
+      .eq('id', String(id))
       .maybeSingle();
-    return data;
+    return row;
   });
 
-  if (!isAdmin(myRole)) {
+  if (!can(role, 'residents:remove')) {
     return (
       <Screen>
-        <EmptyState title="Admins only" description="Only admins can change members." />
+        <EmptyState title="Staff and committee only" />
       </Screen>
     );
   }
 
-  if (loading || !member) {
-    return <Screen>{loading ? <Loading /> : <EmptyState title="Member not found" />}</Screen>;
+  if (loading && !data) {
+    return (
+      <Screen>
+        <Loading />
+      </Screen>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Screen>
+        <EmptyState title="Member not found" description="They may already have been removed." />
+      </Screen>
+    );
   }
 
   return (
-    <MemberForm
-      // Remount with fresh state whenever the saved row changes.
-      key={`${member.role}:${member.title ?? ''}:${member.approves_spending}`}
-      member={member}
-      isSelf={member.id === myMembershipId}
-      managesApproval={canManageSpendingApproval(myRole, iApprove)}
+    <MemberEditor
+      key={data.role}
+      member={data}
+      isSelf={data.id === membershipId}
+      mayManageRoles={can(role, 'roles:manage')}
+      onSelfChanged={refreshAuth}
     />
   );
 }
 
-function MemberForm({
+type MemberRow = {
+  id: string;
+  role: Parameters<typeof normalizeRole>[0];
+  joined_at: string;
+  profiles: { full_name: string | null; email: string | null } | null;
+  unit_occupants: { relation: string; units: { block: string | null; number: string } | null }[];
+};
+
+function MemberEditor({
   member,
   isSelf,
-  managesApproval,
+  mayManageRoles,
+  onSelfChanged,
 }: {
-  member: {
-    id: string;
-    role: MemberRole;
-    title: string | null;
-    approves_spending: boolean;
-    profiles: { full_name: string | null } | null;
-  };
+  member: MemberRow;
   isSelf: boolean;
-  managesApproval: boolean;
+  mayManageRoles: boolean;
+  onSelfChanged: () => Promise<void>;
 }) {
   const router = useRouter();
-  const { colors } = useTheme();
   const queryClient = useQueryClient();
-  const { refresh: refreshAuth } = useAuth();
-
-  const [role, setRole] = useState<MemberRole>(member.role);
-  const [title, setTitle] = useState(member.title ?? '');
-  const [approver, setApprover] = useState(member.approves_spending);
-  const [saving, setSaving] = useState(false);
+  const current = normalizeRole(member.role) ?? 'resident';
+  const [nextRole, setNextRole] = useState<Role>(current);
+  const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isOwner = member.role === 'owner';
-  const roleAllowsApproval = role === 'admin' || role === 'owner';
+  const name = member.profiles?.full_name ?? member.profiles?.email ?? 'This member';
+  const flats = member.unit_occupants
+    .filter((row) => row.units)
+    .map((row) => `Flat ${unitLabel(row.units)} · ${row.relation}`);
+  const mayRemove = !isSelf && (current === 'resident' || mayManageRoles);
 
-  const save = async () => {
-    setSaving(true);
+  const afterChange = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['admin:members'] });
+    await queryClient.invalidateQueries({ queryKey: [`admin:member:${member.id}`] });
+    if (isSelf) await onSelfChanged();
+  };
+
+  const saveRole = async () => {
+    setBusy('save');
     setError(null);
-
-    const trimmed = title.trim();
-    const changes: { role?: MemberRole; title: string | null; approves_spending?: boolean } = {
-      title: trimmed ? trimmed.slice(0, TITLE_MAX_LENGTH) : null,
-    };
-    if (!isOwner && role !== member.role) changes.role = role;
-    // Dropping below admin clears the approver flag, which the database requires.
-    const nextApprover = roleAllowsApproval ? approver : false;
-    if (nextApprover !== member.approves_spending) changes.approves_spending = nextApprover;
-
     const { error: updateError } = await supabase
       .from('memberships')
-      .update(changes)
+      .update({ role: nextRole })
       .eq('id', member.id);
-    setSaving(false);
-
+    setBusy(null);
     if (updateError) {
       setError(updateError.message);
       return;
     }
+    await afterChange();
+    router.back();
+  };
 
-    void queryClient.invalidateQueries({ queryKey: ['admin:members'] });
-    void queryClient.invalidateQueries({ queryKey: [`admin:member:${member.id}`] });
-    void queryClient.invalidateQueries({ queryKey: ['admin:approvals'] });
-    if (isSelf) await refreshAuth();
+  const remove = async () => {
+    setBusy('remove');
+    setError(null);
+    const { error: deleteError, count } = await supabase
+      .from('memberships')
+      .delete({ count: 'exact' })
+      .eq('id', member.id);
+    setBusy(null);
+    if (deleteError || count === 0) {
+      setError(deleteError?.message ?? 'You can’t remove this member.');
+      return;
+    }
+    await afterChange();
     router.back();
   };
 
@@ -138,85 +158,63 @@ function MemberForm({
     <Screen>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <View style={{ gap: 2 }}>
-          <Title>{member.profiles?.full_name ?? 'Member'}</Title>
-          <Caption>{positionLabel(member.role, member.title)}</Caption>
+          <Title>{name}</Title>
+          <Caption>
+            {ROLE_LABEL[current]}
+            {member.profiles?.email ? ` · ${member.profiles.email}` : ''}
+          </Caption>
+          {flats.map((flat) => (
+            <Caption key={flat}>{flat}</Caption>
+          ))}
         </View>
 
-        <Card style={{ gap: spacing.sm }}>
-          <Heading>Title</Heading>
-          <Caption>A label for their position. Their role decides what they can do.</Caption>
-          <Input
-            value={title}
-            onChangeText={setTitle}
-            placeholder="e.g. Treasurer"
-            maxLength={TITLE_MAX_LENGTH}
-          />
-          <ChipRow>
-            {SUGGESTED_TITLES.map((suggestion) => (
-              <Chip
-                key={suggestion}
-                label={suggestion}
-                selected={title.trim() === suggestion}
-                onPress={() => setTitle(title.trim() === suggestion ? '' : suggestion)}
-              />
-            ))}
-          </ChipRow>
-        </Card>
-
-        <Card style={{ gap: spacing.sm }}>
-          <Heading>Role</Heading>
-          {isOwner ? (
-            <Body muted>Owners can only be changed by transferring ownership on the web.</Body>
-          ) : (
-            <>
-              <ChipRow>
-                {ASSIGNABLE_ROLES.map((option) => (
-                  <Chip
-                    key={option}
-                    label={ROLE_LABEL[option]}
-                    selected={role === option}
-                    onPress={() => setRole(option)}
-                  />
-                ))}
-              </ChipRow>
-              <Caption>{ROLE_DESCRIPTION[role]}</Caption>
-              {isSelf ? <Caption>You can lower your own role but not raise it.</Caption> : null}
-            </>
-          )}
-        </Card>
-
-        <Card style={{ gap: spacing.sm }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: spacing.md,
-            }}
-          >
-            <View style={{ flex: 1, gap: 2 }}>
-              <Heading>Spending approver</Heading>
-              <Caption>
-                Can approve expenses when the society limits approval to designated approvers.
-              </Caption>
-            </View>
-            <Switch
-              value={roleAllowsApproval && approver}
-              onValueChange={setApprover}
-              disabled={!managesApproval || !roleAllowsApproval}
-              trackColor={{ true: colors.accent, false: colors.border }}
+        {mayManageRoles ? (
+          <Card style={{ gap: spacing.md }}>
+            <Heading>Role</Heading>
+            <ChipRow>
+              {ASSIGNABLE_ROLES.map((option) => (
+                <Chip
+                  key={option}
+                  label={ROLE_LABEL[option]}
+                  selected={nextRole === option}
+                  onPress={() => setNextRole(option)}
+                  disabled={busy !== null}
+                />
+              ))}
+            </ChipRow>
+            <Caption>{ROLE_DESCRIPTION[nextRole]}</Caption>
+            {isSelf ? <Caption>You can lower your own role but not raise it.</Caption> : null}
+            <Button
+              label="Save role"
+              onPress={() => void saveRole()}
+              loading={busy === 'save'}
+              disabled={nextRole === current}
             />
-          </View>
-          {!roleAllowsApproval ? (
-            <Caption>Only admins and owners can be approvers.</Caption>
-          ) : !managesApproval ? (
-            <Caption>Only an owner or an existing approver can change this.</Caption>
-          ) : null}
-        </Card>
+          </Card>
+        ) : null}
+
+        {mayRemove ? (
+          <Card style={{ gap: spacing.sm }}>
+            <Heading>Remove from the society</Heading>
+            <Body muted>
+              For someone who has moved out. Their past contributions stay in the accounts; they
+              lose access straight away and would need to ask to join again.
+            </Body>
+            <Button
+              label={`Remove ${name}`}
+              variant="secondary"
+              loading={busy === 'remove'}
+              onPress={() =>
+                Alert.alert(`Remove ${name}?`, 'They lose access immediately.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: () => void remove() },
+                ])
+              }
+            />
+          </Card>
+        ) : null}
 
         <ErrorText message={error} />
-        <Button label="Save" onPress={() => void save()} loading={saving} />
-        <View style={{ height: spacing.xl }} />
       </ScrollView>
     </Screen>
   );

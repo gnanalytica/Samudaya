@@ -52,10 +52,6 @@ type AuthValue = {
   activeCommunity: Tables<'communities'> | null;
   role: MemberRole | null;
   membershipId: string | null;
-  /** Position in the active community, e.g. "Treasurer". A label; `role` decides access. */
-  title: string | null;
-  /** Whether the active membership is a designated spending approver. */
-  approvesSpending: boolean;
   /** False once the stored session has been read from disk. */
   loading: boolean;
   signInWithGoogle: () => Promise<{ error?: string }>;
@@ -185,8 +181,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       activeCommunity: active?.communities ?? null,
       role: active?.role ?? null,
       membershipId: active?.id ?? null,
-      title: active?.title ?? null,
-      approvesSpending: active?.approves_spending ?? false,
       loading,
       signInWithGoogle,
       signInWithEmail,
