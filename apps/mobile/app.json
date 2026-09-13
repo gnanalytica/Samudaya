@@ -16,6 +16,7 @@
     },
     "android": {
       "package": "com.samudaya.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/android-icon-foreground.png",
