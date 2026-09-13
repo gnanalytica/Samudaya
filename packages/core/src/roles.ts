@@ -83,3 +83,56 @@ export function can(role: MemberRole | null | undefined, capability: Capability)
   if (!role) return false;
   return hasRoleAtLeast(role, CAPABILITIES[capability]);
 }
+
+/**
+ * Titles offered when naming a member's position. A title is a label only; the
+ * role still decides permissions. A paid estate supervisor, for instance, is a
+ * committee member titled "Supervisor". Any other title up to 40 characters is
+ * allowed.
+ */
+export const SUGGESTED_TITLES = [
+  'President',
+  'Vice President',
+  'Secretary',
+  'Treasurer',
+  'Joint Secretary',
+  'Cultural Secretary',
+  'Sports Secretary',
+  'Committee Member',
+  'Supervisor',
+  'Estate Manager',
+] as const;
+
+export const TITLE_MAX_LENGTH = 40;
+
+/** How a member is described: their title when set, otherwise their role. */
+export function positionLabel(role: MemberRole | null | undefined, title?: string | null): string {
+  const trimmed = title?.trim();
+  if (trimmed) return trimmed;
+  return role ? ROLE_LABEL[role] : '';
+}
+
+/**
+ * Whether this member may approve spending right now. Mirrors
+ * app.can_approve_spending(): any admin, unless the community restricts approval
+ * to designated approvers. The database re-checks on every approval.
+ */
+export function canApproveSpending(
+  role: MemberRole | null | undefined,
+  approvesSpending: boolean | null | undefined,
+  restrictSpendingApproval: boolean | null | undefined,
+): boolean {
+  if (!isAdmin(role)) return false;
+  return !restrictSpendingApproval || Boolean(approvesSpending);
+}
+
+/**
+ * Who may change the approver list or the restriction: an owner, or an admin who
+ * is already an approver. Mirrors app.manages_spending_approval().
+ */
+export function canManageSpendingApproval(
+  role: MemberRole | null | undefined,
+  approvesSpending: boolean | null | undefined,
+): boolean {
+  return role === 'owner' || (isAdmin(role) && Boolean(approvesSpending));
+}

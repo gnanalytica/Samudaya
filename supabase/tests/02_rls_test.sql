@@ -557,4 +557,74 @@ select test.eq(test.visible('select id from public.events'), 0::bigint,
 select test.eq(test.visible('select * from public.event_stats'), 0::bigint,
   'not even aggregate numbers');
 
+-- ---------------------------------------------------------------------------
+-- Titles and designated spending approvers (Hill Crest, founded by Hana)
+-- ---------------------------------------------------------------------------
+-- Ivan is an admin, Kiran is an admin who becomes Treasurer, Jaya is the
+-- committee Supervisor who raises a bill.
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('99999999-9999-4999-8999-999999999999', 'ivan@example.com',  '{"full_name":"Ivan Dsouza"}'),
+  ('abababab-abab-4bab-8bab-abababababab', 'kiran@example.com', '{"full_name":"Kiran Rao"}'),
+  ('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', 'jaya@example.com',  '{"full_name":"Jaya Pillai"}');
+insert into public.memberships (community_id, user_id, role, status)
+select c.id, u.id::uuid, u.role::public.member_role, 'active'
+  from public.communities c,
+       (values ('99999999-9999-4999-8999-999999999999', 'admin'),
+               ('abababab-abab-4bab-8bab-abababababab', 'admin'),
+               ('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd', 'committee')) as u(id, role)
+ where c.slug = 'hill-crest';
+insert into public.events (id, community_id, slug, name, starts_on, status)
+select 'cccccccc-0000-4000-8000-0000000000aa', c.id, 'hill-diwali', 'Hill Crest Diwali', '2026-11-07', 'published'
+  from public.communities c where c.slug = 'hill-crest';
+insert into public.expenses (id, event_id, community_id, name, amount, vendor, requested_by)
+select 'dddddddd-0000-4000-8000-0000000000aa', 'cccccccc-0000-4000-8000-0000000000aa', m.community_id,
+       'Diyas', 2500, 'Clay Crafts', m.id
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+update public.memberships set title = 'Supervisor'
+ where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+select test.eq(
+  (select title from public.memberships where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'),
+  'Supervisor', 'an admin can give a member a title');
+select test.raises(
+  $q$update public.memberships set approves_spending = true
+      where user_id = '99999999-9999-4999-8999-999999999999'$q$,
+  'an admin who is not an approver cannot make themselves a spending approver');
+select test.raises(
+  $q$update public.communities set restrict_spending_approval = true where slug = 'hill-crest'$q$,
+  'nor switch on approver-only spending');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.raises(
+  $q$update public.communities set restrict_spending_approval = true where slug = 'hill-crest'$q$,
+  'restricting approval needs at least one approver first');
+select test.raises(
+  $q$update public.memberships set approves_spending = true
+      where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$,
+  'a committee member cannot be a spending approver');
+update public.memberships set approves_spending = true, title = 'Treasurer'
+ where user_id = 'abababab-abab-4bab-8bab-abababababab';
+update public.communities set restrict_spending_approval = true where slug = 'hill-crest';
+select test.ok(
+  (select restrict_spending_approval from public.communities where slug = 'hill-crest'),
+  'the owner designates a Treasurer and restricts approval to approvers');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.raises(
+  $q$select public.review_expense('dddddddd-0000-4000-8000-0000000000aa', 'approved')$q$,
+  'once restricted, an ordinary admin cannot approve spending');
+select test.raises(
+  $q$update public.communities set restrict_spending_approval = false where slug = 'hill-crest'$q$,
+  'and cannot lift the restriction');
+
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  (select status::text from public.review_expense('dddddddd-0000-4000-8000-0000000000aa', 'approved')),
+  'approved', 'the designated Treasurer approves it');
+
 reset role;

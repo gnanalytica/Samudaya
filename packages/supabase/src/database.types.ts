@@ -397,6 +397,7 @@ export type Database = {
           created_by: string | null
           created_at: string
           updated_at: string
+          restrict_spending_approval: boolean
         }
         Insert: {
           id?: string
@@ -416,6 +417,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          restrict_spending_approval?: boolean
         }
         Update: {
           id?: string
@@ -435,6 +437,7 @@ export type Database = {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          restrict_spending_approval?: boolean
         }
         Relationships: [
           {
@@ -1263,6 +1266,8 @@ export type Database = {
           joined_at: string
           created_at: string
           updated_at: string
+          title: string | null
+          approves_spending: boolean
         }
         Insert: {
           id?: string
@@ -1274,6 +1279,8 @@ export type Database = {
           joined_at?: string
           created_at?: string
           updated_at?: string
+          title?: string | null
+          approves_spending?: boolean
         }
         Update: {
           id?: string
@@ -1285,6 +1292,8 @@ export type Database = {
           joined_at?: string
           created_at?: string
           updated_at?: string
+          title?: string | null
+          approves_spending?: boolean
         }
         Relationships: [
           {

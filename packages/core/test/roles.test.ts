@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ROLE_RANK, can, hasRoleAtLeast, isAdmin, isCommittee } from '../src/roles';
+import {
+  ROLE_RANK,
+  can,
+  canApproveSpending,
+  canManageSpendingApproval,
+  hasRoleAtLeast,
+  isAdmin,
+  isCommittee,
+  positionLabel,
+} from '../src/roles';
 
 describe('role ranking', () => {
   it('orders roles the same way the database does', () => {
@@ -58,5 +67,34 @@ describe('capabilities', () => {
       expect(can(role, 'joinrequests:review')).toBe(true);
       expect(can(role, 'reallocation:propose')).toBe(true);
     }
+  });
+});
+
+describe('titles', () => {
+  it('describes a member by title when set, role otherwise', () => {
+    expect(positionLabel('committee', 'Supervisor')).toBe('Supervisor');
+    expect(positionLabel('admin', '  ')).toBe('Administrator');
+    expect(positionLabel('resident', null)).toBe('Resident');
+  });
+});
+
+describe('spending approval', () => {
+  it('lets any admin approve until the community restricts it', () => {
+    expect(canApproveSpending('admin', false, false)).toBe(true);
+    expect(canApproveSpending('owner', false, false)).toBe(true);
+    expect(canApproveSpending('committee', true, false)).toBe(false);
+  });
+
+  it('narrows approval to designated approvers once restricted', () => {
+    expect(canApproveSpending('admin', false, true)).toBe(false);
+    expect(canApproveSpending('owner', false, true)).toBe(false);
+    expect(canApproveSpending('admin', true, true)).toBe(true);
+  });
+
+  it('lets only owners and existing approvers change who approves', () => {
+    expect(canManageSpendingApproval('owner', false)).toBe(true);
+    expect(canManageSpendingApproval('admin', true)).toBe(true);
+    expect(canManageSpendingApproval('admin', false)).toBe(false);
+    expect(canManageSpendingApproval('committee', true)).toBe(false);
   });
 });
