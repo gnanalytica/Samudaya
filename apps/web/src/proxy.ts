@@ -85,7 +85,15 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  // Sending someone away from the login page needs a real account, not just a
+  // well-signed token: a token outlives a deleted account or a revoked session
+  // for up to an hour, and pages (which call getUser) would bounce it straight
+  // back here in a loop. Only /login pays for this call to Supabase.
   if (user && pathname === '/login') {
+    const {
+      data: { user: account },
+    } = await supabase.auth.getUser();
+    if (!account) return response;
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = '/app';
     redirectUrl.search = '';
