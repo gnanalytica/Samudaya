@@ -638,7 +638,16 @@ async function seedSociety() {
     'describe community',
     await db
       .from('communities')
-      .update({ city: 'Bengaluru', timezone: 'Asia/Kolkata', currency: 'INR' })
+      .update({
+        city: 'Bengaluru',
+        timezone: 'Asia/Kolkata',
+        currency: 'INR',
+        // Deliberately not a real UPI handle: a test payment from the demo
+        // fails in the UPI app instead of reaching a stranger. The committee
+        // sets the society's real UPI ID in the app.
+        upi_vpa: 'whitecliff.demo@samudayademo',
+        upi_payee_name: 'Whitecliff Residents Association',
+      })
       .eq('id', cid),
   );
 
@@ -768,15 +777,20 @@ async function seedSociety() {
     const start = new Date(giving.from).getTime();
     const span = new Date(giving.to).getTime() - start;
     const when = () => new Date(start + rand() * span).toISOString();
+    // UPI references (UTRs) are 12 digits.
     const upiRef = () =>
-      `UPI${Math.floor(rand() * 1e12)
+      `6${Math.floor(rand() * 1e11)
         .toString()
-        .padStart(12, '0')}`;
+        .padStart(11, '0')}`;
+    const verifier = staff[0]?.membershipId ?? null;
 
     const online: Tables['contributions']['Insert'][] = shuffle(participants)
       .slice(0, giving.members)
       .map((member) => {
         const method = rand() < 0.85 ? ('upi' as const) : ('bank_transfer' as const);
+        // Some residents have reported a UPI payment staff have not checked yet.
+        const confirmed = method !== 'upi' || rand() < 0.85;
+        const paidAt = when();
         return {
           event_id: eventId,
           community_id: cid,
@@ -784,10 +798,12 @@ async function seedSociety() {
           unit_id: member.unitId,
           amount: pick(giving.amounts),
           method,
-          status: 'succeeded',
+          status: confirmed ? ('succeeded' as const) : ('pending' as const),
+          verified_by: confirmed ? verifier : null,
+          verified_at: confirmed ? paidAt : null,
           channel: pick(['web', 'mobile', 'mobile'] as const satisfies readonly Channel[]),
           reference: method === 'upi' ? upiRef() : null,
-          paid_at: when(),
+          paid_at: paidAt,
         };
       });
     // Flats that never open the app pay staff by UPI or cash; staff record the
@@ -804,6 +820,8 @@ async function seedSociety() {
           amount: pick(giving.amounts),
           method,
           status: 'succeeded',
+          verified_by: verifier,
+          verified_at: new Date().toISOString(),
           channel: 'system',
           reference: method === 'upi' ? upiRef() : null,
           paid_at: when(),
@@ -813,7 +831,10 @@ async function seedSociety() {
     if (rows.length) {
       check('contributions', await db.from('contributions').insert(rows, { defaultToNull: false }));
     }
-    return rows.reduce((sum, row) => sum + row.amount, 0);
+    // Only confirmed money counts as raised, the same as event_stats.
+    return rows
+      .filter((row) => row.status === 'succeeded')
+      .reduce((sum, row) => sum + row.amount, 0);
   }
 
   async function insertExpenses(eventId: string, expenses: EventSpec['expenses']) {
