@@ -452,6 +452,8 @@ export type Database = {
           created_at: string
           updated_at: string
           restrict_spending_approval: boolean
+          upi_vpa: string | null
+          upi_payee_name: string | null
         }
         Insert: {
           id?: string
@@ -472,6 +474,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           restrict_spending_approval?: boolean
+          upi_vpa?: string | null
+          upi_payee_name?: string | null
         }
         Update: {
           id?: string
@@ -492,6 +496,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           restrict_spending_approval?: boolean
+          upi_vpa?: string | null
+          upi_payee_name?: string | null
         }
         Relationships: [
           {
@@ -520,6 +526,10 @@ export type Database = {
           channel: Database["public"]["Enums"]["origin_channel"]
           paid_at: string
           created_at: string
+          proof_path: string | null
+          verified_by: string | null
+          verified_at: string | null
+          review_note: string | null
         }
         Insert: {
           id?: string
@@ -537,6 +547,10 @@ export type Database = {
           channel?: Database["public"]["Enums"]["origin_channel"]
           paid_at?: string
           created_at?: string
+          proof_path?: string | null
+          verified_by?: string | null
+          verified_at?: string | null
+          review_note?: string | null
         }
         Update: {
           id?: string
@@ -554,6 +568,10 @@ export type Database = {
           channel?: Database["public"]["Enums"]["origin_channel"]
           paid_at?: string
           created_at?: string
+          proof_path?: string | null
+          verified_by?: string | null
+          verified_at?: string | null
+          review_note?: string | null
         }
         Relationships: [
           {
@@ -582,6 +600,13 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           }
         ]
@@ -2191,6 +2216,14 @@ export type Database = {
         community_id: string | null
         community_name: string | null
       }[]
+      }
+      review_contribution: {
+        Args: {
+        p_contribution_id: string
+        p_confirm: boolean
+        p_note?: string
+      }
+        Returns: Database["public"]["Tables"]["contributions"]["Row"]
       }
       review_expense: {
         Args: {

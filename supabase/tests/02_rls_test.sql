@@ -249,6 +249,17 @@ select 'cccccccc-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-00000000
 select test.eq(test.visible('select id from public.contributions'), 1::bigint,
   'a resident sees only their own contribution, not their neighbour''s');
 select test.eq(
+  coalesce((select fund_raised from public.event_stats where event_id = 'cccccccc-0000-4000-8000-000000000001'), 0),
+  0::numeric, 'a reported payment does not count until staff confirm it');
+
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+select public.review_contribution(c.id, true) from public.contributions c
+ where c.event_id = 'cccccccc-0000-4000-8000-000000000001' and c.status = 'pending';
+
+reset role;
+select test.act_as('44444444-4444-4444-8444-444444444444');
+select test.eq(
   (select fund_raised from public.event_stats where event_id = 'cccccccc-0000-4000-8000-000000000001'),
   7000::numeric(12,2),
   'but the society total is public — that is the whole point of the fund');
@@ -643,8 +654,8 @@ select test.raises(
      select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 500
        from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999'$q$,
   'staff cannot contribute as a participant');
-insert into public.contributions (event_id, community_id, unit_id, amount, method, channel)
-select 'cccccccc-0000-4000-8000-0000000000aa', e.community_id, 'b2b2b2b2-0000-4000-8000-000000000001', 1500, 'cash', 'system'
+insert into public.contributions (event_id, community_id, unit_id, amount, method, channel, status)
+select 'cccccccc-0000-4000-8000-0000000000aa', e.community_id, 'b2b2b2b2-0000-4000-8000-000000000001', 1500, 'cash', 'system', 'succeeded'
   from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
 select test.eq(test.visible($q$select id from public.contributions where event_id = 'cccccccc-0000-4000-8000-0000000000aa'$q$),
   2::bigint, 'staff record cash against a flat and see every flat''s payments');
@@ -777,5 +788,128 @@ select test.raises(
      select 'f1f1f1f1-0000-4000-8000-0000000000aa', m.id, true
        from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999'$q$,
   'staff do not vote');
+
+-- ---------------------------------------------------------------------------
+-- UPI payments: report, then staff confirm
+-- ---------------------------------------------------------------------------
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+update public.communities set upi_vpa = 'hillcrest.rwa@okaxis', upi_payee_name = 'Hill Crest RWA'
+ where slug = 'hill-crest';
+select test.eq((select upi_vpa from public.communities where slug = 'hill-crest'),
+  'hillcrest.rwa@okaxis', 'the committee sets the society''s UPI ID');
+select test.raises(
+  $q$update public.communities set upi_vpa = 'not a vpa' where slug = 'hill-crest'$q$,
+  'an invalid UPI ID is refused');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+update public.communities set upi_vpa = 'staff.personal@okicici' where slug = 'hill-crest';
+reset role;
+select test.eq((select upi_vpa from public.communities where slug = 'hill-crest'),
+  'hillcrest.rwa@okaxis', 'staff cannot redirect payments to another UPI ID');
+
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.raises(
+  $q$insert into public.contributions (event_id, community_id, membership_id, amount, method, reference, status)
+     select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 1001, 'upi', '612345678901', 'succeeded'
+       from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$,
+  'a resident cannot mark their own payment as confirmed');
+insert into public.contributions (event_id, community_id, membership_id, amount, method, reference)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 1001, 'upi', '612345678901'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+select test.eq(
+  (select status::text from public.contributions where reference = '612345678901'),
+  'pending', 'a resident reports a UPI payment with its reference');
+select test.raises(
+  $q$insert into public.contributions (event_id, community_id, membership_id, amount, method, reference)
+     select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 1001, 'upi', ' 612345678901'
+       from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$,
+  'the same UPI reference cannot be reported twice');
+
+-- Look the id up as the platform, so the resident below really calls the
+-- function instead of RLS hiding the row and skipping the call.
+reset role;
+create temporary table t_upi as
+select id from public.contributions where reference = '612345678901';
+grant select on t_upi to authenticated;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.raises(
+  format($q$select public.review_contribution('%s', true)$q$, (select id from t_upi)),
+  'a resident cannot confirm a payment');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.raises(
+  $q$select public.review_contribution(c.id, false) from public.contributions c where c.reference = '612345678901'$q$,
+  'turning a payment down needs a reason');
+select test.eq(
+  (select status::text from public.review_contribution(
+     (select c.id from public.contributions c where c.reference = '612345678901'), true)),
+  'succeeded', 'staff confirm it against the bank statement');
+select test.raises(
+  $q$select public.review_contribution(c.id, false, 'duplicate') from public.contributions c where c.reference = '612345678901'$q$,
+  'and a confirmed payment cannot be reviewed again');
+
+-- ---------------------------------------------------------------------------
+-- Storage: bills and payment screenshots
+-- ---------------------------------------------------------------------------
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into storage.objects (bucket_id, name)
+select 'bills', c.id || '/cccccccc-0000-4000-8000-0000000000aa/lanterns.pdf'
+  from public.communities c where c.slug = 'hill-crest';
+insert into public.expenses (id, event_id, community_id, name, category, amount, vendor, requested_by, bill_url)
+select 'dddddddd-0000-4000-8000-0000000000bb', 'cccccccc-0000-4000-8000-0000000000aa', m.community_id,
+       'Lanterns', 'decoration', 1800, 'Paper Glow', m.id, m.community_id || '/cccccccc-0000-4000-8000-0000000000aa/lanterns.pdf'
+  from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999';
+select test.eq(test.visible($q$select id from storage.objects where bucket_id = 'bills'$q$), 1::bigint,
+  'staff upload a bill and can read it');
+
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.raises(
+  $q$insert into storage.objects (bucket_id, name)
+     select 'bills', c.id || '/cccccccc-0000-4000-8000-0000000000aa/fake.pdf'
+       from public.communities c where c.slug = 'hill-crest'$q$,
+  'a resident cannot upload bills');
+select test.eq(test.visible($q$select id from storage.objects where bucket_id = 'bills'$q$), 0::bigint,
+  'a resident cannot open a bill that is still pending');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select public.review_expense('dddddddd-0000-4000-8000-0000000000bb', 'approved');
+
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(test.visible($q$select id from storage.objects where bucket_id = 'bills'$q$), 1::bigint,
+  'once approved, residents can open the bill');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+delete from storage.objects where bucket_id = 'bills';
+reset role;
+select test.eq((select count(*)::int from storage.objects where bucket_id = 'bills'), 1,
+  'nobody can delete an approved bill''s file');
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into storage.objects (bucket_id, name)
+select 'payment-proofs', m.community_id || '/' || m.id || '/utr.png'
+  from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+select test.raises(
+  $q$insert into storage.objects (bucket_id, name)
+     select 'payment-proofs', m.community_id || '/' || m.id || '/not-mine.png'
+       from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$,
+  'a resident cannot upload into someone else''s payment folder');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(test.visible($q$select id from storage.objects where bucket_id = 'payment-proofs'$q$), 0::bigint,
+  'a flatmate cannot see another person''s payment screenshot');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(test.visible($q$select id from storage.objects where bucket_id = 'payment-proofs'$q$), 1::bigint,
+  'staff can see it to confirm the payment');
 
 reset role;

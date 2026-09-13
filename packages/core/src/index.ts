@@ -8,3 +8,4 @@ export { parseCommand, HELP_TEXT, NOT_LINKED_TEXT, UNKNOWN_TEXT } from './whatsa
 export type { WhatsAppCommand } from './whatsapp/commands';
 export { verifyWebhookSignature, extractInboundMessages, toE164 } from './whatsapp/webhook';
 export type { InboundMessage } from './whatsapp/webhook';
+export * from './payments';
