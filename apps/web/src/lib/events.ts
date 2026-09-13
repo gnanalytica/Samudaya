@@ -279,7 +279,7 @@ export const getPayments = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('contributions')
     .select(
-      'id, amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name))',
+      'id, amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, gateway_payload, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('paid_at', { ascending: false });

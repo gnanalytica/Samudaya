@@ -2,10 +2,13 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
+import { startActivityAsync } from 'expo-intent-launcher';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   can,
   formatMoney,
+  newTransactionRef,
+  parseUpiResponse,
   paymentProofPath,
   unitLabel,
   upiNote,
@@ -41,6 +44,12 @@ const PRESETS = [1001, 2001, 5001];
  * There is no gateway: the money goes straight to the society's account, and
  * the payment counts in the event total once staff confirm it against the
  * bank statement.
+ *
+ * On Android the UPI app is opened for a result, and most apps hand back the
+ * payment's status and bank reference; a successful payment is then reported
+ * without the resident typing anything. That response comes from the phone,
+ * not the bank, so it is still only a report for staff to confirm. iPhones
+ * return nothing, so the resident enters the reference there.
  */
 export default function Contribute() {
   const { event: eventSlug } = useLocalSearchParams<{ event: string }>();
@@ -115,6 +124,9 @@ export default function Contribute() {
 
 type Stage = 'amount' | 'report' | 'done';
 
+/** What the UPI app said about a payment, stored for staff with the report. */
+type AppResponse = Record<string, string | null>;
+
 function PayWithUpi({
   event,
   unit,
@@ -140,6 +152,7 @@ function PayWithUpi({
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captured, setCaptured] = useState(false);
 
   const note = upiNote(unit ? unitLabel(unit) : null, event.name);
 
@@ -147,10 +160,54 @@ function PayWithUpi({
     if (!amount) return;
     setError(null);
     setNotice(null);
+    const transactionRef = newTransactionRef();
+    const uri = upiPayUri({ vpa, payeeName, amount, note, transactionRef });
     try {
-      await Linking.openURL(upiPayUri({ vpa, payeeName, amount, note }));
+      if (Platform.OS !== 'android') {
+        await Linking.openURL(uri);
+        setStage('report');
+        return;
+      }
+
+      setBusy(true);
+      const result = await startActivityAsync('android.intent.action.VIEW', { data: uri });
+      setBusy(false);
+      const extra = (result.extra ?? {}) as Record<string, unknown>;
+      const response = parseUpiResponse(
+        typeof extra.response === 'string' ? extra.response : (result.data ?? null),
+      );
+
+      if (response.status === 'failure') {
+        setError('Your UPI app says the payment did not go through. Nothing was charged here.');
+        return;
+      }
+
+      if (
+        (response.status === 'success' || response.status === 'submitted') &&
+        response.reference
+      ) {
+        await submitReport(response.reference, {
+          source: 'upi_app',
+          status: response.status,
+          approval_ref: response.approvalRef,
+          txn_id: response.txnId,
+          txn_ref: response.txnRef,
+          expected_txn_ref: transactionRef,
+          response_code: response.responseCode,
+          raw: response.raw.slice(0, 500),
+        });
+        return;
+      }
+
+      // Cancelled, or an app that returns nothing: let them report it by hand,
+      // with whatever id the app did give filled in.
+      if (response.reference) setReference(response.reference);
+      setNotice(
+        'We couldn’t read the payment details from your UPI app. If you paid, enter the UPI reference from the app’s payment details.',
+      );
       setStage('report');
     } catch {
+      setBusy(false);
       // No UPI app handles the link (common on iPhones with no UPI app
       // registered); copy the ID so they can pay by hand.
       await Clipboard.setStringAsync(vpa);
@@ -162,12 +219,16 @@ function PayWithUpi({
   };
 
   const submit = async () => {
-    if (!amount || !activeCommunity || !membershipId) return;
     const parsed = upiReferenceSchema.safeParse(reference);
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Enter the UPI reference.');
       return;
     }
+    await submitReport(parsed.data, null);
+  };
+
+  const submitReport = async (upiReference: string, appResponse: AppResponse | null) => {
+    if (!amount || !activeCommunity || !membershipId) return;
     setBusy(true);
     setError(null);
 
@@ -193,10 +254,13 @@ function PayWithUpi({
       unit_id: unit?.id ?? null,
       amount,
       method: 'upi',
-      reference: parsed.data,
+      reference: upiReference,
       proof_path: proofPath,
       status: 'pending',
       channel: 'mobile',
+      // Kept for staff: what the UPI app said, and whether it echoed our own
+      // transaction reference back.
+      gateway_payload: appResponse ?? {},
     });
     setBusy(false);
 
@@ -206,11 +270,18 @@ function PayWithUpi({
       setError(
         insertError.code === '23505'
           ? 'That UPI reference has already been reported.'
-          : 'That did not go through. Please try again.',
+          : appResponse
+            ? `Your payment went through, but we couldn’t save the report. Enter UPI reference ${upiReference} below and try again.`
+            : 'That did not go through. Please try again.',
       );
+      if (appResponse) {
+        setReference(upiReference);
+        setStage('report');
+      }
       return;
     }
 
+    setCaptured(Boolean(appResponse));
     // Keys embed the member and event (`more:<id>`, `event:<slug>`), so refresh
     // everything rather than guessing prefixes.
     await queryClient.invalidateQueries();
@@ -228,6 +299,9 @@ function PayWithUpi({
             </Text>
             <Body muted>Waiting for confirmation</Body>
             <Caption>
+              {captured
+                ? 'We picked up the payment details from your UPI app, so there is nothing to type. '
+                : ''}
               Staff will match your UPI reference with the society’s bank statement. It counts in
               the event total once confirmed; you can follow it under More.
             </Caption>
@@ -314,6 +388,7 @@ function PayWithUpi({
                   amount ? `Pay ${formatMoney(amount, currency)} with UPI` : 'Choose an amount'
                 }
                 onPress={() => void openUpiApp()}
+                loading={busy}
                 disabled={!amount}
               />
               <Button

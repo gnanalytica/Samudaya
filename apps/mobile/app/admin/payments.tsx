@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { can, formatDate, formatMoney, unitLabel } from '@samudaya/core';
+import { can, formatDate, formatMoney, unitLabel, upiCaptureNote } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -67,7 +67,7 @@ export default function Payments() {
         supabase
           .from('contributions')
           .select(
-            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name))',
+            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, gateway_payload, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name))',
           )
           .eq('community_id', communityId)
           .order('paid_at', { ascending: false })
@@ -246,6 +246,7 @@ type PendingRow = {
   reference: string | null;
   paid_at: string;
   proof_path: string | null;
+  gateway_payload?: unknown;
   units: { block: string | null; number: string } | null;
   payer: { profiles: { full_name: string | null } | null } | null;
 };
@@ -302,6 +303,9 @@ function PendingPayment({
         </View>
         <Body>{formatMoney(row.amount, currency)}</Body>
       </View>
+      {upiCaptureNote(row.gateway_payload) ? (
+        <Caption>{upiCaptureNote(row.gateway_payload)}</Caption>
+      ) : null}
       <ViewFileChip bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
       {mayReview ? (
         declining ? (

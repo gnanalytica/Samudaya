@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   billPath,
+  newTransactionRef,
+  parseUpiResponse,
   paymentProofPath,
+  upiCaptureNote,
   upiNote,
   upiPayUri,
   upiReferenceSchema,
@@ -49,5 +52,56 @@ describe('storage paths', () => {
   it('matches the bucket policy folders', () => {
     expect(billPath('c1', 'e1', 'Invoice.PDF')).toMatch(/^c1\/e1\/[a-z0-9-]+\.pdf$/);
     expect(paymentProofPath('c1', 'm1', 'shot.jpeg')).toMatch(/^c1\/m1\/[a-z0-9-]+\.jpeg$/);
+  });
+});
+
+describe('UPI app responses', () => {
+  it('reads a successful response and prefers the bank reference', () => {
+    const result = parseUpiResponse(
+      'txnId=AXI7Y2K&responseCode=00&Status=SUCCESS&txnRef=SMDY1&ApprovalRefNo=612345678901',
+    );
+    expect(result.status).toBe('success');
+    expect(result.reference).toBe('612345678901');
+    expect(result.txnRef).toBe('SMDY1');
+  });
+
+  it('copes with lower-case keys, a leading ? and missing approval numbers', () => {
+    const result = parseUpiResponse('?txnid=YBL0123456789AB&status=submitted&approvalRefNo=null');
+    expect(result.status).toBe('submitted');
+    expect(result.approvalRef).toBeNull();
+    expect(result.reference).toBe('YBL0123456789AB');
+  });
+
+  it('reports failures and empty responses without inventing a reference', () => {
+    expect(parseUpiResponse('Status=FAILURE&responseCode=ZD').status).toBe('failure');
+    const empty = parseUpiResponse(undefined);
+    expect(empty.status).toBe('unknown');
+    expect(empty.reference).toBeNull();
+  });
+
+  it('passes our transaction reference to the UPI app', () => {
+    const ref = newTransactionRef();
+    expect(ref).toMatch(/^SMDY[A-Z0-9]+$/);
+    expect(ref.length).toBeLessThanOrEqual(35);
+    const uri = upiPayUri({
+      vpa: 'a@okaxis',
+      payeeName: 'A',
+      amount: 1,
+      note: 'N',
+      transactionRef: ref,
+    });
+    expect(new URLSearchParams(uri.slice('upi://pay?'.length)).get('tr')).toBe(ref);
+  });
+});
+
+describe('capture note for staff', () => {
+  it('flags captures and whether our reference came back', () => {
+    expect(upiCaptureNote({})).toBeNull();
+    expect(upiCaptureNote({ source: 'upi_app', txn_ref: 'SMDY1', expected_txn_ref: 'SMDY1' })).toBe(
+      'Captured from the resident’s UPI app.',
+    );
+    expect(
+      upiCaptureNote({ source: 'upi_app', txn_ref: null, expected_txn_ref: 'SMDY1' }),
+    ).toContain('check it carefully');
   });
 });

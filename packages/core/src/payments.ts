@@ -38,6 +38,11 @@ export type UpiPaymentLink = {
   amount: number;
   /** Shown in the resident's and the society's bank statements. */
   note: string;
+  /**
+   * Our own id for this attempt (UPI `tr`). Many apps echo it back as
+   * `txnRef`, which ties the app's response to the payment we started.
+   */
+  transactionRef?: string;
 };
 
 /**
@@ -55,7 +60,13 @@ export function upiNote(flatLabel: string | null | undefined, eventName: string)
 }
 
 /** The `upi://pay` link every UPI app understands (NPCI deep-link format). */
-export function upiPayUri({ vpa, payeeName, amount, note }: UpiPaymentLink): string {
+export function upiPayUri({
+  vpa,
+  payeeName,
+  amount,
+  note,
+  transactionRef,
+}: UpiPaymentLink): string {
   const params = new URLSearchParams({
     pa: vpa,
     pn: payeeName,
@@ -63,7 +74,97 @@ export function upiPayUri({ vpa, payeeName, amount, note }: UpiPaymentLink): str
     cu: 'INR',
     tn: note,
   });
+  if (transactionRef) params.set('tr', transactionRef);
   return `upi://pay?${params.toString().replace(/\+/g, '%20')}`;
+}
+
+/** A fresh, UPI-safe reference for one payment attempt, e.g. "SMDY7K2F9QX1". */
+export function newTransactionRef(): string {
+  const random = Math.random().toString(36).slice(2, 10);
+  return `SMDY${Date.now().toString(36)}${random}`.toUpperCase().slice(0, 35);
+}
+
+export type UpiAppResult = {
+  /** 'submitted' means the UPI app accepted it but the bank has not settled yet. */
+  status: 'success' | 'submitted' | 'failure' | 'unknown';
+  /** The bank reference (UTR) when the app gives one, else the app's transaction id. */
+  reference: string | null;
+  approvalRef: string | null;
+  txnId: string | null;
+  txnRef: string | null;
+  responseCode: string | null;
+  raw: string;
+};
+
+/**
+ * Reads the key=value string an Android UPI app hands back after a payment,
+ * e.g. "txnId=AXI123&responseCode=00&Status=SUCCESS&txnRef=SMDY...&ApprovalRefNo=612345678901".
+ *
+ * Apps differ in key casing, order and which keys they send, and some send
+ * nothing. The result is the payer's phone talking, not the bank: treat it as
+ * a report that still needs staff to confirm against the statement.
+ */
+export function parseUpiResponse(raw: string | null | undefined): UpiAppResult {
+  const text = (raw ?? '').trim().replace(/^\?/, '');
+  const values = new Map<string, string>();
+  for (const part of text.split('&')) {
+    const index = part.indexOf('=');
+    if (index <= 0) continue;
+    const key = part.slice(0, index).trim().toLowerCase();
+    let value = part.slice(index + 1).trim();
+    try {
+      value = decodeURIComponent(value.replace(/\+/g, ' '));
+    } catch {
+      // Keep the raw value if an app sent a malformed escape.
+    }
+    if (value && value.toLowerCase() !== 'null' && value.toLowerCase() !== 'undefined') {
+      values.set(key, value);
+    }
+  }
+
+  const statusText = (values.get('status') ?? '').toLowerCase();
+  const status: UpiAppResult['status'] =
+    statusText === 'success'
+      ? 'success'
+      : statusText === 'submitted' || statusText === 'pending'
+        ? 'submitted'
+        : statusText === 'failure' || statusText === 'failed'
+          ? 'failure'
+          : 'unknown';
+
+  const approvalRef = values.get('approvalrefno') ?? null;
+  const txnId = values.get('txnid') ?? null;
+  const usable = (value: string | null) =>
+    value && /^[A-Za-z0-9]{10,22}$/.test(value.replace(/\s+/g, ''))
+      ? value.replace(/\s+/g, '')
+      : null;
+
+  return {
+    status,
+    reference: usable(approvalRef) ?? usable(txnId),
+    approvalRef,
+    txnId,
+    txnRef: values.get('txnref') ?? null,
+    responseCode: values.get('responsecode') ?? null,
+    raw: text,
+  };
+}
+
+/**
+ * For staff reviewing a report: how it reached us. A capture from the UPI app is
+ * still the payer's phone talking, but an echoed transaction reference means it
+ * answered the payment Samudaya started rather than something pasted in.
+ */
+export function upiCaptureNote(payload: unknown): string | null {
+  if (!payload || typeof payload !== 'object') return null;
+  const data = payload as Record<string, unknown>;
+  if (data.source !== 'upi_app') return null;
+  const echoed = Boolean(data.txn_ref) && data.txn_ref === data.expected_txn_ref;
+  const processing =
+    data.status === 'submitted' ? ' The UPI app said it was still processing.' : '';
+  return echoed
+    ? `Captured from the resident’s UPI app.${processing}`
+    : `Captured from the resident’s UPI app, but it did not return our payment reference, so check it carefully.${processing}`;
 }
 
 /** Storage paths, mirroring the bucket policies in the database. */

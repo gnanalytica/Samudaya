@@ -1,6 +1,14 @@
 import Link from 'next/link';
 import { ArrowLeft, FileText, Receipt, Sparkles, Wallet } from 'lucide-react';
-import { can, formatDate, formatMoney, fundedPercent, receiptRef, unitLabel } from '@samudaya/core';
+import {
+  can,
+  formatDate,
+  formatMoney,
+  fundedPercent,
+  receiptRef,
+  unitLabel,
+  upiCaptureNote,
+} from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import {
   budgetVsSpent,
@@ -554,6 +562,11 @@ export default async function ManageEventPage(
                           <p className="text-ink mt-1 font-mono text-xs">
                             UPI reference {payment.reference ?? '—'}
                           </p>
+                          {upiCaptureNote(payment.gateway_payload) ? (
+                            <p className="text-ink-muted mt-1 text-xs">
+                              {upiCaptureNote(payment.gateway_payload)}
+                            </p>
+                          ) : null}
                           <StoredFileLink
                             bucket="payment-proofs"
                             path={payment.proof_path}
