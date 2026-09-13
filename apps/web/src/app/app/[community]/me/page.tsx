@@ -18,7 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { PaymentStatusBadge, StatTile } from '@/components/badges';
 
-export const metadata = { title: 'My activity' };
+export const metadata = { title: 'Me' };
 
 const SUGGESTION_STATUS = {
   new: 'With the committee',
@@ -74,15 +74,15 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
   return (
     <>
       <PageHeader
-        title={profile?.full_name ?? 'My activity'}
+        title={profile?.full_name ?? 'Me'}
         description={[community.name, roleLabel, myUnits].filter(Boolean).join(' · ')}
       />
       <PageBody>
         {!canParticipate(role) ? (
           <Card className="mb-5">
             <CardBody className="text-ink-muted text-sm">
-              As staff you run events and accounts from the console. Contributing, voting and
-              suggesting are for residents and the committee.
+              As staff you run events from Manage and clear your To do list. Contributing, voting
+              and suggesting are for residents and the committee.
             </CardBody>
           </Card>
         ) : null}
@@ -155,7 +155,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                     </p>
                     {row.event_activities?.events?.slug ? (
                       <Link
-                        href={`${base}/events/${row.event_activities.events.slug}#activities`}
+                        href={`${base}/events/${row.event_activities.events.slug}?tab=activities`}
                         className="text-ink-subtle mt-0.5 text-xs hover:underline"
                       >
                         {row.event_activities.events.name}

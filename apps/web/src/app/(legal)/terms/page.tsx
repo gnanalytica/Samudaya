@@ -84,8 +84,8 @@ export default function TermsPage() {
 
       <LegalSection id="communities" title="Communities and admins">
         <p>
-          Each community decides who can join. Residents join with a Society ID or invite code, and
-          the community’s admins approve them. Admins can remove members and change roles.
+          Each community decides who can join. Residents join with a society code or invite code,
+          and the community’s admins approve them. Admins can remove members and change roles.
         </p>
         <p>If you set up or administer a community, you agree to:</p>
         <LegalList>

@@ -1,10 +1,11 @@
-import { Users } from 'lucide-react';
+import { Send, Users } from 'lucide-react';
 import { ROLE_LABEL, can, normalizeRole, relativeTime, unitLabel } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RemoveForm, RoleForm } from './member-controls';
 
@@ -41,6 +42,12 @@ export default async function MembersPage(props: PageProps<'/app/[community]/adm
       <PageHeader
         title="Residents"
         description={`${counts.resident} residents · ${counts.staff} staff · ${counts.committee} committee`}
+        action={
+          <ButtonLink href={`/app/${community.slug}/admin/invite`} size="sm" variant="secondary">
+            <Send className="size-4" aria-hidden="true" />
+            Invite
+          </ButtonLink>
+        }
       />
       <PageBody>
         <Card>

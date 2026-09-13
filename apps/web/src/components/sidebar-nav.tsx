@@ -4,19 +4,46 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { MemberRole } from '@samudaya/core';
 import { cn } from '@/lib/utils';
-import { visibleNav } from './nav-items';
+import { bottomNavItems, visibleNav, type NavItem } from './nav-items';
+
+export type NavCounts = { todo?: number };
 
 /** A nav link is active on its exact route, or on any child of a section root. */
-function useIsActive() {
+function useIsActive(slug: string) {
   const pathname = usePathname();
-  return (href: string, isHome: boolean) =>
-    isHome ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const roots = new Set([`/app/${slug}`, `/app/${slug}/admin`]);
+  return (href: string) => {
+    if (pathname === href) return true;
+    if (!pathname.startsWith(`${href}/`)) return false;
+    // Home and the events console own their exact page, not everything below
+    // them, so /admin/members does not light up "Events" as well.
+    if (!roots.has(href)) return true;
+    return href === `/app/${slug}/admin` && pathname.startsWith(`${href}/events`);
+  };
 }
 
-export function SidebarNav({ slug, role }: { slug: string; role: MemberRole }) {
-  const isActive = useIsActive();
+function Count({ item, counts }: { item: NavItem; counts: NavCounts }) {
+  const value = item.badge ? (counts[item.badge] ?? 0) : 0;
+  if (!value) return null;
+  return (
+    <span className="bg-warning/20 text-warning ml-auto rounded-full px-1.5 text-xs font-semibold">
+      {value > 99 ? '99+' : value}
+      <span className="sr-only"> waiting</span>
+    </span>
+  );
+}
+
+export function SidebarNav({
+  slug,
+  role,
+  counts = {},
+}: {
+  slug: string;
+  role: MemberRole;
+  counts?: NavCounts;
+}) {
+  const isActive = useIsActive(slug);
   const groups = visibleNav(slug, role);
-  const home = `/app/${slug}`;
 
   return (
     <nav aria-label="Main" className="space-y-6">
@@ -28,8 +55,9 @@ export function SidebarNav({ slug, role }: { slug: string; role: MemberRole }) {
             </p>
           ) : null}
           <ul className="space-y-0.5">
-            {group.items.map(({ href, label, icon: Icon }) => {
-              const active = isActive(href, href === home);
+            {group.items.map((item) => {
+              const { href, label, icon: Icon } = item;
+              const active = isActive(href);
               return (
                 <li key={href}>
                   <Link
@@ -44,6 +72,7 @@ export function SidebarNav({ slug, role }: { slug: string; role: MemberRole }) {
                   >
                     <Icon className="size-4 shrink-0" aria-hidden="true" />
                     {label}
+                    <Count item={item} counts={counts} />
                   </Link>
                 </li>
               );
@@ -55,13 +84,18 @@ export function SidebarNav({ slug, role }: { slug: string; role: MemberRole }) {
   );
 }
 
-/** Compact bar for phones — the handful of things a resident opens daily. */
-export function BottomNav({ slug, role }: { slug: string; role: MemberRole }) {
-  const isActive = useIsActive();
-  const home = `/app/${slug}`;
-  const items = visibleNav(slug, role)
-    .flatMap((group) => group.items)
-    .filter((item) => item.primary);
+/** Compact bar for phones — the handful of things a member opens daily. */
+export function BottomNav({
+  slug,
+  role,
+  counts = {},
+}: {
+  slug: string;
+  role: MemberRole;
+  counts?: NavCounts;
+}) {
+  const isActive = useIsActive(slug);
+  const items = bottomNavItems(slug, role);
 
   return (
     <nav
@@ -70,20 +104,30 @@ export function BottomNav({ slug, role }: { slug: string; role: MemberRole }) {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className="grid auto-cols-fr grid-flow-col">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = isActive(href, href === home);
+        {items.map((item) => {
+          const { href, label, shortLabel, icon: Icon } = item;
+          const active = isActive(href);
+          const count = item.badge ? (counts[item.badge] ?? 0) : 0;
           return (
             <li key={href}>
               <Link
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex flex-col items-center gap-0.5 py-2.5 text-[11px]',
+                  'relative flex flex-col items-center gap-0.5 py-2.5 text-[11px]',
                   active ? 'text-accent' : 'text-ink-subtle',
                 )}
               >
-                <Icon className="size-5" aria-hidden="true" />
-                {label}
+                <span className="relative">
+                  <Icon className="size-5" aria-hidden="true" />
+                  {count ? (
+                    <span className="bg-warning absolute -top-1.5 -right-2.5 min-w-4 rounded-full px-1 text-center text-[10px] leading-4 font-semibold text-white">
+                      {count > 99 ? '99+' : count}
+                      <span className="sr-only"> waiting</span>
+                    </span>
+                  ) : null}
+                </span>
+                {shortLabel ?? label}
               </Link>
             </li>
           );

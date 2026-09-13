@@ -19,11 +19,11 @@ export default async function SocietyDetailsPage(
       <PageBody>
         <div className="mx-auto max-w-2xl">
           <Link
-            href={`/app/${community.slug}/admin`}
+            href={`/app/${community.slug}/admin/settings`}
             className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Console
+            Society settings
           </Link>
           <Card>
             <CardBody>

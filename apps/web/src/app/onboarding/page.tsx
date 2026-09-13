@@ -28,13 +28,7 @@ async function latestRequest(userId: string) {
     .maybeSingle();
   if (!request) return null;
 
-  return {
-    ...request,
-    // Step one files the request before the flat is picked and step two
-    // refreshes it, so a request counts as submitted once it has a flat or has
-    // been refreshed by the details step.
-    submitted: Boolean(request.unit_id) || request.updated_at > request.created_at,
-  };
+  return request;
 }
 
 export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
@@ -49,7 +43,8 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
   if (firstSlug && mode !== 'join') redirect(`/app/${firstSlug}`);
 
   const request = mode === 'join' && firstSlug ? null : await latestRequest(user.id);
-  const pending = request?.status === 'pending' && request.submitted ? request : null;
+  // Joining files one complete request, so any pending request is waiting on staff.
+  const pending = request?.status === 'pending' ? request : null;
   const declined = request?.status === 'rejected' && mode !== 'join' ? request : null;
 
   return (
@@ -112,7 +107,8 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
         <>
           <h1 className="text-2xl font-semibold tracking-tight">Join your society</h1>
           <p className="text-ink-muted mt-1.5 mb-6 text-sm">
-            Enter the society code your committee shared, then tell us which flat is yours.
+            Enter the society code your committee shared, then tell us who you are and which flat is
+            yours.
           </p>
 
           {declined ? (

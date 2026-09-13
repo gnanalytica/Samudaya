@@ -216,7 +216,7 @@ export async function suggestForEvent(
   if (error) return { error: friendlyDbError(error) };
 
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
-  revalidatePath(`/app/${slug}/admin/approvals`);
+  revalidatePath(`/app/${slug}/todo`);
   return {
     ...EMPTY_STATE,
     success: 'Sent to the committee. Once they approve it, residents can vote on it.',
@@ -315,7 +315,7 @@ export async function proposeCampaign(
   if (error) return { error: friendlyDbError(error) };
 
   revalidatePath(`/app/${slug}/events`);
-  revalidatePath(`/app/${slug}/admin/approvals`);
+  revalidatePath(`/app/${slug}/todo`);
   redirect(`/app/${slug}/events?proposed=1`);
 }
 

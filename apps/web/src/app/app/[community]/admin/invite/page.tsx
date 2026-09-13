@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { ArrowLeft } from 'lucide-react';
-import { joinLink } from '@samudaya/core';
+import { COPY, can, joinLink } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
+import { siteUrl } from '@/lib/site-url';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
@@ -10,18 +10,10 @@ import { CopyButton, InviteMessage, JoinQr } from './invite-tools';
 
 export const metadata = { title: 'Invite' };
 
-/** The site's own origin, for links that leave the app (WhatsApp, printed QR codes). */
-async function siteUrl() {
-  if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL;
-  const list = await headers();
-  const host = list.get('x-forwarded-host') ?? list.get('host') ?? 'localhost:3000';
-  const proto = list.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
-  return `${proto}://${host}`;
-}
-
 export default async function InvitePage(props: PageProps<'/app/[community]/admin/invite'>) {
   const { community: slug } = await props.params;
-  const { community } = await requireCapability(slug, 'joinrequests:review');
+  const { community, role } = await requireCapability(slug, 'joinrequests:review');
+  const committee = can(role, 'roles:manage');
   const link = joinLink(await siteUrl(), community.join_code);
   const base = `/app/${community.slug}`;
 
@@ -34,11 +26,11 @@ export default async function InvitePage(props: PageProps<'/app/[community]/admi
       <PageBody>
         <div className="mx-auto max-w-3xl space-y-5">
           <Link
-            href={`${base}/admin`}
+            href={committee ? `${base}/admin/settings#invite` : `${base}/admin/members`}
             className="text-ink-muted hover:text-ink inline-flex items-center gap-1.5 text-sm"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
-            Console
+            {committee ? COPY.societySettings : 'Residents'}
           </Link>
 
           <Card>
@@ -46,7 +38,9 @@ export default async function InvitePage(props: PageProps<'/app/[community]/admi
             <CardBody className="grid gap-6 sm:grid-cols-[1fr_auto]">
               <div className="space-y-4">
                 <div>
-                  <p className="text-ink-subtle text-xs tracking-wide uppercase">Society code</p>
+                  <p className="text-ink-subtle text-xs tracking-wide uppercase">
+                    {COPY.societyCode}
+                  </p>
                   <div className="mt-1 flex flex-wrap items-center gap-3">
                     <span className="text-ink font-mono text-2xl font-semibold tracking-widest">
                       {community.join_code}
@@ -79,12 +73,11 @@ export default async function InvitePage(props: PageProps<'/app/[community]/admi
                   they don’t need a flat.
                 </li>
                 <li>
-                  A committee member opens Join requests, sets the role to <strong>Staff</strong>{' '}
-                  and approves.
+                  A committee member opens {COPY.todo} and admits them <strong>as staff</strong>.
                 </li>
               </ol>
-              <ButtonLink href={`${base}/admin/requests`} size="sm" variant="secondary">
-                Open join requests
+              <ButtonLink href={`${base}/todo#join_request`} size="sm" variant="secondary">
+                Open {COPY.todo}
               </ButtonLink>
             </CardBody>
           </Card>

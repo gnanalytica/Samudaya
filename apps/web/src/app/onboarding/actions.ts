@@ -8,12 +8,13 @@ import { requireUser } from '@/lib/auth';
 import { fieldErrors, type ActionState } from '@/lib/action-state';
 
 /**
- * Joining a society: one society code for everyone.
+ * Joining a society: one society code for everyone, one request.
  *
- * Step one takes the code, name and phone and files the join request through
- * request_to_join, which checks the code against a brute-force throttle. Step
- * two adds the flat and how they live there. Staff or the committee then admit
- * the resident; until that happens they see nothing but a pending screen.
+ * The code step only looks the code up and lists the society's flats; nothing
+ * is filed. The details step then sends name, phone, flat and relation to
+ * request_to_join once, which checks the code again under its brute-force
+ * throttle. Staff or the committee admit the resident; until then they see
+ * nothing but a pending screen.
  */
 
 export type Unit = { id: string; block: string | null; number: string };
@@ -26,81 +27,48 @@ const residentPhone = z
   .transform((value) => (/^[6-9]\d{9}$/.test(value) ? `+91${value}` : value))
   .pipe(phoneSchema);
 
-export type JoinState = ActionState & {
-  step?: 'details' | 'submitted';
-  society?: { name: string; code: string };
+export type CodeState = ActionState & {
+  code?: string;
   units?: Unit[];
-  name?: string;
-  phone?: string;
 };
 
-const startSchema = z.object({
-  join_code: z.string().trim().min(4, 'Enter the society code your committee shared'),
-  name: z.string().trim().min(2, 'Tell us your name').max(120),
-  phone: residentPhone,
-});
+export type JoinState = ActionState & {
+  /** The code that turned out to be wrong when the request was sent. */
+  badCode?: string;
+};
 
 /**
- * Flats a society has, for someone who knows its code. Applicants are not
- * members yet, so row-level security hides `units`; society_units returns the
- * flat labels only for a valid code, under the same throttle as joining.
+ * Checks the society code and lists its flats, without filing anything.
+ * society_units returns flat labels only for a valid code, and wrong codes
+ * spend the same throttle as joining. A society with no flats listed yet looks
+ * the same as a wrong code here, so the details step still opens and the
+ * request itself gives the final word.
  */
-async function societyUnits(code: string): Promise<Unit[]> {
-  const supabase = await getSupabase();
-  const { data } = await supabase.rpc('society_units', { p_join_code: code });
-  return (data ?? []).flatMap((unit) =>
-    unit.id && unit.number ? [{ id: unit.id, block: unit.block, number: unit.number }] : [],
-  );
-}
-
-export async function startJoin(_prev: JoinState, formData: FormData): Promise<JoinState> {
+export async function checkJoinCode(_prev: CodeState, formData: FormData): Promise<CodeState> {
   await requireUser();
 
-  const parsed = startSchema.safeParse({
-    join_code: formData.get('join_code'),
-    name: formData.get('name'),
-    phone: formData.get('phone'),
-  });
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  const raw = String(formData.get('join_code') ?? '').trim();
+  if (raw.length < 4) {
+    return { fieldErrors: { join_code: 'Enter the society code your committee shared' } };
+  }
+  const code = normalizeJoinCode(raw);
 
-  const code = normalizeJoinCode(parsed.data.join_code);
   const supabase = await getSupabase();
-  const { data, error } = await supabase.rpc('request_to_join', {
-    p_join_code: code,
-    p_name: parsed.data.name,
-    p_phone: parsed.data.phone,
-  });
-  if (error) return { error: 'We could not check that code. Please try again.' };
-
-  const row = data?.[0];
-  if (!row?.status) return { fieldErrors: { join_code: joinMessage('not_found') } };
-
-  if (row.status === 'already_member') {
-    const { data: community } = await supabase
-      .from('communities')
-      .select('slug')
-      .eq('id', row.community_id ?? '')
-      .maybeSingle();
-    if (community) redirect(`/app/${community.slug}`);
-    return { error: joinMessage('already_member') };
-  }
-  if (row.status !== 'pending') {
-    return row.status === 'not_found'
-      ? { fieldErrors: { join_code: joinMessage('not_found') } }
-      : { error: joinMessage(row.status) };
+  const { data, error } = await supabase.rpc('society_units', { p_join_code: code });
+  if (error) {
+    return error.code === '54000'
+      ? { fieldErrors: { join_code: joinMessage('rate_limited') } }
+      : { error: 'We could not check that code. Please try again.' };
   }
 
-  return {
-    step: 'details',
-    society: { name: row.community_name ?? 'your society', code },
-    units: await societyUnits(code),
-    name: parsed.data.name,
-    phone: parsed.data.phone,
-  };
+  const units = (data ?? []).flatMap((unit) =>
+    unit.id && unit.number ? [{ id: unit.id, block: unit.block, number: unit.number }] : [],
+  );
+  return { code, units };
 }
 
-const detailsSchema = z.object({
-  join_code: z.string().trim().min(4),
+const joinSchema = z.object({
+  join_code: z.string().trim().min(4, 'Enter the society code your committee shared'),
   name: z.string().trim().min(2, 'Tell us your name').max(120),
   phone: residentPhone,
   unit_id: uuid.nullable(),
@@ -109,31 +77,45 @@ const detailsSchema = z.object({
   relation: z.enum(['owner', 'tenant', 'family', 'other']),
 });
 
-export async function submitJoinDetails(_prev: JoinState, formData: FormData): Promise<JoinState> {
+/** Files the join request, once, with everything staff need to admit the person. */
+export async function submitJoin(_prev: JoinState, formData: FormData): Promise<JoinState> {
   await requireUser();
 
-  const parsed = detailsSchema.safeParse({
+  const parsed = joinSchema.safeParse({
     join_code: formData.get('join_code'),
     name: formData.get('name'),
     phone: formData.get('phone'),
     unit_id: String(formData.get('unit_id') ?? '') || null,
     relation: formData.get('relation') || 'owner',
   });
-  if (!parsed.success) return { error: 'Please pick your flat and try again.' };
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  parsed.data.join_code = normalizeJoinCode(parsed.data.join_code);
   const unitId = parsed.data.relation === 'other' ? null : parsed.data.unit_id;
 
   const supabase = await getSupabase();
   const { data, error } = await supabase.rpc('request_to_join', {
-    p_join_code: normalizeJoinCode(parsed.data.join_code),
+    p_join_code: parsed.data.join_code,
     p_unit_id: unitId ?? undefined,
     p_name: parsed.data.name,
     p_phone: parsed.data.phone,
     p_relation: parsed.data.relation,
   });
-  if (error) return { error: 'We could not send your details. Please try again.' };
+  if (error) return { error: 'We could not send your request. Please try again.' };
 
   const row = data?.[0];
-  if (row?.status !== 'pending') return { error: joinMessage(row?.status ?? 'not_found') };
+  if (row?.status === 'already_member') {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('slug')
+      .eq('id', row.community_id ?? '')
+      .maybeSingle();
+    if (community) redirect(`/app/${community.slug}`);
+    return { error: joinMessage('already_member') };
+  }
+  if (!row?.status || row.status === 'not_found') {
+    return { badCode: parsed.data.join_code, error: joinMessage('not_found') };
+  }
+  if (row.status !== 'pending') return { error: joinMessage(row.status) };
 
   // The pending screen on /onboarding reads the request back from the server.
   redirect('/onboarding');

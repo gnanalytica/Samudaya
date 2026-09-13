@@ -56,11 +56,11 @@ export default async function FlatsPage(props: PageProps<'/app/[community]/admin
       />
       <PageBody>
         <Link
-          href={`${base}/admin`}
+          href={`${base}/admin/settings#flats`}
           className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Console
+          Society settings
         </Link>
 
         <div className="space-y-5">

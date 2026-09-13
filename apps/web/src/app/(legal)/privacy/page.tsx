@@ -150,7 +150,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             Members of your community can see event details, announcements, a fund’s total and its
-            number of contributors, and approved expenses with the vendor and bill.
+            number of households that contributed, and approved expenses with the vendor and bill.
           </li>
           <li>
             The amount <Strong>you</Strong> contributed is visible to you and your community’s

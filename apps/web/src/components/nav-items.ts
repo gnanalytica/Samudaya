@@ -1,17 +1,14 @@
 import {
-  Building2,
+  CalendarCog,
   CalendarDays,
   ClipboardCheck,
-  ClipboardList,
   LayoutDashboard,
-  Library,
-  Send,
-  Settings,
-  UserPlus,
+  Settings2,
+  UserRound,
   Users,
   type LucideIcon,
 } from 'lucide-react';
-import { can, type Capability, type MemberRole } from '@samudaya/core';
+import { COPY, can, type Capability, type MemberRole } from '@samudaya/core';
 
 export type NavItem = {
   href: string;
@@ -21,40 +18,46 @@ export type NavItem = {
   capability?: Capability;
   /** Shown in the compact bottom bar on small screens. */
   primary?: boolean;
+  /** A shorter name for the bottom bar, where two "Events" would be confusing. */
+  shortLabel?: string;
+  /** Shows a count next to the label. */
+  badge?: 'todo';
 };
 
+/**
+ * Residents see Home, Events and Me. Staff add a Manage group with their To do
+ * queue, events and residents; the committee also gets Society settings.
+ * Notifications and personal settings live in the profile menu.
+ */
 export function navItems(slug: string): { section: string; items: NavItem[] }[] {
   const base = `/app/${slug}`;
   return [
     {
-      section: 'Community',
+      section: '',
       items: [
         { href: base, label: 'Home', icon: LayoutDashboard, primary: true },
         { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
-        { href: `${base}/me`, label: 'My activity', icon: ClipboardList, primary: true },
+        { href: `${base}/me`, label: 'Me', icon: UserRound, primary: true },
       ],
     },
     {
-      section: 'Run the society',
+      section: COPY.manage,
       items: [
         {
-          href: `${base}/admin`,
-          label: 'Console',
-          icon: ClipboardList,
+          href: `${base}/todo`,
+          label: COPY.todo,
+          icon: ClipboardCheck,
           capability: 'events:manage',
           primary: true,
+          badge: 'todo',
         },
         {
-          href: `${base}/admin/approvals`,
-          label: 'Committee approvals',
-          icon: ClipboardCheck,
-          capability: 'expenses:approve',
-        },
-        {
-          href: `${base}/admin/requests`,
-          label: 'Join requests',
-          icon: UserPlus,
-          capability: 'joinrequests:review',
+          href: `${base}/admin`,
+          label: 'Events',
+          shortLabel: COPY.manage,
+          icon: CalendarCog,
+          capability: 'events:manage',
+          primary: true,
         },
         {
           href: `${base}/admin/members`,
@@ -63,28 +66,12 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
           capability: 'residents:remove',
         },
         {
-          href: `${base}/admin/invite`,
-          label: 'Invite',
-          icon: Send,
-          capability: 'joinrequests:review',
-        },
-        {
-          href: `${base}/admin/catalogue`,
-          label: 'Catalogue',
-          icon: Library,
-          capability: 'events:manage',
-        },
-        {
-          href: `${base}/admin/units`,
-          label: 'Flats',
-          icon: Building2,
+          href: `${base}/admin/settings`,
+          label: COPY.societySettings,
+          icon: Settings2,
           capability: 'roles:manage',
         },
       ],
-    },
-    {
-      section: '',
-      items: [{ href: `${base}/settings`, label: 'Settings', icon: Settings }],
     },
   ];
 }
@@ -97,4 +84,13 @@ export function visibleNav(slug: string, role: MemberRole) {
       items: group.items.filter((item) => !item.capability || can(role, item.capability)),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+/** Bottom bar order: the resident's three, with To do and Manage before Me. */
+export function bottomNavItems(slug: string, role: MemberRole) {
+  const items = visibleNav(slug, role)
+    .flatMap((group) => group.items)
+    .filter((item) => item.primary);
+  const me = items.filter((item) => item.href === `/app/${slug}/me`);
+  return [...items.filter((item) => item.href !== `/app/${slug}/me`), ...me];
 }

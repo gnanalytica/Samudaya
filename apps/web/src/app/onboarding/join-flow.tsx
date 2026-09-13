@@ -3,10 +3,11 @@
 import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ShieldCheck } from 'lucide-react';
+import { COPY } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { Field, Input, Select } from '@/components/ui/field';
-import { startJoin, submitJoinDetails, type JoinState } from './actions';
+import { checkJoinCode, submitJoin, type CodeState, type JoinState } from './actions';
 
 function Submit({ label, busy }: { label: string; busy: string }) {
   const { pending } = useFormStatus();
@@ -17,15 +18,15 @@ function Submit({ label, busy }: { label: string; busy: string }) {
   );
 }
 
-const initial: JoinState = {};
+const initialCode: CodeState = {};
+const initialJoin: JoinState = {};
 
 /**
- * Two short steps: the society code with who you are, then your flat. The
- * second step needs the society's flat list, which only exists once the code
- * has been checked.
+ * The society code, then one form with who you are and your flat. Checking the
+ * code files nothing; the request is sent once, from the second form.
  */
 export function JoinFlow({
-  initialCode = '',
+  initialCode: prefilledCode = '',
   initialName = '',
 }: {
   /** From a shared join link. */
@@ -33,38 +34,80 @@ export function JoinFlow({
   /** From the Google account, so most people only add their mobile number. */
   initialName?: string;
 }) {
-  const [start, startAction] = useActionState(startJoin, initial);
-  const [details, detailsAction] = useActionState(submitJoinDetails, initial);
-  const [code, setCode] = useState(initialCode);
+  const [checked, checkAction] = useActionState(checkJoinCode, initialCode);
+  const [joined, joinAction] = useActionState(submitJoin, initialJoin);
+  const [code, setCode] = useState(prefilledCode);
+  const [editingCode, setEditingCode] = useState(false);
 
+  const units = useMemo(() => checked.units ?? [], [checked.units]);
   const blocks = useMemo(() => {
-    const names = new Set((start.units ?? []).map((unit) => unit.block ?? ''));
+    const names = new Set(units.map((unit) => unit.block ?? ''));
     return [...names].sort();
-  }, [start.units]);
+  }, [units]);
   const [block, setBlock] = useState<string | null>(null);
   const [relation, setRelation] = useState('owner');
   const worksHere = relation === 'other';
-  const activeBlock = block ?? blocks[0] ?? '';
-  const flats = (start.units ?? []).filter((unit) => (unit.block ?? '') === activeBlock);
+  const activeBlock = block && blocks.includes(block) ? block : (blocks[0] ?? '');
+  const flats = units.filter((unit) => (unit.block ?? '') === activeBlock);
 
-  if (start.step === 'details' && start.society) {
+  const codeRejected = Boolean(checked.code) && joined.badCode === checked.code;
+
+  if (checked.code && !editingCode && !codeRejected) {
     return (
       <Card>
         <CardBody>
-          <form action={detailsAction} className="space-y-4">
-            <input type="hidden" name="join_code" value={start.society.code} />
-            <input type="hidden" name="name" value={start.name ?? ''} />
-            <input type="hidden" name="phone" value={start.phone ?? ''} />
+          <form action={joinAction} className="space-y-4">
+            <input type="hidden" name="join_code" value={checked.code} />
 
-            <div className="border-border-base bg-surface-sunken rounded-xl border p-4">
-              <p className="text-ink-subtle text-xs tracking-wide uppercase">Joining</p>
-              <p className="text-ink mt-1 text-lg font-semibold tracking-tight">
-                {start.society.name}
-              </p>
-              <p className="text-ink-muted mt-0.5 text-sm">
-                {start.name} · {start.phone}
-              </p>
+            <div className="border-border-base bg-surface-sunken flex items-center justify-between gap-3 rounded-xl border px-4 py-3">
+              <div>
+                <p className="text-ink-subtle text-xs tracking-wide uppercase">
+                  {COPY.societyCode}
+                </p>
+                <p className="text-ink font-mono text-lg font-semibold tracking-[0.2em]">
+                  {checked.code}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCode(true)}
+                className="text-accent text-sm hover:underline"
+              >
+                Change
+              </button>
             </div>
+
+            <Field label="Your name" htmlFor="jr-name" error={joined.fieldErrors?.name} required>
+              {(control) => (
+                <Input
+                  {...control}
+                  name="name"
+                  autoComplete="name"
+                  defaultValue={initialName}
+                  required
+                />
+              )}
+            </Field>
+            <Field
+              label="Mobile number"
+              htmlFor="jr-phone"
+              error={joined.fieldErrors?.phone}
+              hint="So staff can confirm it’s you."
+              required
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  name="phone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="98450 12345"
+                  autoFocus={Boolean(initialName)}
+                  required
+                />
+              )}
+            </Field>
 
             <Field label="You are" htmlFor="jr-relation">
               {(control) => (
@@ -87,7 +130,7 @@ export function JoinFlow({
                 Supervisors, managers and other staff don’t need a flat. The committee will choose
                 your role when they approve you.
               </p>
-            ) : start.units?.length ? (
+            ) : units.length ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 {blocks.length > 1 ? (
                   <Field label="Tower" htmlFor="jr-block">
@@ -106,7 +149,7 @@ export function JoinFlow({
                     )}
                   </Field>
                 ) : null}
-                <Field label="Flat" htmlFor="jr-unit" required>
+                <Field label="Flat" htmlFor="jr-unit" error={joined.fieldErrors?.unit_id} required>
                   {(control) => (
                     <Select {...control} name="unit_id" required defaultValue="">
                       <option value="" disabled>
@@ -123,14 +166,14 @@ export function JoinFlow({
               </div>
             ) : (
               <p className="text-ink-muted text-sm">
-                This society hasn’t listed its flats yet. You can still send your request; staff
-                will confirm your flat.
+                No flats are listed for this code yet. You can still send your request; staff will
+                confirm your flat. If the code is wrong, we’ll tell you when you send.
               </p>
             )}
 
-            {details.error ? (
+            {joined.error && !joined.badCode ? (
               <p role="alert" className="text-danger text-sm">
-                {details.error}
+                {joined.error}
               </p>
             ) : null}
 
@@ -144,13 +187,22 @@ export function JoinFlow({
   return (
     <Card>
       <CardBody>
-        <form action={startAction} className="space-y-4">
+        <form
+          action={async (formData) => {
+            setEditingCode(false);
+            await checkAction(formData);
+          }}
+          className="space-y-4"
+        >
           <Field
-            label="Society code"
+            label={COPY.societyCode}
             htmlFor="join-code"
-            error={start.fieldErrors?.join_code}
+            error={
+              checked.fieldErrors?.join_code ??
+              (codeRejected && !editingCode ? joined.error : undefined)
+            }
             hint={
-              initialCode
+              prefilledCode
                 ? 'Filled in from your join link.'
                 : 'Your committee shares one code with every resident.'
             }
@@ -165,46 +217,16 @@ export function JoinFlow({
                 placeholder="VJ4FQW"
                 autoCapitalize="characters"
                 spellCheck={false}
+                autoFocus={!prefilledCode}
                 required
                 className="text-center font-mono text-lg tracking-[0.2em]"
               />
             )}
           </Field>
-          <Field label="Your name" htmlFor="jr-name" error={start.fieldErrors?.name} required>
-            {(control) => (
-              <Input
-                {...control}
-                name="name"
-                autoComplete="name"
-                defaultValue={initialName}
-                required
-              />
-            )}
-          </Field>
-          <Field
-            label="Mobile number"
-            htmlFor="jr-phone"
-            error={start.fieldErrors?.phone}
-            hint="So staff can confirm it’s you."
-            required
-          >
-            {(control) => (
-              <Input
-                {...control}
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                placeholder="98450 12345"
-                autoFocus={Boolean(initialCode)}
-                required
-              />
-            )}
-          </Field>
 
-          {start.error ? (
+          {checked.error ? (
             <p role="alert" className="text-danger text-sm">
-              {start.error}
+              {checked.error}
             </p>
           ) : null}
 

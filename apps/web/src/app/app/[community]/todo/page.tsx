@@ -1,0 +1,252 @@
+import Link from 'next/link';
+import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import {
+  COPY,
+  TODO_KIND,
+  TODO_ORDER,
+  can,
+  formatMoney,
+  relativeTime,
+  type TodoKind,
+} from '@samudaya/core';
+import { requireCapability } from '@/lib/auth';
+import { getTodoItems, type TodoItem } from '@/lib/todo';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { Card, CardHeader } from '@/components/ui/card';
+import { Button, ButtonLink } from '@/components/ui/button';
+import { Input, Select } from '@/components/ui/field';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ReviewExpenseForm, ReviewPaymentForm } from '../admin/events/[event]/forms';
+import { decideCampaign, decideSuggestion, reviewJoinRequest } from '../admin/events/actions';
+
+export const metadata = { title: COPY.todo };
+
+/** Where to see the full picture behind a task. */
+function detailHref(base: string, item: TodoItem): string | null {
+  const event = item.eventSlug;
+  switch (item.kind) {
+    case 'payment_to_confirm':
+      return event ? `${base}/admin/events/${event}?tab=payments` : null;
+    case 'join_request':
+      return `${base}/admin/requests`;
+    case 'bill_to_approve':
+    case 'bill_sent_back':
+      return event ? `${base}/admin/events/${event}?tab=bills` : null;
+    case 'campaign_to_review':
+      return event ? `${base}/events/${event}` : null;
+    case 'suggestion_to_review':
+      return event ? `${base}/events/${event}?tab=vote` : null;
+  }
+}
+
+const DETAIL_LABEL: Record<TodoKind, string> = {
+  payment_to_confirm: 'See screenshot and payments',
+  join_request: 'See all join requests',
+  bill_to_approve: 'See the bill',
+  bill_sent_back: 'Fix the bill',
+  campaign_to_review: 'See the campaign',
+  suggestion_to_review: 'See the event',
+};
+
+/**
+ * One queue for everything waiting on staff or the committee, across every
+ * event, with the decision right next to each item.
+ */
+export default async function TodoPage(props: PageProps<'/app/[community]/todo'>) {
+  const { community: slug } = await props.params;
+  const { community, role } = await requireCapability(slug, 'events:manage');
+  const items = await getTodoItems(community.id, role);
+  const base = `/app/${community.slug}`;
+  const committee = can(role, 'roles:manage');
+
+  const sections = TODO_ORDER.map((kind) => ({
+    kind,
+    items: items.filter((item) => item.kind === kind),
+  })).filter((section) => section.items.length > 0);
+
+  return (
+    <>
+      <PageHeader
+        title={COPY.todo}
+        description={
+          items.length
+            ? `${items.length} ${items.length === 1 ? 'thing' : 'things'} waiting on you.`
+            : 'Everything that needs you, across every event.'
+        }
+      />
+      <PageBody>
+        {sections.length ? (
+          <div className="space-y-5">
+            {sections.map((section) => (
+              <Card key={section.kind} id={section.kind}>
+                <CardHeader
+                  title={`${TODO_KIND[section.kind].emoji} ${TODO_KIND[section.kind].section}`}
+                  description={`${section.items.length} waiting`}
+                />
+                <ul className="divide-border-base divide-y">
+                  {section.items.map((item) => {
+                    const href = detailHref(base, item);
+                    return (
+                      <li key={item.id} className="space-y-3 px-5 py-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-ink text-sm font-semibold">{item.title}</p>
+                            <p className="text-ink-subtle mt-0.5 text-xs">
+                              {[item.subtitle, item.eventName, relativeTime(item.createdAt)]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          </div>
+                          {item.amount !== null ? (
+                            <span className="text-ink shrink-0 text-sm font-semibold">
+                              {formatMoney(item.amount, community.currency)}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <TodoActions
+                          slug={community.slug}
+                          item={item}
+                          committee={committee}
+                          role={role}
+                          fixHref={href}
+                        />
+
+                        {href && item.kind !== 'bill_sent_back' ? (
+                          <Link
+                            href={href}
+                            className="text-accent inline-flex items-center gap-1 text-xs hover:underline"
+                          >
+                            {DETAIL_LABEL[item.kind]}
+                            <ArrowRight className="size-3.5" aria-hidden="true" />
+                          </Link>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <EmptyState
+              icon={<CheckCircle2 className="size-6" />}
+              title="All done"
+              description="Payments to confirm, new residents, bills and suggestions show up here when they need you."
+            />
+          </Card>
+        )}
+      </PageBody>
+    </>
+  );
+}
+
+function TodoActions({
+  slug,
+  item,
+  committee,
+  role,
+  fixHref,
+}: {
+  slug: string;
+  item: TodoItem;
+  committee: boolean;
+  role: Parameters<typeof can>[0];
+  fixHref: string | null;
+}) {
+  switch (item.kind) {
+    case 'payment_to_confirm':
+      return can(role, 'payments:record') ? (
+        <ReviewPaymentForm slug={slug} eventSlug={item.eventSlug ?? ''} contributionId={item.id} />
+      ) : null;
+
+    case 'join_request':
+      return can(role, 'joinrequests:review') ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={reviewJoinRequest} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="request_id" value={item.id} />
+            <input type="hidden" name="approve" value="1" />
+            {committee ? (
+              <>
+                <label htmlFor={`todo-role-${item.id}`} className="sr-only">
+                  Admit {item.title} as
+                </label>
+                <Select
+                  id={`todo-role-${item.id}`}
+                  name="role"
+                  defaultValue="resident"
+                  className="w-auto"
+                >
+                  <option value="resident">as resident</option>
+                  <option value="staff">as staff</option>
+                </Select>
+              </>
+            ) : null}
+            <Button type="submit" size="sm">
+              {committee ? 'Admit' : 'Admit as resident'}
+            </Button>
+          </form>
+          <form action={reviewJoinRequest}>
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="request_id" value={item.id} />
+            <input type="hidden" name="approve" value="0" />
+            <Button type="submit" size="sm" variant="ghost">
+              Decline
+            </Button>
+          </form>
+        </div>
+      ) : null;
+
+    case 'bill_to_approve':
+      return can(role, 'expenses:approve') ? (
+        <ReviewExpenseForm slug={slug} eventSlug={item.eventSlug ?? ''} expenseId={item.id} />
+      ) : null;
+
+    case 'bill_sent_back':
+      return fixHref ? (
+        <ButtonLink href={fixHref} size="sm" variant="secondary">
+          {TODO_KIND.bill_sent_back.action}
+        </ButtonLink>
+      ) : null;
+
+    case 'campaign_to_review':
+      return can(role, 'campaigns:approve') ? (
+        <form action={decideCampaign} className="flex flex-wrap gap-2">
+          <input type="hidden" name="slug" value={slug} />
+          <input type="hidden" name="event_id" value={item.id} />
+          <Button type="submit" name="approve" value="1" size="sm">
+            Approve
+          </Button>
+          <Button type="submit" name="approve" value="0" size="sm" variant="ghost">
+            Decline
+          </Button>
+        </form>
+      ) : null;
+
+    case 'suggestion_to_review':
+      return can(role, 'suggestions:approve') ? (
+        <form action={decideSuggestion} className="space-y-2">
+          <input type="hidden" name="slug" value={slug} />
+          <input type="hidden" name="suggestion_id" value={item.id} />
+          <label htmlFor={`todo-note-${item.id}`} className="sr-only">
+            Note for the resident
+          </label>
+          <Input
+            id={`todo-note-${item.id}`}
+            name="note"
+            placeholder="Note for the resident (optional)"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" name="approve" value="1" size="sm">
+              Open for voting
+            </Button>
+            <Button type="submit" name="approve" value="0" size="sm" variant="ghost">
+              Decline
+            </Button>
+          </div>
+        </form>
+      ) : null;
+  }
+}

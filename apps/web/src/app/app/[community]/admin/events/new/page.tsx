@@ -16,12 +16,13 @@ export default async function NewEventPage(props: PageProps<'/app/[community]/ad
     <>
       <PageHeader
         title="Create an event"
-        description="It starts as a draft. Add activities and bills, then publish it to residents."
+        description="Name, date and budget are enough to start. You can add bills and more activities later."
       />
       <PageBody>
         <div className="mx-auto max-w-2xl">
           <CreateEventForm
             slug={slug}
+            societyName={community.name}
             pickers={{
               event_type: pick('event_type'),
               venue: pick('venue'),

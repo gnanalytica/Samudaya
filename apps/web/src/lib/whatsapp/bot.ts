@@ -181,7 +181,7 @@ async function handleFund(db: Db, sender: Sender): Promise<string> {
     `Available: ${formatMoney(stats.available, sender.currency)}`,
     `${stats.contributors} households have contributed.`,
     '',
-    `Full ledger, with every bill: ${appLink(sender, `/events/${event.slug}/accounts`)}`,
+    `Full ledger, with every bill: ${appLink(sender, `/events/${event.slug}?tab=money`)}`,
   ].join('\n');
 }
 
@@ -258,7 +258,7 @@ async function handleActivities(db: Db, sender: Sender): Promise<string> {
         `${activity.emoji} *${activity.name}* — ${counts.get(activity.id) ?? 0} interested`,
     ),
     '',
-    `Sign up: ${appLink(sender, `/events/${event.slug}#activities`)}`,
+    `Sign up: ${appLink(sender, `/events/${event.slug}?tab=activities`)}`,
   ].join('\n');
 }
 

@@ -4,10 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
+  DEFAULT_FUND_RULE,
   closeEventSchema,
   createActivitySchema,
   createEventSchema,
   createExpenseSchema,
+  eventSlug as makeEventSlug,
   paymentMethodSchema,
   reviewExpenseSchema,
   uuid,
@@ -31,7 +33,7 @@ import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/l
 function refreshEvent(communitySlug: string, eventSlug: string) {
   revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
   revalidatePath(`/app/${communitySlug}/events/${eventSlug}`);
-  revalidatePath(`/app/${communitySlug}/events/${eventSlug}/accounts`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   revalidatePath(`/app/${communitySlug}/events`);
   revalidatePath(`/app/${communitySlug}/admin`);
 }
@@ -63,25 +65,43 @@ export type EventFormState = ActionState;
 
 function eventFields(formData: FormData) {
   return {
-    slug: formData.get('event_slug'),
     emoji: formData.get('emoji') || '🎉',
     name: formData.get('name'),
     starts_on: formData.get('starts_on'),
     ends_on: formData.get('ends_on') || null,
     organizer: formData.get('organizer') || undefined,
     description: formData.get('description') || undefined,
-    fund_rule: formData.get('fund_rule') || 'general_fund',
+    expected_attendance: formData.get('expected_attendance') || undefined,
+    fund_rule: formData.get('fund_rule') || DEFAULT_FUND_RULE,
     fund_rule_note: formData.get('fund_rule_note') || undefined,
   };
 }
 
-/** Creates an event as a draft with its first budget lines; budget sum = fund target. */
+/** Web addresses to try for a new event: its name, then with the year, then a random tail. */
+function slugCandidates(name: string, startsOn: string) {
+  const year = startsOn.slice(0, 4);
+  const base = makeEventSlug(name);
+  const random = () => Math.random().toString(36).slice(2, 6);
+  return [
+    base,
+    base.endsWith(year) ? makeEventSlug(name, random()) : makeEventSlug(name, year),
+    makeEventSlug(name, random()),
+    makeEventSlug(name, random()),
+  ];
+}
+
+/**
+ * Creates an event with its first budget lines (their sum is the fund target)
+ * and activities. The web address comes from the name. "Save for later" keeps
+ * it a draft; "Publish" shows it to residents straight away.
+ */
 export async function createEvent(
   _prev: EventFormState,
   formData: FormData,
 ): Promise<EventFormState> {
   const communitySlug = String(formData.get('slug') ?? '');
   const context = await requireCapability(communitySlug, 'events:manage');
+  const publish = formData.get('intent') === 'publish';
 
   // Budget lines pick a category from the catalogue; the label stored on the
   // line comes from the catalogue, not the form.
@@ -107,33 +127,70 @@ export async function createEvent(
     resolveCatalogueChoice(context.community.id, 'venue', formData, 'venue'),
   ]);
 
+  // Activities added while creating: a name (usually from the picked type) and
+  // an optional type from the catalogue.
+  const activityTypeIds = formData.getAll('new_activity_type_id').map((value) => String(value));
+  const activityNames = formData.getAll('new_activity_name').map((value) => String(value).trim());
+  const activityEmojis = formData.getAll('new_activity_emoji').map((value) => String(value));
+  const newActivities = activityNames
+    .map((name, index) => ({
+      name,
+      emoji: activityEmojis[index] || '🎭',
+      type: catalogue.activity_type.find((entry) => entry.id === activityTypeIds[index]) ?? null,
+    }))
+    .filter((activity) => activity.name);
+  if (activityNames.some((name, index) => !name && activityTypeIds[index])) {
+    return { error: 'Give every activity a name.' };
+  }
+
+  const fields = eventFields(formData);
+  const candidates = slugCandidates(String(fields.name ?? ''), String(fields.starts_on ?? ''));
   const parsed = createEventSchema.safeParse({
     community_id: context.community.id,
-    ...eventFields(formData),
+    ...fields,
+    slug: candidates[0],
     venue: venue.label ?? undefined,
     fund_target: fundTarget,
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
-  const { data: event, error } = await supabase
-    .from('events')
-    .insert({
-      ...parsed.data,
-      event_type_id: eventType.id,
-      venue_id: venue.id,
-      kind: 'event',
-      status: 'draft',
-      created_by: context.user.id,
-    })
-    .select('id, slug')
-    .single();
-
-  if (error) {
-    if (error.code === '23505') {
-      return { fieldErrors: { slug: 'An event with that web address already exists.' } };
+  let created: { id: string; slug: string } | null = null;
+  for (const candidate of candidates) {
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        ...parsed.data,
+        slug: candidate,
+        event_type_id: eventType.id,
+        venue_id: venue.id,
+        kind: 'event',
+        status: 'draft',
+        created_by: context.user.id,
+      })
+      .select('id, slug')
+      .single();
+    if (!error) {
+      created = data;
+      break;
     }
-    return { error: friendlyDbError(error) };
+    // Another event already has this web address; try the next one.
+    if (error.code !== '23505') return { error: friendlyDbError(error) };
+  }
+  const event = created;
+  if (!event) return { error: 'Could not create the event. Try a slightly different name.' };
+
+  if (newActivities.length) {
+    await supabase.from('event_activities').insert(
+      newActivities.map((activity, position) => ({
+        event_id: event.id,
+        community_id: context.community.id,
+        name: activity.name.slice(0, 140),
+        emoji: activity.emoji,
+        activity_type_id: activity.type?.id ?? null,
+        position,
+      })),
+    );
   }
 
   if (lines.length) {
@@ -149,7 +206,12 @@ export async function createEvent(
     );
   }
 
+  if (publish) {
+    await supabase.from('events').update({ status: 'published' }).eq('id', event.id);
+  }
+
   revalidatePath(`/app/${communitySlug}/events`);
+  revalidatePath(`/app/${communitySlug}/admin`);
   redirect(`/app/${communitySlug}/admin/events/${event.slug}`);
 }
 
@@ -459,7 +521,7 @@ export async function submitExpense(_prev: ActionState, formData: FormData): Pro
   if (error) return { error: friendlyDbError(error) };
 
   refreshEvent(communitySlug, eventSlug);
-  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   return { ...EMPTY_STATE, success: 'Bill uploaded. It now waits for the committee.' };
 }
 
@@ -525,7 +587,7 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
   }
 
   refreshEvent(communitySlug, eventSlug);
-  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   return { ...EMPTY_STATE, success: 'Corrected and sent back to the committee.' };
 }
 
@@ -551,7 +613,7 @@ export async function reviewExpense(_prev: ActionState, formData: FormData): Pro
   if (error) return { error: friendlyDbError(error) };
 
   if (eventSlug) refreshEvent(communitySlug, eventSlug);
-  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   return {
     ...EMPTY_STATE,
     success:
@@ -682,6 +744,7 @@ export async function reviewJoinRequest(formData: FormData): Promise<void> {
   });
 
   revalidatePath(`/app/${communitySlug}/admin/requests`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   revalidatePath(`/app/${communitySlug}/admin`);
 }
 
@@ -703,7 +766,7 @@ export async function decideCampaign(formData: FormData): Promise<void> {
     .eq('community_id', context.community.id)
     .eq('status', 'proposed');
 
-  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   revalidatePath(`/app/${communitySlug}/events`);
   revalidatePath(`/app/${communitySlug}`);
 }
@@ -724,7 +787,7 @@ export async function decideSuggestion(formData: FormData): Promise<void> {
     .select('events(slug)')
     .maybeSingle();
 
-  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  revalidatePath(`/app/${communitySlug}/todo`);
   if (data?.events?.slug) revalidatePath(`/app/${communitySlug}/events/${data.events.slug}`);
 }
 

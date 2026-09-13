@@ -1,6 +1,6 @@
 'use client';
 
-import { todayIn } from '@samudaya/core';
+import { COPY, todayIn } from '@samudaya/core';
 import { useActionState, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -342,7 +342,11 @@ const METHODS = [
   ['other', 'Other'],
 ] as const;
 
-/** Upload a new bill, or correct and re-upload one that is pending or sent back. */
+/**
+ * Upload a new bill, or correct and re-upload one that is pending or sent back.
+ * What, amount, category and the photo come first; the rest has sensible
+ * defaults (today, UPI, paid by the society) and sits under "More details".
+ */
 export function ExpenseForm({
   slug,
   eventSlug,
@@ -350,6 +354,7 @@ export function ExpenseForm({
   eventId,
   expense,
   pickers,
+  today,
 }: {
   slug: string;
   eventSlug: string;
@@ -357,6 +362,8 @@ export function ExpenseForm({
   eventId: string;
   expense?: ExpenseDraft;
   pickers: Pickers;
+  /** Today in the society's timezone, the default bill date. */
+  today: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const creating = !expense;
@@ -367,6 +374,7 @@ export function ExpenseForm({
   );
   const state = creating ? created.state : corrected;
   const id = expense?.id ?? 'new';
+  const detailErrors = state.fieldErrors?.spent_on || state.fieldErrors?.paid_by;
 
   return (
     <form
@@ -408,65 +416,91 @@ export function ExpenseForm({
           )}
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <CatalogueSelect
-          key={creating ? `cat-${created.version}` : `cat-${expense.id}`}
-          slug={slug}
-          kind="budget_category"
-          name="category"
-          label="Category"
-          items={pickers.budget_category}
-          defaultId={expense?.category_id}
-          defaultLabel={expense?.category}
-          placeholder="Choose a category"
-          hint="The same categories as the budget, so planned and spent line up."
-          manageHref={pickers.manageHref}
-        />
-        <CatalogueSelect
-          key={creating ? `ven-${created.version}` : `ven-${expense.id}`}
-          slug={slug}
-          kind="vendor"
-          name="vendor"
-          label="Vendor"
-          items={pickers.vendor}
-          defaultId={expense?.vendor_id}
-          defaultLabel={expense?.vendor}
-          placeholder="Choose a vendor"
-          allowQuickAdd
-        />
-      </div>
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label="Paid by" htmlFor={`ex-paid-${id}`} hint="If someone is reimbursed.">
-          {(control) => <Input {...control} name="paid_by" defaultValue={expense?.paid_by ?? ''} />}
-        </Field>
-        <Field label="Method" htmlFor={`ex-method-${id}`}>
-          {(control) => (
-            <Select {...control} name="method" defaultValue={expense?.method ?? 'upi'}>
-              {METHODS.map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-        <Field label="Date" htmlFor={`ex-date-${id}`}>
-          {(control) => (
-            <Input {...control} name="spent_on" type="date" defaultValue={expense?.spent_on} />
-          )}
-        </Field>
-      </div>
+      <CatalogueSelect
+        key={creating ? `cat-${created.version}` : `cat-${expense.id}`}
+        slug={slug}
+        kind="budget_category"
+        name="category"
+        label="Category"
+        items={pickers.budget_category}
+        defaultId={expense?.category_id}
+        defaultLabel={expense?.category}
+        placeholder="Choose a category"
+        hint="The same categories as the budget, so planned and spent line up."
+        manageHref={pickers.manageHref}
+      />
       <FileUpload
         key={creating ? `new-${created.version}` : expense.id}
         bucket="bills"
         folder={`${communityId}/${eventId}`}
         name="bill_url"
-        label="Bill"
-        hint="A photo or PDF of the bill, up to 10 MB. Residents see it once the committee approves."
+        label="Photo of the bill"
+        hint="A photo or PDF, up to 10 MB. Residents see it once the committee approves."
         maxBytes={10 * 1_048_576}
         defaultPath={expense?.bill_url}
         onUploadingChange={setUploading}
       />
+
+      <details className="group border-border-base rounded-lg border" open={!creating}>
+        <summary className="text-ink flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+          {COPY.moreDetails}
+          <span className="text-ink-subtle text-xs font-normal group-open:hidden">
+            Vendor, paid by, method, date
+          </span>
+        </summary>
+        <div className="border-border-base space-y-4 border-t px-4 py-4">
+          <CatalogueSelect
+            key={creating ? `ven-${created.version}` : `ven-${expense.id}`}
+            slug={slug}
+            kind="vendor"
+            name="vendor"
+            label="Vendor"
+            items={pickers.vendor}
+            defaultId={expense?.vendor_id}
+            defaultLabel={expense?.vendor}
+            placeholder="Choose a vendor"
+            allowQuickAdd
+          />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field
+              label="Paid by"
+              htmlFor={`ex-paid-${id}`}
+              error={state.fieldErrors?.paid_by}
+              hint="Blank if the society paid."
+            >
+              {(control) => (
+                <Input {...control} name="paid_by" defaultValue={expense?.paid_by ?? ''} />
+              )}
+            </Field>
+            <Field label="Method" htmlFor={`ex-method-${id}`}>
+              {(control) => (
+                <Select {...control} name="method" defaultValue={expense?.method ?? 'upi'}>
+                  {METHODS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+            <Field label="Date" htmlFor={`ex-date-${id}`} error={state.fieldErrors?.spent_on}>
+              {(control) => (
+                <Input
+                  {...control}
+                  name="spent_on"
+                  type="date"
+                  defaultValue={expense?.spent_on ?? today}
+                />
+              )}
+            </Field>
+          </div>
+        </div>
+      </details>
+      {detailErrors ? (
+        <p role="alert" className="text-danger text-sm">
+          Check the fields under {COPY.moreDetails}.
+        </p>
+      ) : null}
       <Feedback state={state} />
       <Submit
         label={creating ? 'Upload bill' : 'Save correction'}
@@ -497,7 +531,7 @@ export function ReviewExpenseForm({
       <Input
         id={`note-${expenseId}`}
         name="note"
-        placeholder="Note (shown to staff when sending back or rejecting)"
+        placeholder="Note for staff, if sending back or rejecting"
       />
       <div className="flex flex-wrap gap-2">
         <Button type="submit" name="decision" value="approved" size="sm">
@@ -510,7 +544,7 @@ export function ReviewExpenseForm({
           size="sm"
           variant="secondary"
         >
-          Ask for changes
+          Send back
         </Button>
         <Button type="submit" name="decision" value="rejected" size="sm" variant="ghost">
           Reject
@@ -607,7 +641,11 @@ export function RecordPaymentForm({
             </Select>
           )}
         </Field>
-        <Field label="Reference" htmlFor="pay-ref" hint="UPI reference, cheque or receipt number.">
+        <Field
+          label="Reference"
+          htmlFor="pay-ref"
+          hint="UPI transaction ID, cheque or receipt number."
+        >
           {(control) => <Input {...control} name="reference" />}
         </Field>
       </div>

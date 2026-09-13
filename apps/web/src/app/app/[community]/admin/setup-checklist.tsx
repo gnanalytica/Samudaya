@@ -8,19 +8,21 @@ import { Button, buttonClass } from '@/components/ui/button';
 import { FundBar } from '@/components/badges';
 import { finishSetup } from './actions';
 
+/** Each step opens its section of Society settings (or the editor it links to). */
 const CTA: Record<SetupStepId, { label: string; path: string }> = {
-  details: { label: 'Add details', path: 'admin/society' },
+  details: { label: 'Add details', path: 'admin/settings#details' },
   flats: { label: 'Add flats', path: 'admin/units' },
   catalogue: { label: 'Review catalogue', path: 'admin/catalogue' },
-  upi: { label: 'Set UPI ID', path: 'admin#payments' },
-  staff: { label: 'Invite staff', path: 'admin/invite#staff' },
-  residents: { label: 'Invite residents', path: 'admin/invite#residents' },
+  upi: { label: 'Set UPI ID', path: 'admin/settings#upi' },
+  staff: { label: 'Invite staff', path: 'admin/settings#staff' },
+  residents: { label: 'Invite residents', path: 'admin/settings#invite' },
   event: { label: 'Create event', path: 'admin/events/new' },
 };
 
 /**
  * What a new society's committee still has to do before residents arrive.
- * Shown on the console until the committee finishes or skips it.
+ * Shown in Society settings and on the events console until the committee
+ * finishes or skips it.
  */
 export async function SetupChecklist({ community }: { community: Community }) {
   const supabase = await getSupabase();

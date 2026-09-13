@@ -27,11 +27,11 @@ export default async function CataloguePage(props: PageProps<'/app/[community]/a
       />
       <PageBody>
         <Link
-          href={`${base}/admin`}
+          href={committee ? `${base}/admin/settings#catalogue` : `${base}/admin`}
           className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Console
+          {committee ? 'Society settings' : 'Manage events'}
         </Link>
 
         {committee && !community.catalogue_reviewed_at ? (

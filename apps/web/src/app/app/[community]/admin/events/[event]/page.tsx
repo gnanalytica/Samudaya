@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { ArrowLeft, FileText, Receipt, Sparkles, Wallet } from 'lucide-react';
 import {
+  COPY,
   can,
   formatDate,
   formatMoney,
   fundedPercent,
   receiptRef,
+  todayIn,
   unitLabel,
   upiCaptureNote,
 } from '@samudaya/core';
@@ -106,6 +108,7 @@ export default async function ManageEventPage(
   };
 
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
   const open = expenses.filter((e) => e.status === 'pending' || e.status === 'changes_requested');
   const decided = expenses.filter((e) => e.status === 'approved' || e.status === 'rejected');
@@ -136,7 +139,7 @@ export default async function ManageEventPage(
                 <input type="hidden" name="event" value={event.slug} />
                 <input type="hidden" name="status" value="published" />
                 <Button type="submit" size="sm">
-                  Publish to residents
+                  {COPY.publish}
                 </Button>
               </form>
             ) : null}
@@ -155,7 +158,7 @@ export default async function ManageEventPage(
           className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
-          Console
+          All events
         </Link>
 
         <nav
@@ -485,6 +488,7 @@ export default async function ManageEventPage(
                                 spent_on: expense.spent_on,
                               }}
                               pickers={pickers}
+                              today={today}
                             />
                           </div>
                         </details>
@@ -542,6 +546,7 @@ export default async function ManageEventPage(
                     communityId={community.id}
                     eventId={event.id}
                     pickers={pickers}
+                    today={today}
                   />
                 </CardBody>
               </Card>
@@ -584,7 +589,7 @@ export default async function ManageEventPage(
                               .join(' · ')}
                           </p>
                           <p className="text-ink mt-1 font-mono text-xs">
-                            UPI reference {payment.reference ?? '—'}
+                            UPI transaction ID {payment.reference ?? '—'}
                           </p>
                           {upiCaptureNote(payment.gateway_payload) ? (
                             <p className="text-ink-muted mt-1 text-xs">

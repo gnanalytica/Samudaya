@@ -7,11 +7,18 @@ import {
   Lightbulb,
   Megaphone,
   Sparkles,
-  UserPlus,
 } from 'lucide-react';
-import { can, countdown, formatDate, formatMoney, fundedPercent, todayIn } from '@samudaya/core';
+import {
+  COPY,
+  can,
+  countdown,
+  formatDate,
+  formatMoney,
+  fundedPercent,
+  todayIn,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
-import { getSupabase } from '@/lib/supabase/server';
+import { getTodoItems } from '@/lib/todo';
 import { listEvents, getStatsFor } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
@@ -24,7 +31,6 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
   const { community: slug } = await props.params;
   const { joined } = await props.searchParams;
   const { community, role, profile, membership } = await requireCommunity(slug);
-  const supabase = await getSupabase();
   const base = `/app/${community.slug}`;
 
   const events = await listEvents(community.id);
@@ -46,34 +52,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
   const firstName = profile?.full_name?.split(' ')[0];
 
   const staff = can(role, 'events:manage');
-  const [requests, forCommittee] = staff
-    ? await Promise.all([
-        supabase
-          .from('join_requests')
-          .select('id', { count: 'exact', head: true })
-          .eq('community_id', community.id)
-          .eq('status', 'pending'),
-        can(role, 'expenses:approve')
-          ? Promise.all([
-              supabase
-                .from('expenses')
-                .select('id', { count: 'exact', head: true })
-                .eq('community_id', community.id)
-                .eq('status', 'pending'),
-              supabase
-                .from('events')
-                .select('id', { count: 'exact', head: true })
-                .eq('community_id', community.id)
-                .eq('status', 'proposed'),
-              supabase
-                .from('activity_suggestions')
-                .select('id', { count: 'exact', head: true })
-                .eq('community_id', community.id)
-                .eq('status', 'new'),
-            ]).then((rows) => rows.reduce((sum, row) => sum + (row.count ?? 0), 0))
-          : Promise.resolve(0),
-      ])
-    : [null, 0];
+  const todo = await getTodoItems(community.id, role);
 
   return (
     <>
@@ -94,33 +73,17 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
           </div>
         ) : null}
 
-        {staff && ((requests?.count ?? 0) > 0 || forCommittee > 0) ? (
-          <div className="mb-5 grid gap-3 sm:grid-cols-2">
-            {(requests?.count ?? 0) > 0 ? (
-              <Link
-                href={`${base}/admin/requests`}
-                className="border-warning/40 bg-surface-raised hover:bg-surface-sunken flex items-center justify-between gap-3 rounded-xl border p-4"
-              >
-                <span className="text-ink flex items-center gap-2 text-sm font-medium">
-                  <UserPlus className="text-warning size-5" aria-hidden="true" />
-                  {requests?.count} waiting to join
-                </span>
-                <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
-              </Link>
-            ) : null}
-            {forCommittee > 0 ? (
-              <Link
-                href={`${base}/admin/approvals`}
-                className="border-warning/40 bg-surface-raised hover:bg-surface-sunken flex items-center justify-between gap-3 rounded-xl border p-4"
-              >
-                <span className="text-ink flex items-center gap-2 text-sm font-medium">
-                  <ClipboardCheck className="text-warning size-5" aria-hidden="true" />
-                  {forCommittee} waiting for the committee
-                </span>
-                <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
-              </Link>
-            ) : null}
-          </div>
+        {todo.length ? (
+          <Link
+            href={`${base}/todo`}
+            className="border-warning/40 bg-surface-raised hover:bg-surface-sunken mb-5 flex items-center justify-between gap-3 rounded-xl border p-4"
+          >
+            <span className="text-ink flex items-center gap-2 text-sm font-medium">
+              <ClipboardCheck className="text-warning size-5" aria-hidden="true" />
+              {COPY.todo}: {todo.length} {todo.length === 1 ? 'thing needs' : 'things need'} you
+            </span>
+            <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
+          </Link>
         ) : null}
 
         {next ? (
@@ -173,7 +136,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               </div>
               <div className="border-border-base grid grid-cols-3 gap-3 border-t p-4">
                 <StatTile label="Spent" value={formatMoney(s?.spent ?? 0, community.currency)} />
-                <StatTile label="Households gave" value={String(s?.contributors ?? 0)} />
+                <StatTile label={`${COPY.households} gave`} value={String(s?.contributors ?? 0)} />
                 <StatTile label="Registered" value={String(s?.participants ?? 0)} />
               </div>
             </div>
@@ -181,7 +144,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
             <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Take part</h2>
             <div className="grid gap-3 sm:grid-cols-3">
               <Link
-                href={`${base}/events/${next.slug}#activities`}
+                href={`${base}/events/${next.slug}?tab=activities`}
                 className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
               >
                 <CalendarDays className="text-accent size-5" aria-hidden="true" />
@@ -189,7 +152,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 <p className="text-ink-muted text-xs">Register yourself or your family.</p>
               </Link>
               <Link
-                href={`${base}/events/${next.slug}#suggestions`}
+                href={`${base}/events/${next.slug}?tab=vote`}
                 className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
               >
                 <Lightbulb className="text-accent size-5" aria-hidden="true" />
@@ -197,7 +160,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 <p className="text-ink-muted text-xs">Ideas the committee approves go to a vote.</p>
               </Link>
               <Link
-                href={`${base}/events/${next.slug}/accounts`}
+                href={`${base}/events/${next.slug}?tab=money`}
                 className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
               >
                 <BarChart3 className="text-accent size-5" aria-hidden="true" />

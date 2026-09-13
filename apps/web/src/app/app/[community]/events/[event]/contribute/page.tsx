@@ -48,14 +48,14 @@ export default async function ContributePage(
       />
       <PageBody>
         <Link
-          href={`/app/${slug}/events/${event.slug}`}
+          href={`/app/${slug}/events/${event.slug}?tab=money`}
           className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Back to the event
         </Link>
 
-        <div className="mx-auto max-w-xl">
+        <div className="mx-auto max-w-3xl">
           <div className="border-border-base bg-surface-sunken mb-5 rounded-xl border p-4">
             <div className="text-ink-muted flex justify-between text-sm font-medium">
               <span>

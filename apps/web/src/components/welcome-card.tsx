@@ -35,14 +35,14 @@ function welcomeFor(role: MemberRole, societyName: string): Welcome {
         },
         {
           icon: ClipboardCheck,
-          text: 'Approve or reject bills, campaigns and suggestions from Committee approvals.',
+          text: 'Approve or reject bills, campaigns and suggestions from To do.',
         },
         {
           icon: Users,
           text: 'Decide who is staff, and close an event to publish its final accounts.',
         },
       ],
-      cta: { label: 'Open the console', path: 'admin' },
+      cta: { label: 'Open Society settings', path: 'admin/settings' },
     };
   }
   if (role === 'staff') {
@@ -52,7 +52,7 @@ function welcomeFor(role: MemberRole, societyName: string): Welcome {
       points: [
         {
           icon: UserPlus,
-          text: 'Admit new residents from Join requests, and remove people who have left.',
+          text: 'Admit new residents from To do, and remove people who have left.',
         },
         {
           icon: Receipt,
@@ -64,7 +64,7 @@ function welcomeFor(role: MemberRole, societyName: string): Welcome {
         },
         { icon: CalendarDays, text: 'Create events with their budgets and activities.' },
       ],
-      cta: { label: 'Open the console', path: 'admin' },
+      cta: { label: 'Open To do', path: 'todo' },
     };
   }
   return {
