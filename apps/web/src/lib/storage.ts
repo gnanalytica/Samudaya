@@ -26,3 +26,20 @@ export async function fileUrl(
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
+
+/**
+ * Deletes a stored file that nothing points at any more, e.g. the previous copy
+ * of a corrected bill. Best effort, with the caller's own session: storage
+ * policies still decide (an approved bill's file can never be removed), and a
+ * failure only leaves a stray file behind, so it is logged rather than thrown.
+ * Plain http(s) links from older rows are not ours to delete.
+ */
+export async function removeStoredFile(
+  bucket: StorageBucket,
+  path: string | null | undefined,
+): Promise<void> {
+  if (!path || /^https?:\/\//i.test(path)) return;
+  const supabase = await getSupabase();
+  const { error } = await supabase.storage.from(bucket).remove([path]);
+  if (error) console.error(`[storage] could not remove ${bucket}/${path}`, error);
+}

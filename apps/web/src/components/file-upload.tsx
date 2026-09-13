@@ -45,6 +45,14 @@ export function FileUpload({
 
   const setUploading = (uploading: boolean) => onUploadingChange?.(uploading);
 
+  // A file uploaded here but never saved is referenced by nothing, so drop it
+  // when it is replaced or removed. The saved file (defaultPath) is left alone:
+  // the server removes it only once the new copy is actually saved.
+  function discardUnsaved(previous: string) {
+    if (!previous || previous === (defaultPath ?? '')) return;
+    void getBrowserSupabase().storage.from(bucket).remove([previous]);
+  }
+
   async function upload(file: File) {
     if (!(UPLOAD_MIME_TYPES as readonly string[]).includes(file.type)) {
       setStatus({ kind: 'error', message: 'Attach a photo (JPG, PNG, WebP, HEIC) or a PDF.' });
@@ -75,6 +83,7 @@ export function FileUpload({
       });
       return;
     }
+    discardUnsaved(path);
     setPath(objectPath);
     setStatus({ kind: 'done', name: file.name });
   }
@@ -125,6 +134,7 @@ export function FileUpload({
           <button
             type="button"
             onClick={() => {
+              discardUnsaved(path);
               setPath('');
               setStatus({ kind: 'idle' });
             }}

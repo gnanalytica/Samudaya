@@ -68,8 +68,8 @@ export default async function ContributePage(
               <FundBar percent={funded} />
             </div>
             <p className="text-ink-subtle mt-2 text-xs">
-              Confirmed payments only. {stats.contributors} residents have contributed in the app so
-              far.
+              Confirmed payments only. {stats.contributors}{' '}
+              {stats.contributors === 1 ? 'household has' : 'households have'} contributed so far.
             </p>
           </div>
 

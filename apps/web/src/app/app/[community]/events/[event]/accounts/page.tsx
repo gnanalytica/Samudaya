@@ -90,7 +90,8 @@ export default async function AccountsPage(
               <FundBar percent={funded} />
             </div>
             <p className="text-ink-subtle mt-2 text-xs">
-              {stats.contributors} residents contributed in the app.
+              {stats.contributors} {stats.contributors === 1 ? 'household' : 'households'}{' '}
+              contributed.
               {plannedTotal > 0
                 ? ` Budget used: ${Math.round((stats.spent / plannedTotal) * 100)}% of ${formatMoney(plannedTotal, community.currency)}.`
                 : ''}

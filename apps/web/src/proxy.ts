@@ -26,6 +26,11 @@ const PUBLIC_PATHS = [
   '/api/v1',
   '/api/mcp',
   '/api/health',
+  // Android App Links verification. public/.well-known/assetlinks.json lists
+  // the EAS signing key's SHA-256; after the first Google Play upload, append
+  // the Play App Signing certificate's fingerprint too, or links from Play
+  // installs open in the browser instead of the app.
+  '/.well-known',
 ];
 
 const isPublic = (pathname: string) =>
@@ -93,9 +98,9 @@ export const config = {
     /*
      * Everything except static assets, image files and crawler metadata —
      * matching those would burn a Node invocation per asset for no benefit,
-     * and robots.txt must answer crawlers directly rather than redirect them
-     * to /login.
+     * and robots.txt and /.well-known files must answer crawlers and Android's
+     * link verifier directly rather than redirect them to /login.
      */
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
   ],
 };

@@ -173,7 +173,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               </div>
               <div className="border-border-base grid grid-cols-3 gap-3 border-t p-4">
                 <StatTile label="Spent" value={formatMoney(s?.spent ?? 0, community.currency)} />
-                <StatTile label="Contributed" value={String(s?.contributors ?? 0)} />
+                <StatTile label="Households gave" value={String(s?.contributors ?? 0)} />
                 <StatTile label="Registered" value={String(s?.participants ?? 0)} />
               </div>
             </div>

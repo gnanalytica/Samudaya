@@ -69,7 +69,8 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
             </div>
             <FundBar percent={funded} />
             <p className="text-ink-subtle mt-2 text-xs">
-              {s?.contributors ?? 0} contributed · {s?.participants ?? 0} registered for activities
+              {s?.contributors ?? 0} households contributed · {s?.participants ?? 0} registered for
+              activities
             </p>
           </div>
         ) : null}

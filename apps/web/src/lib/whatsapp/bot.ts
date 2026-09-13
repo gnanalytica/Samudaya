@@ -178,7 +178,7 @@ async function handleFund(db: Db, sender: Sender): Promise<string> {
     `Raised: *${formatMoney(stats.fundRaised, sender.currency)}* of ${formatMoney(stats.fundTarget, sender.currency)} (${funded}%)`,
     `Spent: ${formatMoney(stats.spent, sender.currency)}`,
     `Available: ${formatMoney(stats.available, sender.currency)}`,
-    `${stats.contributors} families have contributed.`,
+    `${stats.contributors} households have contributed.`,
     '',
     `Full ledger, with every bill: ${appLink(sender, `/events/${event.slug}/accounts`)}`,
   ].join('\n');

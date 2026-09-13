@@ -15,6 +15,7 @@ import {
 import { requireCapability } from '@/lib/auth';
 import { getCatalogue, resolveCatalogueChoice } from '@/lib/catalogue';
 import { getSupabase } from '@/lib/supabase/server';
+import { removeStoredFile } from '@/lib/storage';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
 
 /**
@@ -484,6 +485,14 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
+  // Remember the file this bill pointed at, to tidy it up if it is replaced.
+  const { data: previous } = await supabase
+    .from('expenses')
+    .select('bill_url')
+    .eq('id', expenseId.data)
+    .eq('event_id', event.id)
+    .maybeSingle();
+
   const { data, error } = await supabase
     .from('expenses')
     .update({
@@ -507,6 +516,12 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
   if (error) return { error: friendlyDbError(error) };
   if (!data?.length) {
     return { error: 'Only bills that are pending or sent back for changes can be corrected.' };
+  }
+
+  // The corrected bill now points at a new copy; the old one is orphaned.
+  const oldBill = previous?.bill_url ?? null;
+  if (oldBill && oldBill !== (parsed.data.bill_url ?? null)) {
+    await removeStoredFile('bills', oldBill);
   }
 
   refreshEvent(communitySlug, eventSlug);
