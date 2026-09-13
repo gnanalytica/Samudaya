@@ -8,23 +8,34 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
 import {
   addActivity,
-  addTask,
-  addVolunteerRole,
+  addBudgetLine,
   closeEvent,
+  correctExpense,
+  recordPayment,
+  reviewExpense,
   submitExpense,
+  updateEventDetails,
   type CloseState,
 } from '../actions';
 
-function Submit({ label, busy }: { label: string; busy: string }) {
+function Submit({
+  label,
+  busy,
+  variant,
+}: {
+  label: string;
+  busy: string;
+  variant?: 'primary' | 'secondary' | 'danger';
+}) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" disabled={pending}>
+    <Button type="submit" size="sm" variant={variant} disabled={pending}>
       {pending ? busy : label}
     </Button>
   );
 }
 
-function Feedback({ state }: { state: ActionState }) {
+export function Feedback({ state }: { state: ActionState }) {
   if (state.error) {
     return (
       <p role="alert" className="text-danger text-sm">
@@ -42,7 +53,7 @@ function Feedback({ state }: { state: ActionState }) {
   return null;
 }
 
-/** Resets itself on success so the committee can add several in a row. */
+/** Resets itself on success so staff can add several in a row. */
 function useResettingAction(fn: (prev: ActionState, formData: FormData) => Promise<ActionState>) {
   const [state, action] = useActionState<ActionState, FormData>(fn, EMPTY_STATE);
   const ref = useRef<HTMLFormElement>(null);
@@ -53,151 +64,398 @@ function useResettingAction(fn: (prev: ActionState, formData: FormData) => Promi
   return { state, action: wrapped, ref };
 }
 
-export function AddTaskForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
-  const { state, action, ref } = useResettingAction(addTask);
+function Hidden({ slug, eventSlug }: { slug: string; eventSlug: string }) {
   return (
-    <form ref={ref} action={action} className="flex flex-wrap items-end gap-2">
+    <>
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="event" value={eventSlug} />
-      <div className="min-w-48 flex-1">
-        <Field label="New task" htmlFor="task-name" error={state.fieldErrors?.name}>
-          {(control) => <Input {...control} name="name" placeholder="Book the sound system" />}
+    </>
+  );
+}
+
+export function EventDetailsForm({
+  slug,
+  event,
+}: {
+  slug: string;
+  event: {
+    slug: string;
+    emoji: string;
+    name: string;
+    starts_on: string;
+    ends_on: string | null;
+    venue: string | null;
+    organizer: string | null;
+    description: string | null;
+  };
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(updateEventDetails, EMPTY_STATE);
+  return (
+    <form action={action} className="space-y-4">
+      <Hidden slug={slug} eventSlug={event.slug} />
+      <div className="grid gap-4 sm:grid-cols-[5rem_1fr]">
+        <Field label="Emoji" htmlFor="ev-emoji">
+          {(control) => (
+            <Input
+              {...control}
+              name="emoji"
+              defaultValue={event.emoji}
+              maxLength={4}
+              className="text-center"
+            />
+          )}
+        </Field>
+        <Field label="Name" htmlFor="ev-name" error={state.fieldErrors?.name} required>
+          {(control) => <Input {...control} name="name" defaultValue={event.name} required />}
         </Field>
       </div>
-      <div className="w-40">
-        <Field label="Due" htmlFor="task-due">
-          {(control) => <Input {...control} name="due_on" type="date" />}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Starts" htmlFor="ev-start" error={state.fieldErrors?.starts_on} required>
+          {(control) => (
+            <Input
+              {...control}
+              name="starts_on"
+              type="date"
+              defaultValue={event.starts_on}
+              required
+            />
+          )}
+        </Field>
+        <Field label="Ends" htmlFor="ev-end" error={state.fieldErrors?.ends_on}>
+          {(control) => (
+            <Input {...control} name="ends_on" type="date" defaultValue={event.ends_on ?? ''} />
+          )}
         </Field>
       </div>
-      <Submit label="Add" busy="Adding…" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Venue" htmlFor="ev-venue">
+          {(control) => <Input {...control} name="venue" defaultValue={event.venue ?? ''} />}
+        </Field>
+        <Field label="Organised by" htmlFor="ev-org">
+          {(control) => (
+            <Input {...control} name="organizer" defaultValue={event.organizer ?? ''} />
+          )}
+        </Field>
+      </div>
+      <Field label="Description" htmlFor="ev-desc">
+        {(control) => (
+          <Textarea {...control} name="description" defaultValue={event.description ?? ''} />
+        )}
+      </Field>
       <Feedback state={state} />
+      <Submit label="Save details" busy="Saving…" />
     </form>
   );
 }
 
-export function AddExpenseForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
-  const { state, action, ref } = useResettingAction(submitExpense);
+export function AddBudgetLineForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
+  const { state, action, ref } = useResettingAction(addBudgetLine);
   return (
-    <Card>
-      <CardHeader
-        title="Record an expense"
-        description="It stays out of the resident ledger until an admin approves it — and nobody can approve their own."
-      />
-      <CardBody>
-        <form ref={ref} action={action} className="space-y-4">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="event" value={eventSlug} />
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="What" htmlFor="ex-name" error={state.fieldErrors?.name} required>
-              {(control) => <Input {...control} name="name" placeholder="Sound system" required />}
-            </Field>
-            <Field label="Amount" htmlFor="ex-amount" error={state.fieldErrors?.amount} required>
-              {(control) => (
-                <Input {...control} name="amount" type="number" min={1} step="1" required />
-              )}
-            </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Vendor" htmlFor="ex-vendor">
-              {(control) => <Input {...control} name="vendor" placeholder="Beat Box Audio" />}
-            </Field>
-            <Field label="Category" htmlFor="ex-category">
-              {(control) => <Input {...control} name="category" placeholder="sound" />}
-            </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Paid by" htmlFor="ex-paidby" hint="If someone is being reimbursed.">
-              {(control) => <Input {...control} name="paid_by" placeholder="Ravi" />}
-            </Field>
-            <Field label="Spent on" htmlFor="ex-date">
-              {(control) => <Input {...control} name="spent_on" type="date" />}
-            </Field>
-          </div>
-
-          <Field
-            label="Bill"
-            htmlFor="ex-bill"
-            hint="Path of the uploaded bill. Residents can open it from the ledger."
-          >
-            {(control) => (
-              <Input {...control} name="bill_url" placeholder="bills/beatbox-invoice.pdf" />
-            )}
-          </Field>
-
-          <Feedback state={state} />
-          <Submit label="Submit for approval" busy="Submitting…" />
-        </form>
-      </CardBody>
-    </Card>
+    <form ref={ref} action={action} className="flex flex-wrap items-end gap-2">
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <div className="min-w-40 flex-1">
+        <Field label="Category" htmlFor="bl-category" error={state.fieldErrors?.category}>
+          {(control) => <Input {...control} name="category" placeholder="Decoration" required />}
+        </Field>
+      </div>
+      <div className="w-36">
+        <Field label="Amount (₹)" htmlFor="bl-amount" error={state.fieldErrors?.amount}>
+          {(control) => (
+            <Input {...control} name="amount" type="number" min={0} step="1" required />
+          )}
+        </Field>
+      </div>
+      <Submit label="Add line" busy="Adding…" />
+      <div className="basis-full">
+        <Feedback state={state} />
+      </div>
+    </form>
   );
 }
 
 export function AddActivityForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
   const { state, action, ref } = useResettingAction(addActivity);
   return (
-    <form ref={ref} action={action} className="flex flex-wrap items-end gap-2">
-      <input type="hidden" name="slug" value={slug} />
-      <input type="hidden" name="event" value={eventSlug} />
-      <div className="w-20">
-        <Field label="Emoji" htmlFor="act-emoji">
+    <form ref={ref} action={action} className="space-y-3">
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-20">
+          <Field label="Emoji" htmlFor="act-emoji">
+            {(control) => (
+              <Input
+                {...control}
+                name="emoji"
+                defaultValue="🎭"
+                maxLength={4}
+                className="text-center"
+              />
+            )}
+          </Field>
+        </div>
+        <div className="min-w-40 flex-1">
+          <Field label="Activity" htmlFor="act-name" error={state.fieldErrors?.name}>
+            {(control) => <Input {...control} name="name" placeholder="Rangoli contest" required />}
+          </Field>
+        </div>
+        <div className="w-28">
+          <Field label="Places" htmlFor="act-capacity" hint="Blank = no limit">
+            {(control) => <Input {...control} name="capacity" type="number" min={1} />}
+          </Field>
+        </div>
+      </div>
+      <Field label="Description" htmlFor="act-desc">
+        {(control) => <Textarea {...control} name="description" rows={2} />}
+      </Field>
+      <Feedback state={state} />
+      <Submit label="Add activity" busy="Adding…" />
+    </form>
+  );
+}
+
+type ExpenseDraft = {
+  id: string;
+  name: string;
+  category: string | null;
+  amount: number;
+  vendor: string | null;
+  paid_by: string | null;
+  method: string;
+  bill_url: string | null;
+  spent_on: string;
+};
+
+const METHODS = [
+  ['upi', 'UPI'],
+  ['cash', 'Cash'],
+  ['bank_transfer', 'Bank transfer'],
+  ['cheque', 'Cheque'],
+  ['card', 'Card'],
+  ['netbanking', 'Net banking'],
+  ['other', 'Other'],
+] as const;
+
+/** Upload a new bill, or correct and re-upload one that is pending or sent back. */
+export function ExpenseForm({
+  slug,
+  eventSlug,
+  expense,
+}: {
+  slug: string;
+  eventSlug: string;
+  expense?: ExpenseDraft;
+}) {
+  const creating = !expense;
+  const created = useResettingAction(submitExpense);
+  const [corrected, correctAction] = useActionState<ActionState, FormData>(
+    correctExpense,
+    EMPTY_STATE,
+  );
+  const state = creating ? created.state : corrected;
+  const id = expense?.id ?? 'new';
+
+  return (
+    <form
+      ref={creating ? created.ref : undefined}
+      action={creating ? created.action : correctAction}
+      className="space-y-4"
+    >
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      {expense ? <input type="hidden" name="expense_id" value={expense.id} /> : null}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="What" htmlFor={`ex-name-${id}`} error={state.fieldErrors?.name} required>
           {(control) => (
             <Input
               {...control}
-              name="emoji"
-              defaultValue="🎭"
-              maxLength={4}
-              className="text-center"
+              name="name"
+              placeholder="Pandal and stage"
+              defaultValue={expense?.name}
+              required
+            />
+          )}
+        </Field>
+        <Field
+          label="Amount (₹)"
+          htmlFor={`ex-amount-${id}`}
+          error={state.fieldErrors?.amount}
+          required
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="amount"
+              type="number"
+              min={1}
+              step="1"
+              defaultValue={expense?.amount}
+              required
             />
           )}
         </Field>
       </div>
-      <div className="min-w-40 flex-1">
-        <Field label="Activity" htmlFor="act-name" error={state.fieldErrors?.name}>
-          {(control) => <Input {...control} name="name" placeholder="Open mic" />}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field
+          label="Category"
+          htmlFor={`ex-category-${id}`}
+          hint="Use a budget category so planned vs spent lines up."
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="category"
+              placeholder="Decoration"
+              defaultValue={expense?.category ?? ''}
+            />
+          )}
+        </Field>
+        <Field label="Vendor" htmlFor={`ex-vendor-${id}`}>
+          {(control) => <Input {...control} name="vendor" defaultValue={expense?.vendor ?? ''} />}
         </Field>
       </div>
-      <Submit label="Add" busy="Adding…" />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Paid by" htmlFor={`ex-paid-${id}`} hint="If someone is reimbursed.">
+          {(control) => <Input {...control} name="paid_by" defaultValue={expense?.paid_by ?? ''} />}
+        </Field>
+        <Field label="Method" htmlFor={`ex-method-${id}`}>
+          {(control) => (
+            <Select {...control} name="method" defaultValue={expense?.method ?? 'upi'}>
+              {METHODS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Field label="Date" htmlFor={`ex-date-${id}`}>
+          {(control) => (
+            <Input {...control} name="spent_on" type="date" defaultValue={expense?.spent_on} />
+          )}
+        </Field>
+      </div>
+      <Field
+        label="Bill"
+        htmlFor={`ex-bill-${id}`}
+        hint="Link to the bill (Drive, photo link) or its stored file path."
+      >
+        {(control) => (
+          <Input
+            {...control}
+            name="bill_url"
+            placeholder="https://… or bills/pandal.pdf"
+            defaultValue={expense?.bill_url ?? ''}
+          />
+        )}
+      </Field>
+      <Feedback state={state} />
+      <Submit
+        label={creating ? 'Upload bill' : 'Save correction'}
+        busy={creating ? 'Uploading…' : 'Saving…'}
+      />
+    </form>
+  );
+}
+
+export function ReviewExpenseForm({
+  slug,
+  eventSlug,
+  expenseId,
+}: {
+  slug: string;
+  eventSlug: string;
+  expenseId: string;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(reviewExpense, EMPTY_STATE);
+  return (
+    <form action={action} className="space-y-2">
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <input type="hidden" name="expense_id" value={expenseId} />
+      <label htmlFor={`note-${expenseId}`} className="sr-only">
+        Note for staff
+      </label>
+      <Input
+        id={`note-${expenseId}`}
+        name="note"
+        placeholder="Note (shown to staff when sending back or rejecting)"
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" name="decision" value="approved" size="sm">
+          Approve
+        </Button>
+        <Button
+          type="submit"
+          name="decision"
+          value="changes_requested"
+          size="sm"
+          variant="secondary"
+        >
+          Ask for changes
+        </Button>
+        <Button type="submit" name="decision" value="rejected" size="sm" variant="ghost">
+          Reject
+        </Button>
+      </div>
       <Feedback state={state} />
     </form>
   );
 }
 
-export function AddRoleForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
-  const { state, action, ref } = useResettingAction(addVolunteerRole);
+export function RecordPaymentForm({
+  slug,
+  eventSlug,
+  units,
+}: {
+  slug: string;
+  eventSlug: string;
+  units: { id: string; label: string }[];
+}) {
+  const { state, action, ref } = useResettingAction(recordPayment);
+  const today = new Date().toISOString().slice(0, 10);
   return (
-    <form ref={ref} action={action} className="flex flex-wrap items-end gap-2">
-      <input type="hidden" name="slug" value={slug} />
-      <input type="hidden" name="event" value={eventSlug} />
-      <div className="w-20">
-        <Field label="Emoji" htmlFor="role-emoji">
+    <form ref={ref} action={action} className="space-y-4">
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Flat" htmlFor="pay-unit" error={state.fieldErrors?.unit_id} required>
           {(control) => (
-            <Input
-              {...control}
-              name="emoji"
-              defaultValue="🙋"
-              maxLength={4}
-              className="text-center"
-            />
+            <Select {...control} name="unit_id" defaultValue="" required>
+              <option value="" disabled>
+                Pick a flat
+              </option>
+              {units.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.label}
+                </option>
+              ))}
+            </Select>
           )}
         </Field>
-      </div>
-      <div className="min-w-40 flex-1">
-        <Field label="Role" htmlFor="role-name" error={state.fieldErrors?.name}>
-          {(control) => <Input {...control} name="name" placeholder="Cleanup" />}
-        </Field>
-      </div>
-      <div className="w-24">
-        <Field label="How many" htmlFor="role-target">
+        <Field label="Amount (₹)" htmlFor="pay-amount" error={state.fieldErrors?.amount} required>
           {(control) => (
-            <Input {...control} name="target_count" type="number" min={1} defaultValue={3} />
+            <Input {...control} name="amount" type="number" min={1} step="1" required />
           )}
         </Field>
+        <Field label="Received on" htmlFor="pay-date" error={state.fieldErrors?.paid_on}>
+          {(control) => <Input {...control} name="paid_on" type="date" defaultValue={today} />}
+        </Field>
       </div>
-      <Submit label="Add" busy="Adding…" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Method" htmlFor="pay-method">
+          {(control) => (
+            <Select {...control} name="method" defaultValue="cash">
+              {METHODS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <Field label="Reference" htmlFor="pay-ref" hint="UPI reference, cheque or receipt number.">
+          {(control) => <Input {...control} name="reference" />}
+        </Field>
+      </div>
       <Feedback state={state} />
+      <Submit label="Record payment" busy="Recording…" />
     </form>
   );
 }
@@ -208,32 +466,29 @@ export function CloseEventForm({
   slug,
   eventSlug,
   eventName,
-  pendingExpenses,
+  openBills,
 }: {
   slug: string;
   eventSlug: string;
   eventName: string;
-  pendingExpenses: number;
+  openBills: number;
 }) {
   const [state, action] = useActionState(closeEvent, closeInitial);
-
   return (
     <Card className="border-danger/40">
       <CardHeader
         title="Close the event"
-        description="Publishes the transparency report and freezes the ledger. This cannot be undone."
+        description="Publishes the final accounts and freezes the ledger. This cannot be undone."
       />
       <CardBody>
-        {pendingExpenses > 0 ? (
+        {openBills > 0 ? (
           <p className="bg-warning/10 text-warning mb-3 rounded-lg px-4 py-3 text-sm">
-            {pendingExpenses} expense{pendingExpenses === 1 ? '' : 's'} still awaiting a decision.
-            Approve or reject them first.
+            {openBills} bill{openBills === 1 ? '' : 's'} still awaiting a decision. Decide on them
+            first.
           </p>
         ) : null}
-
         <form action={action} className="space-y-3">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="event" value={eventSlug} />
+          <Hidden slug={slug} eventSlug={eventSlug} />
           <Field
             label={`Type “${eventName}” to confirm`}
             htmlFor="close-confirm"
@@ -242,21 +497,9 @@ export function CloseEventForm({
             {(control) => <Input {...control} name="confirm_name" autoComplete="off" />}
           </Field>
           <Feedback state={state} />
-          <Button type="submit" variant="danger" size="sm" disabled={pendingExpenses > 0}>
-            Close and publish the report
-          </Button>
+          <Submit label="Close and publish accounts" busy="Closing…" variant="danger" />
         </form>
       </CardBody>
     </Card>
   );
 }
-
-export function ExpenseNoteField() {
-  return (
-    <Field label="Note" htmlFor="review-note" hint="Shown to whoever submitted it.">
-      {(control) => <Textarea {...control} name="note" rows={2} />}
-    </Field>
-  );
-}
-
-export { Select };

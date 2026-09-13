@@ -8,7 +8,7 @@ import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/l
 
 export async function addUnit(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const slug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(slug, 'units:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const parsed = createUnitSchema.safeParse({
     community_id: context.community.id,
@@ -40,7 +40,7 @@ export async function addUnit(_prev: ActionState, formData: FormData): Promise<A
  */
 export async function addUnitsBulk(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const slug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(slug, 'units:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const raw = String(formData.get('units') ?? '');
 
@@ -81,7 +81,7 @@ export async function addUnitsBulk(_prev: ActionState, formData: FormData): Prom
 export async function deleteUnit(formData: FormData): Promise<void> {
   const slug = String(formData.get('slug') ?? '');
   const id = String(formData.get('id') ?? '');
-  const context = await requireCapability(slug, 'units:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const supabase = await getSupabase();
   await supabase.from('units').delete().eq('id', id).eq('community_id', context.community.id);

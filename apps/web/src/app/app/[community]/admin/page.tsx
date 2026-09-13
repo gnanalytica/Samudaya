@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, KeyRound, Plus, Receipt, Ticket, UserPlus, Users } from 'lucide-react';
+import { CalendarDays, ClipboardCheck, Plus, Receipt, UserPlus, Users } from 'lucide-react';
 import { can, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
@@ -9,20 +9,21 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventStatusBadge, FundBar, ReadinessBar, StatTile } from '@/components/badges';
+import { EventStatusBadge, FundBar, StatTile } from '@/components/badges';
 
-export const metadata = { title: 'Admin console' };
+export const metadata = { title: 'Console' };
 
-export default async function AdminConsolePage(props: PageProps<'/app/[community]/admin'>) {
+export default async function ConsolePage(props: PageProps<'/app/[community]/admin'>) {
   const { community: slug } = await props.params;
-  const { community, role } = await requireCapability(slug, 'events:prepare');
+  const { community, role } = await requireCapability(slug, 'events:manage');
   const supabase = await getSupabase();
+  const committee = can(role, 'expenses:approve');
 
-  const events = await listEvents(community.id);
+  const events = (await listEvents(community.id)).filter((event) => event.status !== 'proposed');
   const stats = await getStatsFor(events.map((event) => event.id));
   const base = `/app/${community.slug}`;
 
-  const [pendingRequests, pendingExpenses, memberCount] = await Promise.all([
+  const [requests, bills, sentBack, proposals, suggestions, members] = await Promise.all([
     supabase
       .from('join_requests')
       .select('id', { count: 'exact', head: true })
@@ -30,11 +31,25 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
       .eq('status', 'pending'),
     supabase
       .from('expenses')
-      .select('id, name, amount, vendor, events(slug, name)')
+      .select('id', { count: 'exact', head: true })
       .eq('community_id', community.id)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(5),
+      .eq('status', 'pending'),
+    supabase
+      .from('expenses')
+      .select('id, name, amount, events(slug, name)')
+      .eq('community_id', community.id)
+      .eq('status', 'changes_requested')
+      .limit(10),
+    supabase
+      .from('events')
+      .select('id', { count: 'exact', head: true })
+      .eq('community_id', community.id)
+      .eq('status', 'proposed'),
+    supabase
+      .from('activity_suggestions')
+      .select('id', { count: 'exact', head: true })
+      .eq('community_id', community.id)
+      .eq('status', 'new'),
     supabase
       .from('memberships')
       .select('id', { count: 'exact', head: true })
@@ -42,14 +57,41 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
       .eq('status', 'active'),
   ]);
 
-  const live = events.filter((event) => event.status === 'published');
-  const drafts = events.filter((event) => event.status === 'draft');
+  const waiting = [
+    {
+      show: (requests.count ?? 0) > 0,
+      icon: UserPlus,
+      text: `${requests.count} resident${requests.count === 1 ? '' : 's'} waiting to join`,
+      href: `${base}/admin/requests`,
+    },
+    {
+      show: committee && (bills.count ?? 0) + (proposals.count ?? 0) + (suggestions.count ?? 0) > 0,
+      icon: ClipboardCheck,
+      text: [
+        bills.count ? `${bills.count} bill${bills.count === 1 ? '' : 's'}` : null,
+        proposals.count ? `${proposals.count} campaign${proposals.count === 1 ? '' : 's'}` : null,
+        suggestions.count
+          ? `${suggestions.count} suggestion${suggestions.count === 1 ? '' : 's'}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(', ')
+        .concat(' for the committee'),
+      href: `${base}/admin/approvals`,
+    },
+    {
+      show: !committee && (bills.count ?? 0) > 0,
+      icon: Receipt,
+      text: `${bills.count} bill${bills.count === 1 ? '' : 's'} waiting for the committee`,
+      href: null,
+    },
+  ].filter((item) => item.show);
 
   return (
     <>
       <PageHeader
-        title="Admin console"
-        description={`${community.name} · Society ID ${community.join_code}`}
+        title="Console"
+        description={`${community.name} · society code ${community.join_code}`}
         action={
           <ButtonLink href={`${base}/admin/events/new`} size="sm">
             <Plus className="size-4" aria-hidden="true" />
@@ -59,57 +101,52 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
       />
       <PageBody>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Live events" value={String(live.length)} />
-          <StatTile label="Drafts" value={String(drafts.length)} />
-          <StatTile label="Members" value={String(memberCount.count ?? 0)} />
           <StatTile
-            label="Needs you"
-            value={String((pendingRequests.count ?? 0) + (pendingExpenses.data?.length ?? 0))}
-            tone={
-              (pendingRequests.count ?? 0) + (pendingExpenses.data?.length ?? 0) > 0
-                ? 'danger'
-                : undefined
-            }
+            label="Live"
+            value={String(events.filter((event) => event.status === 'published').length)}
+          />
+          <StatTile
+            label="Drafts"
+            value={String(events.filter((event) => event.status === 'draft').length)}
+          />
+          <StatTile label="Members" value={String(members.count ?? 0)} />
+          <StatTile
+            label="Join requests"
+            value={String(requests.count ?? 0)}
+            tone={(requests.count ?? 0) > 0 ? 'danger' : undefined}
           />
         </div>
 
-        {/* Anything waiting on a human decision comes first. */}
-        {(pendingRequests.count ?? 0) > 0 || pendingExpenses.data?.length ? (
+        {waiting.length || sentBack.data?.length ? (
           <Card className="border-warning/40 mt-5">
-            <CardHeader title="Waiting on you" />
+            <CardHeader title="Needs attention" />
             <ul className="divide-border-base divide-y">
-              {(pendingRequests.count ?? 0) > 0 && can(role, 'joinrequests:review') ? (
-                <li className="flex items-center justify-between gap-3 px-5 py-3">
+              {waiting.map(({ icon: Icon, text, href }) => (
+                <li key={text} className="flex items-center justify-between gap-3 px-5 py-3">
                   <span className="text-ink flex items-center gap-2 text-sm">
-                    <UserPlus className="text-ink-muted size-4" aria-hidden="true" />
-                    {pendingRequests.count} resident
-                    {pendingRequests.count === 1 ? '' : 's'} waiting to join
+                    <Icon className="text-ink-muted size-4" aria-hidden="true" />
+                    {text}
                   </span>
-                  <Link
-                    href={`${base}/admin/requests`}
-                    className="text-accent shrink-0 text-sm hover:underline"
-                  >
-                    Review
-                  </Link>
+                  {href ? (
+                    <Link href={href} className="text-accent shrink-0 text-sm hover:underline">
+                      Review
+                    </Link>
+                  ) : null}
                 </li>
-              ) : null}
-              {(pendingExpenses.data ?? []).map((expense) => (
+              ))}
+              {(sentBack.data ?? []).map((expense) => (
                 <li key={expense.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <span className="min-w-0">
-                    <span className="text-ink flex items-center gap-2 text-sm">
-                      <Receipt className="text-ink-muted size-4" aria-hidden="true" />
-                      {expense.name} · {formatMoney(expense.amount, community.currency)}
-                    </span>
-                    <span className="text-ink-subtle mt-0.5 block pl-6 text-xs">
-                      {expense.vendor ?? 'No vendor'} · {expense.events?.name}
-                    </span>
+                  <span className="text-ink flex items-center gap-2 text-sm">
+                    <Receipt className="text-ink-muted size-4" aria-hidden="true" />
+                    Sent back: {expense.name} · {formatMoney(expense.amount, community.currency)}
+                    {expense.events?.name ? ` · ${expense.events.name}` : ''}
                   </span>
                   {expense.events?.slug ? (
                     <Link
-                      href={`${base}/admin/events/${expense.events.slug}?tab=expenses`}
+                      href={`${base}/admin/events/${expense.events.slug}?tab=bills`}
                       className="text-accent shrink-0 text-sm hover:underline"
                     >
-                      Review
+                      Correct
                     </Link>
                   ) : null}
                 </li>
@@ -118,7 +155,7 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
           </Card>
         ) : null}
 
-        <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Events</h2>
+        <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Events and campaigns</h2>
         {events.length ? (
           <div className="space-y-3">
             {events.map((event) => {
@@ -137,37 +174,27 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
                         {event.name}
                       </p>
                       <p className="text-ink-muted mt-0.5 text-sm">
+                        {event.kind === 'campaign' ? 'Campaign · ' : ''}
                         {formatDate(event.starts_on)}
                         {event.venue ? ` · ${event.venue}` : ''}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {(s?.pendingExpenses ?? 0) > 0 ? (
-                        <Badge tone="warning">{s?.pendingExpenses} to approve</Badge>
+                        <Badge tone="warning">{s?.pendingExpenses} bills pending</Badge>
                       ) : null}
                       <EventStatusBadge status={event.status} />
                     </div>
                   </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
-                        <span>
-                          Readiness · {s?.tasksDone ?? 0}/{s?.tasksTotal ?? 0}
-                        </span>
-                        <span>{s?.readiness ?? 0}%</span>
-                      </div>
-                      <ReadinessBar percent={s?.readiness ?? 0} />
+                  <div className="mt-4">
+                    <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
+                      <span>
+                        {formatMoney(s?.fundRaised ?? 0, community.currency)} raised ·{' '}
+                        {formatMoney(s?.spent ?? 0, community.currency)} spent
+                      </span>
+                      <span>{funded}%</span>
                     </div>
-                    <div>
-                      <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
-                        <span>
-                          {formatMoney(s?.fundRaised ?? 0, community.currency)} raised ·{' '}
-                          {formatMoney(s?.spent ?? 0, community.currency)} spent
-                        </span>
-                        <span>{funded}%</span>
-                      </div>
-                      <FundBar percent={funded} />
-                    </div>
+                    <FundBar percent={funded} />
                   </div>
                 </Link>
               );
@@ -178,7 +205,7 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
             <EmptyState
               icon={<CalendarDays className="size-6" />}
               title="No events yet"
-              description="The wizard walks through budget, checklist and surplus rule in seven steps."
+              description="Create one with its budget, then add activities and publish it."
               action={
                 <ButtonLink href={`${base}/admin/events/new`} size="sm">
                   Create your first event
@@ -188,35 +215,18 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
           </Card>
         )}
 
-        <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Manage</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-8 grid gap-3 sm:grid-cols-3">
           {[
+            { href: `${base}/admin/requests`, label: 'Join requests', icon: UserPlus, show: true },
+            { href: `${base}/admin/members`, label: 'Residents', icon: Users, show: true },
             {
-              href: `${base}/admin/requests`,
-              label: 'Join requests',
-              icon: UserPlus,
-              cap: 'joinrequests:review' as const,
-            },
-            {
-              href: `${base}/admin/members`,
-              label: 'Members',
-              icon: Users,
-              cap: 'members:manage' as const,
-            },
-            {
-              href: `${base}/admin/invites`,
-              label: 'Invite codes',
-              icon: Ticket,
-              cap: 'invites:manage' as const,
-            },
-            {
-              href: `${base}/admin/api-keys`,
-              label: 'API & AI access',
-              icon: KeyRound,
-              cap: 'apikeys:manage' as const,
+              href: `${base}/admin/approvals`,
+              label: 'Committee approvals',
+              icon: ClipboardCheck,
+              show: committee,
             },
           ]
-            .filter((item) => can(role, item.cap))
+            .filter((item) => item.show)
             .map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
@@ -231,8 +241,8 @@ export default async function AdminConsolePage(props: PageProps<'/app/[community
 
         <Card className="mt-5">
           <CardHeader
-            title="Share your Society ID"
-            description="Residents enter this, pick their flat, and you approve them."
+            title="Society code"
+            description="One code for every resident. They enter it with their flat, and staff approve them."
           />
           <CardBody>
             <p className="text-ink font-mono text-2xl font-semibold tracking-widest">

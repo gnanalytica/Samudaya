@@ -2,15 +2,18 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
 import {
   contributeSchema,
   joinActivitySchema,
   suggestActivitySchema,
+  suggestionKindSchema,
+  uuid,
   volunteerSchema,
   votePollSchema,
   voteReallocationSchema,
 } from '@samudaya/core';
-import { requireCommunity } from '@/lib/auth';
+import { requireCapability, requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
 
@@ -28,7 +31,7 @@ export async function contribute(
 ): Promise<ContributeState> {
   const slug = String(formData.get('slug') ?? '');
   const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCommunity(slug);
+  const context = await requireCapability(slug, 'contribute');
   const supabase = await getSupabase();
 
   const { data: event } = await supabase
@@ -80,35 +83,71 @@ export async function contribute(
   };
 }
 
-export async function joinActivity(_prev: ActionState, formData: FormData): Promise<ActionState> {
+/**
+ * Registers the signed-in resident, or a family member by name, for an
+ * activity. Several people from one flat can take part: each account registers
+ * separately, and a resident can add children or relatives who have no account.
+ */
+export async function registerForActivity(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const slug = String(formData.get('slug') ?? '');
   const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCommunity(slug);
+  const context = await requireCapability(slug, 'activities:register');
 
   const parsed = joinActivitySchema.safeParse({
     activity_id: formData.get('activity_id'),
-    performance_type: formData.get('performance_type') || undefined,
     age_group: formData.get('age_group') || undefined,
-    experience: formData.get('experience') || undefined,
     special_requirements: formData.get('special_requirements') || undefined,
     channel: 'web',
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
-  const supabase = await getSupabase();
-  // Signing up twice is a double tap, not a second performer, so update the
-  // details rather than failing on the unique constraint.
-  const { error } = await supabase
-    .from('activity_participants')
-    .upsert(
-      { ...parsed.data, membership_id: context.membership.id },
-      { onConflict: 'activity_id,membership_id' },
-    );
+  const who = String(formData.get('participant_name') ?? '').trim();
+  if (who.length > 80) return { fieldErrors: { participant_name: 'Keep the name short' } };
 
-  if (error) return { error: friendlyDbError(error) };
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('activity_participants').insert({
+    ...parsed.data,
+    membership_id: context.membership.id,
+    participant_name: who || null,
+  });
+
+  if (error) {
+    return {
+      error:
+        error.code === '23505'
+          ? who
+            ? `${who} is already registered.`
+            : 'You’re already registered.'
+          : friendlyDbError(error),
+    };
+  }
 
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
-  return { ...EMPTY_STATE, success: 'You’re in.' };
+  return { ...EMPTY_STATE, success: who ? `${who} is registered.` : 'You’re registered.' };
+}
+
+/** Removes one of the caller's own registrations (theirs or a family member's). */
+export async function cancelRegistration(formData: FormData): Promise<void> {
+  const slug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCommunity(slug);
+
+  const supabase = await getSupabase();
+  await supabase
+    .from('activity_participants')
+    .delete()
+    .eq('id', String(formData.get('registration_id') ?? ''))
+    .eq('membership_id', context.membership.id);
+
+  revalidatePath(`/app/${slug}/events/${eventSlug}`);
+}
+
+/** Kept for the hidden community feed. */
+export async function joinActivity(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  return registerForActivity(_prev, formData);
 }
 
 export async function leaveActivity(formData: FormData): Promise<void> {
@@ -121,9 +160,147 @@ export async function leaveActivity(formData: FormData): Promise<void> {
     .from('activity_participants')
     .delete()
     .eq('activity_id', String(formData.get('activity_id') ?? ''))
-    .eq('membership_id', context.membership.id);
+    .eq('membership_id', context.membership.id)
+    .is('participant_name', null);
 
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
+}
+
+const eventSuggestionSchema = z.object({
+  event_id: uuid,
+  kind: suggestionKindSchema,
+  name: z.string().trim().min(3, 'Give your suggestion a short title').max(120),
+  description: z.string().trim().max(2000).optional(),
+});
+
+/** A resident suggests an idea or an activity for an event; the committee reviews it. */
+export async function suggestForEvent(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const slug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(slug, 'suggest');
+
+  const parsed = eventSuggestionSchema.safeParse({
+    event_id: formData.get('event_id'),
+    kind: formData.get('kind') || 'activity',
+    name: formData.get('name'),
+    description: formData.get('description') || undefined,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('activity_suggestions').insert({
+    ...parsed.data,
+    community_id: context.community.id,
+    suggested_by: context.membership.id,
+    status: 'new',
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  revalidatePath(`/app/${slug}/events/${eventSlug}`);
+  revalidatePath(`/app/${slug}/admin/approvals`);
+  return {
+    ...EMPTY_STATE,
+    success: 'Sent to the committee. Once they approve it, residents can vote on it.',
+  };
+}
+
+/** One vote per person, for or against; voting again changes the vote. */
+export async function voteOnSuggestion(formData: FormData): Promise<void> {
+  const slug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(slug, 'vote');
+
+  const suggestionId = String(formData.get('suggestion_id') ?? '');
+  const support = formData.get('support') === '1';
+  const supabase = await getSupabase();
+
+  if (formData.get('withdraw') === '1') {
+    await supabase
+      .from('suggestion_votes')
+      .delete()
+      .eq('suggestion_id', suggestionId)
+      .eq('membership_id', context.membership.id);
+  } else {
+    await supabase.from('suggestion_votes').upsert(
+      {
+        suggestion_id: suggestionId,
+        membership_id: context.membership.id,
+        support,
+        voted_at: new Date().toISOString(),
+      },
+      { onConflict: 'suggestion_id,membership_id' },
+    );
+  }
+
+  revalidatePath(`/app/${slug}/events/${eventSlug}`);
+}
+
+const campaignSchema = z.object({
+  name: z.string().trim().min(3, 'Name the campaign').max(140),
+  description: z.string().trim().min(10, 'Say what the money is for').max(2000),
+  fund_target: z.coerce
+    .number()
+    .positive('Enter a target amount')
+    .max(100_000_000, 'That is larger than this app will accept'),
+  starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
+});
+
+/** Turns a campaign name into a unique-enough web address. */
+function campaignSlug(name: string) {
+  const base = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 48);
+  return `${base || 'campaign'}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export type CampaignState = ActionState;
+
+/**
+ * A resident proposes a fundraising campaign. It stays 'proposed', visible only
+ * to them and to staff, until the committee approves it.
+ */
+export async function proposeCampaign(
+  _prev: CampaignState,
+  formData: FormData,
+): Promise<CampaignState> {
+  const slug = String(formData.get('slug') ?? '');
+  const context = await requireCapability(slug, 'campaigns:propose');
+
+  const parsed = campaignSchema.safeParse({
+    name: formData.get('name'),
+    description: formData.get('description'),
+    fund_target: formData.get('fund_target'),
+    starts_on: formData.get('starts_on'),
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const eventSlug = campaignSlug(parsed.data.name);
+  const { error } = await supabase.from('events').insert({
+    community_id: context.community.id,
+    slug: eventSlug,
+    kind: 'campaign',
+    status: 'proposed',
+    emoji: '🤝',
+    name: parsed.data.name,
+    description: parsed.data.description,
+    fund_target: parsed.data.fund_target,
+    starts_on: parsed.data.starts_on,
+    fund_rule: 'general_fund',
+    organizer: context.profile?.full_name ?? undefined,
+    created_by: context.user.id,
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  revalidatePath(`/app/${slug}/events`);
+  revalidatePath(`/app/${slug}/admin/approvals`);
+  redirect(`/app/${slug}/events?proposed=1`);
 }
 
 export async function volunteer(_prev: ActionState, formData: FormData): Promise<ActionState> {

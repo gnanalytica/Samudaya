@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowLeft, FileText, Receipt } from 'lucide-react';
+import { ArrowLeft, Receipt } from 'lucide-react';
 import {
   FUND_RULE_LABEL,
   can,
@@ -9,7 +9,14 @@ import {
   receiptRef,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
-import { getEventStats, getExpenses, requireEvent } from '@/lib/events';
+import {
+  budgetVsSpent,
+  getBudgetLines,
+  getEventStats,
+  getExpenses,
+  requireEvent,
+} from '@/lib/events';
+import { BillLink } from '@/components/bill-link';
 import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody } from '@/components/ui/card';
@@ -26,9 +33,10 @@ export default async function AccountsPage(
   const event = await requireEvent(community.id, eventSlug);
   const supabase = await getSupabase();
 
-  const [stats, expenses, myContributions] = await Promise.all([
+  const [stats, expenses, budget, myContributions] = await Promise.all([
     getEventStats(event.id),
     getExpenses(event.id),
+    getBudgetLines(event.id),
     supabase
       .from('contributions')
       .select('id, amount, method, receipt_no, paid_at')
@@ -40,13 +48,16 @@ export default async function AccountsPage(
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
   const approved = expenses.filter((expense) => expense.status === 'approved');
   const awaiting = expenses.filter((expense) => expense.status !== 'approved');
-  const isStaff = can(role, 'events:prepare');
+  const isStaff = can(role, 'events:manage');
+  const categories = budgetVsSpent(budget, expenses);
+  const plannedTotal = categories.reduce((sum, row) => sum + row.planned, 0);
+  const largest = Math.max(1, ...categories.map((row) => Math.max(row.planned, row.spent)));
 
   return (
     <>
       <PageHeader
-        title={`${event.emoji} ${event.name} · accounts`}
-        description="Every approved rupee, with the bill attached."
+        title={`${event.emoji} ${event.name} · money`}
+        description="Raised, planned and spent, with every approved bill."
       />
       <PageBody>
         <Link
@@ -77,10 +88,66 @@ export default async function AccountsPage(
               <FundBar percent={funded} />
             </div>
             <p className="text-ink-subtle mt-2 text-xs">
-              {stats.contributors} families contributed.
+              {stats.contributors} residents contributed in the app.
+              {plannedTotal > 0
+                ? ` Budget used: ${Math.round((stats.spent / plannedTotal) * 100)}% of ${formatMoney(plannedTotal, community.currency)}.`
+                : ''}
             </p>
           </CardBody>
         </Card>
+
+        {categories.length ? (
+          <>
+            <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Planned vs spent</h2>
+            <Card>
+              <CardBody className="space-y-4">
+                <div className="text-ink-subtle flex gap-4 text-xs">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="bg-border-strong inline-block size-2.5 rounded-sm" /> Planned
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="bg-accent inline-block size-2.5 rounded-sm" /> Spent
+                  </span>
+                </div>
+                {categories.map((row) => (
+                  <div key={row.label}>
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span className="text-ink font-medium">{row.label}</span>
+                      <span
+                        className={
+                          row.planned > 0 && row.spent > row.planned
+                            ? 'text-danger'
+                            : 'text-ink-muted'
+                        }
+                      >
+                        {formatMoney(row.spent, community.currency)} /{' '}
+                        {formatMoney(row.planned, community.currency)}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 space-y-1">
+                      <div className="bg-surface-sunken h-2 overflow-hidden rounded-full">
+                        <div
+                          className="bg-border-strong h-full rounded-full"
+                          style={{ width: `${(row.planned / largest) * 100}%` }}
+                        />
+                      </div>
+                      <div className="bg-surface-sunken h-2 overflow-hidden rounded-full">
+                        <div
+                          className={
+                            row.planned > 0 && row.spent > row.planned
+                              ? 'bg-danger h-full rounded-full'
+                              : 'bg-accent h-full rounded-full'
+                          }
+                          style={{ width: `${(row.spent / largest) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardBody>
+            </Card>
+          </>
+        ) : null}
 
         <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">
           Expenses ({approved.length})
@@ -126,7 +193,6 @@ export default async function AccountsPage(
                           <>
                             <br />
                             approved by {expense.approver.profiles.full_name}
-                            {expense.approver.title ? ` (${expense.approver.title})` : null}
                           </>
                         ) : null}
                       </td>
@@ -135,10 +201,7 @@ export default async function AccountsPage(
                       </td>
                       <td className="px-5 py-3">
                         {expense.bill_url ? (
-                          <span className="text-ink-muted inline-flex items-center gap-1 text-xs">
-                            <FileText className="size-3.5" aria-hidden="true" />
-                            Attached
-                          </span>
+                          <BillLink url={expense.bill_url} />
                         ) : (
                           <span className="text-ink-subtle text-xs">—</span>
                         )}
@@ -171,7 +234,7 @@ export default async function AccountsPage(
         {isStaff && awaiting.length ? (
           <>
             <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">
-              Not yet in the resident ledger
+              Waiting for the committee
             </h2>
             <Card>
               <ul className="divide-border-base divide-y">
@@ -235,8 +298,7 @@ export default async function AccountsPage(
           🔒 <span className="text-ink font-medium">Surplus rule:</span>{' '}
           {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}
           <p className="text-ink-subtle mt-1 text-xs">
-            Fixed when the event was created, before any money was collected. Moving funds elsewhere
-            needs a resident vote.
+            Fixed when the event was created, before any money was collected.
           </p>
         </div>
       </PageBody>

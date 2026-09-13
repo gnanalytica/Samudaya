@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
-import { formatMoney, fundedPercent } from '@samudaya/core';
+import { can, formatMoney, fundedPercent } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getEventStats, requireEvent } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
@@ -15,11 +15,11 @@ export default async function ContributePage(
 ) {
   const { community: slug, event: eventSlug } = await props.params;
   const { amount } = await props.searchParams;
-  const { community } = await requireCommunity(slug);
+  const { community, role } = await requireCommunity(slug);
   const event = await requireEvent(community.id, eventSlug);
 
-  // A closed or draft event has no open fund.
-  if (event.status !== 'published') notFound();
+  // A closed or draft event has no open fund, and staff do not contribute.
+  if (event.status !== 'published' || !can(role, 'contribute')) notFound();
 
   const stats = await getEventStats(event.id);
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
@@ -54,7 +54,7 @@ export default async function ContributePage(
               <FundBar percent={funded} />
             </div>
             <p className="text-ink-subtle mt-2 text-xs">
-              {stats.contributors} families have contributed so far.
+              {stats.contributors} residents have contributed in the app so far.
             </p>
           </div>
 

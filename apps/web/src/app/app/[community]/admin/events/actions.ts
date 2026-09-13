@@ -4,105 +4,97 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
-  budgetLineSchema,
   closeEventSchema,
   createActivitySchema,
   createEventSchema,
   createExpenseSchema,
-  createVolunteerRoleSchema,
-  proposeReallocationSchema,
+  paymentMethodSchema,
   reviewExpenseSchema,
-  updateTaskSchema,
+  uuid,
 } from '@samudaya/core';
-import { requireCapability, requireCommunity } from '@/lib/auth';
+import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
 
 /**
- * Admin and committee actions on an event.
+ * Staff and committee actions on events.
  *
- * The split that matters: a committee member can prepare an event and work it;
- * only an admin can publish it, approve spending, or close it. Each action
+ * The line that matters: staff run events (create, edit, publish, budgets,
+ * activities, bills, payments, join requests); the committee has the final say
+ * (approving bills, campaigns and suggestions, closing an event). Each action
  * asks for the capability it needs, and the database enforces the same line.
  */
 
-const wizardSchema = z.object({
-  slug: z.string(),
-  emoji: z.string(),
-  name: z.string(),
-  starts_on: z.string(),
-  ends_on: z.string().nullable().optional(),
-  venue: z.string().optional(),
-  organizer: z.string().optional(),
-  description: z.string().optional(),
-  expected_attendance: z.coerce.number().int().min(0).optional(),
-  fund_rule: z.string(),
-  fund_rule_note: z.string().optional(),
-  budget: z.array(budgetLineSchema),
-  tasks: z.array(z.string().trim().min(1)),
-  activities: z.array(z.object({ name: z.string().trim().min(1), emoji: z.string() })),
-  volunteer_roles: z.array(
-    z.object({
-      name: z.string().trim().min(1),
-      emoji: z.string(),
-      target: z.coerce.number().int().min(1),
-    }),
-  ),
-});
+/** Paths that show an event's numbers; refreshed after anything changes them. */
+function refreshEvent(communitySlug: string, eventSlug: string) {
+  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
+  revalidatePath(`/app/${communitySlug}/events/${eventSlug}`);
+  revalidatePath(`/app/${communitySlug}/events/${eventSlug}/accounts`);
+  revalidatePath(`/app/${communitySlug}/events`);
+  revalidatePath(`/app/${communitySlug}/admin`);
+}
 
-export type WizardState = ActionState & { slug?: string };
+async function findEvent(communityId: string, eventSlug: string) {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('events')
+    .select('id, name, status, kind, slug')
+    .eq('community_id', communityId)
+    .eq('slug', eventSlug)
+    .maybeSingle();
+  return data;
+}
 
-/**
- * Creates the whole event in one go: the event itself, its checklist, its
- * activities and its volunteer roles. It lands as a DRAFT — publishing is a
- * separate, deliberate admin action.
- */
-export async function createEventFromWizard(
-  _prev: WizardState,
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+
+export type EventFormState = ActionState;
+
+function eventFields(formData: FormData) {
+  return {
+    slug: formData.get('event_slug'),
+    emoji: formData.get('emoji') || '🎉',
+    name: formData.get('name'),
+    starts_on: formData.get('starts_on'),
+    ends_on: formData.get('ends_on') || null,
+    venue: formData.get('venue') || undefined,
+    organizer: formData.get('organizer') || undefined,
+    description: formData.get('description') || undefined,
+    fund_rule: formData.get('fund_rule') || 'general_fund',
+    fund_rule_note: formData.get('fund_rule_note') || undefined,
+  };
+}
+
+/** Creates an event as a draft with its first budget lines; budget sum = fund target. */
+export async function createEvent(
+  _prev: EventFormState,
   formData: FormData,
-): Promise<WizardState> {
+): Promise<EventFormState> {
   const communitySlug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(communitySlug, 'events:prepare');
+  const context = await requireCapability(communitySlug, 'events:manage');
 
-  let payload: z.infer<typeof wizardSchema>;
-  try {
-    payload = wizardSchema.parse(JSON.parse(String(formData.get('payload') ?? '{}')));
-  } catch {
-    return { error: 'Those details could not be read. Please check the form and try again.' };
+  const categories = formData.getAll('budget_category').map((value) => String(value).trim());
+  const amounts = formData.getAll('budget_amount').map((value) => Number(value || 0));
+  const lines = categories
+    .map((category, index) => ({ category, amount: amounts[index] ?? 0 }))
+    .filter((line) => line.category && line.amount >= 0);
+  if (lines.some((line) => !Number.isFinite(line.amount))) {
+    return { error: 'Budget amounts must be numbers.' };
   }
-
-  // The budget lines are the fund target: the number residents are asked to
-  // reach is the sum of what the committee actually planned to spend.
-  const fundTarget = payload.budget.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+  const fundTarget = lines.reduce((sum, line) => sum + line.amount, 0);
 
   const parsed = createEventSchema.safeParse({
     community_id: context.community.id,
-    slug: payload.slug,
-    emoji: payload.emoji,
-    name: payload.name,
-    starts_on: payload.starts_on,
-    ends_on: payload.ends_on || null,
-    venue: payload.venue || undefined,
-    organizer: payload.organizer || undefined,
-    description: payload.description || undefined,
-    expected_attendance: payload.expected_attendance,
+    ...eventFields(formData),
     fund_target: fundTarget,
-    fund_rule: payload.fund_rule,
-    fund_rule_note: payload.fund_rule_note || undefined,
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
   const { data: event, error } = await supabase
     .from('events')
-    .insert({
-      ...parsed.data,
-      status: 'draft',
-      created_by: context.user.id,
-      // Keep the budget with the event so the closing report can compare
-      // what was planned against what was actually spent.
-      closing_summary: null,
-    })
+    .insert({ ...parsed.data, kind: 'event', status: 'draft', created_by: context.user.id })
     .select('id, slug')
     .single();
 
@@ -113,66 +105,75 @@ export async function createEventFromWizard(
     return { error: friendlyDbError(error) };
   }
 
-  // Children are inserted separately rather than in one transaction: if any
-  // fails the event still exists as a draft the committee can finish by hand,
-  // which is far better than losing everything they just typed.
-  // PostgrestFilterBuilder is thenable but not a Promise, so this is typed
-  // as PromiseLike rather than Promise.
-  const children: PromiseLike<unknown>[] = [];
-
-  if (payload.tasks.length) {
-    children.push(
-      supabase.from('event_tasks').insert(
-        payload.tasks.map((name, index) => ({
-          event_id: event.id,
-          community_id: context.community.id,
-          name,
-          position: index,
-        })),
-      ),
+  if (lines.length) {
+    await supabase.from('budget_lines').insert(
+      lines.map((line, position) => ({
+        event_id: event.id,
+        community_id: context.community.id,
+        category: line.category,
+        amount: line.amount,
+        position,
+      })),
     );
   }
-
-  if (payload.activities.length) {
-    children.push(
-      supabase.from('event_activities').insert(
-        payload.activities.map((activity, index) => ({
-          event_id: event.id,
-          community_id: context.community.id,
-          name: activity.name,
-          emoji: activity.emoji,
-          position: index,
-        })),
-      ),
-    );
-  }
-
-  if (payload.volunteer_roles.length) {
-    children.push(
-      supabase.from('volunteer_roles').insert(
-        payload.volunteer_roles.map((role, index) => ({
-          event_id: event.id,
-          community_id: context.community.id,
-          name: role.name,
-          emoji: role.emoji,
-          target_count: role.target,
-          position: index,
-        })),
-      ),
-    );
-  }
-
-  await Promise.all(children);
 
   revalidatePath(`/app/${communitySlug}/events`);
   redirect(`/app/${communitySlug}/admin/events/${event.slug}`);
 }
 
+const updateEventSchema = z.object({
+  emoji: z.string().trim().min(1).max(8),
+  name: z.string().trim().min(3, 'Give the event a name').max(140),
+  starts_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
+  ends_on: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullable(),
+  venue: z.string().trim().max(140).nullable(),
+  organizer: z.string().trim().max(140).nullable(),
+  description: z.string().trim().max(5000).nullable(),
+});
+
+export async function updateEventDetails(
+  _prev: EventFormState,
+  formData: FormData,
+): Promise<EventFormState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'events:manage');
+
+  const parsed = updateEventSchema.safeParse({
+    emoji: formData.get('emoji') || '🎉',
+    name: formData.get('name'),
+    starts_on: formData.get('starts_on'),
+    ends_on: String(formData.get('ends_on') ?? '') || null,
+    venue: String(formData.get('venue') ?? '').trim() || null,
+    organizer: String(formData.get('organizer') ?? '').trim() || null,
+    description: String(formData.get('description') ?? '').trim() || null,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  if (parsed.data.ends_on && parsed.data.ends_on < parsed.data.starts_on) {
+    return { fieldErrors: { ends_on: 'The event cannot end before it starts' } };
+  }
+
+  const supabase = await getSupabase();
+  const { error } = await supabase
+    .from('events')
+    .update(parsed.data)
+    .eq('community_id', context.community.id)
+    .eq('slug', eventSlug);
+  if (error) return { error: friendlyDbError(error) };
+
+  refreshEvent(communitySlug, eventSlug);
+  return { ...EMPTY_STATE, success: 'Saved.' };
+}
+
+/** Staff publish, cancel or return an event to draft. Closing is separate. */
 export async function setEventStatus(formData: FormData): Promise<void> {
   const communitySlug = String(formData.get('slug') ?? '');
   const eventSlug = String(formData.get('event') ?? '');
   const status = String(formData.get('status') ?? '');
-  const context = await requireCapability(communitySlug, 'events:publish');
+  const context = await requireCapability(communitySlug, 'events:manage');
 
   if (!['draft', 'published', 'cancelled'].includes(status)) return;
 
@@ -181,81 +182,175 @@ export async function setEventStatus(formData: FormData): Promise<void> {
     .from('events')
     .update({ status: status as 'draft' | 'published' | 'cancelled' })
     .eq('community_id', context.community.id)
-    .eq('slug', eventSlug);
-
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  revalidatePath(`/app/${communitySlug}/events`);
-}
-
-export async function updateTask(formData: FormData): Promise<void> {
-  const communitySlug = String(formData.get('slug') ?? '');
-  const eventSlug = String(formData.get('event') ?? '');
-  await requireCapability(communitySlug, 'events:prepare');
-
-  const parsed = updateTaskSchema.safeParse({
-    id: formData.get('id'),
-    status: formData.get('status') || undefined,
-    assignee_id: formData.get('assignee_id') || undefined,
-  });
-  if (!parsed.success) return;
-
-  const { id, ...changes } = parsed.data;
-  const supabase = await getSupabase();
-  await supabase.from('event_tasks').update(changes).eq('id', id);
-
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  revalidatePath(`/app/${communitySlug}/events/${eventSlug}`);
-}
-
-export async function addTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const communitySlug = String(formData.get('slug') ?? '');
-  const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCapability(communitySlug, 'events:prepare');
-
-  const name = String(formData.get('name') ?? '').trim();
-  if (name.length < 2) return { fieldErrors: { name: 'Describe the task' } };
-
-  const supabase = await getSupabase();
-  const { data: event } = await supabase
-    .from('events')
-    .select('id')
-    .eq('community_id', context.community.id)
     .eq('slug', eventSlug)
-    .maybeSingle();
-  if (!event) return { error: 'That event no longer exists.' };
+    .neq('status', 'proposed');
 
-  const { error } = await supabase.from('event_tasks').insert({
+  refreshEvent(communitySlug, eventSlug);
+}
+
+// ---------------------------------------------------------------------------
+// Budget
+// ---------------------------------------------------------------------------
+
+/** Keeps the event's fund target equal to the sum of its budget lines. */
+async function syncFundTarget(eventId: string) {
+  const supabase = await getSupabase();
+  const { data } = await supabase.from('budget_lines').select('amount').eq('event_id', eventId);
+  const total = (data ?? []).reduce((sum, line) => sum + Number(line.amount), 0);
+  await supabase.from('events').update({ fund_target: total }).eq('id', eventId);
+}
+
+const budgetLineInput = z.object({
+  category: z.string().trim().min(1, 'Name the category').max(80),
+  amount: z.coerce.number().min(0, 'Enter an amount').max(100_000_000),
+  notes: z.string().trim().max(300).optional(),
+});
+
+export async function addBudgetLine(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'budget:manage');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+  if (event.kind === 'campaign') return { error: 'Campaigns have a single target, not a budget.' };
+
+  const parsed = budgetLineInput.safeParse({
+    category: formData.get('category'),
+    amount: formData.get('amount'),
+    notes: formData.get('notes') || undefined,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { count } = await supabase
+    .from('budget_lines')
+    .select('id', { count: 'exact', head: true })
+    .eq('event_id', event.id);
+  const { error } = await supabase.from('budget_lines').insert({
+    ...parsed.data,
     event_id: event.id,
     community_id: context.community.id,
-    name,
-    due_on: String(formData.get('due_on') ?? '') || null,
+    position: count ?? 0,
   });
-
   if (error) return { error: friendlyDbError(error) };
 
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  return { ...EMPTY_STATE, success: 'Task added.' };
+  await syncFundTarget(event.id);
+  refreshEvent(communitySlug, eventSlug);
+  return { ...EMPTY_STATE, success: 'Budget line added.' };
 }
 
-export async function submitExpense(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function updateBudgetLine(formData: FormData): Promise<void> {
   const communitySlug = String(formData.get('slug') ?? '');
   const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCapability(communitySlug, 'expenses:submit');
+  const context = await requireCapability(communitySlug, 'budget:manage');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return;
+
+  const id = uuid.safeParse(formData.get('line_id'));
+  const parsed = budgetLineInput.safeParse({
+    category: formData.get('category'),
+    amount: formData.get('amount'),
+  });
+  if (!id.success || !parsed.success) return;
 
   const supabase = await getSupabase();
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, status')
-    .eq('community_id', context.community.id)
-    .eq('slug', eventSlug)
-    .maybeSingle();
+  await supabase
+    .from('budget_lines')
+    .update({ category: parsed.data.category, amount: parsed.data.amount })
+    .eq('id', id.data)
+    .eq('event_id', event.id);
+
+  await syncFundTarget(event.id);
+  refreshEvent(communitySlug, eventSlug);
+}
+
+export async function removeBudgetLine(formData: FormData): Promise<void> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'budget:manage');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return;
+
+  const supabase = await getSupabase();
+  await supabase
+    .from('budget_lines')
+    .delete()
+    .eq('id', String(formData.get('line_id') ?? ''))
+    .eq('event_id', event.id);
+
+  await syncFundTarget(event.id);
+  refreshEvent(communitySlug, eventSlug);
+}
+
+// ---------------------------------------------------------------------------
+// Activities
+// ---------------------------------------------------------------------------
+
+export async function addActivity(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'activities:manage');
+  const event = await findEvent(context.community.id, eventSlug);
   if (!event) return { error: 'That event no longer exists.' };
-  if (event.status === 'completed') {
-    return { error: 'This event is closed; its ledger cannot be changed.' };
+
+  const parsed = createActivitySchema.safeParse({
+    event_id: event.id,
+    name: formData.get('name'),
+    emoji: formData.get('emoji') || '🎭',
+    description: formData.get('description') || undefined,
+    capacity: String(formData.get('capacity') ?? '') || null,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { error } = await supabase
+    .from('event_activities')
+    .insert({ ...parsed.data, community_id: context.community.id });
+  if (error) {
+    return {
+      error:
+        error.code === '23505'
+          ? 'This event already has an activity with that name.'
+          : friendlyDbError(error),
+    };
   }
 
-  const parsed = createExpenseSchema.safeParse({
-    event_id: event.id,
+  refreshEvent(communitySlug, eventSlug);
+  return { ...EMPTY_STATE, success: 'Activity added.' };
+}
+
+/** Opens or closes registrations, or removes an activity with no registrations. */
+export async function updateActivity(formData: FormData): Promise<void> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'activities:manage');
+  const activityId = String(formData.get('activity_id') ?? '');
+  const intent = String(formData.get('intent') ?? '');
+
+  const supabase = await getSupabase();
+  if (intent === 'open' || intent === 'close') {
+    await supabase
+      .from('event_activities')
+      .update({ is_open: intent === 'open' })
+      .eq('id', activityId)
+      .eq('community_id', context.community.id);
+  } else if (intent === 'remove') {
+    await supabase
+      .from('event_activities')
+      .delete()
+      .eq('id', activityId)
+      .eq('community_id', context.community.id);
+  }
+
+  refreshEvent(communitySlug, eventSlug);
+}
+
+// ---------------------------------------------------------------------------
+// Bills
+// ---------------------------------------------------------------------------
+
+function expenseFields(formData: FormData) {
+  return {
     name: formData.get('name'),
     category: formData.get('category') || undefined,
     amount: formData.get('amount'),
@@ -264,23 +359,85 @@ export async function submitExpense(_prev: ActionState, formData: FormData): Pro
     method: formData.get('method') || 'upi',
     bill_url: formData.get('bill_url') || undefined,
     spent_on: formData.get('spent_on') || undefined,
-  });
+  };
+}
+
+/** Staff upload a bill; it waits for the committee before residents see it. */
+export async function submitExpense(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'expenses:submit');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+  if (event.status === 'completed') {
+    return { error: 'This event is closed; its ledger cannot be changed.' };
+  }
+
+  const parsed = createExpenseSchema.safeParse({ event_id: event.id, ...expenseFields(formData) });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
+  const supabase = await getSupabase();
   const { error } = await supabase.from('expenses').insert({
     ...parsed.data,
     community_id: context.community.id,
     requested_by: context.membership.id,
     status: 'pending',
   });
-
   if (error) return { error: friendlyDbError(error) };
 
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  return { ...EMPTY_STATE, success: 'Submitted for approval.' };
+  refreshEvent(communitySlug, eventSlug);
+  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  return { ...EMPTY_STATE, success: 'Bill uploaded. It now waits for the committee.' };
 }
 
-export async function reviewExpense(formData: FormData): Promise<void> {
+/**
+ * Corrects a bill that is still pending or was sent back, including attaching
+ * a new copy. A corrected bill goes back to the committee as pending.
+ */
+export async function correctExpense(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'expenses:submit');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+
+  const expenseId = uuid.safeParse(formData.get('expense_id'));
+  if (!expenseId.success) return { error: 'That bill no longer exists.' };
+
+  const parsed = createExpenseSchema.safeParse({ event_id: event.id, ...expenseFields(formData) });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase
+    .from('expenses')
+    .update({
+      name: parsed.data.name,
+      category: parsed.data.category ?? null,
+      amount: parsed.data.amount,
+      vendor: parsed.data.vendor ?? null,
+      paid_by: parsed.data.paid_by ?? null,
+      method: parsed.data.method,
+      bill_url: parsed.data.bill_url ?? null,
+      spent_on: parsed.data.spent_on,
+      status: 'pending',
+      review_note: null,
+    })
+    .eq('id', expenseId.data)
+    .eq('event_id', event.id)
+    .in('status', ['pending', 'changes_requested'])
+    .select('id');
+  if (error) return { error: friendlyDbError(error) };
+  if (!data?.length) {
+    return { error: 'Only bills that are pending or sent back for changes can be corrected.' };
+  }
+
+  refreshEvent(communitySlug, eventSlug);
+  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  return { ...EMPTY_STATE, success: 'Corrected and sent back to the committee.' };
+}
+
+/** The committee approves, rejects or sends back a bill. */
+export async function reviewExpense(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const communitySlug = String(formData.get('slug') ?? '');
   const eventSlug = String(formData.get('event') ?? '');
   await requireCapability(communitySlug, 'expenses:approve');
@@ -290,53 +447,160 @@ export async function reviewExpense(formData: FormData): Promise<void> {
     decision: formData.get('decision'),
     note: formData.get('note') || undefined,
   });
-  if (!parsed.success) return;
+  if (!parsed.success) return { error: 'That decision could not be recorded.' };
 
   const supabase = await getSupabase();
-  // The database refuses self-approval and refuses to touch a closed ledger.
-  await supabase.rpc('review_expense', {
+  const { error } = await supabase.rpc('review_expense', {
     p_expense_id: parsed.data.expense_id,
     p_decision: parsed.data.decision,
     p_note: parsed.data.note ?? undefined,
   });
+  if (error) return { error: friendlyDbError(error) };
 
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  revalidatePath(`/app/${communitySlug}/events/${eventSlug}/accounts`);
+  if (eventSlug) refreshEvent(communitySlug, eventSlug);
+  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  return {
+    ...EMPTY_STATE,
+    success:
+      parsed.data.decision === 'approved'
+        ? 'Approved. Residents can see it now.'
+        : parsed.data.decision === 'rejected'
+          ? 'Rejected.'
+          : 'Sent back for changes.',
+  };
 }
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+const recordPaymentSchema = z.object({
+  unit_id: uuid,
+  amount: z.coerce
+    .number()
+    .positive('Enter an amount greater than zero')
+    .max(10_000_000, 'That is larger than this app will accept'),
+  method: paymentMethodSchema,
+  reference: z.string().trim().max(120).optional(),
+  paid_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
+});
+
+/** Staff record money collected from a flat (cash, UPI to the society, cheque). */
+export async function recordPayment(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'payments:record');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+  if (event.status !== 'published') {
+    return { error: 'Payments can only be recorded while the event is open.' };
+  }
+
+  const parsed = recordPaymentSchema.safeParse({
+    unit_id: formData.get('unit_id'),
+    amount: formData.get('amount'),
+    method: formData.get('method') || 'cash',
+    reference: formData.get('reference') || undefined,
+    paid_on: formData.get('paid_on'),
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('contributions').insert({
+    event_id: event.id,
+    community_id: context.community.id,
+    unit_id: parsed.data.unit_id,
+    amount: parsed.data.amount,
+    method: parsed.data.method,
+    reference: parsed.data.reference ?? null,
+    status: 'succeeded',
+    channel: 'system',
+    paid_at: new Date(`${parsed.data.paid_on}T12:00:00+05:30`).toISOString(),
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  refreshEvent(communitySlug, eventSlug);
+  return { ...EMPTY_STATE, success: 'Payment recorded.' };
+}
+
+// ---------------------------------------------------------------------------
+// Join requests
+// ---------------------------------------------------------------------------
 
 export async function reviewJoinRequest(formData: FormData): Promise<void> {
   const communitySlug = String(formData.get('slug') ?? '');
-  await requireCapability(communitySlug, 'joinrequests:review');
+  const context = await requireCapability(communitySlug, 'joinrequests:review');
+
+  const requested = String(formData.get('role') ?? 'resident');
+  // Staff admit residents; only the committee can admit someone as staff.
+  const role = requested === 'staff' && context.role === 'committee' ? 'staff' : 'resident';
 
   const supabase = await getSupabase();
   await supabase.rpc('review_join_request', {
     p_request_id: String(formData.get('request_id') ?? ''),
     p_approve: formData.get('approve') === '1',
-    p_role: String(formData.get('role') ?? 'resident') as 'resident' | 'committee' | 'admin',
+    p_role: role,
+    p_reason: String(formData.get('reason') ?? '').trim() || undefined,
   });
 
   revalidatePath(`/app/${communitySlug}/admin/requests`);
+  revalidatePath(`/app/${communitySlug}/admin`);
+}
+
+// ---------------------------------------------------------------------------
+// Committee decisions
+// ---------------------------------------------------------------------------
+
+/** Approves a proposed campaign (it goes live) or turns it down. */
+export async function decideCampaign(formData: FormData): Promise<void> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const context = await requireCapability(communitySlug, 'campaigns:approve');
+  const approve = formData.get('approve') === '1';
+
+  const supabase = await getSupabase();
+  await supabase
+    .from('events')
+    .update({ status: approve ? 'published' : 'cancelled' })
+    .eq('id', String(formData.get('event_id') ?? ''))
+    .eq('community_id', context.community.id)
+    .eq('status', 'proposed');
+
+  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  revalidatePath(`/app/${communitySlug}/events`);
+  revalidatePath(`/app/${communitySlug}`);
+}
+
+/** Opens a suggestion for voting, or declines it with an optional note. */
+export async function decideSuggestion(formData: FormData): Promise<void> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const context = await requireCapability(communitySlug, 'suggestions:approve');
+  const approve = formData.get('approve') === '1';
+  const note = String(formData.get('note') ?? '').trim();
+
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('activity_suggestions')
+    .update({ status: approve ? 'accepted' : 'declined', review_note: note || null })
+    .eq('id', String(formData.get('suggestion_id') ?? ''))
+    .eq('community_id', context.community.id)
+    .select('events(slug)')
+    .maybeSingle();
+
+  revalidatePath(`/app/${communitySlug}/admin/approvals`);
+  if (data?.events?.slug) revalidatePath(`/app/${communitySlug}/events/${data.events.slug}`);
 }
 
 export type CloseState = ActionState & { closed?: boolean };
 
 /**
- * Closing an event publishes its transparency report and freezes the ledger.
- * The summary is written into the event row so the report cannot drift if rows
- * change later.
+ * Closing an event publishes its final accounts and freezes the ledger. The
+ * summary is written into the event row so the report cannot drift later.
  */
 export async function closeEvent(_prev: CloseState, formData: FormData): Promise<CloseState> {
   const communitySlug = String(formData.get('slug') ?? '');
   const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCapability(communitySlug, 'events:publish');
-
-  const supabase = await getSupabase();
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, name, status')
-    .eq('community_id', context.community.id)
-    .eq('slug', eventSlug)
-    .maybeSingle();
+  const context = await requireCapability(communitySlug, 'events:close');
+  const event = await findEvent(context.community.id, eventSlug);
   if (!event) return { error: 'That event no longer exists.' };
 
   const parsed = closeEventSchema.safeParse({
@@ -344,27 +608,23 @@ export async function closeEvent(_prev: CloseState, formData: FormData): Promise
     confirm_name: formData.get('confirm_name'),
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
-
-  // Typing the name is a deliberate speed bump — closing cannot be undone.
   if (parsed.data.confirm_name.trim().toLowerCase() !== event.name.trim().toLowerCase()) {
     return { fieldErrors: { confirm_name: 'That does not match the event name.' } };
   }
 
-  const { data: stats } = await supabase
-    .from('event_stats')
-    .select('*')
-    .eq('event_id', event.id)
-    .maybeSingle();
+  const supabase = await getSupabase();
+  const [{ data: stats }, { data: open }] = await Promise.all([
+    supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
+    supabase
+      .from('expenses')
+      .select('id')
+      .eq('event_id', event.id)
+      .in('status', ['pending', 'changes_requested']),
+  ]);
 
-  const { data: pending } = await supabase
-    .from('expenses')
-    .select('id')
-    .eq('event_id', event.id)
-    .eq('status', 'pending');
-
-  if (pending?.length) {
+  if (open?.length) {
     return {
-      error: `${pending.length} expense${pending.length === 1 ? '' : 's'} still awaiting approval. Decide on them before closing.`,
+      error: `${open.length} bill${open.length === 1 ? '' : 's'} still awaiting a decision. Decide on them before closing.`,
     };
   }
 
@@ -380,116 +640,11 @@ export async function closeEvent(_prev: CloseState, formData: FormData): Promise
         surplus: Number(stats?.fund_raised ?? 0) - Number(stats?.spent ?? 0),
         contributors: stats?.contributors ?? 0,
         participants: stats?.participants ?? 0,
-        volunteers: stats?.volunteers ?? 0,
-        tasks_done: stats?.tasks_done ?? 0,
-        tasks_total: stats?.tasks_total ?? 0,
       },
     })
     .eq('id', event.id);
-
   if (error) return { error: friendlyDbError(error) };
 
-  revalidatePath(`/app/${communitySlug}/events/${eventSlug}`);
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  return { ...EMPTY_STATE, closed: true, success: 'Event closed and the report published.' };
-}
-
-export async function proposeReallocation(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const communitySlug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(communitySlug, 'reallocation:propose');
-
-  const toEvent = String(formData.get('to_event_id') ?? '').trim();
-
-  const parsed = proposeReallocationSchema.safeParse({
-    community_id: context.community.id,
-    from_event_id: formData.get('from_event_id'),
-    to_event_id: toEvent || null,
-    to_label: toEvent ? null : String(formData.get('to_label') ?? '').trim() || null,
-    amount: formData.get('amount'),
-    reason: formData.get('reason'),
-    threshold_pct: formData.get('threshold_pct') || 60,
-  });
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
-
-  const supabase = await getSupabase();
-  const { error } = await supabase.from('fund_reallocations').insert({
-    ...parsed.data,
-    status: 'voting',
-    created_by: context.membership.id,
-  });
-
-  if (error) return { error: friendlyDbError(error) };
-
-  revalidatePath(`/app/${communitySlug}/feed`);
-  return { ...EMPTY_STATE, success: 'Put to the community for a vote.' };
-}
-
-export async function addActivity(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const communitySlug = String(formData.get('slug') ?? '');
-  const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCommunity(communitySlug);
-
-  const supabase = await getSupabase();
-  const { data: event } = await supabase
-    .from('events')
-    .select('id')
-    .eq('community_id', context.community.id)
-    .eq('slug', eventSlug)
-    .maybeSingle();
-  if (!event) return { error: 'That event no longer exists.' };
-
-  const parsed = createActivitySchema.safeParse({
-    event_id: event.id,
-    name: formData.get('name'),
-    emoji: formData.get('emoji') || '🎭',
-    description: formData.get('description') || undefined,
-  });
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
-
-  const { error } = await supabase
-    .from('event_activities')
-    .insert({ ...parsed.data, community_id: context.community.id });
-
-  if (error) return { error: friendlyDbError(error) };
-
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  return { ...EMPTY_STATE, success: 'Activity added.' };
-}
-
-export async function addVolunteerRole(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const communitySlug = String(formData.get('slug') ?? '');
-  const eventSlug = String(formData.get('event') ?? '');
-  const context = await requireCommunity(communitySlug);
-
-  const supabase = await getSupabase();
-  const { data: event } = await supabase
-    .from('events')
-    .select('id')
-    .eq('community_id', context.community.id)
-    .eq('slug', eventSlug)
-    .maybeSingle();
-  if (!event) return { error: 'That event no longer exists.' };
-
-  const parsed = createVolunteerRoleSchema.safeParse({
-    event_id: event.id,
-    name: formData.get('name'),
-    emoji: formData.get('emoji') || '🙋',
-    target_count: formData.get('target_count') || 1,
-  });
-  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
-
-  const { error } = await supabase
-    .from('volunteer_roles')
-    .insert({ ...parsed.data, community_id: context.community.id });
-
-  if (error) return { error: friendlyDbError(error) };
-
-  revalidatePath(`/app/${communitySlug}/admin/events/${eventSlug}`);
-  return { ...EMPTY_STATE, success: 'Role added.' };
+  refreshEvent(communitySlug, eventSlug);
+  return { ...EMPTY_STATE, closed: true, success: 'Event closed and its accounts published.' };
 }

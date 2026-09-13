@@ -28,11 +28,20 @@ export function fieldErrors(error: ZodError): Record<string, string> {
  * so they are shown as-is instead of a generic permission error.
  */
 const KNOWN_DB_MESSAGES = [
-  'Only an owner or an existing spending approver can change who approves spending',
-  'Only an owner or an existing spending approver can change this setting',
-  'Only admins and owners can be spending approvers',
-  'Mark at least one spending approver before restricting approval',
-  'Only designated spending approvers can approve expenses in this community',
+  'Only the committee can approve or reject a bill',
+  'You cannot approve an expense you requested yourself',
+  'This event is closed; its ledger cannot be changed',
+  'Only the committee can approve or turn down a proposed campaign',
+  'Only the committee can close an event',
+  'Only staff or the committee can change an event',
+  'A closed event cannot be reopened',
+  'Only the committee can approve or decline a suggestion',
+  'Only staff or the committee can review join requests',
+  'Only the committee can admit someone as staff or committee',
+  'Committee access is set by the committee, not granted from a join request',
+  'Only the committee can change roles',
+  'You cannot raise your own role',
+  'A community must keep at least one committee member',
 ];
 
 /**

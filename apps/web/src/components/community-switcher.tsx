@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ChevronsUpDown, Plus } from 'lucide-react';
-import { ROLE_LABEL, type MemberRole } from '@samudaya/core';
+import { ROLE_LABEL, normalizeRole, type MemberRole } from '@samudaya/core';
 import type { MembershipWithCommunity } from '@/lib/auth';
 
 /**
@@ -25,7 +25,9 @@ export function CommunitySwitcher({
       </span>
       <span className="min-w-0 flex-1 text-left">
         <span className="text-ink block truncate text-sm font-medium">{current.name}</span>
-        <span className="text-ink-subtle block truncate text-xs">{ROLE_LABEL[role]}</span>
+        <span className="text-ink-subtle block truncate text-xs">
+          {ROLE_LABEL[normalizeRole(role) ?? 'resident']}
+        </span>
       </span>
     </>
   );

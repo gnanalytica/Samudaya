@@ -1,5 +1,5 @@
 import { UserPlus } from 'lucide-react';
-import { ASSIGNABLE_ROLES, ROLE_LABEL, relativeTime, unitLabel } from '@samudaya/core';
+import { can, relativeTime, unitLabel } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
@@ -16,7 +16,8 @@ export default async function JoinRequestsPage(
   props: PageProps<'/app/[community]/admin/requests'>,
 ) {
   const { community: slug } = await props.params;
-  const { community } = await requireCapability(slug, 'joinrequests:review');
+  const { community, role } = await requireCapability(slug, 'joinrequests:review');
+  const committee = can(role, 'roles:manage');
   const supabase = await getSupabase();
 
   const { data: requests } = await supabase
@@ -36,7 +37,7 @@ export default async function JoinRequestsPage(
     <>
       <PageHeader
         title="Join requests"
-        description={`Residents who entered Society ID ${community.join_code} and are waiting for you.`}
+        description={`People who entered society code ${community.join_code}. Approve to let them see the society.`}
       />
       <PageBody>
         <Card>
@@ -49,7 +50,7 @@ export default async function JoinRequestsPage(
                     <div className="min-w-0">
                       <p className="text-ink text-sm font-semibold">{request.claimed_name}</p>
                       <p className="text-ink-subtle mt-0.5 text-xs">
-                        {request.units ? unitLabel(request.units) : 'No flat claimed'}
+                        {request.units ? unitLabel(request.units) : 'Flat not chosen yet'}
                         {request.claimed_phone ? ` · ${request.claimed_phone}` : ''}
                         {request.profiles?.email ? ` · ${request.profiles.email}` : ''}
                       </p>
@@ -64,21 +65,24 @@ export default async function JoinRequestsPage(
                         <input type="hidden" name="slug" value={slug} />
                         <input type="hidden" name="request_id" value={request.id} />
                         <input type="hidden" name="approve" value="1" />
-                        <label htmlFor={`role-${request.id}`} className="sr-only">
-                          Role for {request.claimed_name}
-                        </label>
-                        <Select
-                          id={`role-${request.id}`}
-                          name="role"
-                          defaultValue="resident"
-                          className="h-9 py-1 text-xs"
-                        >
-                          {ASSIGNABLE_ROLES.map((memberRole) => (
-                            <option key={memberRole} value={memberRole}>
-                              {ROLE_LABEL[memberRole]}
-                            </option>
-                          ))}
-                        </Select>
+                        {committee ? (
+                          <>
+                            <label htmlFor={`role-${request.id}`} className="sr-only">
+                              Role for {request.claimed_name}
+                            </label>
+                            <Select
+                              id={`role-${request.id}`}
+                              name="role"
+                              defaultValue="resident"
+                              className="h-9 py-1 text-xs"
+                            >
+                              <option value="resident">Resident</option>
+                              <option value="staff">Staff</option>
+                            </Select>
+                          </>
+                        ) : (
+                          <input type="hidden" name="role" value="resident" />
+                        )}
                         <Button type="submit" size="sm">
                           Approve
                         </Button>
@@ -101,7 +105,7 @@ export default async function JoinRequestsPage(
             <EmptyState
               icon={<UserPlus className="size-6" />}
               title="Nobody waiting"
-              description={`Share Society ID ${community.join_code} and requests will land here.`}
+              description={`Share society code ${community.join_code} and requests will land here.`}
             />
           )}
         </Card>

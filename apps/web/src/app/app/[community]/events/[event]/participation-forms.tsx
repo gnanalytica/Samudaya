@@ -1,12 +1,12 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Check, ChevronDown } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Textarea } from '@/components/ui/field';
+import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
-import { joinActivity, leaveActivity, volunteer, withdrawVolunteer } from '../actions';
+import { registerForActivity, suggestForEvent } from '../actions';
 
 function Submit({ label, busy }: { label: string; busy: string }) {
   const { pending } = useFormStatus();
@@ -17,143 +17,147 @@ function Submit({ label, busy }: { label: string; busy: string }) {
   );
 }
 
+function Feedback({ state }: { state: ActionState }) {
+  if (state.error) {
+    return (
+      <p role="alert" className="text-danger text-sm">
+        {state.error}
+      </p>
+    );
+  }
+  if (state.success) {
+    return (
+      <p role="status" className="text-success text-sm">
+        {state.success}
+      </p>
+    );
+  }
+  return null;
+}
+
 /**
- * Joining an activity collects a few optional details. They are behind a
- * disclosure so the common case — "yes, count me in" — stays one tap.
+ * Registers the resident or someone from their flat. "Me" is one tap; adding a
+ * child or relative takes their name.
  */
-export function JoinActivityForm({
+export function RegisterForm({
   slug,
   eventSlug,
   activityId,
   activityName,
-  joined,
+  selfRegistered,
 }: {
   slug: string;
   eventSlug: string;
   activityId: string;
   activityName: string;
-  joined: boolean;
+  selfRegistered: boolean;
 }) {
-  const [state, action] = useActionState<ActionState, FormData>(joinActivity, EMPTY_STATE);
-  const [showDetails, setShowDetails] = useState(false);
-
-  if (joined) {
-    return (
-      <form action={leaveActivity} className="flex items-center gap-3">
-        <input type="hidden" name="slug" value={slug} />
-        <input type="hidden" name="event" value={eventSlug} />
-        <input type="hidden" name="activity_id" value={activityId} />
-        <span className="text-success inline-flex items-center gap-1.5 text-sm font-medium">
-          <Check className="size-4" aria-hidden="true" />
-          You’re in
-        </span>
-        <button
-          type="submit"
-          className="text-ink-muted hover:text-ink text-sm underline underline-offset-4"
-        >
-          Withdraw
-        </button>
-      </form>
-    );
-  }
+  const [state, action] = useActionState<ActionState, FormData>(registerForActivity, EMPTY_STATE);
+  const [forFamily, setForFamily] = useState(selfRegistered);
+  const ref = useRef<HTMLFormElement>(null);
 
   return (
-    <form action={action} className="space-y-3">
+    <form
+      ref={ref}
+      action={async (formData) => {
+        await action(formData);
+        ref.current?.reset();
+      }}
+      className="space-y-3"
+    >
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="event" value={eventSlug} />
       <input type="hidden" name="activity_id" value={activityId} />
 
-      {showDetails ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Performance type" htmlFor={`type-${activityId}`}>
-            {(control) => <Input {...control} name="performance_type" placeholder="Solo, group…" />}
+      {forFamily ? (
+        <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+          <Field
+            label="Name of family member"
+            htmlFor={`fam-${activityId}`}
+            error={state.fieldErrors?.participant_name}
+          >
+            {(control) => (
+              <Input {...control} name="participant_name" placeholder="Aarav" required />
+            )}
           </Field>
           <Field label="Age group" htmlFor={`age-${activityId}`}>
-            {(control) => <Input {...control} name="age_group" placeholder="Adult, kids…" />}
-          </Field>
-          <Field label="Experience" htmlFor={`exp-${activityId}`}>
-            {(control) => <Input {...control} name="experience" placeholder="Beginner" />}
-          </Field>
-          <Field label="Anything we should know?" htmlFor={`req-${activityId}`}>
-            {(control) => <Textarea {...control} name="special_requirements" rows={2} />}
+            {(control) => (
+              <Select {...control} name="age_group" defaultValue="">
+                <option value="">—</option>
+                <option>Kids (5–12)</option>
+                <option>Teens</option>
+                <option>Adults</option>
+                <option>Seniors</option>
+              </Select>
+            )}
           </Field>
         </div>
       ) : null}
 
-      {state.error ? (
-        <p role="alert" className="text-danger text-sm">
-          {state.error}
-        </p>
-      ) : null}
-
-      <div className="flex items-center gap-3">
-        <Submit label={`Join ${activityName}`} busy="Joining…" />
-        <button
-          type="button"
-          onClick={() => setShowDetails((open) => !open)}
-          className="text-ink-muted hover:text-ink inline-flex items-center gap-1 text-sm"
-        >
-          <ChevronDown
-            className={
-              showDetails
-                ? 'size-3.5 rotate-180 transition-transform'
-                : 'size-3.5 transition-transform'
-            }
-            aria-hidden="true"
-          />
-          {showDetails ? 'Hide details' : 'Add details'}
-        </button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Submit
+          label={forFamily ? 'Register them' : `Register for ${activityName}`}
+          busy="Registering…"
+        />
+        {!selfRegistered || !forFamily ? (
+          <button
+            type="button"
+            onClick={() => setForFamily((value) => !value)}
+            className="text-ink-muted hover:text-ink inline-flex items-center gap-1 text-sm"
+          >
+            <UserPlus className="size-3.5" aria-hidden="true" />
+            {forFamily ? 'Register myself instead' : 'Add a family member'}
+          </button>
+        ) : null}
       </div>
+      <Feedback state={state} />
     </form>
   );
 }
 
-export function VolunteerForm({
+export function SuggestionForm({
   slug,
   eventSlug,
-  roleId,
-  signedUp,
-  stillNeeded,
+  eventId,
 }: {
   slug: string;
   eventSlug: string;
-  roleId: string;
-  signedUp: boolean;
-  stillNeeded: number;
+  eventId: string;
 }) {
-  const [state, action] = useActionState<ActionState, FormData>(volunteer, EMPTY_STATE);
-
-  if (signedUp) {
-    return (
-      <form action={withdrawVolunteer} className="flex items-center gap-3">
-        <input type="hidden" name="slug" value={slug} />
-        <input type="hidden" name="event" value={eventSlug} />
-        <input type="hidden" name="role_id" value={roleId} />
-        <span className="text-success inline-flex items-center gap-1.5 text-sm font-medium">
-          <Check className="size-4" aria-hidden="true" />
-          Signed up
-        </span>
-        <button
-          type="submit"
-          className="text-ink-muted hover:text-ink text-sm underline underline-offset-4"
-        >
-          Withdraw
-        </button>
-      </form>
-    );
-  }
-
+  const [state, action] = useActionState<ActionState, FormData>(suggestForEvent, EMPTY_STATE);
+  const ref = useRef<HTMLFormElement>(null);
   return (
-    <form action={action} className="flex items-center gap-3">
+    <form
+      ref={ref}
+      action={async (formData) => {
+        await action(formData);
+        ref.current?.reset();
+      }}
+      className="space-y-3"
+    >
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="event" value={eventSlug} />
-      <input type="hidden" name="role_id" value={roleId} />
-      <Submit label={stillNeeded > 0 ? 'Volunteer' : 'Join anyway'} busy="Signing up…" />
-      {state.error ? (
-        <span role="alert" className="text-danger text-sm">
-          {state.error}
-        </span>
-      ) : null}
+      <input type="hidden" name="event_id" value={eventId} />
+      <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
+        <Field label="Type" htmlFor="sg-kind">
+          {(control) => (
+            <Select {...control} name="kind" defaultValue="activity">
+              <option value="activity">An activity</option>
+              <option value="idea">An idea</option>
+            </Select>
+          )}
+        </Field>
+        <Field label="Suggestion" htmlFor="sg-name" error={state.fieldErrors?.name} required>
+          {(control) => (
+            <Input {...control} name="name" placeholder="Lantern walk around the towers" required />
+          )}
+        </Field>
+      </div>
+      <Field label="Details" htmlFor="sg-desc">
+        {(control) => <Textarea {...control} name="description" rows={2} />}
+      </Field>
+      <Feedback state={state} />
+      <Submit label="Send to the committee" busy="Sending…" />
     </form>
   );
 }

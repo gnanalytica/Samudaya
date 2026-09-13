@@ -11,7 +11,7 @@ export async function postAnnouncement(
   formData: FormData,
 ): Promise<ActionState> {
   const slug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(slug, 'announcements:post');
+  const context = await requireCapability(slug, 'events:manage');
 
   const expiresRaw = String(formData.get('expires_at') ?? '').trim();
 
@@ -43,7 +43,7 @@ export async function postAnnouncement(
 export async function deleteAnnouncement(formData: FormData): Promise<void> {
   const slug = String(formData.get('slug') ?? '');
   const id = String(formData.get('id') ?? '');
-  await requireCapability(slug, 'announcements:post');
+  await requireCapability(slug, 'events:manage');
 
   const supabase = await getSupabase();
   await supabase.from('announcements').delete().eq('id', id);

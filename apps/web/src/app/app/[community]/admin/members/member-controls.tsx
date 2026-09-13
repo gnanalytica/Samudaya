@@ -1,32 +1,27 @@
 'use client';
 
 import { useActionState } from 'react';
-import { SUGGESTED_TITLES, TITLE_MAX_LENGTH } from '@samudaya/core';
+import { useFormStatus } from 'react-dom';
+import { ROLE_LABEL, ASSIGNABLE_ROLES, type Role } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
-import { Card, CardBody, CardHeader } from '@/components/ui/card';
-import { Input } from '@/components/ui/field';
+import { Select } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
-import { setSpendingApprover, setSpendingRestriction, updateMemberTitle } from './actions';
+import { changeMemberRole, removeMember } from './actions';
 
-export const TITLE_OPTIONS_ID = 'member-title-options';
-
-/** Rendered once per page; every title input points its `list` at it. */
-export function TitleOptions() {
+function Submit({ label, variant }: { label: string; variant?: 'secondary' | 'ghost' }) {
+  const { pending } = useFormStatus();
   return (
-    <datalist id={TITLE_OPTIONS_ID}>
-      {SUGGESTED_TITLES.map((title) => (
-        <option key={title} value={title} />
-      ))}
-    </datalist>
+    <Button type="submit" size="sm" variant={variant} disabled={pending}>
+      {pending ? '…' : label}
+    </Button>
   );
 }
 
-function Feedback({ state }: { state: ActionState }) {
-  const message = state.error ?? state.fieldErrors?.title;
-  if (message) {
+function Message({ state }: { state: ActionState }) {
+  if (state.error) {
     return (
       <p role="alert" className="text-danger mt-1 text-xs">
-        {message}
+        {state.error}
       </p>
     );
   }
@@ -40,132 +35,66 @@ function Feedback({ state }: { state: ActionState }) {
   return null;
 }
 
-export function TitleForm({
+export function RoleForm({
   slug,
   membershipId,
-  title,
-  memberName,
+  role,
+  name,
 }: {
   slug: string;
   membershipId: string;
-  title: string | null;
-  memberName: string;
+  role: Role;
+  name: string;
 }) {
-  const [state, action, pending] = useActionState(updateMemberTitle, EMPTY_STATE);
-
+  const [state, action] = useActionState<ActionState, FormData>(changeMemberRole, EMPTY_STATE);
   return (
     <form action={action}>
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="membership_id" value={membershipId} />
       <div className="flex items-center gap-2">
-        <label htmlFor={`title-${membershipId}`} className="sr-only">
-          Title for {memberName}
+        <label htmlFor={`role-${membershipId}`} className="sr-only">
+          Role for {name}
         </label>
-        <Input
-          id={`title-${membershipId}`}
-          name="title"
-          list={TITLE_OPTIONS_ID}
-          defaultValue={title ?? ''}
-          maxLength={TITLE_MAX_LENGTH}
-          placeholder="e.g. Treasurer"
-          className="h-8 w-40 py-1 text-xs"
-        />
-        <Button type="submit" size="sm" variant="ghost" disabled={pending}>
-          {pending ? 'Saving…' : 'Save'}
-        </Button>
+        <Select
+          id={`role-${membershipId}`}
+          name="role"
+          defaultValue={role}
+          className="h-8 w-32 py-1 text-xs"
+        >
+          {ASSIGNABLE_ROLES.map((option) => (
+            <option key={option} value={option}>
+              {ROLE_LABEL[option]}
+            </option>
+          ))}
+        </Select>
+        <Submit label="Save" variant="secondary" />
       </div>
-      <Feedback state={state} />
+      <Message state={state} />
     </form>
   );
 }
 
-export function ApproverToggle({
+export function RemoveForm({
   slug,
   membershipId,
-  approves,
-  canManage,
+  name,
 }: {
   slug: string;
   membershipId: string;
-  approves: boolean;
-  canManage: boolean;
+  name: string;
 }) {
-  const [state, action, pending] = useActionState(setSpendingApprover, EMPTY_STATE);
-
+  const [state, action] = useActionState<ActionState, FormData>(removeMember, EMPTY_STATE);
   return (
-    <form action={action} className="mt-2">
+    <form
+      action={action}
+      onSubmit={(event) => {
+        if (!window.confirm(`Remove ${name} from the society?`)) event.preventDefault();
+      }}
+    >
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="membership_id" value={membershipId} />
-      <input type="hidden" name="approves_spending" value={approves ? 'false' : 'true'} />
-      {/* Why it is disabled is explained once, in the Spending approval card. */}
-      <label className="text-ink-muted flex items-center gap-2 text-xs">
-        <input
-          type="checkbox"
-          checked={approves}
-          disabled={!canManage || pending}
-          onChange={(event) => event.currentTarget.form?.requestSubmit()}
-          className="border-border-strong size-4 rounded"
-        />
-        Spending approver
-      </label>
-      <Feedback state={state} />
+      <Submit label="Remove" variant="ghost" />
+      <Message state={state} />
     </form>
-  );
-}
-
-export function SpendingApprovalCard({
-  slug,
-  restricted,
-  approvers,
-  canManage,
-}: {
-  slug: string;
-  restricted: boolean;
-  approvers: string[];
-  canManage: boolean;
-}) {
-  const [state, action, pending] = useActionState(setSpendingRestriction, EMPTY_STATE);
-
-  return (
-    <Card>
-      <CardHeader
-        title="Spending approval"
-        description={
-          restricted
-            ? 'Only designated approvers can approve spending.'
-            : 'Any admin can approve spending. Turn this on to limit it to people like the Treasurer.'
-        }
-      />
-      <CardBody>
-        <p className="text-ink text-sm">
-          <span className="text-ink-muted">Approvers: </span>
-          {approvers.length ? approvers.join(', ') : 'none yet'}
-        </p>
-        <p className="text-ink-subtle mt-1 text-xs">
-          Mark approvers with the “Spending approver” checkbox next to an admin below. Nobody can
-          approve an expense they submitted themselves, whichever way this is set.
-        </p>
-        <form action={action} className="mt-4 flex flex-wrap items-center gap-3">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="restrict" value={restricted ? 'false' : 'true'} />
-          <Button
-            type="submit"
-            size="sm"
-            variant={restricted ? 'secondary' : 'primary'}
-            disabled={!canManage || pending || (!restricted && approvers.length === 0)}
-          >
-            {restricted ? 'Let any admin approve' : 'Only designated approvers can approve'}
-          </Button>
-          {!canManage ? (
-            <span className="text-ink-subtle text-xs">
-              Only an owner or an existing approver can change this.
-            </span>
-          ) : !restricted && approvers.length === 0 ? (
-            <span className="text-ink-subtle text-xs">Mark at least one approver first.</span>
-          ) : null}
-        </form>
-        <Feedback state={state} />
-      </CardBody>
-    </Card>
   );
 }

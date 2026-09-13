@@ -13,7 +13,7 @@ export type ApiKeyState = ActionState & {
 
 export async function createApiKey(_prev: ApiKeyState, formData: FormData): Promise<ApiKeyState> {
   const slug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(slug, 'apikeys:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const expiresRaw = String(formData.get('expires_at') ?? '').trim();
 
@@ -68,7 +68,7 @@ export async function createApiKey(_prev: ApiKeyState, formData: FormData): Prom
 export async function revokeApiKey(formData: FormData): Promise<void> {
   const slug = String(formData.get('slug') ?? '');
   const id = String(formData.get('id') ?? '');
-  const context = await requireCapability(slug, 'apikeys:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const supabase = await getSupabase();
   await supabase

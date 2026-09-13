@@ -1,14 +1,11 @@
 import {
-  Bell,
   CalendarDays,
+  ClipboardCheck,
   ClipboardList,
-  KeyRound,
   LayoutDashboard,
   Settings,
-  Ticket,
-  Users,
   UserPlus,
-  Building2,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { can, type Capability, type MemberRole } from '@samudaya/core';
@@ -31,19 +28,24 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
       items: [
         { href: base, label: 'Home', icon: LayoutDashboard, primary: true },
         { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
-        { href: `${base}/feed`, label: 'Community', icon: Users, primary: true },
-        { href: `${base}/notices`, label: 'Notices', icon: Bell },
         { href: `${base}/me`, label: 'My activity', icon: ClipboardList, primary: true },
       ],
     },
     {
-      section: 'Administration',
+      section: 'Run the society',
       items: [
         {
           href: `${base}/admin`,
-          label: 'Admin console',
+          label: 'Console',
           icon: ClipboardList,
-          capability: 'events:prepare',
+          capability: 'events:manage',
+          primary: true,
+        },
+        {
+          href: `${base}/admin/approvals`,
+          label: 'Committee approvals',
+          icon: ClipboardCheck,
+          capability: 'expenses:approve',
         },
         {
           href: `${base}/admin/requests`,
@@ -53,27 +55,9 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
         },
         {
           href: `${base}/admin/members`,
-          label: 'Members',
+          label: 'Residents',
           icon: Users,
-          capability: 'members:manage',
-        },
-        {
-          href: `${base}/admin/units`,
-          label: 'Flats',
-          icon: Building2,
-          capability: 'units:manage',
-        },
-        {
-          href: `${base}/admin/invites`,
-          label: 'Invite codes',
-          icon: Ticket,
-          capability: 'invites:manage',
-        },
-        {
-          href: `${base}/admin/api-keys`,
-          label: 'API & AI access',
-          icon: KeyRound,
-          capability: 'apikeys:manage',
+          capability: 'residents:remove',
         },
       ],
     },

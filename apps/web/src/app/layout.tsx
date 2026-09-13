@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: '%s · Samudaya',
   },
   description:
-    'Run your residential community: notices, service requests, visitors, amenities and dues — on the web, on your phone, and over WhatsApp.',
+    'Plan society events together: activities, budgets, contributions and every bill, open to residents on the web and on their phone.',
   applicationName: 'Samudaya',
 };
 

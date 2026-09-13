@@ -69,7 +69,7 @@ export function BottomNav({ slug, role }: { slug: string; role: MemberRole }) {
       className="border-border-base bg-surface-raised/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-5">
+      <ul className="grid auto-cols-fr grid-flow-col">
         {items.map(({ href, label, icon: Icon }) => {
           const active = isActive(href, href === home);
           return (

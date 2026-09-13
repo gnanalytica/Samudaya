@@ -1,25 +1,53 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Clock, RefreshCw, XCircle } from 'lucide-react';
+import { relativeTime } from '@samudaya/core';
 import { getMemberships, requireUser } from '@/lib/auth';
+import { getSupabase } from '@/lib/supabase/server';
 import { Card, CardBody } from '@/components/ui/card';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { JoinFlow } from './join-flow';
-import { CreateCommunityForm } from './create-form';
+import { withdrawJoinRequest } from './actions';
 
-export const metadata = { title: 'Join your community' };
+export const metadata = { title: 'Join your society' };
 
-export default async function OnboardingPage(props: { searchParams: Promise<{ mode?: string }> }) {
-  await requireUser();
+/**
+ * The caller's own latest request. Applicants cannot read the society or its
+ * flats yet, so the pending screen shows what they submitted about themselves.
+ */
+async function latestRequest(userId: string) {
+  const supabase = await getSupabase();
+  const { data: request } = await supabase
+    .from('join_requests')
+    .select(
+      'id, unit_id, claimed_name, claimed_phone, relation, status, decline_reason, created_at, updated_at',
+    )
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!request) return null;
+
+  return {
+    ...request,
+    // Step one files the request before the flat is picked and step two
+    // refreshes it, so a request counts as submitted once it has a flat or has
+    // been refreshed by the details step.
+    submitted: Boolean(request.unit_id) || request.updated_at > request.created_at,
+  };
+}
+
+export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
+  const user = await requireUser();
   const { mode } = await props.searchParams;
 
-  // Someone who already belongs somewhere lands here only by typing the URL.
-  // Send them to their community unless they explicitly came to add another.
   const memberships = await getMemberships();
   const firstSlug = memberships[0]?.communities?.slug;
-  if (firstSlug && mode !== 'join' && mode !== 'create') {
-    redirect(`/app/${firstSlug}`);
-  }
+  if (firstSlug && mode !== 'join') redirect(`/app/${firstSlug}`);
 
-  const creating = mode === 'create';
+  const request = mode === 'join' && firstSlug ? null : await latestRequest(user.id);
+  const pending = request?.status === 'pending' && request.submitted ? request : null;
+  const declined = request?.status === 'rejected' && mode !== 'join' ? request : null;
 
   return (
     <main id="main" className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-12">
@@ -30,45 +58,73 @@ export default async function OnboardingPage(props: { searchParams: Promise<{ mo
         <span className="text-lg font-semibold tracking-tight">Samudaya</span>
       </Link>
 
-      <h1 className="text-2xl font-semibold tracking-tight">
-        {creating ? 'Set up your community' : 'Join your community'}
-      </h1>
-      <p className="text-ink-muted mt-1.5 mb-8 text-sm">
-        {creating
-          ? 'Create the space your residents will join.'
-          : 'Enter the Society ID your admin shared, or an invite code.'}
-      </p>
-
-      {creating ? (
+      {pending ? (
         <Card>
-          <CardBody>
-            <CreateCommunityForm />
+          <CardBody className="py-8 text-center">
+            <Clock className="text-accent mx-auto size-10" aria-hidden="true" />
+            <h1 className="text-ink mt-4 text-xl font-semibold tracking-tight">
+              Waiting for approval
+            </h1>
+            <p className="text-ink-muted mt-1.5 text-sm">
+              Your request is with your society’s staff. You’ll see events and accounts as soon as
+              they approve it.
+            </p>
+            <dl className="border-border-base bg-surface-sunken mt-5 space-y-1 rounded-xl border p-4 text-left text-sm">
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Name</dt>
+                <dd className="text-ink font-medium">{pending.claimed_name}</dd>
+              </div>
+              {pending.claimed_phone ? (
+                <div className="flex justify-between gap-4">
+                  <dt className="text-ink-muted">Mobile</dt>
+                  <dd className="text-ink font-medium">{pending.claimed_phone}</dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Living there as</dt>
+                <dd className="text-ink font-medium capitalize">{pending.relation}</dd>
+              </div>
+              <div className="flex justify-between gap-4">
+                <dt className="text-ink-muted">Sent</dt>
+                <dd className="text-ink font-medium">{relativeTime(pending.created_at)}</dd>
+              </div>
+            </dl>
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <ButtonLink href="/onboarding" size="sm">
+                <RefreshCw className="size-4" aria-hidden="true" />
+                Check again
+              </ButtonLink>
+              <form action={withdrawJoinRequest}>
+                <input type="hidden" name="request_id" value={pending.id} />
+                <Button type="submit" size="sm" variant="ghost">
+                  Withdraw and start over
+                </Button>
+              </form>
+            </div>
           </CardBody>
         </Card>
       ) : (
-        <JoinFlow />
-      )}
+        <>
+          <h1 className="text-2xl font-semibold tracking-tight">Join your society</h1>
+          <p className="text-ink-muted mt-1.5 mb-6 text-sm">
+            Enter the society code your committee shared, then tell us which flat is yours.
+          </p>
 
-      <p className="text-ink-muted mt-6 text-center text-sm">
-        {creating ? (
-          <>
-            Have an invite code instead?{' '}
-            <Link href="/onboarding?mode=join" className="text-accent underline underline-offset-4">
-              Join a community
-            </Link>
-          </>
-        ) : (
-          <>
-            Setting up a new society?{' '}
-            <Link
-              href="/onboarding?mode=create"
-              className="text-accent underline underline-offset-4"
-            >
-              Create a community
-            </Link>
-          </>
-        )}
-      </p>
+          {declined ? (
+            <div className="border-danger/30 bg-danger/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
+              <XCircle className="text-danger mt-0.5 size-5 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-ink font-medium">Your last request to join wasn’t approved.</p>
+                <p className="text-ink-muted mt-0.5">
+                  {declined.decline_reason ?? 'Check your flat and details with the committee.'}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
+          <JoinFlow />
+        </>
+      )}
 
       <form action="/auth/signout" method="post" className="mt-8 text-center">
         <button type="submit" className="text-ink-subtle text-xs underline underline-offset-4">

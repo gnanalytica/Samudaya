@@ -3,6 +3,7 @@ import { EVENT_STATUS_LABEL, EXPENSE_STATUS_LABEL, TASK_STATUS_LABEL } from '@sa
 import { Badge, type Tone } from './ui/badge';
 
 const EVENT_TONES: Record<Enums<'event_status'>, Tone> = {
+  proposed: 'warning',
   draft: 'neutral',
   published: 'brand',
   completed: 'success',

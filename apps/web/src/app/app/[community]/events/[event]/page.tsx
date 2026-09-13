@@ -1,76 +1,75 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
-  ClipboardList,
-  FileText,
-  HandHeart,
+  BarChart3,
+  Check,
+  Clock,
+  Lightbulb,
   Receipt,
   Settings2,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
+  Wallet,
 } from 'lucide-react';
-import {
-  FUND_RULE_LABEL,
-  TASK_STATUS_DOT,
-  TASK_STATUS_LABEL,
-  can,
-  countdown,
-  formatDate,
-  formatMoney,
-  fundedPercent,
-  listSentence,
-} from '@samudaya/core';
+import { can, countdown, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import {
+  budgetVsSpent,
   getActivities,
+  getBudgetLines,
   getEventStats,
   getExpenses,
   getMyParticipation,
-  getTasks,
-  getVolunteerRoles,
+  getRegistrations,
+  getSuggestions,
   requireEvent,
 } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
-import { ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import {
-  EventStatusBadge,
-  ExpenseStatusBadge,
-  FundBar,
-  ReadinessBar,
-  StatTile,
-} from '@/components/badges';
-import { JoinActivityForm, VolunteerForm } from './participation-forms';
+import { EventStatusBadge, FundBar, StatTile } from '@/components/badges';
+import { BillLink } from '@/components/bill-link';
+import { cancelRegistration, voteOnSuggestion } from '../actions';
+import { RegisterForm, SuggestionForm } from './participation-forms';
 
 export default async function EventDetailPage(props: PageProps<'/app/[community]/events/[event]'>) {
   const { community: slug, event: eventSlug } = await props.params;
   const { community, role, membership } = await requireCommunity(slug);
   const event = await requireEvent(community.id, eventSlug);
 
-  const [stats, tasks, activities, roles, expenses, mine] = await Promise.all([
-    getEventStats(event.id),
-    getTasks(event.id),
-    getActivities(event.id),
-    getVolunteerRoles(event.id),
-    getExpenses(event.id),
-    getMyParticipation(event.id, membership.id),
-  ]);
+  const [stats, budget, expenses, activities, registrations, suggestions, mine] = await Promise.all(
+    [
+      getEventStats(event.id),
+      getBudgetLines(event.id),
+      getExpenses(event.id),
+      getActivities(event.id),
+      getRegistrations(event.id),
+      getSuggestions(event.id, membership.id),
+      getMyParticipation(event.id, membership.id),
+    ],
+  );
 
   const base = `/app/${community.slug}`;
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
-  const isStaff = can(role, 'events:prepare');
   const open = event.status === 'published';
-
-  // Residents only ever receive approved rows; the committee sees the rest.
+  const isCampaign = event.kind === 'campaign';
   const approved = expenses.filter((expense) => expense.status === 'approved');
-  const awaiting = expenses.filter((expense) => expense.status !== 'approved');
+  const categories = budgetVsSpent(budget, expenses);
+  const myRegistrations = registrations.filter((r) => r.membership_id === membership.id);
+  const voting = suggestions.filter((s) => s.status === 'accepted');
+  const mySuggestions = suggestions.filter(
+    (s) => s.suggested_by === membership.id && s.status !== 'accepted',
+  );
 
   return (
     <>
       <PageHeader
         title={`${event.emoji} ${event.name}`}
         description={[
+          isCampaign ? 'Fundraising campaign' : null,
           formatDate(event.starts_on),
           event.venue,
           countdown(event.starts_on),
@@ -81,7 +80,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
         action={
           <div className="flex items-center gap-2">
             <EventStatusBadge status={event.status} />
-            {isStaff ? (
+            {can(role, 'events:manage') && event.status !== 'proposed' ? (
               <ButtonLink href={`${base}/admin/events/${event.slug}`} size="sm" variant="secondary">
                 <Settings2 className="size-4" aria-hidden="true" />
                 Manage
@@ -100,282 +99,156 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
           All events
         </Link>
 
+        {event.status === 'proposed' ? (
+          <div className="border-warning/40 bg-warning/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
+            <Clock className="text-warning mt-0.5 size-5 shrink-0" aria-hidden="true" />
+            <p className="text-ink">
+              This campaign is waiting for the committee. Residents will see it and can contribute
+              once it is approved.
+            </p>
+          </div>
+        ) : null}
+
         {event.description ? (
-          <p className="text-ink-muted mb-5 max-w-2xl text-sm leading-relaxed">
+          <p className="text-ink-muted mb-5 max-w-2xl text-sm leading-relaxed whitespace-pre-line">
             {event.description}
           </p>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* -------------------------------------------------- readiness */}
-          <Card>
-            <CardHeader
-              title="Readiness"
-              action={<span className="text-accent text-sm font-semibold">{stats.readiness}%</span>}
-            />
-            <CardBody>
-              <ReadinessBar percent={stats.readiness} />
-              <p className="text-ink-muted mt-2 text-sm">
-                {stats.tasksDone} of {stats.tasksTotal} tasks complete
-              </p>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <StatTile label="Performing" value={String(stats.participants)} />
-                <StatTile label="Volunteering" value={String(stats.volunteers)} />
-                <StatTile label="Contributed" value={String(stats.contributors)} />
+        {/* ----------------------------------------------------------- fund */}
+        <Card>
+          <CardHeader
+            title={isCampaign ? 'Campaign fund' : 'Fund'}
+            action={<span className="text-success text-sm font-semibold">{funded}%</span>}
+          />
+          <CardBody>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-ink text-2xl font-semibold tracking-tight">
+                  {formatMoney(stats.fundRaised, community.currency)}
+                </p>
+                <p className="text-ink-muted text-sm">
+                  of {formatMoney(stats.fundTarget, community.currency)} target
+                </p>
               </div>
-            </CardBody>
-          </Card>
-
-          {/* ------------------------------------------------------- fund */}
-          <Card>
-            <CardHeader
-              title="Fund"
-              description={FUND_RULE_LABEL[event.fund_rule]}
-              action={<span className="text-success text-sm font-semibold">{funded}%</span>}
-            />
-            <CardBody>
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className="text-ink text-2xl font-semibold tracking-tight">
-                    {formatMoney(stats.fundRaised, community.currency)}
-                  </p>
-                  <p className="text-ink-muted text-sm">
-                    of {formatMoney(stats.fundTarget, community.currency)} target
-                  </p>
-                </div>
-                {mine.contributed > 0 ? (
-                  <Badge tone="success">
-                    You gave {formatMoney(mine.contributed, community.currency)}
-                  </Badge>
-                ) : null}
-              </div>
-              <div className="mt-3">
-                <FundBar percent={funded} />
-              </div>
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <StatTile
-                  label="Raised"
-                  value={formatMoney(stats.fundRaised, community.currency)}
-                />
-                <StatTile label="Spent" value={formatMoney(stats.spent, community.currency)} />
-                <StatTile
-                  label="Available"
-                  value={formatMoney(stats.available, community.currency)}
-                  tone={stats.available < 0 ? 'danger' : 'success'}
-                />
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              {mine.contributed > 0 ? (
+                <Badge tone="success">
+                  You gave {formatMoney(mine.contributed, community.currency)}
+                </Badge>
+              ) : null}
+            </div>
+            <div className="mt-3">
+              <FundBar percent={funded} />
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <StatTile label="Raised" value={formatMoney(stats.fundRaised, community.currency)} />
+              <StatTile label="Spent" value={formatMoney(stats.spent, community.currency)} />
+              <StatTile
+                label="Balance"
+                value={formatMoney(stats.available, community.currency)}
+                tone={stats.available < 0 ? 'danger' : 'success'}
+              />
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {open && can(role, 'contribute') ? (
+                <ButtonLink href={`${base}/events/${event.slug}/contribute`} size="sm">
+                  Contribute
+                </ButtonLink>
+              ) : null}
+              {event.status !== 'proposed' ? (
                 <ButtonLink
                   href={`${base}/events/${event.slug}/accounts`}
                   size="sm"
                   variant="secondary"
                 >
-                  <Receipt className="size-4" aria-hidden="true" />
-                  View the ledger
+                  <BarChart3 className="size-4" aria-hidden="true" />
+                  Money and analytics
                 </ButtonLink>
-                {open ? (
-                  <ButtonLink href={`${base}/events/${event.slug}/contribute`} size="sm">
-                    Contribute
-                  </ButtonLink>
-                ) : null}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+              ) : null}
+            </div>
+          </CardBody>
+        </Card>
 
-        {/* ------------------------------------------------------ activities */}
-        <section id="activities" className="mt-8 scroll-mt-20">
-          <h2 className="text-ink-soft mb-3 text-sm font-semibold">Cultural activities</h2>
-          {activities.length ? (
-            <div className="space-y-3">
-              {activities.map((activity) => {
-                const joined = mine.activities.includes(activity.id);
-                const full = activity.capacity !== null && activity.interested >= activity.capacity;
-                return (
-                  <Card key={activity.id}>
-                    <CardBody>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-ink text-sm font-semibold">
-                            <span className="mr-1.5">{activity.emoji}</span>
-                            {activity.name}
-                          </p>
-                          {activity.description ? (
-                            <p className="text-ink-muted mt-1 text-sm">{activity.description}</p>
-                          ) : null}
-                          <p className="text-ink-subtle mt-1.5 text-xs">
-                            {activity.interested} interested
-                            {activity.capacity ? ` of ${activity.capacity} places` : ''}
-                            {activity.memberships?.profiles?.full_name
-                              ? ` · coordinated by ${activity.memberships.profiles.full_name}`
-                              : ''}
-                            {activity.practice_dates.length
-                              ? ` · rehearsals ${listSentence(
-                                  activity.practice_dates.map((date) => formatDate(date)),
-                                )}`
-                              : ''}
-                          </p>
+        {/* ------------------------------------------------- budget vs spent */}
+        {!isCampaign ? (
+          <section id="budget" className="mt-8 scroll-mt-20">
+            <h2 className="text-ink-soft mb-3 text-sm font-semibold">Budget and spending</h2>
+            <Card>
+              {categories.length ? (
+                <ul className="divide-border-base divide-y">
+                  {categories.map((row) => {
+                    const pct = row.planned > 0 ? Math.round((row.spent / row.planned) * 100) : 100;
+                    const over = row.planned > 0 && row.spent > row.planned;
+                    return (
+                      <li key={row.label} className="px-5 py-3">
+                        <div className="flex items-center justify-between gap-3 text-sm">
+                          <span className="text-ink font-medium">{row.label}</span>
+                          <span className={over ? 'text-danger' : 'text-ink-muted'}>
+                            {formatMoney(row.spent, community.currency)} of{' '}
+                            {row.planned > 0
+                              ? formatMoney(row.planned, community.currency)
+                              : 'no budget'}
+                          </span>
                         </div>
-                        {full && !joined ? <Badge tone="neutral">Full</Badge> : null}
-                      </div>
-
-                      {open && activity.is_open && (!full || joined) ? (
-                        <div className="border-border-base mt-3 border-t pt-3">
-                          <JoinActivityForm
-                            slug={slug}
-                            eventSlug={event.slug}
-                            activityId={activity.id}
-                            activityName={activity.name}
-                            joined={joined}
+                        <div className="bg-surface-sunken mt-2 h-2 overflow-hidden rounded-full">
+                          <div
+                            className={
+                              over
+                                ? 'bg-danger h-full rounded-full'
+                                : 'bg-accent h-full rounded-full'
+                            }
+                            style={{ width: `${Math.min(100, pct)}%` }}
                           />
                         </div>
-                      ) : null}
-                    </CardBody>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card>
-              <EmptyState
-                icon={<Sparkles className="size-6" />}
-                title="No activities yet"
-                description="The committee hasn’t opened any performances for this event."
-              />
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <EmptyState
+                  icon={<Wallet className="size-6" />}
+                  title="No budget yet"
+                  description="Staff add the planned spend for each category."
+                />
+              )}
             </Card>
-          )}
-        </section>
+          </section>
+        ) : null}
 
-        {/* ------------------------------------------------------ volunteers */}
-        <section id="volunteer" className="mt-8 scroll-mt-20">
-          <h2 className="text-ink-soft mb-3 text-sm font-semibold">Volunteers</h2>
-          {roles.length ? (
-            <div className="space-y-3">
-              {roles.map((volunteerRole) => {
-                const signedUp = mine.roles.includes(volunteerRole.id);
-                return (
-                  <Card key={volunteerRole.id}>
-                    <CardBody className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-ink text-sm font-semibold">
-                          <span className="mr-1.5">{volunteerRole.emoji}</span>
-                          {volunteerRole.name}
-                        </p>
-                        <p className="text-ink-subtle mt-0.5 text-xs">
-                          {volunteerRole.signedUp} of {volunteerRole.target_count} signed up
-                          {volunteerRole.stillNeeded > 0
-                            ? ` · ${volunteerRole.stillNeeded} more needed`
-                            : ' · fully staffed'}
-                          {volunteerRole.memberships?.profiles?.full_name
-                            ? ` · ${volunteerRole.memberships.profiles.full_name} coordinating`
-                            : ''}
-                        </p>
-                      </div>
-                      {open ? (
-                        <VolunteerForm
-                          slug={slug}
-                          eventSlug={event.slug}
-                          roleId={volunteerRole.id}
-                          signedUp={signedUp}
-                          stillNeeded={volunteerRole.stillNeeded}
-                        />
-                      ) : null}
-                    </CardBody>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card>
-              <EmptyState
-                icon={<HandHeart className="size-6" />}
-                title="No volunteer roles yet"
-                description="Nothing needs hands just now."
-              />
-            </Card>
-          )}
-        </section>
-
-        {/* ------------------------------------------------------- checklist */}
-        <section className="mt-8">
-          <h2 className="text-ink-soft mb-3 text-sm font-semibold">Checklist</h2>
-          <Card>
-            {tasks.length ? (
-              <ul className="divide-border-base divide-y">
-                {tasks.map((task) => (
-                  <li key={task.id} className="flex items-start gap-3 px-5 py-3">
-                    <span aria-hidden="true">{TASK_STATUS_DOT[task.status]}</span>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={
-                          task.status === 'done'
-                            ? 'text-ink-muted text-sm line-through'
-                            : 'text-ink text-sm'
-                        }
-                      >
-                        {task.name}
-                      </p>
-                      <p className="text-ink-subtle mt-0.5 text-xs">
-                        <span className="sr-only">{TASK_STATUS_LABEL[task.status]}. </span>
-                        {task.memberships?.profiles?.full_name ?? 'Unassigned'}
-                        {task.due_on ? ` · due ${formatDate(task.due_on)}` : ''}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon={<ClipboardList className="size-6" />}
-                title="No tasks yet"
-                description="The committee hasn’t built the checklist for this event."
-              />
-            )}
-          </Card>
-        </section>
-
-        {/* ---------------------------------------------------------- ledger */}
-        <section className="mt-8">
+        {/* -------------------------------------------------------- spending */}
+        <section id="spending" className="mt-8 scroll-mt-20">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-ink-soft text-sm font-semibold">Where the money went</h2>
-            <Link
-              href={`${base}/events/${event.slug}/accounts`}
-              className="text-accent text-sm hover:underline"
-            >
-              Full ledger
-            </Link>
+            {event.status !== 'proposed' ? (
+              <Link
+                href={`${base}/events/${event.slug}/accounts`}
+                className="text-accent text-sm hover:underline"
+              >
+                Full accounts
+              </Link>
+            ) : null}
           </div>
           <Card>
             {approved.length ? (
               <ul className="divide-border-base divide-y">
-                {approved.slice(0, 5).map((expense) => (
-                  <li
-                    key={expense.id}
-                    className="flex items-center justify-between gap-3 px-5 py-3"
-                  >
+                {approved.map((expense) => (
+                  <li key={expense.id} className="flex items-start justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
                       <p className="text-ink text-sm font-medium">{expense.name}</p>
                       <p className="text-ink-subtle mt-0.5 text-xs">
-                        {expense.vendor ?? 'Vendor not recorded'}
-                        {expense.approver?.profiles?.full_name
-                          ? ` · approved by ${expense.approver.profiles.full_name}`
-                          : ''}
+                        {[
+                          expense.category,
+                          expense.vendor ?? 'Vendor not recorded',
+                          formatDate(expense.spent_on),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
                       </p>
+                      <BillLink url={expense.bill_url} />
                     </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-ink text-sm font-semibold">
-                        {formatMoney(expense.amount, community.currency)}
-                      </span>
-                      {expense.bill_url ? (
-                        <span
-                          className="text-ink-muted inline-flex items-center gap-1 text-xs"
-                          title="A bill is attached"
-                        >
-                          <FileText className="size-3.5" aria-hidden="true" />
-                          Bill
-                        </span>
-                      ) : null}
-                    </div>
+                    <span className="text-ink shrink-0 text-sm font-semibold">
+                      {formatMoney(expense.amount, community.currency)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -383,35 +256,246 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               <EmptyState
                 icon={<Receipt className="size-6" />}
                 title="Nothing spent yet"
-                description="Approved expenses appear here with their bills, for everyone to see."
+                description="Bills approved by the committee appear here, for everyone to see."
               />
             )}
-
-            {isStaff && awaiting.length ? (
-              <CardBody className="border-border-base border-t">
-                <p className="text-ink-subtle mb-2 text-xs font-medium">
-                  Not yet in the resident ledger
-                </p>
-                <ul className="space-y-2">
-                  {awaiting.map((expense) => (
-                    <li key={expense.id} className="flex items-center justify-between gap-3">
-                      <span className="text-ink-muted text-sm">
-                        {expense.name} · {formatMoney(expense.amount, community.currency)}
-                      </span>
-                      <ExpenseStatusBadge status={expense.status} />
-                    </li>
-                  ))}
-                </ul>
-              </CardBody>
-            ) : null}
           </Card>
-
-          {event.fund_rule_note ? (
-            <p className="border-border-base bg-surface-sunken text-ink-muted mt-3 rounded-lg border px-4 py-3 text-sm">
-              🔒 {event.fund_rule_note}
-            </p>
-          ) : null}
         </section>
+
+        {/* ------------------------------------------------------ activities */}
+        {!isCampaign ? (
+          <section id="activities" className="mt-8 scroll-mt-20">
+            <h2 className="text-ink-soft mb-3 text-sm font-semibold">Activities</h2>
+            {activities.length ? (
+              <div className="space-y-3">
+                {activities.map((activity) => {
+                  const here = myRegistrations.filter((r) => r.activity_id === activity.id);
+                  const selfRegistered = here.some((r) => !r.participant_name);
+                  const count = registrations.filter((r) => r.activity_id === activity.id).length;
+                  const full = activity.capacity !== null && count >= activity.capacity;
+                  return (
+                    <Card key={activity.id}>
+                      <CardBody>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-ink text-sm font-semibold">
+                              <span className="mr-1.5">{activity.emoji}</span>
+                              {activity.name}
+                            </p>
+                            {activity.description ? (
+                              <p className="text-ink-muted mt-1 text-sm">{activity.description}</p>
+                            ) : null}
+                            <p className="text-ink-subtle mt-1.5 text-xs">
+                              {count} registered
+                              {activity.capacity ? ` of ${activity.capacity} places` : ''}
+                            </p>
+                          </div>
+                          {!activity.is_open ? (
+                            <Badge tone="neutral">Closed</Badge>
+                          ) : full ? (
+                            <Badge tone="neutral">Full</Badge>
+                          ) : null}
+                        </div>
+
+                        {here.length ? (
+                          <ul className="mt-3 space-y-1.5">
+                            {here.map((registration) => (
+                              <li
+                                key={registration.id}
+                                className="flex items-center justify-between gap-3 text-sm"
+                              >
+                                <span className="text-success inline-flex items-center gap-1.5">
+                                  <Check className="size-4" aria-hidden="true" />
+                                  {registration.participant_name ?? 'You'}
+                                </span>
+                                {open ? (
+                                  <form action={cancelRegistration}>
+                                    <input type="hidden" name="slug" value={slug} />
+                                    <input type="hidden" name="event" value={event.slug} />
+                                    <input
+                                      type="hidden"
+                                      name="registration_id"
+                                      value={registration.id}
+                                    />
+                                    <button
+                                      type="submit"
+                                      className="text-ink-muted hover:text-ink text-xs underline underline-offset-4"
+                                    >
+                                      Withdraw
+                                    </button>
+                                  </form>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+
+                        {open && activity.is_open && !full && can(role, 'activities:register') ? (
+                          <div className="border-border-base mt-3 border-t pt-3">
+                            <RegisterForm
+                              slug={slug}
+                              eventSlug={event.slug}
+                              activityId={activity.id}
+                              activityName={activity.name}
+                              selfRegistered={selfRegistered}
+                            />
+                          </div>
+                        ) : null}
+                      </CardBody>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card>
+                <EmptyState
+                  icon={<Sparkles className="size-6" />}
+                  title="No activities yet"
+                  description="Staff add activities you and your family can register for."
+                />
+              </Card>
+            )}
+          </section>
+        ) : null}
+
+        {/* ----------------------------------------------------- suggestions */}
+        {event.status !== 'proposed' ? (
+          <section id="suggestions" className="mt-8 scroll-mt-20">
+            <h2 className="text-ink-soft mb-3 text-sm font-semibold">Suggestions and voting</h2>
+            <div className="space-y-3">
+              {voting.length ? (
+                voting.map((suggestion) => {
+                  const total = suggestion.votesFor + suggestion.votesAgainst;
+                  const forPct = total ? Math.round((suggestion.votesFor / total) * 100) : 0;
+                  return (
+                    <Card key={suggestion.id}>
+                      <CardBody>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-ink text-sm font-semibold">{suggestion.name}</p>
+                            <p className="text-ink-subtle mt-0.5 text-xs">
+                              {suggestion.kind === 'idea' ? 'Idea' : 'Activity'} suggested by{' '}
+                              {suggestion.memberships?.profiles?.full_name ?? 'a resident'} ·
+                              approved for voting
+                            </p>
+                            {suggestion.description ? (
+                              <p className="text-ink-muted mt-1.5 text-sm">
+                                {suggestion.description}
+                              </p>
+                            ) : null}
+                          </div>
+                          <Badge tone="success">Voting</Badge>
+                        </div>
+                        <div className="mt-3">
+                          <div className="text-ink-muted mb-1 flex justify-between text-xs font-medium">
+                            <span>
+                              {suggestion.votesFor} for · {suggestion.votesAgainst} against
+                            </span>
+                            <span>{total ? `${forPct}% in favour` : 'No votes yet'}</span>
+                          </div>
+                          <FundBar percent={forPct} />
+                        </div>
+                        {can(role, 'vote') && event.status !== 'completed' ? (
+                          <form
+                            action={voteOnSuggestion}
+                            className="mt-3 flex flex-wrap items-center gap-2"
+                          >
+                            <input type="hidden" name="slug" value={slug} />
+                            <input type="hidden" name="event" value={event.slug} />
+                            <input type="hidden" name="suggestion_id" value={suggestion.id} />
+                            <Button
+                              type="submit"
+                              name="support"
+                              value="1"
+                              size="sm"
+                              variant={suggestion.myVote === true ? 'primary' : 'secondary'}
+                              aria-pressed={suggestion.myVote === true}
+                            >
+                              <ThumbsUp className="size-4" aria-hidden="true" />
+                              For
+                            </Button>
+                            <Button
+                              type="submit"
+                              name="support"
+                              value="0"
+                              size="sm"
+                              variant={suggestion.myVote === false ? 'primary' : 'secondary'}
+                              aria-pressed={suggestion.myVote === false}
+                            >
+                              <ThumbsDown className="size-4" aria-hidden="true" />
+                              Against
+                            </Button>
+                            {suggestion.myVote !== null ? (
+                              <Button
+                                type="submit"
+                                name="withdraw"
+                                value="1"
+                                size="sm"
+                                variant="ghost"
+                              >
+                                Withdraw vote
+                              </Button>
+                            ) : null}
+                          </form>
+                        ) : null}
+                      </CardBody>
+                    </Card>
+                  );
+                })
+              ) : (
+                <Card>
+                  <EmptyState
+                    icon={<Lightbulb className="size-6" />}
+                    title="Nothing to vote on yet"
+                    description="Suggestions the committee approves are put to residents here."
+                  />
+                </Card>
+              )}
+
+              {mySuggestions.length ? (
+                <Card>
+                  <CardHeader title="Your suggestions" />
+                  <ul className="divide-border-base divide-y">
+                    {mySuggestions.map((suggestion) => (
+                      <li
+                        key={suggestion.id}
+                        className="flex items-center justify-between gap-3 px-5 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-ink text-sm">{suggestion.name}</p>
+                          {suggestion.review_note ? (
+                            <p className="text-ink-subtle text-xs">“{suggestion.review_note}”</p>
+                          ) : null}
+                        </div>
+                        <Badge tone={suggestion.status === 'declined' ? 'neutral' : 'warning'}>
+                          {suggestion.status === 'declined' ? 'Declined' : 'With the committee'}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              ) : null}
+
+              {can(role, 'suggest') && event.status === 'published' ? (
+                <Card>
+                  <CardHeader
+                    title="Suggest something"
+                    description="The committee reviews every suggestion, then puts it to residents for a vote."
+                  />
+                  <CardBody>
+                    <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />
+                  </CardBody>
+                </Card>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {event.fund_rule_note ? (
+          <p className="border-border-base bg-surface-sunken text-ink-muted mt-8 rounded-lg border px-4 py-3 text-sm">
+            🔒 {event.fund_rule_note}
+          </p>
+        ) : null}
       </PageBody>
     </>
   );

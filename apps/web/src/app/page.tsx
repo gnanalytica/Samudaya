@@ -8,32 +8,32 @@ const FEATURES = [
   {
     icon: CalendarDays,
     title: 'One place per event',
-    body: 'Ganesh Chaturthi, sports day, a cultural evening — each carries its own people, tasks, fund and ledger.',
+    body: 'Ganesh Chaturthi, Dussehra, Diwali, Christmas — each carries its own activities, budget, fund and ledger.',
   },
   {
     icon: ClipboardList,
-    title: 'A checklist everyone can see',
-    body: 'Twenty-five things to arrange, each with an owner and a date. Residents watch it turn green.',
+    title: 'A budget everyone can see',
+    body: 'What the committee plans to spend, category by category, next to what was actually spent.',
   },
   {
     icon: Wallet,
     title: 'A fund with a target',
-    body: 'Residents chip in, the bar fills, and the contributor count is public while individual amounts stay private.',
+    body: 'Residents chip in, the bar fills, and totals are public while individual amounts stay private.',
   },
   {
     icon: Receipt,
     title: 'Every rupee, with the bill',
-    body: 'Approved spending shows the vendor, who asked, who signed off, and the invoice. Nothing is hidden behind a summary.',
+    body: 'Staff upload each bill, the committee approves it, and residents see the vendor, amount and invoice.',
   },
   {
     icon: Vote,
-    title: 'Surplus you cannot quietly move',
-    body: 'What happens to leftover money is fixed before collection. Changing it takes a resident vote that clears a threshold.',
+    title: 'Residents suggest and vote',
+    body: 'Suggest an activity or idea; once the committee approves it, everyone votes.',
   },
   {
     icon: MessageCircle,
-    title: 'Works over WhatsApp',
-    body: 'Residents who will never install an app can still check the fund, see the notices and back an idea.',
+    title: 'Campaigns from residents',
+    body: 'Anyone can propose a fundraising campaign. The committee approves it before collection starts.',
   },
 ];
 
@@ -63,20 +63,17 @@ export default async function LandingPage() {
             Plan together. Participate together. Spend transparently.
           </h1>
           <p className="text-ink-muted mt-5 max-w-xl text-lg text-pretty">
-            Samudaya gives every community event its own people, activities, checklist, fund and
-            public ledger — so residents can see exactly what is planned, what was spent, and on
-            what. On the web, on iOS and Android, and over WhatsApp.
+            Samudaya gives every community event its own activities, budget, fund and public ledger
+            — so residents can see exactly what is planned, what was spent, and on what. On the web
+            and on your phone.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <ButtonLink href="/login" size="lg">
               Get started
             </ButtonLink>
-            <ButtonLink href="/onboarding?mode=create" variant="secondary" size="lg">
-              Set up a society
-            </ButtonLink>
           </div>
           <p className="text-ink-subtle mt-4 text-sm">
-            Residents join with the Society ID their admin shares, and an admin approves each one.
+            Residents join with their society’s code, and staff approve each one.
           </p>
         </section>
 

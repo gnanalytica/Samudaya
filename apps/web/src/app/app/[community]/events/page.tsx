@@ -1,29 +1,36 @@
 import Link from 'next/link';
-import { CalendarDays, Plus } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Megaphone, Plus } from 'lucide-react';
 import { can, countdown, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { listEvents, getStatsFor } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventStatusBadge, FundBar, ReadinessBar } from '@/components/badges';
+import { EventStatusBadge, FundBar } from '@/components/badges';
 
 export const metadata = { title: 'Events' };
 
 export default async function EventsPage(props: PageProps<'/app/[community]/events'>) {
   const { community: slug } = await props.params;
-  const { community, role } = await requireCommunity(slug);
+  const { proposed: justProposed } = await props.searchParams;
+  const { community, role, user } = await requireCommunity(slug);
 
   const events = await listEvents(community.id);
   const stats = await getStatsFor(events.map((event) => event.id));
+  const staff = can(role, 'events:manage');
 
-  const upcoming = events.filter(
-    (event) => event.status === 'published' || event.status === 'draft',
+  // RLS already hides drafts and other people's proposals from residents.
+  const mine = events.filter(
+    (event) => event.status === 'proposed' && event.created_by === user.id,
   );
-  const past = events.filter(
-    (event) => event.status === 'completed' || event.status === 'cancelled',
+  const live = events.filter(
+    (event) => event.status === 'published' || (staff && event.status === 'draft'),
   );
+  const past = events
+    .filter((event) => event.status === 'completed' || event.status === 'cancelled')
+    .filter((event) => event.kind === 'event' || event.status === 'completed');
 
   const card = (event: (typeof events)[number]) => {
     const s = stats.get(event.id);
@@ -41,6 +48,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
               {event.name}
             </p>
             <p className="text-ink-muted mt-0.5 text-sm">
+              {event.kind === 'campaign' ? 'Fundraising campaign · ' : ''}
               {formatDate(event.starts_on)}
               {event.venue ? ` · ${event.venue}` : ''}
               {countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''}
@@ -49,32 +57,22 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
           <EventStatusBadge status={event.status} />
         </div>
 
-        {event.status !== 'cancelled' ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div>
-              <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
-                <span>Readiness</span>
-                <span>{s?.readiness ?? 0}%</span>
-              </div>
-              <ReadinessBar percent={s?.readiness ?? 0} />
+        {event.status !== 'cancelled' && event.status !== 'proposed' ? (
+          <div className="mt-4">
+            <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
+              <span>
+                {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
+                {formatMoney(s?.fundTarget ?? 0, community.currency)} raised ·{' '}
+                {formatMoney(s?.spent ?? 0, community.currency)} spent
+              </span>
+              <span>{funded}%</span>
             </div>
-            <div>
-              <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
-                <span>
-                  {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
-                  {formatMoney(s?.fundTarget ?? 0, community.currency)}
-                </span>
-                <span>{funded}%</span>
-              </div>
-              <FundBar percent={funded} />
-            </div>
+            <FundBar percent={funded} />
+            <p className="text-ink-subtle mt-2 text-xs">
+              {s?.contributors ?? 0} contributed · {s?.participants ?? 0} registered for activities
+            </p>
           </div>
         ) : null}
-
-        <p className="text-ink-subtle mt-3 text-xs">
-          {s?.contributors ?? 0} contributed · {s?.participants ?? 0} performing ·{' '}
-          {s?.volunteers ?? 0} volunteering
-        </p>
       </Link>
     );
   };
@@ -83,52 +81,72 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
     <>
       <PageHeader
         title="Events"
-        description="Every event carries its own people, tasks, fund and ledger."
+        description="Every event and campaign with its budget, spending and activities."
         action={
-          can(role, 'events:prepare') ? (
-            <ButtonLink href={`/app/${slug}/admin/events/new`} size="sm">
-              <Plus className="size-4" aria-hidden="true" />
-              Create event
-            </ButtonLink>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            {can(role, 'campaigns:propose') ? (
+              <ButtonLink href={`/app/${slug}/events/propose`} size="sm" variant="secondary">
+                <Megaphone className="size-4" aria-hidden="true" />
+                Start a campaign
+              </ButtonLink>
+            ) : null}
+            {staff ? (
+              <ButtonLink href={`/app/${slug}/admin/events/new`} size="sm">
+                <Plus className="size-4" aria-hidden="true" />
+                Create event
+              </ButtonLink>
+            ) : null}
+          </div>
         }
       />
       <PageBody>
-        {events.length === 0 ? (
+        {justProposed ? (
+          <div className="border-success/30 bg-success/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
+            <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" aria-hidden="true" />
+            <p className="text-ink">
+              Campaign sent to the committee. Once they approve it, every resident can see it and
+              contribute.
+            </p>
+          </div>
+        ) : null}
+
+        {mine.length ? (
+          <>
+            <h2 className="text-ink-soft mb-3 text-sm font-semibold">
+              Proposed by you <Badge tone="warning">Awaiting committee</Badge>
+            </h2>
+            <div className="mb-8 space-y-3">{mine.map(card)}</div>
+          </>
+        ) : null}
+
+        {live.length === 0 && past.length === 0 ? (
           <Card>
             <EmptyState
               icon={<CalendarDays className="size-6" />}
               title="No events yet"
               description={
-                can(role, 'events:prepare')
-                  ? 'Create the first one — the wizard sets up the budget, checklist and fund rule.'
-                  : 'When the committee plans something, it will appear here.'
-              }
-              action={
-                can(role, 'events:prepare') ? (
-                  <ButtonLink href={`/app/${slug}/admin/events/new`} size="sm" variant="secondary">
-                    Create event
-                  </ButtonLink>
-                ) : undefined
+                staff
+                  ? 'Create the first one with its budget, then publish it.'
+                  : 'When the society plans something, it will appear here.'
               }
             />
           </Card>
-        ) : (
+        ) : null}
+
+        {live.length ? (
           <>
-            {upcoming.length > 0 ? (
-              <>
-                <h2 className="text-ink-soft mb-3 text-sm font-semibold">Upcoming</h2>
-                <div className="space-y-3">{upcoming.map(card)}</div>
-              </>
-            ) : null}
-            {past.length > 0 ? (
-              <>
-                <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Past</h2>
-                <div className="space-y-3">{past.map(card)}</div>
-              </>
-            ) : null}
+            <h2 className="text-ink-soft mb-3 text-sm font-semibold">Upcoming and open</h2>
+            <div className="space-y-3">
+              {live.sort((a, b) => a.starts_on.localeCompare(b.starts_on)).map(card)}
+            </div>
           </>
-        )}
+        ) : null}
+        {past.length ? (
+          <>
+            <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Past</h2>
+            <div className="space-y-3">{past.map(card)}</div>
+          </>
+        ) : null}
       </PageBody>
     </>
   );

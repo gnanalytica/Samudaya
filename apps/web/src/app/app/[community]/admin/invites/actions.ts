@@ -13,7 +13,7 @@ export async function createInviteCode(
   formData: FormData,
 ): Promise<InviteState> {
   const slug = String(formData.get('slug') ?? '');
-  const context = await requireCapability(slug, 'invites:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const maxUsesRaw = String(formData.get('max_uses') ?? '1');
   const expiresRaw = String(formData.get('expires_at') ?? '').trim();
@@ -55,7 +55,7 @@ export async function createInviteCode(
 export async function revokeInviteCode(formData: FormData): Promise<void> {
   const slug = String(formData.get('slug') ?? '');
   const id = String(formData.get('id') ?? '');
-  const context = await requireCapability(slug, 'invites:manage');
+  const context = await requireCapability(slug, 'roles:manage');
 
   const supabase = await getSupabase();
   await supabase

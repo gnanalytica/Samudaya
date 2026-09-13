@@ -18,7 +18,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
 
       <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
       <p className="text-ink-muted mt-1.5 mb-8 text-sm">
-        New here? Sign in first — you’ll enter your community’s invite code next.
+        New here? Sign in first — you’ll enter your society’s code and flat next.
       </p>
 
       <LoginForm next={safeNext} />

@@ -18,7 +18,7 @@ import { getSupabase } from './supabase/server';
 // select text, and concatenating with `+` widens it to `string`, which
 // collapses the result to an error type.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, description, status, expected_attendance, fund_target, fund_rule, fund_rule_note, published_at, closed_at, closing_summary, created_at';
+  'id, slug, emoji, name, kind, starts_on, ends_on, venue, organizer, description, status, expected_attendance, fund_target, fund_rule, fund_rule_note, published_at, closed_at, closing_summary, created_by, created_at';
 
 export const getEvent = cache(async (communityId: string, slug: string) => {
   const supabase = await getSupabase();
@@ -137,7 +137,7 @@ export const getExpenses = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('expenses')
     .select(
-      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(title, profiles(full_name))',
+      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
@@ -173,4 +173,115 @@ export const getMyParticipation = cache(async (eventId: string, membershipId: st
     roles: (volunteers.data ?? []).map((row) => row.role_id),
     contributed: (contributions.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0),
   };
+});
+
+/** Planned spend for an event, line by line. Their sum is the fund target. */
+export const getBudgetLines = cache(async (eventId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('budget_lines')
+    .select('id, category, amount, notes, position')
+    .eq('event_id', eventId)
+    .order('position')
+    .order('created_at');
+  return data ?? [];
+});
+
+/** Normalises a budget or expense category so "Decoration" and "decoration" line up. */
+export function categoryKey(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase() || 'other';
+}
+
+/**
+ * Planned against actually spent, per category. Only approved expenses count
+ * as spent; categories that were spent without a budget line still appear.
+ */
+export function budgetVsSpent(
+  lines: { category: string; amount: number | string }[],
+  expenses: { category: string | null; amount: number | string; status: string }[],
+) {
+  const rows = new Map<string, { label: string; planned: number; spent: number }>();
+  for (const line of lines) {
+    const key = categoryKey(line.category);
+    const row = rows.get(key) ?? { label: line.category.trim(), planned: 0, spent: 0 };
+    row.planned += Number(line.amount);
+    rows.set(key, row);
+  }
+  for (const expense of expenses) {
+    if (expense.status !== 'approved') continue;
+    const key = categoryKey(expense.category);
+    const row = rows.get(key) ?? {
+      label: expense.category?.trim() || 'Other',
+      planned: 0,
+      spent: 0,
+    };
+    row.spent += Number(expense.amount);
+    rows.set(key, row);
+  }
+  return [...rows.values()];
+}
+
+/** Who has registered for each activity, and the signed-in member's own registrations. */
+export const getRegistrations = cache(async (eventId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('activity_participants')
+    .select(
+      'id, activity_id, membership_id, participant_name, joined_at, event_activities!inner(event_id), memberships(profiles(full_name))',
+    )
+    .eq('event_activities.event_id', eventId)
+    .order('joined_at');
+  return data ?? [];
+});
+
+/**
+ * Suggestions for an event with their vote tally. Votes are readable by every
+ * member, so the counts are computed here rather than in a view.
+ */
+export const getSuggestions = cache(async (eventId: string, membershipId: string | null) => {
+  const supabase = await getSupabase();
+  const { data: suggestions } = await supabase
+    .from('activity_suggestions')
+    .select(
+      'id, kind, name, description, status, review_note, created_at, suggested_by, memberships(profiles(full_name))',
+    )
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: false });
+
+  const ids = (suggestions ?? []).map((row) => row.id);
+  const { data: votes } = ids.length
+    ? await supabase
+        .from('suggestion_votes')
+        .select('suggestion_id, membership_id, support')
+        .in('suggestion_id', ids)
+    : { data: [] as { suggestion_id: string; membership_id: string; support: boolean }[] };
+
+  return (suggestions ?? []).map((suggestion) => {
+    const mine = (votes ?? []).filter((vote) => vote.suggestion_id === suggestion.id);
+    return {
+      ...suggestion,
+      votesFor: mine.filter((vote) => vote.support).length,
+      votesAgainst: mine.filter((vote) => !vote.support).length,
+      myVote:
+        membershipId === null
+          ? null
+          : (mine.find((vote) => vote.membership_id === membershipId)?.support ?? null),
+    };
+  });
+});
+
+/**
+ * Every payment for an event with the flat and payer. RLS returns all rows to
+ * staff and committee, and only the caller's own to a resident.
+ */
+export const getPayments = cache(async (eventId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('contributions')
+    .select(
+      'id, amount, method, status, reference, receipt_no, channel, paid_at, units(block, number), memberships(profiles(full_name))',
+    )
+    .eq('event_id', eventId)
+    .order('paid_at', { ascending: false });
+  return data ?? [];
 });

@@ -1,21 +1,39 @@
 import Link from 'next/link';
-import { CalendarDays, HandHeart, Receipt } from 'lucide-react';
-import { ROLE_LABEL, formatDate, formatMoney, receiptRef, unitLabel } from '@samudaya/core';
+import { CalendarDays, Lightbulb, Megaphone, Receipt } from 'lucide-react';
+import {
+  EVENT_STATUS_LABEL,
+  ROLE_LABEL,
+  canParticipate,
+  formatDate,
+  formatMoney,
+  normalizeRole,
+  receiptRef,
+  unitLabel,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
-import { Card, CardHeader } from '@/components/ui/card';
+import { Card, CardHeader, CardBody } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile } from '@/components/badges';
 
 export const metadata = { title: 'My activity' };
 
+const SUGGESTION_STATUS = {
+  new: 'With the committee',
+  reviewing: 'With the committee',
+  accepted: 'Open for voting',
+  declined: 'Declined',
+} as const;
+
 export default async function MyActivityPage(props: PageProps<'/app/[community]/me'>) {
   const { community: slug } = await props.params;
-  const { community, role, profile, membership, unitIds } = await requireCommunity(slug);
+  const { community, role, profile, membership, unitIds, user } = await requireCommunity(slug);
   const supabase = await getSupabase();
+  const base = `/app/${slug}`;
 
-  const [contributions, activities, volunteering, tasks, units] = await Promise.all([
+  const [contributions, registrations, suggestions, campaigns, units] = await Promise.all([
     supabase
       .from('contributions')
       .select('id, amount, method, receipt_no, paid_at, events(slug, name, emoji)')
@@ -25,21 +43,21 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
       .limit(50),
     supabase
       .from('activity_participants')
-      .select('activity_id, joined_at, event_activities(name, emoji, events(slug, name))')
+      .select('id, participant_name, joined_at, event_activities(name, emoji, events(slug, name))')
       .eq('membership_id', membership.id)
       .order('joined_at', { ascending: false }),
     supabase
-      .from('event_volunteers')
-      .select('role_id, signed_up_at, volunteer_roles(name, emoji, events(slug, name))')
-      .eq('membership_id', membership.id)
-      .order('signed_up_at', { ascending: false }),
+      .from('activity_suggestions')
+      .select('id, kind, name, status, review_note, created_at, events(slug, name)')
+      .eq('suggested_by', membership.id)
+      .order('created_at', { ascending: false }),
     supabase
-      .from('event_tasks')
-      .select('id, name, status, due_on, events(slug, name)')
-      .eq('assignee_id', membership.id)
-      .neq('status', 'done')
-      .order('due_on', { nullsFirst: false })
-      .limit(20),
+      .from('events')
+      .select('id, slug, emoji, name, status, fund_target, created_at')
+      .eq('community_id', community.id)
+      .eq('kind', 'campaign')
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false }),
     unitIds.length
       ? supabase.from('units').select('block, number').in('id', unitIds)
       : Promise.resolve({ data: [] as { block: string | null; number: string }[] }),
@@ -47,52 +65,29 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
 
   const totalGiven = (contributions.data ?? []).reduce((sum, row) => sum + Number(row.amount), 0);
   const myUnits = (units.data ?? []).map((unit) => unitLabel(unit)).join(', ');
-  const base = `/app/${slug}`;
+  const roleLabel = ROLE_LABEL[normalizeRole(role) ?? 'resident'];
 
   return (
     <>
       <PageHeader
         title={profile?.full_name ?? 'My activity'}
-        description={[community.name, membership.title, ROLE_LABEL[role], myUnits]
-          .filter(Boolean)
-          .join(' · ')}
+        description={[community.name, roleLabel, myUnits].filter(Boolean).join(' · ')}
       />
       <PageBody>
-        <div className="grid grid-cols-3 gap-3">
-          <StatTile label="Contributed" value={formatMoney(totalGiven, community.currency)} />
-          <StatTile label="Performing in" value={String(activities.data?.length ?? 0)} />
-          <StatTile label="Volunteering" value={String(volunteering.data?.length ?? 0)} />
-        </div>
-
-        {tasks.data?.length ? (
-          <Card className="mt-5">
-            <CardHeader
-              title="Assigned to you"
-              description="Tasks from the event checklists you help run."
-            />
-            <ul className="divide-border-base divide-y">
-              {tasks.data.map((task) => (
-                <li key={task.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div className="min-w-0">
-                    <p className="text-ink text-sm font-medium">{task.name}</p>
-                    <p className="text-ink-subtle mt-0.5 text-xs">
-                      {task.events?.name}
-                      {task.due_on ? ` · due ${formatDate(task.due_on)}` : ''}
-                    </p>
-                  </div>
-                  {task.events?.slug ? (
-                    <Link
-                      href={`${base}/events/${task.events.slug}`}
-                      className="text-accent shrink-0 text-sm hover:underline"
-                    >
-                      Open
-                    </Link>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+        {!canParticipate(role) ? (
+          <Card className="mb-5">
+            <CardBody className="text-ink-muted text-sm">
+              As staff you run events and accounts from the console. Contributing, voting and
+              suggesting are for residents and the committee.
+            </CardBody>
           </Card>
         ) : null}
+
+        <div className="grid grid-cols-3 gap-3">
+          <StatTile label="Contributed" value={formatMoney(totalGiven, community.currency)} />
+          <StatTile label="Registrations" value={String(registrations.data?.length ?? 0)} />
+          <StatTile label="Suggestions" value={String(suggestions.data?.length ?? 0)} />
+        </div>
 
         <Card className="mt-5">
           <CardHeader title="Your contributions" />
@@ -132,53 +127,114 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
 
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <Card>
-            <CardHeader title="Performing in" />
-            {activities.data?.length ? (
+            <CardHeader title="Activity registrations" />
+            {registrations.data?.length ? (
               <ul className="divide-border-base divide-y">
-                {activities.data.map((row) => (
-                  <li key={row.activity_id} className="px-5 py-3">
+                {registrations.data.map((row) => (
+                  <li key={row.id} className="px-5 py-3">
                     <p className="text-ink text-sm font-medium">
                       {row.event_activities?.emoji} {row.event_activities?.name}
+                      {row.participant_name ? (
+                        <span className="text-ink-muted font-normal">
+                          {' '}
+                          · {row.participant_name}
+                        </span>
+                      ) : null}
                     </p>
-                    <p className="text-ink-subtle mt-0.5 text-xs">
-                      {row.event_activities?.events?.name}
-                    </p>
+                    {row.event_activities?.events?.slug ? (
+                      <Link
+                        href={`${base}/events/${row.event_activities.events.slug}#activities`}
+                        className="text-ink-subtle mt-0.5 text-xs hover:underline"
+                      >
+                        {row.event_activities.events.name}
+                      </Link>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             ) : (
               <EmptyState
                 icon={<CalendarDays className="size-6" />}
-                title="Not signed up yet"
-                description="Cultural activities you join will be listed here."
+                title="No registrations yet"
+                description="Register yourself or your family for an event’s activities."
               />
             )}
           </Card>
 
           <Card>
-            <CardHeader title="Volunteering" />
-            {volunteering.data?.length ? (
+            <CardHeader title="Your suggestions" />
+            {suggestions.data?.length ? (
               <ul className="divide-border-base divide-y">
-                {volunteering.data.map((row) => (
-                  <li key={row.role_id} className="px-5 py-3">
-                    <p className="text-ink text-sm font-medium">
-                      {row.volunteer_roles?.emoji} {row.volunteer_roles?.name}
-                    </p>
-                    <p className="text-ink-subtle mt-0.5 text-xs">
-                      {row.volunteer_roles?.events?.name}
-                    </p>
+                {suggestions.data.map((row) => (
+                  <li key={row.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="text-ink text-sm font-medium">{row.name}</p>
+                      <p className="text-ink-subtle mt-0.5 text-xs">
+                        {row.kind === 'idea' ? 'Idea' : 'Activity'}
+                        {row.events?.name ? ` · ${row.events.name}` : ''}
+                        {row.review_note ? ` · “${row.review_note}”` : ''}
+                      </p>
+                    </div>
+                    <Badge
+                      tone={
+                        row.status === 'accepted'
+                          ? 'success'
+                          : row.status === 'declined'
+                            ? 'neutral'
+                            : 'warning'
+                      }
+                    >
+                      {SUGGESTION_STATUS[row.status]}
+                    </Badge>
                   </li>
                 ))}
               </ul>
             ) : (
               <EmptyState
-                icon={<HandHeart className="size-6" />}
-                title="Not volunteering yet"
-                description="Sign up on any event to lend a hand."
+                icon={<Lightbulb className="size-6" />}
+                title="No suggestions yet"
+                description="Suggest an idea or activity from any event page."
               />
             )}
           </Card>
         </div>
+
+        {campaigns.data?.length ? (
+          <Card className="mt-5">
+            <CardHeader title="Campaigns you proposed" />
+            <ul className="divide-border-base divide-y">
+              {campaigns.data.map((campaign) => (
+                <li key={campaign.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                  <Link
+                    href={`${base}/events/${campaign.slug}`}
+                    className="min-w-0 hover:underline"
+                  >
+                    <p className="text-ink flex items-center gap-2 text-sm font-medium">
+                      <Megaphone className="text-ink-muted size-4" aria-hidden="true" />
+                      {campaign.emoji} {campaign.name}
+                    </p>
+                    <p className="text-ink-subtle mt-0.5 text-xs">
+                      Target {formatMoney(campaign.fund_target, community.currency)}
+                    </p>
+                  </Link>
+                  <Badge
+                    tone={
+                      campaign.status === 'published'
+                        ? 'success'
+                        : campaign.status === 'proposed'
+                          ? 'warning'
+                          : 'neutral'
+                    }
+                  >
+                    {campaign.status === 'cancelled'
+                      ? 'Turned down'
+                      : EVENT_STATUS_LABEL[campaign.status]}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
       </PageBody>
     </>
   );
