@@ -2,7 +2,7 @@
   "name": "samudaya",
   "version": "0.1.0",
   "private": true,
-  "description": "Samudaya \u2014 community & residential society management platform (web, mobile, WhatsApp, AI).",
+  "description": "Samudaya — community & residential society management platform (web, mobile, WhatsApp, AI).",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"
@@ -20,7 +20,8 @@
     "db:push": "supabase db push",
     "db:seed": "tsx scripts/seed.ts",
     "db:test": "bash scripts/db-test.sh",
-    "smoke": "bash scripts/smoke-test.sh"
+    "smoke": "bash scripts/smoke-test.sh",
+    "society:create": "tsx scripts/create-society.ts"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1",

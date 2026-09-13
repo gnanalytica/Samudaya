@@ -912,4 +912,66 @@ select test.act_as('99999999-9999-4999-8999-999999999999');
 select test.eq(test.visible($q$select id from storage.objects where bucket_id = 'payment-proofs'$q$), 1::bigint,
   'staff can see it to confirm the payment');
 
+-- ---------------------------------------------------------------------------
+-- Catalogue, flats and first-run welcome
+-- ---------------------------------------------------------------------------
+reset role;
+select test.ok(
+  (select count(*) from public.catalogue_items i join public.communities c on c.id = i.community_id
+    where c.slug = 'hill-crest' and i.kind = 'budget_category') >= 10,
+  'a new society starts with a default catalogue');
+
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.ok(
+  test.visible($q$select id from public.catalogue_items where kind = 'venue'$q$) > 0,
+  'residents can read the catalogue to pick from it');
+select test.raises(
+  $q$insert into public.catalogue_items (community_id, kind, label)
+     select c.id, 'vendor', 'Resident Vendor' from public.communities c where c.slug = 'hill-crest'$q$,
+  'but cannot change it');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.catalogue_items (community_id, kind, label, details)
+select c.id, 'vendor', 'Shubh Tent House', '{"phone":"+919845000111"}'
+  from public.communities c where c.slug = 'hill-crest';
+select test.eq(test.visible($q$select id from public.catalogue_items where label = 'Shubh Tent House'$q$),
+  1::bigint, 'staff add a vendor to the catalogue');
+select test.raises(
+  $q$insert into public.catalogue_items (community_id, kind, label)
+     select c.id, 'vendor', ' shubh tent house ' from public.communities c where c.slug = 'hill-crest'$q$,
+  'the same label cannot be added twice in a different case');
+select test.raises(
+  $q$insert into public.units (community_id, block, number)
+     select c.id, 'Z', '999' from public.communities c where c.slug = 'hill-crest'$q$,
+  'staff cannot add flats; the committee sets them up');
+
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(test.visible($q$select i.id from public.catalogue_items i join public.communities c on c.id = i.community_id where c.slug = 'hill-crest'$q$),
+  0::bigint, 'another society''s catalogue stays private');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+insert into public.units (community_id, block, number, floor)
+select c.id, 'B', '201', 2 from public.communities c where c.slug = 'hill-crest';
+select test.eq(test.visible($q$select id from public.units where block = 'B' and number = '201'$q$),
+  1::bigint, 'the committee adds flats during setup');
+
+reset role;
+update public.memberships set welcomed_at = null where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select public.mark_welcomed(c.id) from public.communities c where c.slug = 'hill-crest';
+reset role;
+select test.ok(
+  (select welcomed_at is not null from public.memberships where user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'),
+  'a member marks their own welcome as seen');
+update public.memberships set welcomed_at = null where user_id = 'abababab-abab-4bab-8bab-abababababab';
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select public.mark_welcomed(c.id) from public.communities c where c.slug = 'hill-crest';
+reset role;
+select test.ok(
+  (select welcomed_at is null from public.memberships where user_id = 'abababab-abab-4bab-8bab-abababababab'),
+  'and nobody else''s');
+
 reset role;

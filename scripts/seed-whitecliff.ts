@@ -647,6 +647,11 @@ async function seedSociety() {
         // sets the society's real UPI ID in the app.
         upi_vpa: 'whitecliff.demo@samudayademo',
         upi_payee_name: 'Whitecliff Residents Association',
+        address: 'Seegehalli Village Road, Seegehalli, Whitefield',
+        pincode: '560067',
+        // The demo is a fully running society, so skip the setup checklist.
+        catalogue_reviewed_at: new Date().toISOString(),
+        setup_completed_at: new Date().toISOString(),
       })
       .eq('id', cid),
   );

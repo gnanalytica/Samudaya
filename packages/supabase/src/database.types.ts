@@ -394,6 +394,7 @@ export type Database = {
           notes: string | null
           position: number
           created_at: string
+          category_id: string | null
         }
         Insert: {
           id?: string
@@ -404,6 +405,7 @@ export type Database = {
           notes?: string | null
           position?: number
           created_at?: string
+          category_id?: string | null
         }
         Update: {
           id?: string
@@ -414,8 +416,16 @@ export type Database = {
           notes?: string | null
           position?: number
           created_at?: string
+          category_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "budget_lines_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "budget_lines_community_id_fkey"
             columns: ["community_id"]
@@ -428,6 +438,63 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      catalogue_items: {
+        Row: {
+          id: string
+          community_id: string
+          kind: string
+          label: string
+          emoji: string | null
+          details: Json
+          position: number
+          is_active: boolean
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          kind: string
+          label: string
+          emoji?: string | null
+          details?: Json
+          position?: number
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          kind?: string
+          label?: string
+          emoji?: string | null
+          details?: Json
+          position?: number
+          is_active?: boolean
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalogue_items_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "catalogue_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           }
         ]
@@ -454,6 +521,10 @@ export type Database = {
           restrict_spending_approval: boolean
           upi_vpa: string | null
           upi_payee_name: string | null
+          address: string | null
+          pincode: string | null
+          setup_completed_at: string | null
+          catalogue_reviewed_at: string | null
         }
         Insert: {
           id?: string
@@ -476,6 +547,10 @@ export type Database = {
           restrict_spending_approval?: boolean
           upi_vpa?: string | null
           upi_payee_name?: string | null
+          address?: string | null
+          pincode?: string | null
+          setup_completed_at?: string | null
+          catalogue_reviewed_at?: string | null
         }
         Update: {
           id?: string
@@ -498,6 +573,10 @@ export type Database = {
           restrict_spending_approval?: boolean
           upi_vpa?: string | null
           upi_payee_name?: string | null
+          address?: string | null
+          pincode?: string | null
+          setup_completed_at?: string | null
+          catalogue_reviewed_at?: string | null
         }
         Relationships: [
           {
@@ -664,6 +743,7 @@ export type Database = {
           position: number
           created_at: string
           updated_at: string
+          activity_type_id: string | null
         }
         Insert: {
           id?: string
@@ -679,6 +759,7 @@ export type Database = {
           position?: number
           created_at?: string
           updated_at?: string
+          activity_type_id?: string | null
         }
         Update: {
           id?: string
@@ -694,8 +775,16 @@ export type Database = {
           position?: number
           created_at?: string
           updated_at?: string
+          activity_type_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "event_activities_activity_type_id_fkey"
+            columns: ["activity_type_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "event_activities_community_id_fkey"
             columns: ["community_id"]
@@ -852,6 +941,8 @@ export type Database = {
           created_at: string
           updated_at: string
           kind: string
+          event_type_id: string | null
+          venue_id: string | null
         }
         Insert: {
           id?: string
@@ -876,6 +967,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           kind?: string
+          event_type_id?: string | null
+          venue_id?: string | null
         }
         Update: {
           id?: string
@@ -900,6 +993,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           kind?: string
+          event_type_id?: string | null
+          venue_id?: string | null
         }
         Relationships: [
           {
@@ -914,6 +1009,20 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_event_type_id_fkey"
+            columns: ["event_type_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_venue_id_fkey"
+            columns: ["venue_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_items"
             referencedColumns: ["id"]
           }
         ]
@@ -939,6 +1048,8 @@ export type Database = {
           spent_on: string
           created_at: string
           updated_at: string
+          vendor_id: string | null
+          category_id: string | null
         }
         Insert: {
           id?: string
@@ -960,6 +1071,8 @@ export type Database = {
           spent_on?: string
           created_at?: string
           updated_at?: string
+          vendor_id?: string | null
+          category_id?: string | null
         }
         Update: {
           id?: string
@@ -981,6 +1094,8 @@ export type Database = {
           spent_on?: string
           created_at?: string
           updated_at?: string
+          vendor_id?: string | null
+          category_id?: string | null
         }
         Relationships: [
           {
@@ -988,6 +1103,13 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_items"
             referencedColumns: ["id"]
           },
           {
@@ -1009,6 +1131,13 @@ export type Database = {
             columns: ["requested_by"]
             isOneToOne: false
             referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "catalogue_items"
             referencedColumns: ["id"]
           }
         ]
@@ -1350,6 +1479,7 @@ export type Database = {
           updated_at: string
           title: string | null
           approves_spending: boolean
+          welcomed_at: string | null
         }
         Insert: {
           id?: string
@@ -1363,6 +1493,7 @@ export type Database = {
           updated_at?: string
           title?: string | null
           approves_spending?: boolean
+          welcomed_at?: string | null
         }
         Update: {
           id?: string
@@ -1376,6 +1507,7 @@ export type Database = {
           updated_at?: string
           title?: string | null
           approves_spending?: boolean
+          welcomed_at?: string | null
         }
         Relationships: [
           {
@@ -2167,6 +2299,12 @@ export type Database = {
         p_community_id?: string
       }
         Returns: Database["public"]["Tables"]["whatsapp_link_codes"]["Row"]
+      }
+      mark_welcomed: {
+        Args: {
+        p_community_id: string
+      }
+        Returns: undefined
       }
       normalize_invite_code: {
         Args: {

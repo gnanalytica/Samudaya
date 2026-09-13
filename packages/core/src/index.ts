@@ -9,3 +9,4 @@ export type { WhatsAppCommand } from './whatsapp/commands';
 export { verifyWebhookSignature, extractInboundMessages, toE164 } from './whatsapp/webhook';
 export type { InboundMessage } from './whatsapp/webhook';
 export * from './payments';
+export * from './setup';
