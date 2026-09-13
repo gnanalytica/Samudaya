@@ -50,13 +50,19 @@ export default async function JoinRequestsPage(
                     <div className="min-w-0">
                       <p className="text-ink text-sm font-semibold">{request.claimed_name}</p>
                       <p className="text-ink-subtle mt-0.5 text-xs">
-                        {request.units ? unitLabel(request.units) : 'Flat not chosen yet'}
+                        {request.relation === 'other'
+                          ? 'Works for the society (no flat)'
+                          : request.units
+                            ? unitLabel(request.units)
+                            : 'Flat not chosen yet'}
                         {request.claimed_phone ? ` · ${request.claimed_phone}` : ''}
                         {request.profiles?.email ? ` · ${request.profiles.email}` : ''}
                       </p>
                       <p className="text-ink-subtle mt-0.5 text-xs">
-                        asked {relativeTime(request.created_at)} · claims to be the{' '}
-                        {request.relation}
+                        asked {relativeTime(request.created_at)}
+                        {request.relation === 'other'
+                          ? ' · a supervisor or other society staff; admit as staff if so'
+                          : ` · claims to be the ${request.relation}`}
                       </p>
                     </div>
 
@@ -119,8 +125,12 @@ export default async function JoinRequestsPage(
                   <div className="min-w-0">
                     <p className="text-ink text-sm">{request.claimed_name}</p>
                     <p className="text-ink-subtle mt-0.5 text-xs">
-                      {request.units ? unitLabel(request.units) : '—'} ·{' '}
-                      {relativeTime(request.reviewed_at)}
+                      {request.relation === 'other'
+                        ? 'Works for the society (no flat)'
+                        : request.units
+                          ? unitLabel(request.units)
+                          : '—'}{' '}
+                      · {relativeTime(request.reviewed_at)}
                     </p>
                   </div>
                   <Badge tone={request.status === 'approved' ? 'success' : 'neutral'}>

@@ -1,16 +1,28 @@
 import Link from 'next/link';
-import { CalendarDays, ClipboardCheck, Plus, Receipt, UserPlus, Users } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  ClipboardCheck,
+  Library,
+  Plus,
+  Receipt,
+  Send,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { can, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { listEvents, getStatsFor } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
-import { ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { EventStatusBadge, FundBar, StatTile } from '@/components/badges';
 import { SocietyUpiForm } from './upi-form';
+import { SetupChecklist } from './setup-checklist';
+import { reopenSetup } from './actions';
 
 export const metadata = { title: 'Console' };
 
@@ -101,6 +113,10 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
         }
       />
       <PageBody>
+        {can(role, 'roles:manage') && !community.setup_completed_at ? (
+          <SetupChecklist community={community} />
+        ) : null}
+
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatTile
             label="Live"
@@ -220,6 +236,14 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
           {[
             { href: `${base}/admin/requests`, label: 'Join requests', icon: UserPlus, show: true },
             { href: `${base}/admin/members`, label: 'Residents', icon: Users, show: true },
+            { href: `${base}/admin/invite`, label: 'Invite', icon: Send, show: true },
+            { href: `${base}/admin/catalogue`, label: 'Catalogue', icon: Library, show: true },
+            {
+              href: `${base}/admin/units`,
+              label: 'Flats',
+              icon: Building2,
+              show: can(role, 'roles:manage'),
+            },
             {
               href: `${base}/admin/approvals`,
               label: 'Committee approvals',
@@ -244,6 +268,11 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
           <CardHeader
             title="Society code"
             description="One code for every resident. They enter it with their flat, and staff approve them."
+            action={
+              <ButtonLink href={`${base}/admin/invite`} size="sm" variant="secondary">
+                Join link and QR
+              </ButtonLink>
+            }
           />
           <CardBody>
             <p className="text-ink font-mono text-2xl font-semibold tracking-widest">
@@ -253,7 +282,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
         </Card>
 
         {can(role, 'roles:manage') ? (
-          <Card className="mt-5">
+          <Card className="mt-5" id="payments">
             <CardHeader
               title="Payments"
               description="Residents pay straight to this UPI ID from their UPI app, then report the UPI reference. Staff confirm each one against the bank statement before it counts."
@@ -273,6 +302,15 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
               <p className="text-ink font-mono text-sm">{community.upi_vpa}</p>
             </CardBody>
           </Card>
+        ) : null}
+
+        {can(role, 'roles:manage') && community.setup_completed_at ? (
+          <form action={reopenSetup} className="mt-6 text-center">
+            <input type="hidden" name="slug" value={community.slug} />
+            <Button type="submit" size="sm" variant="ghost">
+              Show the setup checklist again
+            </Button>
+          </form>
         ) : null}
       </PageBody>
     </>

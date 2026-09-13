@@ -17,6 +17,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 const PUBLIC_PATHS = [
   '/',
   '/login',
+  // Shared join links; the route sends signed-out visitors to sign in.
+  '/join',
   '/privacy',
   '/terms',
   '/auth',

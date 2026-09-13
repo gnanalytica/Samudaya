@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Clock, RefreshCw, XCircle } from 'lucide-react';
 import { relativeTime } from '@samudaya/core';
-import { getMemberships, requireUser } from '@/lib/auth';
+import { getMemberships, getProfile, requireUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -39,7 +39,10 @@ async function latestRequest(userId: string) {
 
 export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
   const user = await requireUser();
-  const { mode } = await props.searchParams;
+  const { mode, code } = await props.searchParams;
+  const profile = await getProfile();
+  // From a shared join link: /join/CODE fills the society code in.
+  const initialCode = typeof code === 'string' ? code.toUpperCase().slice(0, 16) : '';
 
   const memberships = await getMemberships();
   const firstSlug = memberships[0]?.communities?.slug;
@@ -81,8 +84,10 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
                 </div>
               ) : null}
               <div className="flex justify-between gap-4">
-                <dt className="text-ink-muted">Living there as</dt>
-                <dd className="text-ink font-medium capitalize">{pending.relation}</dd>
+                <dt className="text-ink-muted">Joining as</dt>
+                <dd className="text-ink font-medium capitalize">
+                  {pending.relation === 'other' ? 'Works for the society' : pending.relation}
+                </dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-ink-muted">Sent</dt>
@@ -122,7 +127,7 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
             </div>
           ) : null}
 
-          <JoinFlow />
+          <JoinFlow initialCode={initialCode} initialName={profile?.full_name ?? ''} />
         </>
       )}
 

@@ -18,11 +18,12 @@ import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile } from '@/components/badges';
+import { WelcomeCard } from '@/components/welcome-card';
 
 export default async function DashboardPage(props: PageProps<'/app/[community]'>) {
   const { community: slug } = await props.params;
   const { joined } = await props.searchParams;
-  const { community, role, profile } = await requireCommunity(slug);
+  const { community, role, profile, membership } = await requireCommunity(slug);
   const supabase = await getSupabase();
   const base = `/app/${community.slug}`;
 
@@ -82,7 +83,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
       />
 
       <PageBody>
-        {joined ? (
+        {!membership.welcomed_at ? (
+          <WelcomeCard slug={community.slug} role={role} societyName={community.name} />
+        ) : null}
+
+        {joined && membership.welcomed_at ? (
           <div className="border-brand-200 bg-brand-50 dark:border-brand-800 dark:bg-brand-950 mb-5 flex items-start gap-3 rounded-xl border p-4">
             <Sparkles className="text-accent mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink text-sm font-medium">You’ve joined {community.name}.</p>

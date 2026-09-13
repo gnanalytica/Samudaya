@@ -104,7 +104,9 @@ const detailsSchema = z.object({
   name: z.string().trim().min(2, 'Tell us your name').max(120),
   phone: residentPhone,
   unit_id: uuid.nullable(),
-  relation: z.enum(['owner', 'tenant', 'family']),
+  // 'other' is someone who works for the society (a supervisor, a manager):
+  // they have no flat, and staff decide their role when admitting them.
+  relation: z.enum(['owner', 'tenant', 'family', 'other']),
 });
 
 export async function submitJoinDetails(_prev: JoinState, formData: FormData): Promise<JoinState> {
@@ -118,11 +120,12 @@ export async function submitJoinDetails(_prev: JoinState, formData: FormData): P
     relation: formData.get('relation') || 'owner',
   });
   if (!parsed.success) return { error: 'Please pick your flat and try again.' };
+  const unitId = parsed.data.relation === 'other' ? null : parsed.data.unit_id;
 
   const supabase = await getSupabase();
   const { data, error } = await supabase.rpc('request_to_join', {
     p_join_code: normalizeJoinCode(parsed.data.join_code),
-    p_unit_id: parsed.data.unit_id ?? undefined,
+    p_unit_id: unitId ?? undefined,
     p_name: parsed.data.name,
     p_phone: parsed.data.phone,
     p_relation: parsed.data.relation,

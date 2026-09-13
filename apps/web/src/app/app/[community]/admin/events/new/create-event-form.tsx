@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EMPTY_STATE } from '@/lib/action-state';
+import { CatalogueSelect } from '@/components/catalogue-select';
+import type { Pickers } from '../[event]/forms';
 import { createEvent, type EventFormState } from '../actions';
 
 function Submit() {
@@ -29,18 +31,21 @@ function slugify(value: string) {
     .slice(0, 60);
 }
 
-const STARTER_BUDGET = [
-  { category: 'Decoration', amount: '' },
-  { category: 'Food', amount: '' },
-  { category: 'Sound & lights', amount: '' },
-];
+type Line = { key: number; categoryId: string | null; amount: string };
 
-export function CreateEventForm({ slug }: { slug: string }) {
+export function CreateEventForm({ slug, pickers }: { slug: string; pickers: Pickers }) {
   const [state, action] = useActionState<EventFormState, FormData>(createEvent, EMPTY_STATE);
   const [name, setName] = useState('');
   const [eventSlug, setEventSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
-  const [lines, setLines] = useState(STARTER_BUDGET);
+  // Start with the society's first three budget categories; each row keeps a
+  // stable key so removing one does not shuffle the others' choices.
+  const [lines, setLines] = useState<Line[]>(() =>
+    pickers.budget_category
+      .slice(0, 3)
+      .map((item, key) => ({ key, categoryId: item.id, amount: '' })),
+  );
+  const [nextKey, setNextKey] = useState(3);
   const total = lines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
 
   return (
@@ -107,9 +112,25 @@ export function CreateEventForm({ slug }: { slug: string }) {
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Venue" htmlFor="ne-venue">
-              {(control) => <Input {...control} name="venue" placeholder="Clubhouse" />}
-            </Field>
+            <CatalogueSelect
+              slug={slug}
+              kind="event_type"
+              name="event_type"
+              label="Event type"
+              items={pickers.event_type}
+              placeholder="Choose a type"
+            />
+            <CatalogueSelect
+              slug={slug}
+              kind="venue"
+              name="venue"
+              label="Venue"
+              items={pickers.venue}
+              placeholder="Choose a venue"
+              manageHref={pickers.manageHref}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Organised by" htmlFor="ne-org">
               {(control) => (
                 <Input {...control} name="organizer" placeholder="Cultural committee" />
@@ -128,37 +149,34 @@ export function CreateEventForm({ slug }: { slug: string }) {
           description={`What you plan to spend. The total, ${formatMoney(total)}, becomes the fund target.`}
         />
         <CardBody className="space-y-2">
-          {lines.map((line, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <label className="sr-only" htmlFor={`bl-cat-${index}`}>
-                Category
-              </label>
-              <Input
-                id={`bl-cat-${index}`}
-                name="budget_category"
-                value={line.category}
-                onChange={(event) =>
-                  setLines((current) =>
-                    current.map((l, i) =>
-                      i === index ? { ...l, category: event.target.value } : l,
-                    ),
-                  )
-                }
-                placeholder="Category"
-                className="flex-1"
-              />
-              <label className="sr-only" htmlFor={`bl-amt-${index}`}>
+          {lines.map((line) => (
+            <div key={line.key} className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <CatalogueSelect
+                  slug={slug}
+                  kind="budget_category"
+                  name="budget_category"
+                  label="Budget category"
+                  items={pickers.budget_category}
+                  defaultId={line.categoryId}
+                  placeholder="Choose a category"
+                  hideLabel
+                />
+              </div>
+              <label className="sr-only" htmlFor={`bl-amt-${line.key}`}>
                 Amount
               </label>
               <Input
-                id={`bl-amt-${index}`}
+                id={`bl-amt-${line.key}`}
                 name="budget_amount"
                 type="number"
                 min={0}
                 value={line.amount}
                 onChange={(event) =>
                   setLines((current) =>
-                    current.map((l, i) => (i === index ? { ...l, amount: event.target.value } : l)),
+                    current.map((l) =>
+                      l.key === line.key ? { ...l, amount: event.target.value } : l,
+                    ),
                   )
                 }
                 placeholder="₹"
@@ -166,19 +184,28 @@ export function CreateEventForm({ slug }: { slug: string }) {
               />
               <button
                 type="button"
-                onClick={() => setLines((current) => current.filter((_, i) => i !== index))}
+                onClick={() => setLines((current) => current.filter((l) => l.key !== line.key))}
                 className="text-ink-subtle hover:text-ink p-1.5"
-                aria-label={`Remove ${line.category || 'line'}`}
+                aria-label="Remove this budget line"
               >
                 <X className="size-4" aria-hidden="true" />
               </button>
             </div>
           ))}
+          <p className="text-ink-subtle text-xs">
+            Categories come from the catalogue.{' '}
+            <a href={pickers.manageHref} className="underline underline-offset-4">
+              Manage catalogue
+            </a>
+          </p>
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            onClick={() => setLines((current) => [...current, { category: '', amount: '' }])}
+            onClick={() => {
+              setLines((current) => [...current, { key: nextKey, categoryId: null, amount: '' }]);
+              setNextKey((key) => key + 1);
+            }}
           >
             <Plus className="size-4" aria-hidden="true" />
             Add a line

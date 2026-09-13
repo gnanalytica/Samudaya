@@ -24,16 +24,26 @@ const initial: JoinState = {};
  * second step needs the society's flat list, which only exists once the code
  * has been checked.
  */
-export function JoinFlow() {
+export function JoinFlow({
+  initialCode = '',
+  initialName = '',
+}: {
+  /** From a shared join link. */
+  initialCode?: string;
+  /** From the Google account, so most people only add their mobile number. */
+  initialName?: string;
+}) {
   const [start, startAction] = useActionState(startJoin, initial);
   const [details, detailsAction] = useActionState(submitJoinDetails, initial);
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(initialCode);
 
   const blocks = useMemo(() => {
     const names = new Set((start.units ?? []).map((unit) => unit.block ?? ''));
     return [...names].sort();
   }, [start.units]);
   const [block, setBlock] = useState<string | null>(null);
+  const [relation, setRelation] = useState('owner');
+  const worksHere = relation === 'other';
   const activeBlock = block ?? blocks[0] ?? '';
   const flats = (start.units ?? []).filter((unit) => (unit.block ?? '') === activeBlock);
 
@@ -56,7 +66,28 @@ export function JoinFlow() {
               </p>
             </div>
 
-            {start.units?.length ? (
+            <Field label="You are" htmlFor="jr-relation">
+              {(control) => (
+                <Select
+                  {...control}
+                  name="relation"
+                  value={relation}
+                  onChange={(event) => setRelation(event.target.value)}
+                >
+                  <option value="owner">Owner of a flat</option>
+                  <option value="tenant">Tenant</option>
+                  <option value="family">Family member of an owner or tenant</option>
+                  <option value="other">I work for the society</option>
+                </Select>
+              )}
+            </Field>
+
+            {worksHere ? (
+              <p className="text-ink-muted text-sm">
+                Supervisors, managers and other staff don’t need a flat. The committee will choose
+                your role when they approve you.
+              </p>
+            ) : start.units?.length ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 {blocks.length > 1 ? (
                   <Field label="Tower" htmlFor="jr-block">
@@ -97,16 +128,6 @@ export function JoinFlow() {
               </p>
             )}
 
-            <Field label="You live there as" htmlFor="jr-relation">
-              {(control) => (
-                <Select {...control} name="relation" defaultValue="owner">
-                  <option value="owner">Owner</option>
-                  <option value="tenant">Tenant</option>
-                  <option value="family">Family member</option>
-                </Select>
-              )}
-            </Field>
-
             {details.error ? (
               <p role="alert" className="text-danger text-sm">
                 {details.error}
@@ -128,7 +149,11 @@ export function JoinFlow() {
             label="Society code"
             htmlFor="join-code"
             error={start.fieldErrors?.join_code}
-            hint="Your committee shares one code with every resident."
+            hint={
+              initialCode
+                ? 'Filled in from your join link.'
+                : 'Your committee shares one code with every resident.'
+            }
             required
           >
             {(control) => (
@@ -146,7 +171,15 @@ export function JoinFlow() {
             )}
           </Field>
           <Field label="Your name" htmlFor="jr-name" error={start.fieldErrors?.name} required>
-            {(control) => <Input {...control} name="name" autoComplete="name" required />}
+            {(control) => (
+              <Input
+                {...control}
+                name="name"
+                autoComplete="name"
+                defaultValue={initialName}
+                required
+              />
+            )}
           </Field>
           <Field
             label="Mobile number"
@@ -163,6 +196,7 @@ export function JoinFlow() {
                 inputMode="tel"
                 autoComplete="tel"
                 placeholder="98450 12345"
+                autoFocus={Boolean(initialCode)}
                 required
               />
             )}

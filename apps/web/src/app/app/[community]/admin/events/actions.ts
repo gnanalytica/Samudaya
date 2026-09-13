@@ -13,6 +13,7 @@ import {
   uuid,
 } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
+import { getCatalogue, resolveCatalogueChoice } from '@/lib/catalogue';
 import { getSupabase } from '@/lib/supabase/server';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
 
@@ -32,6 +33,14 @@ function refreshEvent(communitySlug: string, eventSlug: string) {
   revalidatePath(`/app/${communitySlug}/events/${eventSlug}/accounts`);
   revalidatePath(`/app/${communitySlug}/events`);
   revalidatePath(`/app/${communitySlug}/admin`);
+}
+
+async function billChoices(communityId: string, formData: FormData) {
+  const [category, vendor] = await Promise.all([
+    resolveCatalogueChoice(communityId, 'budget_category', formData, 'category'),
+    resolveCatalogueChoice(communityId, 'vendor', formData, 'vendor'),
+  ]);
+  return { category, vendor };
 }
 
 async function findEvent(communityId: string, eventSlug: string) {
@@ -58,7 +67,6 @@ function eventFields(formData: FormData) {
     name: formData.get('name'),
     starts_on: formData.get('starts_on'),
     ends_on: formData.get('ends_on') || null,
-    venue: formData.get('venue') || undefined,
     organizer: formData.get('organizer') || undefined,
     description: formData.get('description') || undefined,
     fund_rule: formData.get('fund_rule') || 'general_fund',
@@ -74,19 +82,34 @@ export async function createEvent(
   const communitySlug = String(formData.get('slug') ?? '');
   const context = await requireCapability(communitySlug, 'events:manage');
 
-  const categories = formData.getAll('budget_category').map((value) => String(value).trim());
+  // Budget lines pick a category from the catalogue; the label stored on the
+  // line comes from the catalogue, not the form.
+  const catalogue = await getCatalogue(context.community.id);
+  const categoryIds = formData.getAll('budget_category_id').map((value) => String(value).trim());
   const amounts = formData.getAll('budget_amount').map((value) => Number(value || 0));
-  const lines = categories
-    .map((category, index) => ({ category, amount: amounts[index] ?? 0 }))
-    .filter((line) => line.category && line.amount >= 0);
-  if (lines.some((line) => !Number.isFinite(line.amount))) {
+  const lines = categoryIds
+    .map((id, index) => ({
+      item: catalogue.budget_category.find((entry) => entry.id === id) ?? null,
+      amount: amounts[index] ?? 0,
+    }))
+    .filter((line) => line.item || line.amount > 0);
+  if (lines.some((line) => !line.item)) {
+    return { error: 'Pick a category for every budget line that has an amount.' };
+  }
+  if (lines.some((line) => !Number.isFinite(line.amount) || line.amount < 0)) {
     return { error: 'Budget amounts must be numbers.' };
   }
   const fundTarget = lines.reduce((sum, line) => sum + line.amount, 0);
 
+  const [eventType, venue] = await Promise.all([
+    resolveCatalogueChoice(context.community.id, 'event_type', formData, 'event_type'),
+    resolveCatalogueChoice(context.community.id, 'venue', formData, 'venue'),
+  ]);
+
   const parsed = createEventSchema.safeParse({
     community_id: context.community.id,
     ...eventFields(formData),
+    venue: venue.label ?? undefined,
     fund_target: fundTarget,
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
@@ -94,7 +117,14 @@ export async function createEvent(
   const supabase = await getSupabase();
   const { data: event, error } = await supabase
     .from('events')
-    .insert({ ...parsed.data, kind: 'event', status: 'draft', created_by: context.user.id })
+    .insert({
+      ...parsed.data,
+      event_type_id: eventType.id,
+      venue_id: venue.id,
+      kind: 'event',
+      status: 'draft',
+      created_by: context.user.id,
+    })
     .select('id, slug')
     .single();
 
@@ -110,7 +140,8 @@ export async function createEvent(
       lines.map((line, position) => ({
         event_id: event.id,
         community_id: context.community.id,
-        category: line.category,
+        category: line.item!.label,
+        category_id: line.item!.id,
         amount: line.amount,
         position,
       })),
@@ -142,12 +173,17 @@ export async function updateEventDetails(
   const eventSlug = String(formData.get('event') ?? '');
   const context = await requireCapability(communitySlug, 'events:manage');
 
+  const [eventType, venue] = await Promise.all([
+    resolveCatalogueChoice(context.community.id, 'event_type', formData, 'event_type'),
+    resolveCatalogueChoice(context.community.id, 'venue', formData, 'venue'),
+  ]);
+
   const parsed = updateEventSchema.safeParse({
     emoji: formData.get('emoji') || '🎉',
     name: formData.get('name'),
     starts_on: formData.get('starts_on'),
     ends_on: String(formData.get('ends_on') ?? '') || null,
-    venue: String(formData.get('venue') ?? '').trim() || null,
+    venue: venue.label,
     organizer: String(formData.get('organizer') ?? '').trim() || null,
     description: String(formData.get('description') ?? '').trim() || null,
   });
@@ -159,7 +195,7 @@ export async function updateEventDetails(
   const supabase = await getSupabase();
   const { error } = await supabase
     .from('events')
-    .update(parsed.data)
+    .update({ ...parsed.data, venue_id: venue.id, event_type_id: eventType.id })
     .eq('community_id', context.community.id)
     .eq('slug', eventSlug);
   if (error) return { error: friendlyDbError(error) };
@@ -201,7 +237,7 @@ async function syncFundTarget(eventId: string) {
 }
 
 const budgetLineInput = z.object({
-  category: z.string().trim().min(1, 'Name the category').max(80),
+  category: z.string().trim().min(1, 'Pick a category').max(80),
   amount: z.coerce.number().min(0, 'Enter an amount').max(100_000_000),
   notes: z.string().trim().max(300).optional(),
 });
@@ -214,8 +250,14 @@ export async function addBudgetLine(_prev: ActionState, formData: FormData): Pro
   if (!event) return { error: 'That event no longer exists.' };
   if (event.kind === 'campaign') return { error: 'Campaigns have a single target, not a budget.' };
 
+  const category = await resolveCatalogueChoice(
+    context.community.id,
+    'budget_category',
+    formData,
+    'category',
+  );
   const parsed = budgetLineInput.safeParse({
-    category: formData.get('category'),
+    category: category.label ?? '',
     amount: formData.get('amount'),
     notes: formData.get('notes') || undefined,
   });
@@ -228,6 +270,7 @@ export async function addBudgetLine(_prev: ActionState, formData: FormData): Pro
     .eq('event_id', event.id);
   const { error } = await supabase.from('budget_lines').insert({
     ...parsed.data,
+    category_id: category.id,
     event_id: event.id,
     community_id: context.community.id,
     position: count ?? 0,
@@ -247,8 +290,14 @@ export async function updateBudgetLine(formData: FormData): Promise<void> {
   if (!event) return;
 
   const id = uuid.safeParse(formData.get('line_id'));
+  const category = await resolveCatalogueChoice(
+    context.community.id,
+    'budget_category',
+    formData,
+    'category',
+  );
   const parsed = budgetLineInput.safeParse({
-    category: formData.get('category'),
+    category: category.label ?? '',
     amount: formData.get('amount'),
   });
   if (!id.success || !parsed.success) return;
@@ -256,7 +305,11 @@ export async function updateBudgetLine(formData: FormData): Promise<void> {
   const supabase = await getSupabase();
   await supabase
     .from('budget_lines')
-    .update({ category: parsed.data.category, amount: parsed.data.amount })
+    .update({
+      category: parsed.data.category,
+      category_id: category.id,
+      amount: parsed.data.amount,
+    })
     .eq('id', id.data)
     .eq('event_id', event.id);
 
@@ -303,9 +356,17 @@ export async function addActivity(_prev: ActionState, formData: FormData): Promi
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
-  const { error } = await supabase
-    .from('event_activities')
-    .insert({ ...parsed.data, community_id: context.community.id });
+  const activityType = await resolveCatalogueChoice(
+    context.community.id,
+    'activity_type',
+    formData,
+    'activity_type',
+  );
+  const { error } = await supabase.from('event_activities').insert({
+    ...parsed.data,
+    activity_type_id: activityType.id,
+    community_id: context.community.id,
+  });
   if (error) {
     return {
       error:
@@ -349,12 +410,17 @@ export async function updateActivity(formData: FormData): Promise<void> {
 // Bills
 // ---------------------------------------------------------------------------
 
-function expenseFields(formData: FormData) {
+/** Bill fields; category and vendor are resolved from the catalogue by the caller. */
+function expenseFields(
+  formData: FormData,
+  category: { label: string | null },
+  vendor: { label: string | null },
+) {
   return {
     name: formData.get('name'),
-    category: formData.get('category') || undefined,
+    category: category.label ?? undefined,
     amount: formData.get('amount'),
-    vendor: formData.get('vendor') || undefined,
+    vendor: vendor.label ?? undefined,
     paid_by: formData.get('paid_by') || undefined,
     method: formData.get('method') || 'upi',
     bill_url: formData.get('bill_url') || undefined,
@@ -373,12 +439,18 @@ export async function submitExpense(_prev: ActionState, formData: FormData): Pro
     return { error: 'This event is closed; its ledger cannot be changed.' };
   }
 
-  const parsed = createExpenseSchema.safeParse({ event_id: event.id, ...expenseFields(formData) });
+  const { category, vendor } = await billChoices(context.community.id, formData);
+  const parsed = createExpenseSchema.safeParse({
+    event_id: event.id,
+    ...expenseFields(formData, category, vendor),
+  });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
   const { error } = await supabase.from('expenses').insert({
     ...parsed.data,
+    category_id: category.id,
+    vendor_id: vendor.id,
     community_id: context.community.id,
     requested_by: context.membership.id,
     status: 'pending',
@@ -404,7 +476,11 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
   const expenseId = uuid.safeParse(formData.get('expense_id'));
   if (!expenseId.success) return { error: 'That bill no longer exists.' };
 
-  const parsed = createExpenseSchema.safeParse({ event_id: event.id, ...expenseFields(formData) });
+  const { category, vendor } = await billChoices(context.community.id, formData);
+  const parsed = createExpenseSchema.safeParse({
+    event_id: event.id,
+    ...expenseFields(formData, category, vendor),
+  });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
@@ -413,6 +489,8 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
     .update({
       name: parsed.data.name,
       category: parsed.data.category ?? null,
+      category_id: category.id,
+      vendor_id: vendor.id,
       amount: parsed.data.amount,
       vendor: parsed.data.vendor ?? null,
       paid_by: parsed.data.paid_by ?? null,

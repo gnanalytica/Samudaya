@@ -21,6 +21,8 @@ import {
   requireEvent,
 } from '@/lib/events';
 import { getSupabase } from '@/lib/supabase/server';
+import { activeItems, getCatalogue } from '@/lib/catalogue';
+import { CatalogueSelect } from '@/components/catalogue-select';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -44,6 +46,7 @@ import {
   RecordPaymentForm,
   ReviewExpenseForm,
   ReviewPaymentForm,
+  type Pickers,
 } from './forms';
 import { removeBudgetLine, setEventStatus, updateActivity, updateBudgetLine } from '../actions';
 
@@ -73,21 +76,34 @@ export default async function ManageEventPage(
   const base = `/app/${community.slug}`;
   const here = `${base}/admin/events/${event.slug}`;
 
-  const [stats, budget, expenses, activities, registrations, payments, units] = await Promise.all([
-    getEventStats(event.id),
-    getBudgetLines(event.id),
-    getExpenses(event.id),
-    getActivities(event.id),
-    getRegistrations(event.id),
-    getPayments(event.id),
-    supabase
-      .from('units')
-      .select('id, block, number')
-      .eq('community_id', community.id)
-      .order('block', { nullsFirst: true })
-      .order('number')
-      .limit(2000),
-  ]);
+  const [stats, budget, expenses, activities, registrations, payments, units, catalogue] =
+    await Promise.all([
+      getEventStats(event.id),
+      getBudgetLines(event.id),
+      getExpenses(event.id),
+      getActivities(event.id),
+      getRegistrations(event.id),
+      getPayments(event.id),
+      supabase
+        .from('units')
+        .select('id, block, number')
+        .eq('community_id', community.id)
+        .order('block', { nullsFirst: true })
+        .order('number')
+        .limit(2000),
+      getCatalogue(community.id),
+    ]);
+
+  const pick = (kind: keyof typeof catalogue) =>
+    activeItems(catalogue, kind).map(({ id, label, emoji }) => ({ id, label, emoji }));
+  const pickers: Pickers = {
+    event_type: pick('event_type'),
+    venue: pick('venue'),
+    budget_category: pick('budget_category'),
+    activity_type: pick('activity_type'),
+    vendor: pick('vendor'),
+    manageHref: `${base}/admin/catalogue`,
+  };
 
   const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
   const closed = event.status === 'completed';
@@ -189,7 +205,7 @@ export default async function ManageEventPage(
             <Card>
               <CardHeader title="Details" />
               <CardBody>
-                <EventDetailsForm slug={slug} event={event} />
+                <EventDetailsForm slug={slug} event={event} pickers={pickers} />
               </CardBody>
             </Card>
             {event.status === 'published' || event.status === 'draft' ? (
@@ -253,16 +269,20 @@ export default async function ManageEventPage(
                           <input type="hidden" name="slug" value={slug} />
                           <input type="hidden" name="event" value={event.slug} />
                           <input type="hidden" name="line_id" value={line.id} />
-                          <label className="sr-only" htmlFor={`cat-${line.id}`}>
-                            Category
-                          </label>
-                          <Input
-                            id={`cat-${line.id}`}
-                            name="category"
-                            defaultValue={line.category}
-                            className="min-w-36 flex-1"
-                            disabled={closed}
-                          />
+                          <div className="min-w-44 flex-1">
+                            <CatalogueSelect
+                              slug={slug}
+                              kind="budget_category"
+                              name="category"
+                              label={`Category for ${line.category}`}
+                              items={pickers.budget_category}
+                              defaultId={line.category_id}
+                              defaultLabel={line.category}
+                              disabled={closed}
+                              hideLabel
+                              required
+                            />
+                          </div>
                           <label className="sr-only" htmlFor={`amt-${line.id}`}>
                             Amount
                           </label>
@@ -307,7 +327,7 @@ export default async function ManageEventPage(
               )}
               {!closed ? (
                 <CardBody className="border-border-base border-t">
-                  <AddBudgetLineForm slug={slug} eventSlug={event.slug} />
+                  <AddBudgetLineForm slug={slug} eventSlug={event.slug} pickers={pickers} />
                 </CardBody>
               ) : null}
             </Card>
@@ -390,7 +410,7 @@ export default async function ManageEventPage(
             <Card>
               <CardHeader title="Add an activity" />
               <CardBody>
-                <AddActivityForm slug={slug} eventSlug={event.slug} />
+                <AddActivityForm slug={slug} eventSlug={event.slug} pickers={pickers} />
               </CardBody>
             </Card>
           </div>
@@ -455,13 +475,16 @@ export default async function ManageEventPage(
                                 id: expense.id,
                                 name: expense.name,
                                 category: expense.category,
+                                category_id: expense.category_id,
                                 amount: Number(expense.amount),
                                 vendor: expense.vendor,
+                                vendor_id: expense.vendor_id,
                                 paid_by: expense.paid_by,
                                 method: expense.method,
                                 bill_url: expense.bill_url,
                                 spent_on: expense.spent_on,
                               }}
+                              pickers={pickers}
                             />
                           </div>
                         </details>
@@ -518,6 +541,7 @@ export default async function ManageEventPage(
                     eventSlug={event.slug}
                     communityId={community.id}
                     eventId={event.id}
+                    pickers={pickers}
                   />
                 </CardBody>
               </Card>

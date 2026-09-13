@@ -1,4 +1,5 @@
 import { requireCapability } from '@/lib/auth';
+import { activeItems, getCatalogue } from '@/lib/catalogue';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { CreateEventForm } from './create-event-form';
 
@@ -6,7 +7,10 @@ export const metadata = { title: 'Create event' };
 
 export default async function NewEventPage(props: PageProps<'/app/[community]/admin/events/new'>) {
   const { community: slug } = await props.params;
-  await requireCapability(slug, 'events:manage');
+  const { community } = await requireCapability(slug, 'events:manage');
+  const catalogue = await getCatalogue(community.id);
+  const pick = (kind: keyof typeof catalogue) =>
+    activeItems(catalogue, kind).map(({ id, label, emoji }) => ({ id, label, emoji }));
 
   return (
     <>
@@ -16,7 +20,17 @@ export default async function NewEventPage(props: PageProps<'/app/[community]/ad
       />
       <PageBody>
         <div className="mx-auto max-w-2xl">
-          <CreateEventForm slug={slug} />
+          <CreateEventForm
+            slug={slug}
+            pickers={{
+              event_type: pick('event_type'),
+              venue: pick('venue'),
+              budget_category: pick('budget_category'),
+              activity_type: pick('activity_type'),
+              vendor: pick('vendor'),
+              manageHref: `/app/${community.slug}/admin/catalogue`,
+            }}
+          />
         </div>
       </PageBody>
     </>

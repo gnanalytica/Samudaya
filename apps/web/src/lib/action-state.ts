@@ -52,6 +52,14 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
   contributions_upi_reference_unique: 'That UPI reference has already been reported.',
   communities_upi_vpa_format: 'Enter a UPI ID like society@okaxis.',
   communities_upi_payee_length: 'Keep the payee name under 80 characters.',
+  catalogue_items_unique_label:
+    'That name is already in the catalogue. Restore it from Archived if it is hidden.',
+  catalogue_items_label_length: 'Give it a name of up to 80 characters.',
+  catalogue_items_kind: 'That catalogue section doesn’t exist.',
+  units_community_label_key: 'A flat with that tower and number already exists.',
+  units_number_not_blank: 'Give the flat a number.',
+  communities_pincode_format: 'Enter a 6-digit PIN code.',
+  communities_address_length: 'Keep the address under 300 characters.',
 };
 
 /**

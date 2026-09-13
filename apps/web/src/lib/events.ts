@@ -18,7 +18,7 @@ import { getSupabase } from './supabase/server';
 // select text, and concatenating with `+` widens it to `string`, which
 // collapses the result to an error type.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, kind, starts_on, ends_on, venue, organizer, description, status, expected_attendance, fund_target, fund_rule, fund_rule_note, published_at, closed_at, closing_summary, created_by, created_at';
+  'id, slug, emoji, name, kind, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, status, expected_attendance, fund_target, fund_rule, fund_rule_note, published_at, closed_at, closing_summary, created_by, created_at';
 
 export const getEvent = cache(async (communityId: string, slug: string) => {
   const supabase = await getSupabase();
@@ -137,7 +137,7 @@ export const getExpenses = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('expenses')
     .select(
-      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
+      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
@@ -180,7 +180,7 @@ export const getBudgetLines = cache(async (eventId: string) => {
   const supabase = await getSupabase();
   const { data } = await supabase
     .from('budget_lines')
-    .select('id, category, amount, notes, position')
+    .select('id, category, category_id, amount, notes, position')
     .eq('event_id', eventId)
     .order('position')
     .order('created_at');

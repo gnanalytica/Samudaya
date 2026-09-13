@@ -7,6 +7,7 @@ import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
 import { FileUpload } from '@/components/file-upload';
+import { CatalogueSelect, type PickerItem } from '@/components/catalogue-select';
 import {
   addActivity,
   addBudgetLine,
@@ -74,6 +75,16 @@ function useResettingAction(fn: (prev: ActionState, formData: FormData) => Promi
   return { state, action: wrapped, ref, version };
 }
 
+/** The catalogue items a form's pickers offer, and where staff can edit them. */
+export type Pickers = {
+  event_type: PickerItem[];
+  venue: PickerItem[];
+  budget_category: PickerItem[];
+  activity_type: PickerItem[];
+  vendor: PickerItem[];
+  manageHref: string;
+};
+
 function Hidden({ slug, eventSlug }: { slug: string; eventSlug: string }) {
   return (
     <>
@@ -86,8 +97,10 @@ function Hidden({ slug, eventSlug }: { slug: string; eventSlug: string }) {
 export function EventDetailsForm({
   slug,
   event,
+  pickers,
 }: {
   slug: string;
+  pickers: Pickers;
   event: {
     slug: string;
     emoji: string;
@@ -95,6 +108,8 @@ export function EventDetailsForm({
     starts_on: string;
     ends_on: string | null;
     venue: string | null;
+    venue_id: string | null;
+    event_type_id: string | null;
     organizer: string | null;
     description: string | null;
   };
@@ -138,9 +153,28 @@ export function EventDetailsForm({
         </Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Venue" htmlFor="ev-venue">
-          {(control) => <Input {...control} name="venue" defaultValue={event.venue ?? ''} />}
-        </Field>
+        <CatalogueSelect
+          slug={slug}
+          kind="event_type"
+          name="event_type"
+          label="Event type"
+          items={pickers.event_type}
+          defaultId={event.event_type_id}
+          placeholder="Choose a type"
+        />
+        <CatalogueSelect
+          slug={slug}
+          kind="venue"
+          name="venue"
+          label="Venue"
+          items={pickers.venue}
+          defaultId={event.venue_id}
+          defaultLabel={event.venue}
+          placeholder="Choose a venue"
+          manageHref={pickers.manageHref}
+        />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Organised by" htmlFor="ev-org">
           {(control) => (
             <Input {...control} name="organizer" defaultValue={event.organizer ?? ''} />
@@ -158,15 +192,32 @@ export function EventDetailsForm({
   );
 }
 
-export function AddBudgetLineForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
-  const { state, action, ref } = useResettingAction(addBudgetLine);
+export function AddBudgetLineForm({
+  slug,
+  eventSlug,
+  pickers,
+}: {
+  slug: string;
+  eventSlug: string;
+  pickers: Pickers;
+}) {
+  const { state, action, ref, version } = useResettingAction(addBudgetLine);
   return (
     <form ref={ref} action={action} className="flex flex-wrap items-end gap-2">
       <Hidden slug={slug} eventSlug={eventSlug} />
-      <div className="min-w-40 flex-1">
-        <Field label="Category" htmlFor="bl-category" error={state.fieldErrors?.category}>
-          {(control) => <Input {...control} name="category" placeholder="Decoration" required />}
-        </Field>
+      <div className="min-w-44 flex-1">
+        <CatalogueSelect
+          key={version}
+          slug={slug}
+          kind="budget_category"
+          name="category"
+          label="Category"
+          items={pickers.budget_category}
+          error={state.fieldErrors?.category}
+          placeholder="Choose a category"
+          manageHref={pickers.manageHref}
+          required
+        />
       </div>
       <div className="w-36">
         <Field label="Amount (₹)" htmlFor="bl-amount" error={state.fieldErrors?.amount}>
@@ -183,11 +234,45 @@ export function AddBudgetLineForm({ slug, eventSlug }: { slug: string; eventSlug
   );
 }
 
-export function AddActivityForm({ slug, eventSlug }: { slug: string; eventSlug: string }) {
-  const { state, action, ref } = useResettingAction(addActivity);
+export function AddActivityForm({
+  slug,
+  eventSlug,
+  pickers,
+}: {
+  slug: string;
+  eventSlug: string;
+  pickers: Pickers;
+}) {
+  const { state, action, ref, version } = useResettingAction(addActivity);
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('🎭');
   return (
-    <form ref={ref} action={action} className="space-y-3">
+    <form
+      ref={ref}
+      action={async (formData) => {
+        await action(formData);
+        setName('');
+        setEmoji('🎭');
+      }}
+      className="space-y-3"
+    >
       <Hidden slug={slug} eventSlug={eventSlug} />
+      <CatalogueSelect
+        key={version}
+        slug={slug}
+        kind="activity_type"
+        name="activity_type"
+        label="Type"
+        items={pickers.activity_type}
+        placeholder="Choose a type (optional)"
+        hint="Picking a type fills in the name and emoji; change the name to suit this event."
+        manageHref={pickers.manageHref}
+        onPick={(item) => {
+          if (!item) return;
+          setName(item.label);
+          if (item.emoji) setEmoji(item.emoji);
+        }}
+      />
       <div className="flex flex-wrap items-end gap-2">
         <div className="w-20">
           <Field label="Emoji" htmlFor="act-emoji">
@@ -195,8 +280,9 @@ export function AddActivityForm({ slug, eventSlug }: { slug: string; eventSlug: 
               <Input
                 {...control}
                 name="emoji"
-                defaultValue="🎭"
-                maxLength={4}
+                value={emoji}
+                onChange={(event) => setEmoji(event.target.value)}
+                maxLength={8}
                 className="text-center"
               />
             )}
@@ -204,7 +290,16 @@ export function AddActivityForm({ slug, eventSlug }: { slug: string; eventSlug: 
         </div>
         <div className="min-w-40 flex-1">
           <Field label="Activity" htmlFor="act-name" error={state.fieldErrors?.name}>
-            {(control) => <Input {...control} name="name" placeholder="Rangoli contest" required />}
+            {(control) => (
+              <Input
+                {...control}
+                name="name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Kids’ rangoli contest"
+                required
+              />
+            )}
           </Field>
         </div>
         <div className="w-28">
@@ -226,8 +321,10 @@ type ExpenseDraft = {
   id: string;
   name: string;
   category: string | null;
+  category_id: string | null;
   amount: number;
   vendor: string | null;
+  vendor_id: string | null;
   paid_by: string | null;
   method: string;
   bill_url: string | null;
@@ -251,12 +348,14 @@ export function ExpenseForm({
   communityId,
   eventId,
   expense,
+  pickers,
 }: {
   slug: string;
   eventSlug: string;
   communityId: string;
   eventId: string;
   expense?: ExpenseDraft;
+  pickers: Pickers;
 }) {
   const [uploading, setUploading] = useState(false);
   const creating = !expense;
@@ -309,23 +408,31 @@ export function ExpenseForm({
         </Field>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field
+        <CatalogueSelect
+          key={creating ? `cat-${created.version}` : `cat-${expense.id}`}
+          slug={slug}
+          kind="budget_category"
+          name="category"
           label="Category"
-          htmlFor={`ex-category-${id}`}
-          hint="Use a budget category so planned vs spent lines up."
-        >
-          {(control) => (
-            <Input
-              {...control}
-              name="category"
-              placeholder="Decoration"
-              defaultValue={expense?.category ?? ''}
-            />
-          )}
-        </Field>
-        <Field label="Vendor" htmlFor={`ex-vendor-${id}`}>
-          {(control) => <Input {...control} name="vendor" defaultValue={expense?.vendor ?? ''} />}
-        </Field>
+          items={pickers.budget_category}
+          defaultId={expense?.category_id}
+          defaultLabel={expense?.category}
+          placeholder="Choose a category"
+          hint="The same categories as the budget, so planned and spent line up."
+          manageHref={pickers.manageHref}
+        />
+        <CatalogueSelect
+          key={creating ? `ven-${created.version}` : `ven-${expense.id}`}
+          slug={slug}
+          kind="vendor"
+          name="vendor"
+          label="Vendor"
+          items={pickers.vendor}
+          defaultId={expense?.vendor_id}
+          defaultLabel={expense?.vendor}
+          placeholder="Choose a vendor"
+          allowQuickAdd
+        />
       </div>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Paid by" htmlFor={`ex-paid-${id}`} hint="If someone is reimbursed.">
