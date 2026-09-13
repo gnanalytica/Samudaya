@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ROLE_LABEL, formatDate, formatMoney, receiptRef } from '@samudaya/core';
+import {
+  ROLE_LABEL,
+  formatDate,
+  formatMoney,
+  isAdmin,
+  isCommittee,
+  receiptRef,
+} from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -17,12 +24,22 @@ import {
   Title,
 } from '../../src/components/ui';
 import { StatTile } from '../../src/components/event-ui';
+import { LinkRow } from '../../src/components/admin-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function More() {
   const router = useRouter();
-  const { profile, activeCommunity, role, memberships, membershipId, setActiveCommunity, signOut } =
-    useAuth();
+  const {
+    profile,
+    activeCommunity,
+    role,
+    title,
+    approvesSpending,
+    memberships,
+    membershipId,
+    setActiveCommunity,
+    signOut,
+  } = useAuth();
 
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
@@ -90,9 +107,33 @@ export default function More() {
           <Title>{profile?.full_name ?? 'You'}</Title>
           <Caption>
             {activeCommunity?.name}
+            {title ? ` · ${title}` : ''}
             {role ? ` · ${ROLE_LABEL[role]}` : ''}
+            {approvesSpending ? ' · Spending approver' : ''}
           </Caption>
         </View>
+
+        {isCommittee(role) ? (
+          <Card style={{ gap: spacing.xs }}>
+            <Heading>Admin</Heading>
+            {isAdmin(role) ? (
+              <LinkRow
+                label="Approvals"
+                detail="Expenses waiting for sign-off and join requests"
+                onPress={() => router.push('/admin/approvals')}
+              />
+            ) : null}
+            <LinkRow
+              label="Members"
+              detail={
+                isAdmin(role)
+                  ? 'Roles, titles and spending approvers'
+                  : 'Who is in the society and their positions'
+              }
+              onPress={() => router.push('/admin/members')}
+            />
+          </Card>
+        ) : null}
 
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <StatTile label="CONTRIBUTED" value={formatMoney(totalGiven, currency)} />

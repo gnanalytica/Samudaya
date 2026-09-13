@@ -32,6 +32,9 @@ function RootStack() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="event/[slug]" options={{ title: 'Event' }} />
         <Stack.Screen name="contribute" options={{ title: 'Contribute', presentation: 'modal' }} />
+        <Stack.Screen name="admin/approvals" options={{ title: 'Approvals' }} />
+        <Stack.Screen name="admin/members" options={{ title: 'Members' }} />
+        <Stack.Screen name="admin/member/[id]" options={{ title: 'Edit member' }} />
       </Stack>
     </>
   );
