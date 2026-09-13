@@ -1544,6 +1544,8 @@ export type Database = {
           data: Json
           read_at: string | null
           created_at: string
+          pushed_at: string | null
+          push_error: string | null
         }
         Insert: {
           id?: string
@@ -1555,6 +1557,8 @@ export type Database = {
           data?: Json
           read_at?: string | null
           created_at?: string
+          pushed_at?: string | null
+          push_error?: string | null
         }
         Update: {
           id?: string
@@ -1566,6 +1570,8 @@ export type Database = {
           data?: Json
           read_at?: string | null
           created_at?: string
+          pushed_at?: string | null
+          push_error?: string | null
         }
         Relationships: [
           {
@@ -2299,6 +2305,12 @@ export type Database = {
         p_community_id?: string
       }
         Returns: Database["public"]["Tables"]["whatsapp_link_codes"]["Row"]
+      }
+      mark_notifications_read: {
+        Args: {
+        p_ids?: string[]
+      }
+        Returns: undefined
       }
       mark_welcomed: {
         Args: {

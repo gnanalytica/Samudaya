@@ -122,6 +122,21 @@ else
   fail=$((fail + 1))
 fi
 
+echo "▸ Push dispatch"
+# Same rule: 503 without a configured secret, 401 with one but a missing or
+# wrong header. It must never send pushes for an anonymous caller.
+PUSH_POST=$(status -X POST -H 'Content-Type: application/json' -H 'x-dispatch-secret: wrong' -d '{}' "$BASE/api/webhooks/push-dispatch")
+if [ "$PUSH_POST" = "503" ] || [ "$PUSH_POST" = "401" ]; then
+  printf '  \033[32m✓\033[0m push dispatch refuses a caller without the secret (%s)\n' "$PUSH_POST"
+  pass=$((pass + 1))
+else
+  printf '  \033[31m✗\033[0m push dispatch without the secret returned %s\n' "$PUSH_POST"
+  fail=$((fail + 1))
+fi
+
+echo "▸ Android App Links"
+check "GET /.well-known/assetlinks.json is 200" 200 "$(status "$BASE/.well-known/assetlinks.json")"
+
 echo
 if [ "$fail" -gt 0 ]; then
   echo "✗ smoke test: $pass passed, $fail failed"

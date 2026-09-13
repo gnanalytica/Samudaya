@@ -10,3 +10,4 @@ export { verifyWebhookSignature, extractInboundMessages, toE164 } from './whatsa
 export type { InboundMessage } from './whatsapp/webhook';
 export * from './payments';
 export * from './setup';
+export * from './notifications';

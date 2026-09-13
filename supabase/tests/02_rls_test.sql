@@ -974,4 +974,67 @@ select test.ok(
   (select welcomed_at is null from public.memberships where user_id = 'abababab-abab-4bab-8bab-abababababab'),
   'and nobody else''s');
 
+-- ---------------------------------------------------------------------------
+-- Notifications
+-- ---------------------------------------------------------------------------
+reset role;
+truncate public.notifications;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0', 'omar@example.com', '{"full_name":"Omar Sheikh"}');
+
+select test.act_as('f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0');
+create temporary table t_omar as
+select * from public.request_to_join('HILL2026', 'b2b2b2b2-0000-4000-8000-000000000001', 'Omar Sheikh', '9845098450', 'tenant');
+grant select on t_omar to authenticated;
+
+reset role;
+select test.eq(
+  (select array_agg(m.role::text order by m.role::text) from public.notifications n
+     join public.memberships m on m.user_id = n.user_id
+     join public.communities c on c.id = m.community_id and c.slug = 'hill-crest'
+    where n.kind = 'join_request'),
+  array['committee', 'staff'], 'a join request notifies staff and committee, not residents');
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select public.review_join_request((select request_id from t_omar), true);
+reset role;
+select test.eq(
+  (select count(*)::int from public.notifications
+    where kind = 'join_approved' and user_id = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0'),
+  1, 'the new resident is told they are in');
+
+select test.act_as('f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0');
+insert into public.contributions (event_id, community_id, membership_id, unit_id, amount, method, reference)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 'b2b2b2b2-0000-4000-8000-000000000001', 501, 'upi', '698765432109'
+  from public.memberships m where m.user_id = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0';
+select test.eq(test.visible($q$select id from public.notifications where kind = 'payment_reported'$q$), 0::bigint,
+  'the payer is not notified about their own report');
+
+reset role;
+select test.eq((select count(*)::int from public.notifications where kind = 'payment_reported'), 2,
+  'staff and committee are asked to confirm it');
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select public.review_contribution(c.id, true) from public.contributions c where c.reference = '698765432109';
+select public.mark_notifications_read();
+reset role;
+select test.eq(
+  (select count(*)::int from public.notifications
+    where kind = 'payment_confirmed' and user_id = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0'),
+  1, 'and the payer hears when it is confirmed');
+select test.ok(
+  (select bool_and(read_at is not null) from public.notifications where user_id = '99999999-9999-4999-8999-999999999999')
+  and (select bool_and(read_at is null) from public.notifications where user_id = 'f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0'),
+  'marking all read only touches the caller''s own notifications');
+
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(test.visible($q$select id from public.notifications where kind = 'payment_confirmed'$q$), 0::bigint,
+  'nobody reads another member''s notifications');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select contributors from public.event_stats where event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  2, 'contributors count households: two confirmed payments for flat A-1104 (staff cash and Omar) plus Tom''s count as two');
+
 reset role;
