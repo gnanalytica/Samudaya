@@ -1,6 +1,7 @@
 import { Redirect, Tabs } from 'expo-router';
 import { Text, type ColorValue } from 'react-native';
 import { useAuth } from '../../src/lib/auth';
+import { useUnreadCount } from '../../src/lib/notifications';
 import { Loading, Screen } from '../../src/components/ui';
 import { useTheme } from '../../src/lib/use-theme';
 
@@ -15,6 +16,7 @@ function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { loading, user, memberships, welcomedAt } = useAuth();
+  const unread = useUnreadCount();
 
   if (loading) {
     return (
@@ -59,7 +61,11 @@ export default function TabsLayout() {
       <Tabs.Screen name="community" options={{ href: null }} />
       <Tabs.Screen
         name="more"
-        options={{ title: 'More', tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} /> }}
+        options={{
+          title: 'More',
+          tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} />,
+          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
+        }}
       />
     </Tabs>
   );

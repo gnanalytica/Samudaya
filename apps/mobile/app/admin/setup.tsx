@@ -2,12 +2,10 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import * as WebBrowser from 'expo-web-browser';
 import { can, setupProgress, setupSteps, type SetupStepId } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { fetchSetupFacts } from '../../src/lib/setup';
-import { SITE_URL } from '../../src/lib/site';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
   Body,
@@ -71,18 +69,15 @@ export default function Setup() {
   const finished = Boolean(activeCommunity.setup_completed_at);
 
   const open = (id: SetupStepId) => {
-    const routes: Record<Exclude<SetupStepId, 'event'>, Href> = {
+    const routes: Record<SetupStepId, Href> = {
       details: '/admin/society',
       flats: '/admin/flats',
       catalogue: { pathname: '/admin/catalogue', params: { setup: '1' } },
       upi: '/admin/upi',
       staff: { pathname: '/admin/share', params: { for: 'staff' } },
       residents: { pathname: '/admin/share', params: { for: 'residents' } },
+      event: '/admin/event/new',
     };
-    if (id === 'event') {
-      void WebBrowser.openBrowserAsync(`${SITE_URL}/app/${activeCommunity.slug}/admin/events/new`);
-      return;
-    }
     router.push(routes[id]);
   };
 
@@ -166,9 +161,6 @@ export default function Setup() {
               <View style={{ flex: 1, gap: 2 }}>
                 <Body>{step.title}</Body>
                 <Caption>{step.description}</Caption>
-                {step.id === 'event' ? (
-                  <Caption>Opens the website to create the event.</Caption>
-                ) : null}
               </View>
               <Text style={{ color: colors.inkSubtle, fontSize: 18 }}>›</Text>
             </Card>

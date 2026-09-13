@@ -25,6 +25,7 @@ import {
 } from '../../src/components/ui';
 import { StatTile } from '../../src/components/event-ui';
 import { LinkRow } from '../../src/components/admin-ui';
+import { useUnreadCount } from '../../src/lib/notifications';
 import { spacing } from '../../src/lib/theme';
 
 export default function More() {
@@ -33,6 +34,7 @@ export default function More() {
     useAuth();
   const normalized = normalizeRole(role);
   const participant = can(role, 'contribute');
+  const unread = useUnreadCount();
 
   const { data, loading, refreshing, refresh } = useCommunityData(
     `more:${membershipId}`,
@@ -88,9 +90,22 @@ export default function More() {
           {normalized ? <Caption>{ROLE_DESCRIPTION[normalized]}</Caption> : null}
         </View>
 
+        <Card style={{ gap: spacing.xs }}>
+          <LinkRow
+            label={unread ? `Notifications (${unread} unread)` : 'Notifications'}
+            detail="Join requests, payments, bills and new events"
+            onPress={() => router.push('/notifications')}
+          />
+        </Card>
+
         {can(role, 'events:manage') ? (
           <Card style={{ gap: spacing.xs }}>
             <Heading>{can(role, 'roles:manage') ? 'Committee' : 'Staff'}</Heading>
+            <LinkRow
+              label="New event"
+              detail="Details, budget and activities; save a draft or publish"
+              onPress={() => router.push('/admin/event/new')}
+            />
             <LinkRow
               label="Join requests"
               detail="Admit new residents"
@@ -166,7 +181,7 @@ export default function More() {
                 onPress={() => router.push('/admin/queue')}
               />
             ) : null}
-            <Caption>Creating and editing events is on the website for now.</Caption>
+            <Caption>To edit an event, open it from Events and tap Manage event.</Caption>
           </Card>
         ) : null}
 

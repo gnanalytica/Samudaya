@@ -91,6 +91,16 @@ export default function EventDetail() {
             </View>
           </View>
           <Title>{event.name}</Title>
+          {can(role, 'events:manage') ? (
+            <View style={{ flexDirection: 'row', marginTop: spacing.xs }}>
+              <Chip
+                label="Manage event"
+                onPress={() =>
+                  router.push({ pathname: '/admin/event/[slug]', params: { slug: event.slug } })
+                }
+              />
+            </View>
+          ) : null}
           <Caption>
             {formatDate(event.starts_on)}
             {event.ends_on && event.ends_on !== event.starts_on
@@ -122,7 +132,7 @@ export default function EventDetail() {
           <View style={{ gap: spacing.xs }}>
             <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
             <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
-            <KeyValue label="Contributions" value={String(stats.contributors)} />
+            <KeyValue label="Households" value={String(stats.contributors)} />
           </View>
           {open && can(role, 'contribute') ? (
             <Button
@@ -205,7 +215,7 @@ function Analytics({ data, currency }: { data: Detail; currency: string }) {
       <Heading>At a glance</Heading>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
         <StatTile label="BUDGET USED" value={planned > 0 ? `${spentPercent}%` : '—'} />
-        <StatTile label="AVG GIFT" value={formatMoney(perContribution, currency)} />
+        <StatTile label="PER HOUSEHOLD" value={formatMoney(perContribution, currency)} />
         <StatTile label="BILLS" value={String(expenses.length)} />
       </View>
       {biggest ? (

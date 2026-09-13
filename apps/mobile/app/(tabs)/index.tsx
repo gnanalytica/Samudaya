@@ -193,7 +193,7 @@ export default function Home() {
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <StatTile label="RAISED" value={formatMoney(stats.fundRaised, currency)} />
               <StatTile label="SPENT" value={formatMoney(stats.spent, currency)} />
-              <StatTile label="FAMILIES" value={String(stats.contributors)} />
+              <StatTile label="HOUSEHOLDS" value={String(stats.contributors)} />
             </View>
           </>
         ) : (

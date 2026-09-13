@@ -89,13 +89,18 @@ export default function Events() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          can(role, 'campaigns:propose') ? (
-            <View style={{ marginBottom: spacing.sm }}>
-              <Button
-                label="Start a fundraising campaign"
-                variant="secondary"
-                onPress={() => router.push('/campaign/new')}
-              />
+          can(role, 'campaigns:propose') || can(role, 'events:manage') ? (
+            <View style={{ marginBottom: spacing.sm, gap: spacing.sm }}>
+              {can(role, 'events:manage') ? (
+                <Button label="New event" onPress={() => router.push('/admin/event/new')} />
+              ) : null}
+              {can(role, 'campaigns:propose') ? (
+                <Button
+                  label="Start a fundraising campaign"
+                  variant="secondary"
+                  onPress={() => router.push('/campaign/new')}
+                />
+              ) : null}
             </View>
           ) : null
         }

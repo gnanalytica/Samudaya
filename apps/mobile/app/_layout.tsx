@@ -4,15 +4,18 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/lib/auth';
 import { usePushRegistration } from '../src/lib/use-push-registration';
+import { usePushTapHandler } from '../src/lib/notifications';
 import { useTheme } from '../src/lib/use-theme';
 
 function RootStack() {
   const { colors, isDark } = useTheme();
-  const { user } = useAuth();
+  const { user, memberships, loading } = useAuth();
 
   // Runs inside the provider so it re-registers whenever the signed-in user
   // changes, and does nothing at all while signed out.
   usePushRegistration(user?.id ?? null);
+  // A tapped push opens its screen once there is a signed-in member to show it to.
+  usePushTapHandler(!loading && Boolean(user) && memberships.length > 0);
 
   return (
     <>
@@ -48,6 +51,9 @@ function RootStack() {
         <Stack.Screen name="admin/flats" options={{ title: 'Flats' }} />
         <Stack.Screen name="admin/catalogue" options={{ title: 'Catalogue' }} />
         <Stack.Screen name="admin/share" options={{ title: 'Share society code' }} />
+        <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="admin/event/new" options={{ title: 'New event' }} />
+        <Stack.Screen name="admin/event/[slug]" options={{ title: 'Manage event' }} />
       </Stack>
     </>
   );

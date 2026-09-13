@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { billPath, can, formatMoney } from '@samudaya/core';
@@ -116,10 +116,20 @@ type Existing = {
   status: string;
 };
 
+/**
+ * Removes a bill's stored file. Old rows may hold an http link instead of a
+ * storage path; those aren't ours to delete. Storage policies refuse to
+ * delete an approved bill's file, so a published ledger keeps its evidence.
+ */
+async function removeStoredBill(path: string) {
+  if (/^https?:\/\//i.test(path)) return;
+  await supabase.storage.from('bills').remove([path]);
+}
+
 function Form({ events, existing }: { events: EventOption[]; existing: Existing | null }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { activeCommunity, membershipId } = useAuth();
+  const { activeCommunity, membershipId, role } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
   const [eventId, setEventId] = useState(existing?.event_id ?? events[0]?.id ?? '');
@@ -225,12 +235,42 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
     setBusy(false);
 
     if (saveError) {
+      // The new upload belongs to a bill that never saved; don't leave it behind.
+      if (billFile && billUrl && billUrl !== existing?.bill_url) {
+        void removeStoredBill(billUrl);
+      }
       setError(saveError.message);
       return;
+    }
+    // A correction with a new file replaces the old one; remove the old file
+    // only now that the bill points at the new path.
+    if (billFile && existing?.bill_url && existing.bill_url !== billUrl) {
+      void removeStoredBill(existing.bill_url);
     }
     await queryClient.invalidateQueries({ queryKey: ['admin:bills'] });
     router.back();
   };
+
+  const deleteBill = async () => {
+    if (!existing) return;
+    setBusy(true);
+    setError(null);
+    const { error: deleteError } = await supabase.from('expenses').delete().eq('id', existing.id);
+    setBusy(false);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    if (existing.bill_url) void removeStoredBill(existing.bill_url);
+    await queryClient.invalidateQueries({ queryKey: ['admin:bills'] });
+    router.back();
+  };
+
+  const confirmDelete = () =>
+    Alert.alert('Delete this bill?', 'It will be removed with its file. This can’t be undone.', [
+      { text: 'Keep it', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void deleteBill() },
+    ]);
 
   return (
     <Screen>
@@ -266,7 +306,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
                   ))}
                 </ChipRow>
               ) : (
-                <Caption>No open events. Create one on the website first.</Caption>
+                <Caption>No open events. Create one from More → New event first.</Caption>
               )}
             </View>
             <Input
@@ -345,6 +385,14 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
             onPress={() => void save()}
             loading={busy}
           />
+          {existing && existing.status !== 'approved' && can(role, 'expenses:approve') ? (
+            <Button
+              label="Delete bill"
+              variant="secondary"
+              onPress={confirmDelete}
+              disabled={busy}
+            />
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </Screen>
