@@ -126,6 +126,39 @@ export default function More() {
                 onPress={() => router.push('/admin/upi')}
               />
             ) : null}
+            <LinkRow
+              label="Catalogue"
+              detail="Categories, venues, activity types and vendors"
+              onPress={() => router.push('/admin/catalogue')}
+            />
+            <LinkRow
+              label="Flats"
+              detail={
+                can(role, 'roles:manage') ? 'Add, import or remove flats' : 'The society’s flats'
+              }
+              onPress={() => router.push('/admin/flats')}
+            />
+            <LinkRow
+              label="Share society code"
+              detail={`Code ${activeCommunity?.join_code ?? ''} · invite residents on WhatsApp`}
+              onPress={() =>
+                router.push({ pathname: '/admin/share', params: { for: 'residents' } })
+              }
+            />
+            {can(role, 'roles:manage') ? (
+              <>
+                <LinkRow
+                  label="Society details"
+                  detail={activeCommunity?.address ?? 'Add the society’s address'}
+                  onPress={() => router.push('/admin/society')}
+                />
+                <LinkRow
+                  label="Setup checklist"
+                  detail={activeCommunity?.setup_completed_at ? 'Finished' : 'In progress'}
+                  onPress={() => router.push('/admin/setup')}
+                />
+              </>
+            ) : null}
             {can(role, 'campaigns:approve') ? (
               <LinkRow
                 label="Committee decisions"

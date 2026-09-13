@@ -9,10 +9,13 @@ import {
   fundedPercent,
   normalizeRole,
   normalizeStats,
+  setupProgress,
+  setupSteps,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { fetchEvents, fetchStats, pickNextEvent } from '../../src/lib/events';
+import { fetchSetupFacts } from '../../src/lib/setup';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
   Badge,
@@ -34,6 +37,7 @@ export default function Home() {
   const router = useRouter();
   const { profile, activeCommunity, role } = useAuth();
   const staffView = can(role, 'events:manage');
+  const setupOpen = can(role, 'roles:manage') && !activeCommunity?.setup_completed_at;
 
   const { data, loading, refreshing, refresh } = useCommunityData(
     `home:${role}`,
@@ -74,6 +78,12 @@ export default function Home() {
     },
   );
 
+  // The committee's setup checklist, until they finish it.
+  const setup = useCommunityData(
+    `home:setup:${setupOpen}:${activeCommunity?.address ?? ''}:${activeCommunity?.upi_vpa ?? ''}:${activeCommunity?.catalogue_reviewed_at ?? ''}`,
+    async () => (setupOpen && activeCommunity ? fetchSetupFacts(activeCommunity) : null),
+  );
+
   if (loading && !data) {
     return (
       <Screen>
@@ -102,6 +112,10 @@ export default function Home() {
             {normalized ? ` · ${ROLE_LABEL[normalized]}` : ''}
           </Caption>
         </View>
+
+        {setupOpen && setup.data ? (
+          <SetupCard steps={setupSteps(setup.data)} onOpen={() => router.push('/admin/setup')} />
+        ) : null}
 
         {staffView ? (
           <Card style={{ gap: spacing.xs }}>
@@ -207,5 +221,33 @@ export default function Home() {
         ) : null}
       </ScrollView>
     </Screen>
+  );
+}
+
+function SetupCard({
+  steps,
+  onOpen,
+}: {
+  steps: ReturnType<typeof setupSteps>;
+  onOpen: () => void;
+}) {
+  const progress = setupProgress(steps);
+  const next = steps.find((step) => !step.done);
+  return (
+    <Card style={{ gap: spacing.md }}>
+      <View style={{ gap: 2 }}>
+        <Heading>Set up your society</Heading>
+        <Caption>
+          {progress.done} of {progress.total} done
+          {next ? ` · next: ${next.title}` : ' · all steps done'}
+        </Caption>
+      </View>
+      <Meter
+        percent={Math.round((progress.done / progress.total) * 100)}
+        tone="success"
+        label="Setup progress"
+      />
+      <Button label={next ? 'Continue setup' : 'Review and finish'} onPress={onOpen} />
+    </Card>
   );
 }

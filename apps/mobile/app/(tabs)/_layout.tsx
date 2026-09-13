@@ -14,7 +14,7 @@ function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
 
 export default function TabsLayout() {
   const { colors } = useTheme();
-  const { loading, user, memberships } = useAuth();
+  const { loading, user, memberships, welcomedAt } = useAuth();
 
   if (loading) {
     return (
@@ -28,6 +28,8 @@ export default function TabsLayout() {
   // deep-links into a tab must not see a half-rendered shell.
   if (!user) return <Redirect href="/sign-in" />;
   if (memberships.length === 0) return <Redirect href="/join" />;
+  // First time in after being admitted: a short role-specific welcome.
+  if (!welcomedAt) return <Redirect href="/welcome" />;
 
   return (
     <Tabs

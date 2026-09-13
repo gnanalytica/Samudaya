@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDate, joinMessage, normalizeJoinCode, unitLabel } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
@@ -24,6 +24,9 @@ const RELATIONS = [
   { value: 'owner', label: 'Owner' },
   { value: 'tenant', label: 'Tenant' },
   { value: 'family', label: 'Family member' },
+  // Supervisors and facility managers have no flat; the committee admits them
+  // as staff.
+  { value: 'other', label: 'I work for the society' },
 ] as const;
 
 type Relation = (typeof RELATIONS)[number]['value'];
@@ -33,17 +36,20 @@ type Unit = { id: string; block: string | null; number: string };
  * One way in: the society code the committee shares, plus a few details.
  *
  * Nothing is sent until the details are complete, so staff never see a
- * half-filled request. The request then waits for staff or the committee;
+ * half-filled request. A join link (samudaya://join/CODE, or ?code=CODE) fills
+ * in the code and looks up the flats straight away. The request then waits for staff or the committee;
  * until they admit it the app shows only this pending screen.
  */
 export default function Join() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { user, refresh, signOut, memberships } = useAuth();
+  const params = useLocalSearchParams<{ code?: string }>();
+  const linkedCode = typeof params.code === 'string' ? normalizeJoinCode(params.code) : '';
 
   const [step, setStep] = useState<'code' | 'details'>('code');
   const [editing, setEditing] = useState(false);
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(linkedCode);
   const [name, setName] = useState(user?.user_metadata?.full_name ?? '');
   const [phone, setPhone] = useState('');
   const [units, setUnits] = useState<Unit[]>([]);
@@ -55,6 +61,50 @@ export default function Join() {
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Looks the code up and moves to the details step. Declared before any early
+  // return so the join-link effect below can call it.
+  const lookUpCode = useCallback(async (raw: string) => {
+    const normalized = normalizeJoinCode(raw);
+    if (normalized.length < 4) {
+      setError('Enter the society code your committee shared.');
+      return;
+    }
+    setLookingUp(true);
+    setError(null);
+    // A valid code returns the society's flats; a wrong one returns nothing and
+    // counts toward the same attempt limit as a join request.
+    const { data, error: rpcError } = await supabase.rpc('society_units', {
+      p_join_code: normalized,
+    });
+    setLookingUp(false);
+    if (rpcError) {
+      setError(
+        /too many/i.test(rpcError.message)
+          ? rpcError.message
+          : 'We could not check that code. Please try again.',
+      );
+      return;
+    }
+    const rows = (data ?? []).filter((row): row is Unit => Boolean(row.id) && Boolean(row.number));
+    if (!rows.length) {
+      setError(joinMessage('not_found'));
+      return;
+    }
+    setUnits(rows);
+    const blocks = [...new Set(rows.map((row) => row.block ?? ''))];
+    setBlock(blocks.length === 1 ? (blocks[0] ?? null) : null);
+    setUnitId((current) => (rows.some((row) => row.id === current) ? current : null));
+    setStep('details');
+  }, []);
+
+  // Opened from a join link: look the code up once.
+  const linkHandled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linkedCode || !user?.id || linkHandled.current === linkedCode) return;
+    linkHandled.current = linkedCode;
+    void lookUpCode(linkedCode);
+  }, [linkedCode, user?.id, lookUpCode]);
 
   const latest = useQuery({
     queryKey: ['join:latest', user?.id],
@@ -142,39 +192,7 @@ export default function Join() {
     );
   }
 
-  const continueToDetails = async () => {
-    const normalized = normalizeJoinCode(code);
-    if (normalized.length < 4) {
-      setError('Enter the society code your committee shared.');
-      return;
-    }
-    setLookingUp(true);
-    setError(null);
-    // A valid code returns the society's flats; a wrong one returns nothing and
-    // counts toward the same attempt limit as a join request.
-    const { data, error: rpcError } = await supabase.rpc('society_units', {
-      p_join_code: normalized,
-    });
-    setLookingUp(false);
-    if (rpcError) {
-      setError(
-        /too many/i.test(rpcError.message)
-          ? rpcError.message
-          : 'We could not check that code. Please try again.',
-      );
-      return;
-    }
-    const rows = (data ?? []).filter((row): row is Unit => Boolean(row.id) && Boolean(row.number));
-    if (!rows.length) {
-      setError(joinMessage('not_found'));
-      return;
-    }
-    setUnits(rows);
-    const blocks = [...new Set(rows.map((row) => row.block ?? ''))];
-    setBlock(blocks.length === 1 ? (blocks[0] ?? null) : null);
-    setUnitId((current) => (rows.some((row) => row.id === current) ? current : null));
-    setStep('details');
-  };
+  const continueToDetails = () => lookUpCode(code);
 
   const submit = async () => {
     // Same normalisation as the web app: a 10-digit Indian mobile gets +91.
@@ -188,8 +206,9 @@ export default function Join() {
       setError('Enter a valid phone number.');
       return;
     }
-    if (!unitId) {
-      setError('Pick your flat.');
+    const worksHere = relation === 'other';
+    if (!unitId && !worksHere) {
+      setError('Pick your flat, or choose “I work for the society”.');
       return;
     }
     setBusy(true);
@@ -197,7 +216,7 @@ export default function Join() {
 
     const { data, error: rpcError } = await supabase.rpc('request_to_join', {
       p_join_code: normalizeJoinCode(code),
-      p_unit_id: unitId,
+      p_unit_id: worksHere ? undefined : (unitId ?? undefined),
       p_name: name.trim(),
       p_phone: cleanPhone,
       p_relation: relation,
@@ -284,15 +303,21 @@ export default function Join() {
                 keyboardType="phone-pad"
                 placeholder="9876543210"
               />
-              <FlatPicker
-                units={units}
-                block={block}
-                onBlock={setBlock}
-                query={flatQuery}
-                onQuery={setFlatQuery}
-                unitId={unitId}
-                onPick={setUnitId}
-              />
+              {relation === 'other' ? (
+                <Caption>
+                  No flat needed. The committee will admit you as staff after checking with you.
+                </Caption>
+              ) : (
+                <FlatPicker
+                  units={units}
+                  block={block}
+                  onBlock={setBlock}
+                  query={flatQuery}
+                  onQuery={setFlatQuery}
+                  unitId={unitId}
+                  onPick={setUnitId}
+                />
+              )}
               <View style={{ gap: spacing.sm }}>
                 <Body>You are the</Body>
                 <ChipRow>

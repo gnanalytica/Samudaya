@@ -19,6 +19,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { FilePickerField, ViewFileChip } from '../../src/components/file-ui';
+import { CataloguePicker } from '../../src/components/catalogue-ui';
 import { uploadFile, type PickedFile } from '../../src/lib/storage';
 import { spacing } from '../../src/lib/theme';
 
@@ -51,7 +52,7 @@ export default function BillForm() {
         ? supabase
             .from('expenses')
             .select(
-              'id, event_id, name, category, amount, vendor, method, bill_url, spent_on, status',
+              'id, event_id, name, category, category_id, amount, vendor, vendor_id, method, bill_url, spent_on, status',
             )
             .eq('id', id)
             .maybeSingle()
@@ -105,8 +106,10 @@ type Existing = {
   event_id: string;
   name: string;
   category: string | null;
+  category_id: string | null;
   amount: number;
   vendor: string | null;
+  vendor_id: string | null;
   method: string;
   bill_url: string | null;
   spent_on: string;
@@ -121,9 +124,15 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
 
   const [eventId, setEventId] = useState(existing?.event_id ?? events[0]?.id ?? '');
   const [name, setName] = useState(existing?.name ?? '');
-  const [category, setCategory] = useState(existing?.category ?? '');
+  const [category, setCategory] = useState<{ id: string | null; label: string | null }>({
+    id: existing?.category_id ?? null,
+    label: existing?.category ?? null,
+  });
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
-  const [vendor, setVendor] = useState(existing?.vendor ?? '');
+  const [vendor, setVendor] = useState<{ id: string | null; label: string | null }>({
+    id: existing?.vendor_id ?? null,
+    label: existing?.vendor ?? null,
+  });
   const [method, setMethod] = useState<Method>(
     (METHODS.find((item) => item.value === existing?.method)?.value ?? 'upi') as Method,
   );
@@ -149,6 +158,10 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
     }
     if (!Number.isFinite(value) || value <= 0) {
       setError('Enter the bill amount.');
+      return;
+    }
+    if (!category.label) {
+      setError('Pick the budget category this bill belongs to.');
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(spentOn)) {
@@ -185,9 +198,13 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
     const fields = {
       event_id: eventId,
       name: name.trim(),
-      category: category.trim() || null,
+      // The id links the catalogue; the label stays on the bill so renaming a
+      // category later never rewrites a ledger residents have already seen.
+      category: category.label,
+      category_id: category.id,
       amount: value,
-      vendor: vendor.trim() || null,
+      vendor: vendor.label,
+      vendor_id: vendor.id,
       method,
       spent_on: spentOn,
       bill_url: billUrl,
@@ -258,26 +275,17 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               onChangeText={setName}
               placeholder="Pandal and chairs"
             />
-            <View style={{ gap: spacing.sm }}>
-              <Input
-                label="Budget category"
-                value={category}
-                onChangeText={setCategory}
-                placeholder="Decoration"
-              />
-              {categories.length ? (
-                <ChipRow>
-                  {categories.map((value) => (
-                    <Chip
-                      key={value}
-                      label={value}
-                      selected={category === value}
-                      onPress={() => setCategory(value)}
-                    />
-                  ))}
-                </ChipRow>
-              ) : null}
-            </View>
+            <CataloguePicker
+              kind="budget_category"
+              label="Budget category"
+              valueId={category.id}
+              valueLabel={category.label}
+              onChange={setCategory}
+              preferred={categories}
+            />
+            {categories.length ? (
+              <Caption>Categories in this event’s budget are listed first.</Caption>
+            ) : null}
             <Input
               label={`Amount (${currency})`}
               value={amount}
@@ -288,11 +296,13 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
             {Number.parseFloat(amount) > 0 ? (
               <Caption>{formatMoney(Number.parseFloat(amount), currency)}</Caption>
             ) : null}
-            <Input
+            <CataloguePicker
+              kind="vendor"
               label="Vendor"
-              value={vendor}
-              onChangeText={setVendor}
-              placeholder="Shubh Tent House"
+              valueId={vendor.id}
+              valueLabel={vendor.label}
+              onChange={setVendor}
+              allowAdd
             />
             <View style={{ gap: spacing.sm }}>
               <Body>Paid by</Body>

@@ -41,6 +41,13 @@ function RootStack() {
         <Stack.Screen name="admin/payments" options={{ title: 'Payments' }} />
         <Stack.Screen name="admin/upi" options={{ title: 'Society UPI ID' }} />
         <Stack.Screen name="admin/queue" options={{ title: 'Committee decisions' }} />
+        <Stack.Screen name="welcome" options={{ headerShown: false }} />
+        <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
+        <Stack.Screen name="admin/setup" options={{ title: 'Setup' }} />
+        <Stack.Screen name="admin/society" options={{ title: 'Society details' }} />
+        <Stack.Screen name="admin/flats" options={{ title: 'Flats' }} />
+        <Stack.Screen name="admin/catalogue" options={{ title: 'Catalogue' }} />
+        <Stack.Screen name="admin/share" options={{ title: 'Share society code' }} />
       </Stack>
     </>
   );

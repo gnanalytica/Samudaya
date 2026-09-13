@@ -52,6 +52,8 @@ type AuthValue = {
   activeCommunity: Tables<'communities'> | null;
   role: MemberRole | null;
   membershipId: string | null;
+  /** When the active member saw their first-run welcome; null means not yet. */
+  welcomedAt: string | null;
   /** False once the stored session has been read from disk. */
   loading: boolean;
   signInWithGoogle: () => Promise<{ error?: string }>;
@@ -181,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       activeCommunity: active?.communities ?? null,
       role: active?.role ?? null,
       membershipId: active?.id ?? null,
+      welcomedAt: active ? (active.welcomed_at ?? null) : null,
       loading,
       signInWithGoogle,
       signInWithEmail,
