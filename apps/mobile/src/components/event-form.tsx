@@ -8,6 +8,7 @@ import {
 } from '@samudaya/core';
 import { spacing } from '../lib/theme';
 import { Body, Button, Caption, Input } from './ui';
+import { DateField } from './date-field';
 import { Chip, ChipRow } from './admin-ui';
 import { CataloguePicker, useCatalogue } from './catalogue-ui';
 
@@ -72,11 +73,11 @@ export function validateDetails(
     const issue = parsed.error.issues[0];
     const field = String(issue?.path[0] ?? '');
     const friendly: Record<string, string> = {
-      starts_on: 'Enter the start date as YYYY-MM-DD.',
+      starts_on: 'Pick the date the event starts.',
       ends_on:
         issue?.message === 'The event cannot end before it starts'
           ? issue.message
-          : 'Enter the end date as YYYY-MM-DD, or leave it empty.',
+          : 'Pick an end date on or after the start date, or clear it.',
       expected_attendance: 'Expected attendance should be a whole number.',
     };
     return { error: friendly[field] ?? issue?.message ?? 'Check the event details.' };
@@ -127,28 +128,26 @@ export function DetailsFields({
         valueLabel={details.venue.label}
         onChange={(next) => set('venue', next)}
       />
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <Input
-            label="Starts on"
-            value={details.startsOn}
-            onChangeText={(value) => set('startsOn', value)}
-            placeholder="2026-11-08"
-            autoCapitalize="none"
-            keyboardType="numbers-and-punctuation"
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Input
-            label="Ends on (optional)"
-            value={details.endsOn}
-            onChangeText={(value) => set('endsOn', value)}
-            placeholder="2026-11-09"
-            autoCapitalize="none"
-            keyboardType="numbers-and-punctuation"
-          />
-        </View>
-      </View>
+      <DateField
+        label="Starts on"
+        value={details.startsOn || null}
+        onChange={(next) =>
+          onChange({
+            ...details,
+            startsOn: next ?? '',
+            // An end date before the new start no longer makes sense.
+            endsOn: next && details.endsOn && details.endsOn < next ? '' : details.endsOn,
+          })
+        }
+      />
+      <DateField
+        label="Ends on (optional, for events over several days)"
+        value={details.endsOn || null}
+        onChange={(next) => set('endsOn', next ?? '')}
+        minimumDate={details.startsOn || null}
+        placeholder="Same day"
+        clearable
+      />
       <Input
         label="Description"
         value={details.description}

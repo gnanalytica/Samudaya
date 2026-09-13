@@ -1,5 +1,6 @@
 'use client';
 
+import { todayIn } from '@samudaya/core';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,7 @@ function Submit() {
 
 export function CampaignForm({ slug }: { slug: string }) {
   const [state, action] = useActionState<CampaignState, FormData>(proposeCampaign, EMPTY_STATE);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="slug" value={slug} />

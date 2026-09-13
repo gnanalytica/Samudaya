@@ -105,3 +105,25 @@ export function listSentence(items: string[]): string {
   if (items.length === 1) return items[0]!;
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
+
+/**
+ * Today's date as `YYYY-MM-DD` in a society's time zone. Servers run on UTC,
+ * where "today" is still yesterday in India until 05:30, so date comparisons
+ * (upcoming vs past, default bill dates) must use the society's clock.
+ */
+export function todayIn(
+  timeZone: string | null | undefined = 'Asia/Kolkata',
+  now = new Date(),
+): string {
+  try {
+    // en-CA formats as YYYY-MM-DD.
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: timeZone || 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(now);
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+  }
+}

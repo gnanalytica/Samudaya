@@ -1,5 +1,6 @@
 'use client';
 
+import { todayIn } from '@samudaya/core';
 import { useActionState, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -566,7 +567,7 @@ export function RecordPaymentForm({
   units: { id: string; label: string }[];
 }) {
   const { state, action, ref } = useResettingAction(recordPayment);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   return (
     <form ref={ref} action={action} className="space-y-4">
       <Hidden slug={slug} eventSlug={eventSlug} />

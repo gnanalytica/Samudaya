@@ -15,6 +15,7 @@ import {
   relativeTime,
   type InboundMessage,
   type WhatsAppCommand,
+  todayIn,
 } from '@samudaya/core';
 
 /**
@@ -71,7 +72,7 @@ async function resolveSender(db: Db, phone: string): Promise<Sender | null> {
 
 /** The soonest published event that has not happened yet. */
 async function nextEvent(db: Db, sender: Sender) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const { data } = await db
     .from('events')
     .select('id, slug, emoji, name, starts_on, venue, fund_target')
@@ -137,7 +138,7 @@ async function handleLink(db: Db, phone: string, code: string): Promise<string> 
 }
 
 async function handleEvents(db: Db, sender: Sender): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn();
   const { data } = await db
     .from('events')
     .select('id, emoji, name, starts_on, venue')

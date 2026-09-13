@@ -4,6 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
+import { EMAIL_SIGN_IN_ENABLED } from '@/lib/sign-in-options';
 import { signInWithEmail, signInWithGoogle, type LoginState } from './actions';
 
 const initial: LoginState = {};
@@ -74,33 +75,37 @@ export function LoginForm({ next }: { next: string }) {
         ) : null}
       </form>
 
-      <div className="flex items-center gap-3" aria-hidden="true">
-        <span className="bg-border-base h-px flex-1" />
-        <span className="text-ink-subtle text-xs">or</span>
-        <span className="bg-border-base h-px flex-1" />
-      </div>
+      {EMAIL_SIGN_IN_ENABLED ? (
+        <>
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <span className="bg-border-base h-px flex-1" />
+            <span className="text-ink-subtle text-xs">or</span>
+            <span className="bg-border-base h-px flex-1" />
+          </div>
 
-      <form action={emailAction} className="space-y-3">
-        <input type="hidden" name="next" value={next} />
-        <Field
-          label="Email"
-          htmlFor="email"
-          error={emailState.error}
-          hint="We’ll email you a link — no password to remember."
-        >
-          {(control) => (
-            <Input
-              {...control}
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              placeholder="you@example.com"
-            />
-          )}
-        </Field>
-        <SubmitButton>Email me a link</SubmitButton>
-      </form>
+          <form action={emailAction} className="space-y-3">
+            <input type="hidden" name="next" value={next} />
+            <Field
+              label="Email"
+              htmlFor="email"
+              error={emailState.error}
+              hint="We’ll email you a link — no password to remember."
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  placeholder="you@example.com"
+                />
+              )}
+            </Field>
+            <SubmitButton>Email me a link</SubmitButton>
+          </form>
+        </>
+      ) : null}
     </div>
   );
 }

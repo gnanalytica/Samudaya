@@ -1,4 +1,5 @@
 import { normalizeStats } from '@samudaya/core';
+import { today as localToday } from '../components/date-field';
 import { supabase } from './supabase';
 
 /**
@@ -164,7 +165,7 @@ export function budgetVsSpent(
 
 /** The soonest published event that has not happened yet. */
 export function pickNextEvent<T extends { status: string; starts_on: string }>(events: T[]) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const published = events.filter((event) => event.status === 'published');
   return (
     published

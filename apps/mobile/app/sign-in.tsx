@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-na
 import { Redirect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../src/lib/auth';
+import { EMAIL_SIGN_IN_ENABLED } from '../src/lib/sign-in-options';
 import { Body, Button, Caption, Input, Screen, Title } from '../src/components/ui';
 import { spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
@@ -72,7 +73,9 @@ export default function SignIn() {
               <Text style={{ color: colors.accentInk, fontSize: 22, fontWeight: '700' }}>स</Text>
             </View>
             <Title>Samudaya</Title>
-            <Body muted>Sign in first — you’ll enter your community’s invite code next.</Body>
+            <Body muted>
+              Sign in with Google — you’ll enter your society’s code and pick your flat next.
+            </Body>
           </View>
 
           {sent ? (
@@ -90,28 +93,34 @@ export default function SignIn() {
                 disabled={busy !== null}
               />
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                <Caption>or</Caption>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              </View>
+              {EMAIL_SIGN_IN_ENABLED ? (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                    <Caption>or</Caption>
+                    <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                  </View>
 
-              <Input
-                label="Email"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="you@example.com"
-                autoCapitalize="none"
-                autoComplete="email"
-                keyboardType="email-address"
-                inputMode="email"
-              />
-              <Button
-                label="Email me a link"
-                onPress={handleEmail}
-                loading={busy === 'email'}
-                disabled={busy !== null}
-              />
+                  <Input
+                    label="Email"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    inputMode="email"
+                  />
+                  <Button
+                    label="Email me a link"
+                    onPress={handleEmail}
+                    loading={busy === 'email'}
+                    disabled={busy !== null}
+                  />
+                </>
+              ) : (
+                <Caption>Use the Google account you want your society to know you by.</Caption>
+              )}
             </View>
           )}
 

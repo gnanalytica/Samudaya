@@ -9,7 +9,7 @@ import {
   Sparkles,
   UserPlus,
 } from 'lucide-react';
-import { can, countdown, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
+import { can, countdown, formatDate, formatMoney, fundedPercent, todayIn } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { listEvents, getStatsFor } from '@/lib/events';
@@ -29,7 +29,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
 
   const events = await listEvents(community.id);
   const published = events.filter((event) => event.status === 'published');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayIn(community.timezone);
   const next =
     published
       .filter((event) => event.kind === 'event' && event.starts_on >= today)

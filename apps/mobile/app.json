@@ -70,7 +70,8 @@
           "cameraPermission": "Samudaya uses the camera to photograph bills and payment receipts.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

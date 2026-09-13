@@ -1,4 +1,5 @@
 import { Pressable, RefreshControl, SectionList, View } from 'react-native';
+import { today as localToday } from '../../src/components/date-field';
 import { useRouter } from 'expo-router';
 import {
   EVENT_STATUS_LABEL,
@@ -45,7 +46,7 @@ export default function Events() {
   }
 
   const rows = data ?? [];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const inPlay = (row: (typeof rows)[number]) =>
     row.status === 'published' || row.status === 'draft';
 

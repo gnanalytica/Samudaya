@@ -16,6 +16,7 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
+import { DateField, today } from '../../src/components/date-field';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { spacing } from '../../src/lib/theme';
 
@@ -67,7 +68,7 @@ export default function NewCampaign() {
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      setError('Enter the date the campaign is for as YYYY-MM-DD.');
+      setError('Pick the date the campaign is for.');
       return;
     }
     if (!activeCommunity || !user) return;
@@ -170,13 +171,12 @@ export default function NewCampaign() {
                 Asking the society for {formatMoney(Number.parseInt(target, 10), currency)}
               </Caption>
             ) : null}
-            <Input
+            <DateField
               label="Date"
-              value={date}
-              onChangeText={setDate}
-              placeholder="2026-12-01"
-              autoCapitalize="none"
-              autoCorrect={false}
+              value={date || null}
+              onChange={(next) => setDate(next ?? '')}
+              minimumDate={today()}
+              placeholder="When the money is needed"
             />
           </Card>
 

@@ -17,6 +17,7 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
+import { DateField, today } from '../../src/components/date-field';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { FilePickerField, ViewFileChip } from '../../src/components/file-ui';
 import { CataloguePicker } from '../../src/components/catalogue-ui';
@@ -146,9 +147,8 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
   const [method, setMethod] = useState<Method>(
     (METHODS.find((item) => item.value === existing?.method)?.value ?? 'upi') as Method,
   );
-  const [spentOn, setSpentOn] = useState(
-    existing?.spent_on ?? new Date().toISOString().slice(0, 10),
-  );
+  // Local calendar day: toISOString would give yesterday's date before 5:30 am IST.
+  const [spentOn, setSpentOn] = useState(existing?.spent_on ?? today());
   const [billFile, setBillFile] = useState<PickedFile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +175,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(spentOn)) {
-      setError('Enter the bill date as YYYY-MM-DD.');
+      setError('Pick the date on the bill.');
       return;
     }
     if (!activeCommunity || !membershipId) return;
@@ -357,12 +357,11 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
                 ))}
               </ChipRow>
             </View>
-            <Input
+            <DateField
               label="Bill date"
               value={spentOn}
-              onChangeText={setSpentOn}
-              placeholder="2026-09-12"
-              autoCapitalize="none"
+              onChange={(next) => setSpentOn(next ?? today())}
+              maximumDate={today()}
             />
             <FilePickerField
               label="Bill"
