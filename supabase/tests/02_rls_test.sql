@@ -1037,4 +1037,51 @@ select test.eq(
   (select contributors from public.event_stats where event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
   2, 'contributors count households: two confirmed payments for flat A-1104 (staff cash and Omar) plus Tom''s count as two');
 
+-- ---------------------------------------------------------------------------
+-- To do queue
+-- ---------------------------------------------------------------------------
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0', 'priya@example.com', '{"full_name":"Priya Das"}');
+select test.act_as('a0a0a0a0-a0a0-4a0a-8a0a-a0a0a0a0a0a0');
+select public.request_to_join('HILL2026', null, 'Priya Das', '9845011111', 'other');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.contributions (event_id, community_id, membership_id, amount, method, reference)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 750, 'upi', '677700011122'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+insert into public.activity_suggestions (community_id, event_id, kind, name, suggested_by)
+select m.community_id, 'cccccccc-0000-4000-8000-0000000000aa', 'idea', 'Glow sticks for kids', m.id
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.expenses (event_id, community_id, name, category, amount, vendor, requested_by)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, 'Sweets', 'Food & catering', 3200, 'Anand Sweets', m.id
+  from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999';
+select test.eq(
+  (select array_agg(distinct kind order by kind) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
+  array['join_request', 'payment_to_confirm'],
+  'staff see join requests and payments to confirm, not approvals that need the committee');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select array_agg(distinct kind order by kind) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
+  array['bill_to_approve', 'join_request', 'payment_to_confirm', 'suggestion_to_review'],
+  'the committee also sees bills, campaigns and suggestions to decide');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(
+  (select count(*) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
+  0::bigint, 'residents have no admin to do list');
+
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(
+  (select count(*) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
+  0::bigint, 'another society''s committee sees nothing');
+
 reset role;

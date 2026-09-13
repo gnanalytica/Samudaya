@@ -2402,6 +2402,21 @@ export type Database = {
         number: string | null
       }[]
       }
+      todo_items: {
+        Args: {
+        p_community_id: string
+      }
+        Returns: {
+        kind: string | null
+        id: string | null
+        title: string | null
+        subtitle: string | null
+        amount: number | null
+        event_slug: string | null
+        event_name: string | null
+        created_at: string | null
+      }[]
+      }
       verify_api_key: {
         Args: {
         p_prefix: string

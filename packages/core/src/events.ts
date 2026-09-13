@@ -52,18 +52,19 @@ export const EXPENSE_STATUS_LABEL: Record<ExpenseStatus, string> = {
  * is created — before anybody has contributed — so nobody is deciding the fate
  * of a surplus after seeing how large it is.
  */
+/** What happens to money left over, in the words a resident would use. */
 export const FUND_RULE_LABEL: Record<FundRule, string> = {
-  carry_next_edition: 'Carry forward to the next edition of this event',
-  carry_related: 'Carry forward to related activities',
-  general_fund: 'Transfer to the Society General Event Fund',
-  refund: 'Refund contributors proportionally',
-  donate: 'Donate',
+  general_fund: 'Add it to the society’s event fund',
+  carry_next_edition: 'Keep it for next year’s event',
+  carry_related: 'Use it for related activities',
+  refund: 'Give it back to the households who paid',
+  donate: 'Donate it',
 };
 
 export const FUND_RULES: FundRule[] = [
+  'general_fund',
   'carry_next_edition',
   'carry_related',
-  'general_fund',
   'refund',
   'donate',
 ];

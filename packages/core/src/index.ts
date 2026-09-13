@@ -11,3 +11,4 @@ export type { InboundMessage } from './whatsapp/webhook';
 export * from './payments';
 export * from './setup';
 export * from './notifications';
+export * from './copy';
