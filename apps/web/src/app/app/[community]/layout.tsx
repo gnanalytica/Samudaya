@@ -4,6 +4,7 @@ import { CommunitySwitcher } from '@/components/community-switcher';
 import { BottomNav, SidebarNav } from '@/components/sidebar-nav';
 import { NotificationBell } from '@/components/notification-bell';
 import { ProfileMenu } from '@/components/profile-menu';
+import { ResidentViewBanner, ViewSwitch } from '@/components/view-switch';
 import { getSupabase } from '@/lib/supabase/server';
 import { getTodoCount } from '@/lib/todo';
 
@@ -13,7 +14,7 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
   // both are cached per request, so the redirect path reuses it too.
   const membershipsPromise = getMemberships();
   // Redirects to onboarding or another community if this one is not theirs.
-  const { community, role, profile } = await requireCommunity(slug);
+  const { community, role, viewRole, viewMode, profile } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
   // RLS limits this to the member's own notifications. The badge only needs a
@@ -25,7 +26,7 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
       .select('id', { count: 'exact', head: true })
       .eq('community_id', community.id)
       .is('read_at', null),
-    getTodoCount(community.id, role),
+    getTodoCount(community.id, viewRole),
   ]);
   const counts = { todo: todoCount };
   const name = profile?.full_name ?? 'You';
@@ -38,9 +39,14 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
           role={role}
           memberships={memberships}
         />
+        {viewMode ? (
+          <div className="mt-3 px-1">
+            <ViewSwitch slug={community.slug} mode={viewMode} />
+          </div>
+        ) : null}
 
         <div className="mt-4 flex-1 overflow-y-auto">
-          <SidebarNav slug={community.slug} role={role} counts={counts} />
+          <SidebarNav slug={community.slug} role={viewRole} counts={counts} />
         </div>
 
         <div className="border-border-base mt-4 border-t pt-3">
@@ -63,16 +69,17 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
           </Link>
           <div className="flex items-center gap-1">
             <NotificationBell slug={community.slug} unread={unread ?? 0} className="p-1.5" />
-            <ProfileMenu slug={community.slug} name={name} unread={0} compact />
+            <ProfileMenu slug={community.slug} name={name} unread={0} viewMode={viewMode} compact />
           </div>
         </header>
 
         {/* Bottom padding clears the mobile nav bar. */}
         <main id="main" className="min-w-0 flex-1 pb-20 md:pb-0">
+          {viewMode === 'resident' ? <ResidentViewBanner slug={community.slug} /> : null}
           {props.children}
         </main>
 
-        <BottomNav slug={community.slug} role={role} counts={counts} />
+        <BottomNav slug={community.slug} role={viewRole} counts={counts} />
       </div>
     </div>
   );

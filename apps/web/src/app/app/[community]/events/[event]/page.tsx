@@ -65,7 +65,8 @@ import { RegisterForm, SuggestionForm } from './participation-forms';
 export default async function EventDetailPage(props: PageProps<'/app/[community]/events/[event]'>) {
   const { community: slug, event: eventSlug } = await props.params;
   const { tab } = await props.searchParams;
-  const { community, role, membership } = await requireCommunity(slug);
+  // Committee in resident view sees exactly what residents see.
+  const { community, viewRole: role, membership } = await requireCommunity(slug);
   const event = await requireEvent(community.id, eventSlug);
 
   const supabase = await getSupabase();

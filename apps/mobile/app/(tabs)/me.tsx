@@ -25,6 +25,7 @@ import {
 } from '../../src/components/ui';
 import { StatTile } from '../../src/components/event-ui';
 import { LinkRow } from '../../src/components/admin-ui';
+import { ViewSwitchCard } from '../../src/components/view-switch';
 import { useUnreadCount } from '../../src/lib/notifications';
 import { spacing } from '../../src/lib/theme';
 
@@ -90,6 +91,8 @@ export default function Me() {
           </Caption>
           {normalized ? <Caption>{ROLE_DESCRIPTION[normalized]}</Caption> : null}
         </View>
+
+        <ViewSwitchCard />
 
         <Card style={{ gap: spacing.xs }}>
           <LinkRow

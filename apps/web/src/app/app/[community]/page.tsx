@@ -30,7 +30,8 @@ import { WelcomeCard } from '@/components/welcome-card';
 export default async function DashboardPage(props: PageProps<'/app/[community]'>) {
   const { community: slug } = await props.params;
   const { joined } = await props.searchParams;
-  const { community, role, profile, membership } = await requireCommunity(slug);
+  // Committee in resident view sees exactly what residents see.
+  const { community, viewRole: role, profile, membership } = await requireCommunity(slug);
   const base = `/app/${community.slug}`;
 
   const events = await listEvents(community.id);

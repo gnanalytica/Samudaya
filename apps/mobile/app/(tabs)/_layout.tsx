@@ -17,8 +17,9 @@ function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
 
 export default function TabsLayout() {
   const { colors } = useTheme();
-  const { loading, user, memberships, welcomedAt, role } = useAuth();
-  const staffView = can(role, 'events:manage');
+  const { loading, user, memberships, welcomedAt, viewRole } = useAuth();
+  // The committee's resident view hides Manage, exactly as residents see it.
+  const staffView = can(viewRole, 'events:manage');
   const { data: todo } = useTodoItems();
   const todoCount = staffView ? (todo?.length ?? 0) : 0;
 

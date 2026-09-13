@@ -128,3 +128,30 @@ export function can(role: MemberRole | null | undefined, capability: Capability)
       return isCommittee(role);
   }
 }
+
+/**
+ * Committee members usually live in the society too. They can look at the app
+ * the way any resident does — Home, Events, Me, without the Manage screens —
+ * and switch back. It changes only what is shown: their permissions, and what
+ * the database lets them do, stay the same.
+ */
+export type ViewMode = 'committee' | 'resident';
+
+export const VIEW_MODE_LABEL: Record<ViewMode, string> = {
+  committee: 'Committee view',
+  resident: 'Resident view',
+};
+
+export const canSwitchView = (role: MemberRole | null | undefined) => isCommittee(role);
+
+/** Anything unrecognised, including no stored choice, means the full view. */
+export const parseViewMode = (value: unknown): ViewMode =>
+  value === 'resident' ? 'resident' : 'committee';
+
+/** The role screens should render for. Only the committee can narrow it. */
+export function roleForView<R extends MemberRole | null | undefined>(
+  role: R,
+  mode: ViewMode,
+): R | 'resident' {
+  return mode === 'resident' && canSwitchView(role) ? 'resident' : role;
+}

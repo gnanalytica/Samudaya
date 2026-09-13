@@ -31,13 +31,15 @@ import {
   Title,
 } from '../../src/components/ui';
 import { LinkRow } from '../../src/components/admin-ui';
+import { ResidentViewBanner } from '../../src/components/view-switch';
 import { Meter, StatTile } from '../../src/components/event-ui';
 import { todoTitle } from '../../src/components/todo-queue';
 import { spacing } from '../../src/lib/theme';
 
 export default function Home() {
   const router = useRouter();
-  const { profile, activeCommunity, role } = useAuth();
+  // The committee's resident view renders Home exactly as residents see it.
+  const { profile, activeCommunity, viewRole: role } = useAuth();
   const staffView = can(role, 'events:manage');
   const setupOpen = can(role, 'roles:manage') && !activeCommunity?.setup_completed_at;
   const { data: todoData } = useTodoItems();
@@ -93,6 +95,8 @@ export default function Home() {
             {normalized ? ` · ${ROLE_LABEL[normalized]}` : ''}
           </Caption>
         </View>
+
+        <ResidentViewBanner />
 
         {setupOpen && setup.data ? (
           <SetupCard steps={setupSteps(setup.data)} onOpen={() => router.push('/admin/setup')} />

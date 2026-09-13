@@ -5,7 +5,14 @@ import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import type { Session, User } from '@supabase/supabase-js';
 import type { Tables } from '@samudaya/supabase';
-import type { MemberRole } from '@samudaya/core';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  canSwitchView,
+  parseViewMode,
+  roleForView,
+  type MemberRole,
+  type ViewMode,
+} from '@samudaya/core';
 import { supabase } from './supabase';
 
 /**
@@ -50,7 +57,16 @@ type AuthValue = {
   profile: Tables<'profiles'> | null;
   memberships: Membership[];
   activeCommunity: Tables<'communities'> | null;
+  /** The member's real role. Decides access and admin screens. */
   role: MemberRole | null;
+  /**
+   * What resident-facing screens render for: the real role, or 'resident'
+   * while a committee member uses the resident view.
+   */
+  viewRole: MemberRole | null;
+  /** The committee's current view; null for anyone who cannot switch. */
+  viewMode: ViewMode | null;
+  setViewMode: (mode: ViewMode) => void;
   membershipId: string | null;
   /** When the active member saw their first-run welcome; null means not yet. */
   welcomedAt: string | null;
@@ -65,12 +81,28 @@ type AuthValue = {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
+const VIEW_MODE_STORAGE_KEY = 'samudaya:view-mode';
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewModeState] = useState<ViewMode>('committee');
+
+  // The committee's last chosen view survives restarts. A failed read just
+  // means the full committee view, which is the safe default.
+  useEffect(() => {
+    AsyncStorage.getItem(VIEW_MODE_STORAGE_KEY)
+      .then((stored) => setViewModeState(parseViewMode(stored)))
+      .catch(() => {});
+  }, []);
+
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setViewModeState(mode);
+    void AsyncStorage.setItem(VIEW_MODE_STORAGE_KEY, mode).catch(() => {});
+  }, []);
 
   const loadMemberships = useCallback(async (userId: string) => {
     const [{ data: profileRow }, { data: membershipRows }] = await Promise.all([
@@ -182,6 +214,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       memberships,
       activeCommunity: active?.communities ?? null,
       role: active?.role ?? null,
+      viewRole: roleForView(active?.role ?? null, viewMode),
+      viewMode: canSwitchView(active?.role) ? viewMode : null,
+      setViewMode,
       membershipId: active?.id ?? null,
       welcomedAt: active ? (active.welcomed_at ?? null) : null,
       loading,
@@ -196,6 +231,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     memberships,
     activeId,
+    viewMode,
+    setViewMode,
     loading,
     signInWithGoogle,
     signInWithEmail,

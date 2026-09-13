@@ -46,7 +46,7 @@ export default function EventDetail() {
   );
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { activeCommunity, membershipId, role } = useAuth();
+  const { activeCommunity, membershipId, viewRole: role } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
   const { data, loading, refreshing, refresh } = useCommunityData(
@@ -383,7 +383,7 @@ function Activities({
   open: boolean;
   onChange: () => void;
 }) {
-  const { role, membershipId, profile } = useAuth();
+  const { viewRole: role, membershipId, profile } = useAuth();
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [familyName, setFamilyName] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -552,7 +552,7 @@ function Suggestions({
   open: boolean;
   onChange: () => void;
 }) {
-  const { role, membershipId, activeCommunity } = useAuth();
+  const { viewRole: role, membershipId, activeCommunity } = useAuth();
   const [kind, setKind] = useState<'activity' | 'idea'>('activity');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');

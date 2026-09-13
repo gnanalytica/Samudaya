@@ -1,8 +1,17 @@
+import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import type { User } from '@supabase/supabase-js';
 import type { Tables } from '@samudaya/supabase';
-import { can, type Capability, type MemberRole } from '@samudaya/core';
+import {
+  can,
+  canSwitchView,
+  parseViewMode,
+  roleForView,
+  type Capability,
+  type MemberRole,
+  type ViewMode,
+} from '@samudaya/core';
 import { getSupabase } from './supabase/server';
 
 /**
@@ -66,10 +75,26 @@ export type CommunityContext = {
   profile: Profile | null;
   community: Community;
   membership: Membership;
+  /** The member's real role. Decides access, actions and admin pages. */
   role: MemberRole;
+  /**
+   * What resident-facing screens render for: the real role, or 'resident'
+   * when a committee member has switched to the resident view.
+   */
+  viewRole: MemberRole;
+  /** The committee's current view; null for anyone who cannot switch. */
+  viewMode: ViewMode | null;
   /** Units the user currently occupies here. Empty for staff and admins. */
   unitIds: string[];
 };
+
+/** Remembers a committee member's chosen view across visits and societies. */
+export const VIEW_COOKIE = 'samudaya_view';
+
+const getViewMode = cache(async (): Promise<ViewMode> => {
+  const store = await cookies();
+  return parseViewMode(store.get(VIEW_COOKIE)?.value);
+});
 
 /**
  * Resolves the community in the URL and the caller's standing in it.
@@ -96,13 +121,14 @@ export const getCommunityContext = cache(async (slug: string): Promise<Community
   if (!row?.communities) return null;
   const { communities: community, ...membership } = row;
 
-  const [{ data: occupancies }, profile] = await Promise.all([
+  const [{ data: occupancies }, profile, mode] = await Promise.all([
     supabase
       .from('unit_occupants')
       .select('unit_id, units!inner(community_id)')
       .eq('membership_id', membership.id)
       .is('moved_out_on', null),
     getProfile(),
+    getViewMode(),
   ]);
 
   const unitIds = (occupancies ?? [])
@@ -115,6 +141,8 @@ export const getCommunityContext = cache(async (slug: string): Promise<Community
     community,
     membership,
     role: membership.role,
+    viewRole: roleForView(membership.role, mode),
+    viewMode: canSwitchView(membership.role) ? mode : null,
     unitIds,
   };
 });

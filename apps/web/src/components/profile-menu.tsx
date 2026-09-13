@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { Bell, ChevronDown, LogOut, Settings } from 'lucide-react';
+import { Bell, ChevronDown, Eye, LogOut, Settings } from 'lucide-react';
+import type { ViewMode } from '@samudaya/core';
+import { switchView } from '@/app/app/[community]/view-actions';
 import { cn } from '@/lib/utils';
 
 /**
@@ -11,12 +13,15 @@ export function ProfileMenu({
   name,
   email,
   unread,
+  viewMode = null,
   compact = false,
 }: {
   slug: string;
   name: string;
   email?: string | null;
   unread: number;
+  /** Set for the committee, who can switch to the resident view and back. */
+  viewMode?: ViewMode | null;
   /** The phone header shows an initial instead of the name. */
   compact?: boolean;
 }) {
@@ -69,6 +74,20 @@ export function ProfileMenu({
             </span>
           ) : null}
         </Link>
+        {viewMode ? (
+          <form action={switchView}>
+            <input type="hidden" name="slug" value={slug} />
+            <input
+              type="hidden"
+              name="mode"
+              value={viewMode === 'resident' ? 'committee' : 'resident'}
+            />
+            <button type="submit" className={item}>
+              <Eye className="size-4" aria-hidden="true" />
+              {viewMode === 'resident' ? 'Switch to committee view' : 'Switch to resident view'}
+            </button>
+          </form>
+        ) : null}
         <Link href={`/app/${slug}/settings`} className={item}>
           <Settings className="size-4" aria-hidden="true" />
           Settings

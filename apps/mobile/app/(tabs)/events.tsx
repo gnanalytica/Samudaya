@@ -28,7 +28,7 @@ import { spacing } from '../../src/lib/theme';
 
 export default function Events() {
   const router = useRouter();
-  const { activeCommunity, role, user } = useAuth();
+  const { activeCommunity, viewRole: role, user } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
   const { data, loading, refreshing, refresh } = useCommunityData('events', async (communityId) => {

@@ -3,10 +3,13 @@ import {
   ROLE_RANK,
   can,
   canParticipate,
+  canSwitchView,
   hasRoleAtLeast,
   isCommittee,
   isStaff,
   normalizeRole,
+  parseViewMode,
+  roleForView,
 } from '../src/roles';
 
 describe('role ranking', () => {
@@ -101,5 +104,32 @@ describe('committee', () => {
     ] as const) {
       expect(can('committee', capability)).toBe(true);
     }
+  });
+});
+
+describe('resident view for the committee', () => {
+  it('lets only the committee switch', () => {
+    expect(canSwitchView('committee')).toBe(true);
+    expect(canSwitchView('staff')).toBe(false);
+    expect(canSwitchView('resident')).toBe(false);
+    expect(canSwitchView(null)).toBe(false);
+  });
+
+  it('narrows the committee to a resident in resident view', () => {
+    expect(roleForView('committee', 'resident')).toBe('resident');
+    expect(roleForView('committee', 'committee')).toBe('committee');
+  });
+
+  it('never changes anyone else', () => {
+    expect(roleForView('staff', 'resident')).toBe('staff');
+    expect(roleForView('resident', 'committee')).toBe('resident');
+    expect(roleForView(null, 'resident')).toBe(null);
+  });
+
+  it('treats unknown stored values as the full view', () => {
+    expect(parseViewMode('resident')).toBe('resident');
+    expect(parseViewMode('committee')).toBe('committee');
+    expect(parseViewMode('owner')).toBe('committee');
+    expect(parseViewMode(undefined)).toBe('committee');
   });
 });

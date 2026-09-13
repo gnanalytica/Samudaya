@@ -15,7 +15,8 @@ export const metadata = { title: 'Events' };
 export default async function EventsPage(props: PageProps<'/app/[community]/events'>) {
   const { community: slug } = await props.params;
   const { proposed: justProposed } = await props.searchParams;
-  const { community, role, user } = await requireCommunity(slug);
+  // Committee in resident view sees exactly what residents see.
+  const { community, viewRole: role, user } = await requireCommunity(slug);
 
   const events = await listEvents(community.id);
   const stats = await getStatsFor(events.map((event) => event.id));
