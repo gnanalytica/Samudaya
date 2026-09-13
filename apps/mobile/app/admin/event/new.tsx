@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { can, createActivitySchema } from '@samudaya/core';
+import { COPY, can, createActivitySchema, eventSlug } from '@samudaya/core';
 import { useAuth } from '../../../src/lib/auth';
 import { supabase } from '../../../src/lib/supabase';
-import { makeSlug } from '../../../src/lib/events';
 import {
   Body,
   Button,
@@ -22,7 +21,6 @@ import {
   ActivityTypeChips,
   BudgetLinesEditor,
   DetailsFields,
-  FundRuleFields,
   budgetProblem,
   emptyDetails,
   lineAmount,
@@ -44,7 +42,9 @@ export default function NewEvent() {
   const { role, user, activeCommunity } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
-  const [details, setDetails] = useState<EventDetails>(emptyDetails);
+  const [details, setDetails] = useState<EventDetails>(() =>
+    emptyDetails(activeCommunity?.name ?? ''),
+  );
   const [lines, setLines] = useState<DraftBudgetLine[]>(() => [newBudgetLine()]);
   const [activities, setActivities] = useState<DraftActivity[]>([]);
   const [busy, setBusy] = useState<'draft' | 'published' | null>(null);
@@ -93,14 +93,18 @@ export default function NewEvent() {
     setError(null);
 
     const { slug: _placeholder, ...values } = checked.values;
-    // Slugs carry a random suffix; retry once on the rare clash.
+    // The web address comes from the name ("Deepavali 2026" → deepavali-2026).
+    // If another event already has it, add a short random suffix and retry.
     let created: { id: string; slug: string } | null = null;
-    for (let attempt = 0; attempt < 3 && !created; attempt += 1) {
+    for (let attempt = 0; attempt < 4 && !created; attempt += 1) {
       const { data, error: insertError } = await supabase
         .from('events')
         .insert({
           ...values,
-          slug: makeSlug(details.name),
+          slug: eventSlug(
+            details.name,
+            attempt === 0 ? undefined : Math.random().toString(36).slice(2, 6),
+          ),
           event_type_id: details.eventType.id,
           venue_id: details.venue.id,
           kind: 'event',
@@ -178,9 +182,7 @@ export default function NewEvent() {
         >
           <View style={{ gap: 2 }}>
             <Title>New event</Title>
-            <Caption>
-              Save a draft to keep working on it, or publish so residents can see it and contribute.
-            </Caption>
+            <Caption>A name and a date are enough to start; add the rest now or later.</Caption>
           </View>
 
           <Card style={{ gap: spacing.lg }}>
@@ -191,11 +193,6 @@ export default function NewEvent() {
           <Card style={{ gap: spacing.lg }}>
             <Heading>Budget</Heading>
             <BudgetLinesEditor lines={lines} onChange={setLines} currency={currency} />
-          </Card>
-
-          <Card style={{ gap: spacing.lg }}>
-            <Heading>Fund rule</Heading>
-            <FundRuleFields details={details} onChange={setDetails} />
           </Card>
 
           <Card style={{ gap: spacing.md }}>
@@ -264,18 +261,19 @@ export default function NewEvent() {
 
           <ErrorText message={error} />
           <Button
-            label="Publish event"
+            label={COPY.publish}
             onPress={() => void save('published')}
             loading={busy === 'published'}
             disabled={busy !== null}
           />
           <Button
-            label="Save as draft"
+            label={COPY.saveForLater}
             variant="secondary"
             onPress={() => void save('draft')}
             loading={busy === 'draft'}
             disabled={busy !== null}
           />
+          <Caption>{COPY.publishHint}</Caption>
           <View style={{ height: spacing.xl }} />
         </ScrollView>
       </KeyboardAvoidingView>

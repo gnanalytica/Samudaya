@@ -1,15 +1,17 @@
 import { View } from 'react-native';
 import {
+  COPY,
+  DEFAULT_FUND_RULE,
   FUND_RULES,
-  FUND_RULE_LABEL,
   createEventSchema,
   formatMoney,
   type FundRule,
+  FUND_RULE_LABEL,
 } from '@samudaya/core';
 import { spacing } from '../lib/theme';
 import { Body, Button, Caption, Input } from './ui';
 import { DateField } from './date-field';
-import { Chip, ChipRow } from './admin-ui';
+import { Chip, ChipRow, Disclosure } from './admin-ui';
 import { CataloguePicker, useCatalogue } from './catalogue-ui';
 
 /**
@@ -28,12 +30,21 @@ export type EventDetails = {
   startsOn: string;
   endsOn: string;
   description: string;
+  organizer: string;
   attendance: string;
   fundRule: FundRule;
   fundRuleNote: string;
 };
 
-export const emptyDetails = (): EventDetails => ({
+/**
+ * What happens to money left over, in the words a resident would use. The
+ * stored value is the same enum the website writes.
+ */
+/** Kept as a name for existing imports; the words live in @samudaya/core. */
+export const FUND_RULE_PLAIN = FUND_RULE_LABEL;
+
+/** A new event's starting values; the organiser defaults to the society. */
+export const emptyDetails = (organizer = ''): EventDetails => ({
   emoji: '🎉',
   name: '',
   eventType: { id: null, label: null },
@@ -41,8 +52,9 @@ export const emptyDetails = (): EventDetails => ({
   startsOn: '',
   endsOn: '',
   description: '',
+  organizer,
   attendance: '',
-  fundRule: 'general_fund',
+  fundRule: DEFAULT_FUND_RULE,
   fundRuleNote: '',
 });
 
@@ -63,6 +75,7 @@ export function validateDetails(
     starts_on: details.startsOn.trim(),
     ends_on: details.endsOn.trim() || null,
     venue: details.venue.label ?? undefined,
+    organizer: details.organizer.trim() || undefined,
     description: details.description.trim() || undefined,
     expected_attendance: details.attendance.trim() || undefined,
     fund_target: fundTarget,
@@ -85,6 +98,12 @@ export function validateDetails(
   return { values: parsed.data };
 }
 
+/**
+ * The event's details. The few fields every event needs come first; emoji,
+ * organiser, end date, attendance and the fund rule sit under "More options"
+ * with sensible defaults (the type's emoji, the society, one day, the
+ * society's event fund).
+ */
 export function DetailsFields({
   details,
   onChange,
@@ -110,16 +129,10 @@ export function DetailsFields({
         valueId={details.eventType.id}
         valueLabel={details.eventType.label}
         onChange={(next) => {
-          // Borrow the type's emoji until someone picks their own.
+          // The type's emoji stands in until someone picks their own.
           const emoji = types?.find((item) => item.id === next.id)?.emoji;
           onChange({ ...details, eventType: next, emoji: emoji ?? details.emoji });
         }}
-      />
-      <Input
-        label="Emoji"
-        value={details.emoji}
-        onChangeText={(value) => set('emoji', value)}
-        maxLength={8}
       />
       <CataloguePicker
         kind="venue"
@@ -129,7 +142,7 @@ export function DetailsFields({
         onChange={(next) => set('venue', next)}
       />
       <DateField
-        label="Starts on"
+        label="Date"
         value={details.startsOn || null}
         onChange={(next) =>
           onChange({
@@ -140,14 +153,6 @@ export function DetailsFields({
           })
         }
       />
-      <DateField
-        label="Ends on (optional, for events over several days)"
-        value={details.endsOn || null}
-        onChange={(next) => set('endsOn', next ?? '')}
-        minimumDate={details.startsOn || null}
-        placeholder="Same day"
-        clearable
-      />
       <Input
         label="Description"
         value={details.description}
@@ -156,13 +161,47 @@ export function DetailsFields({
         multiline
         style={{ minHeight: 96, textAlignVertical: 'top' }}
       />
-      <Input
-        label="Expected attendance (optional)"
-        value={details.attendance}
-        onChangeText={(value) => set('attendance', value.replace(/[^0-9]/g, ''))}
-        keyboardType="number-pad"
-        placeholder="250"
-      />
+
+      <Disclosure
+        label={COPY.moreOptions}
+        summary={[
+          details.emoji,
+          details.organizer.trim() || null,
+          details.endsOn ? 'several days' : 'one day',
+          FUND_RULE_PLAIN[details.fundRule],
+        ]
+          .filter(Boolean)
+          .join(' · ')}
+      >
+        <Input
+          label="Emoji"
+          value={details.emoji}
+          onChangeText={(value) => set('emoji', value)}
+          maxLength={8}
+        />
+        <Input
+          label="Organiser"
+          value={details.organizer}
+          onChangeText={(value) => set('organizer', value)}
+          placeholder="The society"
+        />
+        <DateField
+          label="Ends on (for events over several days)"
+          value={details.endsOn || null}
+          onChange={(next) => set('endsOn', next ?? '')}
+          minimumDate={details.startsOn || null}
+          placeholder="Same day"
+          clearable
+        />
+        <Input
+          label="Expected attendance"
+          value={details.attendance}
+          onChangeText={(value) => set('attendance', value.replace(/[^0-9]/g, ''))}
+          keyboardType="number-pad"
+          placeholder="250"
+        />
+        <FundRuleFields details={details} onChange={onChange} />
+      </Disclosure>
     </View>
   );
 }
@@ -181,7 +220,7 @@ export function FundRuleFields({
         {FUND_RULES.map((rule) => (
           <Chip
             key={rule}
-            label={FUND_RULE_LABEL[rule]}
+            label={FUND_RULE_PLAIN[rule]}
             selected={details.fundRule === rule}
             onPress={() => onChange({ ...details, fundRule: rule })}
           />
@@ -194,7 +233,7 @@ export function FundRuleFields({
         placeholder="Any surplus goes to Deepavali 2027."
       />
       <Caption>
-        Fixed before any money comes in, so nobody decides after seeing the surplus.
+        Decided before any money comes in, so nobody decides after seeing what’s left.
       </Caption>
     </View>
   );
@@ -288,7 +327,7 @@ export function ActivityTypeChips({
   const { data: types, loading } = useCatalogue('activity_type');
   if (loading && !types) return <Caption>Loading…</Caption>;
   if (!types?.length)
-    return <Caption>No activity types yet. Add them in More → Catalogue.</Caption>;
+    return <Caption>No activity types yet. Add them from Manage → Catalogue.</Caption>;
   return (
     <ChipRow>
       {types.map((item) => (

@@ -104,7 +104,7 @@ export default function Setup() {
     }
     Alert.alert(
       'Finish setup now?',
-      `${progress.total - progress.done} step${progress.total - progress.done === 1 ? ' is' : 's are'} still open. The checklist will stop showing on Home; everything stays available under More.`,
+      `${progress.total - progress.done} step${progress.total - progress.done === 1 ? ' is' : 's are'} still open. The checklist will stop showing on Home; everything stays available under Manage → Society settings.`,
       [
         { text: 'Keep going', style: 'cancel' },
         { text: 'Finish anyway', onPress: () => void finish() },

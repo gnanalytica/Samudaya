@@ -5,6 +5,7 @@ import * as Clipboard from 'expo-clipboard';
 import { startActivityAsync } from 'expo-intent-launcher';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  COPY,
   can,
   formatMoney,
   newTransactionRef,
@@ -79,7 +80,7 @@ export default function Contribute() {
       <Screen>
         <EmptyState
           title="Staff don’t contribute"
-          description="Record a payment a flat made from More → Payments instead."
+          description="Record a payment a flat made from Manage → Payments instead."
         />
       </Screen>
     );
@@ -203,7 +204,7 @@ function PayWithUpi({
       // with whatever id the app did give filled in.
       if (response.reference) setReference(response.reference);
       setNotice(
-        'We couldn’t read the payment details from your UPI app. If you paid, enter the UPI reference from the app’s payment details.',
+        'We couldn’t read the payment details from your UPI app. If you paid, enter the UPI transaction ID from the app’s payment details.',
       );
       setStage('report');
     } catch {
@@ -221,7 +222,7 @@ function PayWithUpi({
   const submit = async () => {
     const parsed = upiReferenceSchema.safeParse(reference);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Enter the UPI reference.');
+      setError(parsed.error.issues[0]?.message ?? 'Enter the UPI transaction ID.');
       return;
     }
     await submitReport(parsed.data, null);
@@ -269,9 +270,9 @@ function PayWithUpi({
       if (proofPath) void supabase.storage.from('payment-proofs').remove([proofPath]);
       setError(
         insertError.code === '23505'
-          ? 'That UPI reference has already been reported.'
+          ? 'That UPI transaction ID has already been reported.'
           : appResponse
-            ? `Your payment went through, but we couldn’t save the report. Enter UPI reference ${upiReference} below and try again.`
+            ? `Your payment went through, but we couldn’t save the report. Enter UPI transaction ID ${upiReference} below and try again.`
             : 'That did not go through. Please try again.',
       );
       if (appResponse) {
@@ -302,8 +303,8 @@ function PayWithUpi({
               {captured
                 ? 'We picked up the payment details from your UPI app, so there is nothing to type. '
                 : ''}
-              Staff will match your UPI reference with the society’s bank statement. It counts in
-              the event total once confirmed; you can follow it under More.
+              Staff will match your UPI transaction ID with the society’s bank statement. It counts
+              in the event total once confirmed; you can follow it under Me.
             </Caption>
           </Card>
           <Button label="Done" onPress={() => router.back()} />
@@ -403,16 +404,14 @@ function PayWithUpi({
               <Heading>Tell us you’ve paid</Heading>
               {notice ? <Body muted>{notice}</Body> : null}
               <Input
-                label="UPI reference (UTR)"
+                label={COPY.upiReference}
                 value={reference}
                 onChangeText={setReference}
                 keyboardType="number-pad"
                 placeholder="12-digit number from your UPI app"
                 autoCapitalize="none"
               />
-              <Caption>
-                Find it in your UPI app under the payment’s details, often called UPI Ref No or UTR.
-              </Caption>
+              <Caption>{COPY.upiReferenceHint}</Caption>
               <FilePickerField
                 label="Payment screenshot (optional)"
                 file={proof}

@@ -1,7 +1,9 @@
 import { Redirect, Tabs } from 'expo-router';
+import { COPY, can } from '@samudaya/core';
 import { Text, type ColorValue } from 'react-native';
 import { useAuth } from '../../src/lib/auth';
-import { useUnreadCount } from '../../src/lib/notifications';
+import { useTodoItems } from '../../src/lib/todo';
+import { NotificationBell } from '../../src/components/notification-bell';
 import { Loading, Screen } from '../../src/components/ui';
 import { useTheme } from '../../src/lib/use-theme';
 
@@ -15,8 +17,10 @@ function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
 
 export default function TabsLayout() {
   const { colors } = useTheme();
-  const { loading, user, memberships, welcomedAt } = useAuth();
-  const unread = useUnreadCount();
+  const { loading, user, memberships, welcomedAt, role } = useAuth();
+  const staffView = can(role, 'events:manage');
+  const { data: todo } = useTodoItems();
+  const todoCount = staffView ? (todo?.length ?? 0) : 0;
 
   if (loading) {
     return (
@@ -47,26 +51,39 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={{ title: 'Home', tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} /> }}
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} />,
+          headerRight: () => <NotificationBell />,
+        }}
       />
       <Tabs.Screen
         name="events"
         options={{
           title: 'Events',
           tabBarIcon: ({ color }) => <TabIcon glyph="◈" color={color} />,
+          headerRight: () => <NotificationBell />,
         }}
+      />
+      {/* Staff and the committee only; residents never see the tab. */}
+      <Tabs.Screen
+        name="manage"
+        options={{
+          title: COPY.manage,
+          href: staffView ? undefined : null,
+          tabBarIcon: ({ color }) => <TabIcon glyph="☰" color={color} />,
+          tabBarBadge: todoCount > 0 ? (todoCount > 99 ? '99+' : todoCount) : undefined,
+        }}
+      />
+      <Tabs.Screen
+        name="me"
+        options={{ title: 'Me', tabBarIcon: ({ color }) => <TabIcon glyph="◉" color={color} /> }}
       />
       {/* Notices and polls are switched off for the pilot; the screen stays in
           the codebase but is kept out of the tab bar. */}
       <Tabs.Screen name="community" options={{ href: null }} />
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'More',
-          tabBarIcon: ({ color }) => <TabIcon glyph="≡" color={color} />,
-          tabBarBadge: unread > 0 ? (unread > 99 ? '99+' : unread) : undefined,
-        }}
-      />
+      {/* The old More tab, now a redirect to Me. */}
+      <Tabs.Screen name="more" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { COPY } from '@samudaya/core';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../src/lib/auth';
 import { usePushRegistration } from '../src/lib/use-push-registration';
@@ -38,19 +39,24 @@ function RootStack() {
         <Stack.Screen name="campaign/new" options={{ title: 'New campaign' }} />
         <Stack.Screen name="admin/requests" options={{ title: 'Join requests' }} />
         <Stack.Screen name="admin/members" options={{ title: 'Residents' }} />
-        <Stack.Screen name="admin/member/[id]" options={{ title: 'Member' }} />
+        <Stack.Screen name="admin/member/[id]" options={{ title: 'Resident' }} />
         <Stack.Screen name="admin/bills" options={{ title: 'Bills' }} />
         <Stack.Screen name="admin/bill" options={{ title: 'Bill' }} />
         <Stack.Screen name="admin/payments" options={{ title: 'Payments' }} />
-        <Stack.Screen name="admin/upi" options={{ title: 'Society UPI ID' }} />
-        <Stack.Screen name="admin/queue" options={{ title: 'Committee decisions' }} />
+        <Stack.Screen name="admin/upi" options={{ title: 'UPI ID' }} />
+        {/* Old link for committee decisions; redirects to the To do queue. */}
+        <Stack.Screen name="admin/queue" options={{ title: COPY.todo }} />
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
         <Stack.Screen name="admin/setup" options={{ title: 'Setup' }} />
+        <Stack.Screen name="admin/society-settings" options={{ title: COPY.societySettings }} />
         <Stack.Screen name="admin/society" options={{ title: 'Society details' }} />
         <Stack.Screen name="admin/flats" options={{ title: 'Flats' }} />
         <Stack.Screen name="admin/catalogue" options={{ title: 'Catalogue' }} />
-        <Stack.Screen name="admin/share" options={{ title: 'Share society code' }} />
+        <Stack.Screen
+          name="admin/share"
+          options={{ title: `Share ${COPY.societyCode.toLowerCase()}` }}
+        />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="admin/event/new" options={{ title: 'New event' }} />
         <Stack.Screen name="admin/event/[slug]" options={{ title: 'Manage event' }} />

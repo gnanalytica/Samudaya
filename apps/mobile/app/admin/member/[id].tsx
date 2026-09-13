@@ -68,7 +68,7 @@ export default function EditMember() {
   if (!data) {
     return (
       <Screen>
-        <EmptyState title="Member not found" description="They may already have been removed." />
+        <EmptyState title="Resident not found" description="They may already have been removed." />
       </Screen>
     );
   }
@@ -110,7 +110,7 @@ function MemberEditor({
   const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const name = member.profiles?.full_name ?? member.profiles?.email ?? 'This member';
+  const name = member.profiles?.full_name ?? member.profiles?.email ?? 'This resident';
   const flats = member.unit_occupants
     .filter((row) => row.units)
     .map((row) => `Flat ${unitLabel(row.units)} · ${row.relation}`);
@@ -147,7 +147,7 @@ function MemberEditor({
       .eq('id', member.id);
     setBusy(null);
     if (deleteError || count === 0) {
-      setError(deleteError?.message ?? 'You can’t remove this member.');
+      setError(deleteError?.message ?? 'You can’t remove this resident.');
       return;
     }
     await afterChange();

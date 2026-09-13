@@ -2,6 +2,7 @@ import { RefreshControl, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ROLE_LABEL,
+  TODO_KIND,
   can,
   countdown,
   formatDate,
@@ -13,9 +14,9 @@ import {
   setupSteps,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
-import { supabase } from '../../src/lib/supabase';
 import { fetchEvents, fetchStats, pickNextEvent } from '../../src/lib/events';
 import { fetchSetupFacts } from '../../src/lib/setup';
+import { groupTodo, useTodoItems } from '../../src/lib/todo';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
   Badge,
@@ -31,6 +32,7 @@ import {
 } from '../../src/components/ui';
 import { LinkRow } from '../../src/components/admin-ui';
 import { Meter, StatTile } from '../../src/components/event-ui';
+import { todoTitle } from '../../src/components/todo-queue';
 import { spacing } from '../../src/lib/theme';
 
 export default function Home() {
@@ -38,42 +40,21 @@ export default function Home() {
   const { profile, activeCommunity, role } = useAuth();
   const staffView = can(role, 'events:manage');
   const setupOpen = can(role, 'roles:manage') && !activeCommunity?.setup_completed_at;
+  const { data: todoData } = useTodoItems();
+  const todoItems = todoData ?? [];
+  const todoGroups = groupTodo(todoItems);
 
   const { data, loading, refreshing, refresh } = useCommunityData(
     `home:${role}`,
     async (communityId) => {
       const events = await fetchEvents(communityId);
       const next = pickNextEvent(events);
-      const [stats, requests, bills, proposals] = await Promise.all([
-        next ? fetchStats([next.id]) : Promise.resolve(new Map()),
-        staffView
-          ? supabase
-              .from('join_requests')
-              .select('id', { count: 'exact', head: true })
-              .eq('community_id', communityId)
-              .eq('status', 'pending')
-          : Promise.resolve({ count: 0 }),
-        staffView
-          ? supabase
-              .from('expenses')
-              .select('id', { count: 'exact', head: true })
-              .eq('community_id', communityId)
-              .in('status', ['pending', 'changes_requested'])
-          : Promise.resolve({ count: 0 }),
-        can(role, 'campaigns:approve')
-          ? supabase
-              .from('events')
-              .select('id', { count: 'exact', head: true })
-              .eq('community_id', communityId)
-              .eq('status', 'proposed')
-          : Promise.resolve({ count: 0 }),
-      ]);
+      const stats = next
+        ? await fetchStats([next.id])
+        : new Map<string, ReturnType<typeof normalizeStats>>();
       return {
         next: next ?? null,
         stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
-        pendingRequests: requests.count ?? 0,
-        openBills: bills.count ?? 0,
-        proposals: proposals.count ?? 0,
       };
     },
   );
@@ -119,28 +100,18 @@ export default function Home() {
 
         {staffView ? (
           <Card style={{ gap: spacing.xs }}>
-            <Heading>Needs attention</Heading>
-            <LinkRow
-              label={`Join requests (${data?.pendingRequests ?? 0})`}
-              detail="New residents waiting to be admitted"
-              onPress={() => router.push('/admin/requests')}
-            />
-            <LinkRow
-              label={`Bills in progress (${data?.openBills ?? 0})`}
-              detail={
-                can(role, 'expenses:approve')
-                  ? 'Waiting for committee approval or corrections'
-                  : 'Pending approval or sent back for corrections'
-              }
-              onPress={() => router.push('/admin/bills')}
-            />
-            {can(role, 'campaigns:approve') ? (
-              <LinkRow
-                label={`Committee decisions (${data?.proposals ?? 0} campaigns)`}
-                detail="Proposed campaigns and new suggestions"
-                onPress={() => router.push('/admin/queue')}
-              />
-            ) : null}
+            <Heading>{todoTitle(todoItems.length)}</Heading>
+            {todoGroups.length ? (
+              todoGroups.map((group) => (
+                <LinkRow
+                  key={group.kind}
+                  label={`${TODO_KIND[group.kind].emoji} ${TODO_KIND[group.kind].section} (${group.items.length})`}
+                  onPress={() => router.push('/manage')}
+                />
+              ))
+            ) : (
+              <Caption>Nothing waiting on you.</Caption>
+            )}
           </Card>
         ) : null}
 

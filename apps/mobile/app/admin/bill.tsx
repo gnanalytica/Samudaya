@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { billPath, can, formatMoney } from '@samudaya/core';
+import { COPY, billPath, can, formatDate, formatMoney } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
+import { TODO_KEY } from '../../src/lib/todo';
 import {
   Body,
   Button,
@@ -18,7 +19,7 @@ import {
   Title,
 } from '../../src/components/ui';
 import { DateField, today } from '../../src/components/date-field';
-import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
+import { Chip, ChipRow, Disclosure, ErrorText } from '../../src/components/admin-ui';
 import { FilePickerField, ViewFileChip } from '../../src/components/file-ui';
 import { CataloguePicker } from '../../src/components/catalogue-ui';
 import { uploadFile, type PickedFile } from '../../src/lib/storage';
@@ -248,6 +249,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
       void removeStoredBill(existing.bill_url);
     }
     await queryClient.invalidateQueries({ queryKey: ['admin:bills'] });
+    await queryClient.invalidateQueries({ queryKey: [TODO_KEY] });
     router.back();
   };
 
@@ -263,6 +265,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
     }
     if (existing.bill_url) void removeStoredBill(existing.bill_url);
     await queryClient.invalidateQueries({ queryKey: ['admin:bills'] });
+    await queryClient.invalidateQueries({ queryKey: [TODO_KEY] });
     router.back();
   };
 
@@ -306,7 +309,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
                   ))}
                 </ChipRow>
               ) : (
-                <Caption>No open events. Create one from More → New event first.</Caption>
+                <Caption>No open events. Create one from Manage → New event first.</Caption>
               )}
             </View>
             <Input
@@ -315,17 +318,6 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               onChangeText={setName}
               placeholder="Pandal and chairs"
             />
-            <CataloguePicker
-              kind="budget_category"
-              label="Budget category"
-              valueId={category.id}
-              valueLabel={category.label}
-              onChange={setCategory}
-              preferred={categories}
-            />
-            {categories.length ? (
-              <Caption>Categories in this event’s budget are listed first.</Caption>
-            ) : null}
             <Input
               label={`Amount (${currency})`}
               value={amount}
@@ -337,34 +329,18 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               <Caption>{formatMoney(Number.parseFloat(amount), currency)}</Caption>
             ) : null}
             <CataloguePicker
-              kind="vendor"
-              label="Vendor"
-              valueId={vendor.id}
-              valueLabel={vendor.label}
-              onChange={setVendor}
-              allowAdd
+              kind="budget_category"
+              label="Category"
+              valueId={category.id}
+              valueLabel={category.label}
+              onChange={setCategory}
+              preferred={categories}
             />
-            <View style={{ gap: spacing.sm }}>
-              <Body>Paid by</Body>
-              <ChipRow>
-                {METHODS.map((item) => (
-                  <Chip
-                    key={item.value}
-                    label={item.label}
-                    selected={method === item.value}
-                    onPress={() => setMethod(item.value)}
-                  />
-                ))}
-              </ChipRow>
-            </View>
-            <DateField
-              label="Bill date"
-              value={spentOn}
-              onChange={(next) => setSpentOn(next ?? today())}
-              maximumDate={today()}
-            />
+            {categories.length ? (
+              <Caption>Categories in this event’s budget are listed first.</Caption>
+            ) : null}
             <FilePickerField
-              label="Bill"
+              label="Photo of the bill"
               file={billFile}
               onChange={setBillFile}
               existingLabel={
@@ -376,6 +352,45 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
             {existing?.bill_url && !billFile ? (
               <ViewFileChip bucket="bills" value={existing.bill_url} label="View current bill" />
             ) : null}
+
+            <Disclosure
+              label={COPY.moreDetails}
+              summary={[
+                vendor.label ?? 'No vendor',
+                spentOn === today() ? 'Today' : formatDate(spentOn),
+                METHODS.find((item) => item.value === method)?.label,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            >
+              <CataloguePicker
+                kind="vendor"
+                label="Vendor"
+                valueId={vendor.id}
+                valueLabel={vendor.label}
+                onChange={setVendor}
+                allowAdd
+              />
+              <DateField
+                label="Bill date"
+                value={spentOn}
+                onChange={(next) => setSpentOn(next ?? today())}
+                maximumDate={today()}
+              />
+              <View style={{ gap: spacing.sm }}>
+                <Body>Paid by</Body>
+                <ChipRow>
+                  {METHODS.map((item) => (
+                    <Chip
+                      key={item.value}
+                      label={item.label}
+                      selected={method === item.value}
+                      onPress={() => setMethod(item.value)}
+                    />
+                  ))}
+                </ChipRow>
+              </View>
+            </Disclosure>
           </Card>
 
           <ErrorText message={error} />

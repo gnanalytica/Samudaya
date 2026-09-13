@@ -6,6 +6,7 @@ import { EXPENSE_STATUS_LABEL, can, formatDate, formatMoney } from '@samudaya/co
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
+import { TODO_KEY } from '../../src/lib/todo';
 import {
   Badge,
   Body,
@@ -78,6 +79,7 @@ export default function Bills() {
   const afterChange = () => {
     void queryClient.invalidateQueries({ queryKey: ['admin:bills'] });
     void queryClient.invalidateQueries({ queryKey: [`home:${role}`] });
+    void queryClient.invalidateQueries({ queryKey: [TODO_KEY] });
   };
 
   const rows = (data ?? []).filter((row) => row.status === filter);

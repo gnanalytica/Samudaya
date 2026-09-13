@@ -10,6 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  COPY,
   EVENT_STATUS_LABEL,
   can,
   createActivitySchema,
@@ -37,7 +38,6 @@ import { CataloguePicker } from '../../../src/components/catalogue-ui';
 import {
   ActivityTypeChips,
   DetailsFields,
-  FundRuleFields,
   validateDetails,
   type Choice,
   type EventDetails,
@@ -48,7 +48,7 @@ async function loadEvent(communityId: string, slug: string) {
   const { data: event } = await supabase
     .from('events')
     .select(
-      'id, slug, emoji, name, kind, status, starts_on, ends_on, venue, venue_id, event_type_id, description, expected_attendance, fund_target, fund_rule, fund_rule_note, created_by',
+      'id, slug, emoji, name, kind, status, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, expected_attendance, fund_target, fund_rule, fund_rule_note, created_by',
     )
     .eq('community_id', communityId)
     .eq('slug', slug)
@@ -244,21 +244,24 @@ function StatusCard({ data, onChange }: { data: Loaded; onChange: () => void }) 
 
       {proposed ? (
         <Caption>
-          This is a resident’s campaign. The committee approves it from Committee decisions.
+          This is a resident’s campaign. The committee approves it from To do on the Manage tab.
         </Caption>
       ) : null}
 
       {!proposed && !finished ? (
         <View style={{ gap: spacing.sm }}>
           {event.status === 'draft' ? (
-            <Button
-              label="Publish"
-              onPress={() => void setStatus('published')}
-              loading={busy === 'published'}
-            />
+            <>
+              <Button
+                label={COPY.publish}
+                onPress={() => void setStatus('published')}
+                loading={busy === 'published'}
+              />
+              <Caption>{COPY.publishHint}</Caption>
+            </>
           ) : (
             <Button
-              label="Back to draft"
+              label="Hide from residents"
               variant="secondary"
               onPress={() => void setStatus('draft')}
               loading={busy === 'draft'}
@@ -319,6 +322,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
     startsOn: event.starts_on,
     endsOn: event.ends_on ?? '',
     description: event.description ?? '',
+    organizer: event.organizer ?? '',
     attendance: event.expected_attendance ? String(event.expected_attendance) : '',
     fundRule: event.fund_rule as FundRule,
     fundRuleNote: event.fund_rule_note ?? '',
@@ -348,6 +352,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
         venue: values.venue ?? null,
         venue_id: details.venue.id,
         event_type_id: details.eventType.id,
+        organizer: values.organizer ?? null,
         description: values.description ?? null,
         expected_attendance: values.expected_attendance ?? null,
         fund_rule: values.fund_rule,
@@ -369,13 +374,6 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
     <Card style={{ gap: spacing.lg }}>
       <Heading>Details</Heading>
       <DetailsFields
-        details={details}
-        onChange={(next) => {
-          setDetails(next);
-          setSaved(false);
-        }}
-      />
-      <FundRuleFields
         details={details}
         onChange={(next) => {
           setDetails(next);

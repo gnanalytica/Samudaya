@@ -2,10 +2,9 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { can, formatMoney } from '@samudaya/core';
+import { can, formatMoney, eventSlug } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
-import { makeSlug } from '../../src/lib/events';
 import {
   Body,
   Button,
@@ -77,7 +76,8 @@ export default function NewCampaign() {
     setError(null);
     const { error: insertError } = await supabase.from('events').insert({
       community_id: activeCommunity.id,
-      slug: makeSlug(name),
+      // A short random suffix keeps two campaigns with the same name apart.
+      slug: eventSlug(name, Math.random().toString(36).slice(2, 6)),
       emoji,
       name: name.trim(),
       description: purpose.trim(),

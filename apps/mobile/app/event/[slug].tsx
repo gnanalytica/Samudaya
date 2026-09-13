@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { Alert, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  COPY,
   EVENT_STATUS_LABEL,
-  FUND_RULE_LABEL,
+  EVENT_TABS,
   can,
   countdown,
   formatDate,
   formatMoney,
   fundedPercent,
+  type EventTab,
+  type FundRule,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
@@ -28,7 +31,8 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
-import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
+import { Chip, ChipRow, ErrorText, Segmented } from '../../src/components/admin-ui';
+import { FUND_RULE_PLAIN } from '../../src/components/event-form';
 import { KeyValue, Meter, StatTile } from '../../src/components/event-ui';
 import { ViewFileChip } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
@@ -36,7 +40,10 @@ import { spacing } from '../../src/lib/theme';
 type Detail = NonNullable<Awaited<ReturnType<typeof fetchEventDetail>>>;
 
 export default function EventDetail() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, tab: initialTab } = useLocalSearchParams<{ slug: string; tab?: string }>();
+  const [tab, setTab] = useState<EventTab>(
+    () => EVENT_TABS.find((item) => item.id === initialTab)?.id ?? 'about',
+  );
   const router = useRouter();
   const queryClient = useQueryClient();
   const { activeCommunity, membershipId, role } = useAuth();
@@ -103,103 +110,171 @@ export default function EventDetail() {
           ) : null}
           <Caption>
             {formatDate(event.starts_on)}
-            {event.ends_on && event.ends_on !== event.starts_on
-              ? ` – ${formatDate(event.ends_on)}`
-              : ''}
-            {event.venue ? ` · ${event.venue}` : ''}
             {countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''}
           </Caption>
         </View>
 
-        {event.description ? <Body muted>{event.description}</Body> : null}
+        <Segmented options={EVENT_TABS} value={tab} onChange={setTab} />
 
-        {event.status === 'proposed' ? (
-          <Card>
-            <Body muted>
-              This campaign is waiting for the committee. Residents can contribute once it is
-              approved.
-            </Body>
-          </Card>
+        {tab === 'about' ? (
+          <About data={data} currency={currency} onMoney={() => setTab('money')} />
         ) : null}
 
-        <Card style={{ gap: spacing.md }}>
-          <Heading>Fund</Heading>
-          <Title>{formatMoney(stats.fundRaised, currency)}</Title>
-          <Caption>
-            of {formatMoney(stats.fundTarget || event.fund_target, currency)} target
-          </Caption>
-          <Meter percent={funded} tone="success" label="Fund progress" />
-          <View style={{ gap: spacing.xs }}>
-            <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
-            <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
-            <KeyValue label="Households" value={String(stats.contributors)} />
-          </View>
-          {open && can(role, 'contribute') ? (
-            <Button
-              label="Contribute"
-              onPress={() => router.push(`/contribute?event=${event.slug}`)}
-            />
-          ) : null}
-          {data.myPayments.length ? (
-            <View style={{ gap: spacing.xs }}>
-              <Body>Your payments</Body>
-              {data.myPayments.map((payment) => (
-                <View key={payment.id} style={{ gap: 2 }}>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      gap: spacing.sm,
-                    }}
-                  >
-                    <Caption>
-                      {formatMoney(payment.amount, currency)}
-                      {payment.reference ? ` · UPI ref ${payment.reference}` : ''}
-                    </Caption>
-                    <Badge
-                      label={
-                        payment.status === 'succeeded'
-                          ? 'Confirmed'
-                          : payment.status === 'failed'
-                            ? 'Not confirmed'
-                            : 'Waiting for confirmation'
-                      }
-                      tone={
-                        payment.status === 'succeeded'
-                          ? 'success'
-                          : payment.status === 'failed'
-                            ? 'danger'
-                            : 'warning'
-                      }
-                    />
-                  </View>
-                  {payment.status === 'failed' && payment.review_note ? (
-                    <Caption>{payment.review_note}</Caption>
-                  ) : null}
-                </View>
-              ))}
-            </View>
-          ) : null}
-          {can(role, 'payments:view') ? (
-            <Button
-              label="Who has paid"
-              variant="secondary"
-              onPress={() => router.push(`/admin/payments?event=${event.slug}`)}
-            />
-          ) : null}
-          <Caption>🔒 {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}</Caption>
-        </Card>
+        {tab === 'money' ? (
+          <>
+            <Card style={{ gap: spacing.md }}>
+              <Heading>Fund</Heading>
+              <Title>{formatMoney(stats.fundRaised, currency)}</Title>
+              <Caption>
+                of {formatMoney(stats.fundTarget || event.fund_target, currency)} target
+              </Caption>
+              <Meter percent={funded} tone="success" label="Fund progress" />
+              <View style={{ gap: spacing.xs }}>
+                <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
+                <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
+                <KeyValue label={COPY.households} value={String(stats.contributors)} />
+              </View>
+              {open && can(role, 'contribute') ? (
+                <Button
+                  label="Contribute"
+                  onPress={() => router.push(`/contribute?event=${event.slug}`)}
+                />
+              ) : null}
+              {can(role, 'payments:view') ? (
+                <Button
+                  label="Who has paid"
+                  variant="secondary"
+                  onPress={() => router.push(`/admin/payments?event=${event.slug}`)}
+                />
+              ) : null}
+              <Caption>
+                🔒 If money is left over:{' '}
+                {event.fund_rule_note ?? FUND_RULE_PLAIN[event.fund_rule as FundRule]}
+              </Caption>
+            </Card>
 
-        <Analytics data={data} currency={currency} />
+            {data.myPayments.length ? <YourPayments data={data} currency={currency} /> : null}
 
-        <Activities data={data} open={open} onChange={changed} />
+            <Analytics data={data} currency={currency} />
 
-        <BudgetAndSpending data={data} currency={currency} />
+            <BudgetAndSpending data={data} currency={currency} />
+          </>
+        ) : null}
 
-        <Suggestions data={data} open={open} onChange={changed} />
+        {tab === 'activities' ? <Activities data={data} open={open} onChange={changed} /> : null}
+
+        {tab === 'vote' ? <Suggestions data={data} open={open} onChange={changed} /> : null}
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </Screen>
+  );
+}
+
+function About({
+  data,
+  currency,
+  onMoney,
+}: {
+  data: Detail;
+  currency: string;
+  onMoney: () => void;
+}) {
+  const { event, stats } = data;
+  const dates =
+    event.ends_on && event.ends_on !== event.starts_on
+      ? `${formatDate(event.starts_on)} – ${formatDate(event.ends_on)}`
+      : formatDate(event.starts_on);
+
+  return (
+    <>
+      {event.status === 'proposed' ? (
+        <Card>
+          <Body muted>
+            This campaign is waiting for the committee. Residents can contribute once it is
+            approved.
+          </Body>
+        </Card>
+      ) : null}
+
+      <Card style={{ gap: spacing.md }}>
+        {event.description ? (
+          <Body>{event.description}</Body>
+        ) : (
+          <Body muted>No description yet.</Body>
+        )}
+        <View style={{ gap: spacing.xs }}>
+          <KeyValue label="Date" value={dates} />
+          {event.venue ? <KeyValue label="Venue" value={event.venue} /> : null}
+          {data.eventType ? <KeyValue label="Type" value={data.eventType} /> : null}
+          {event.organizer ? <KeyValue label="Organiser" value={event.organizer} /> : null}
+        </View>
+      </Card>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={onMoney}
+        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+      >
+        <Card style={{ gap: spacing.sm }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Heading>{COPY.money}</Heading>
+            <Caption>See where it went ›</Caption>
+          </View>
+          <Caption>
+            {formatMoney(stats.fundRaised, currency)} raised of{' '}
+            {formatMoney(stats.fundTarget || event.fund_target, currency)}
+          </Caption>
+          <Meter
+            percent={fundedPercent(stats.fundRaised, stats.fundTarget)}
+            tone="success"
+            label="Fund progress"
+          />
+        </Card>
+      </Pressable>
+    </>
+  );
+}
+
+function YourPayments({ data, currency }: { data: Detail; currency: string }) {
+  return (
+    <Card style={{ gap: spacing.sm }}>
+      <Heading>Your payments</Heading>
+      {data.myPayments.map((payment) => (
+        <View key={payment.id} style={{ gap: 2 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              gap: spacing.sm,
+            }}
+          >
+            <Caption>
+              {formatMoney(payment.amount, currency)}
+              {payment.reference ? ` · UPI transaction ID ${payment.reference}` : ''}
+            </Caption>
+            <Badge
+              label={
+                payment.status === 'succeeded'
+                  ? 'Confirmed'
+                  : payment.status === 'failed'
+                    ? 'Not confirmed'
+                    : 'Waiting for confirmation'
+              }
+              tone={
+                payment.status === 'succeeded'
+                  ? 'success'
+                  : payment.status === 'failed'
+                    ? 'danger'
+                    : 'warning'
+              }
+            />
+          </View>
+          {payment.status === 'failed' && payment.review_note ? (
+            <Caption>{payment.review_note}</Caption>
+          ) : null}
+        </View>
+      ))}
+    </Card>
   );
 }
 
@@ -314,7 +389,16 @@ function Activities({
   const [busy, setBusy] = useState<string | null>(null);
   const mayRegister = open && can(role, 'activities:register');
 
-  if (!data.activities.length) return null;
+  if (!data.activities.length) {
+    return (
+      <Card>
+        <EmptyState
+          title="No activities yet"
+          description="When the organisers add activities, you can register here."
+        />
+      </Card>
+    );
+  }
 
   const register = async (activityId: string, participantName: string | null) => {
     if (!membershipId) return;
@@ -530,7 +614,16 @@ function Suggestions({
     onChange();
   };
 
-  if (!voting.length && !waiting.length && !maySuggest) return null;
+  if (!voting.length && !waiting.length && !maySuggest) {
+    return (
+      <Card>
+        <EmptyState
+          title="Nothing to vote on yet"
+          description="Suggestions the committee opens for voting appear here."
+        />
+      </Card>
+    );
+  }
 
   return (
     <Card style={{ gap: spacing.lg }}>

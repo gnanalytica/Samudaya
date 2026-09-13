@@ -5,6 +5,7 @@ import { ROLE_LABEL, can, formatDate, unitLabel, type Role } from '@samudaya/cor
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
+import { TODO_KEY } from '../../src/lib/todo';
 import {
   Body,
   Button,
@@ -61,6 +62,7 @@ export default function Requests() {
     void queryClient.invalidateQueries({ queryKey: ['admin:requests'] });
     void queryClient.invalidateQueries({ queryKey: ['admin:members'] });
     void queryClient.invalidateQueries({ queryKey: [`home:${role}`] });
+    void queryClient.invalidateQueries({ queryKey: [TODO_KEY] });
   };
 
   return (

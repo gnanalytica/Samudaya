@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { CATALOGUE_KIND_LABEL, type CatalogueKind } from '@samudaya/core';
+import { CATALOGUE_KIND_LABEL, can, type CatalogueKind } from '@samudaya/core';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { useCommunityData } from '../lib/use-community-data';
 import { spacing } from '../lib/theme';
+import { useTheme } from '../lib/use-theme';
 import { Body, Button, Caption, Input } from './ui';
 import { Chip, ChipRow, ErrorText } from './admin-ui';
 
@@ -124,7 +126,10 @@ export function CataloguePicker({
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <Body>{label}</Body>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
+        <Body>{label}</Body>
+        <ManageCatalogueLink />
+      </View>
       {loading && !items ? <Caption>Loading…</Caption> : null}
       <ChipRow>
         {legacy ? <Chip label={legacy} selected onPress={() => undefined} /> : null}
@@ -146,7 +151,7 @@ export function CataloguePicker({
       </ChipRow>
       {!loading && !sorted.length && !allowAdd ? (
         <Caption>
-          No {CATALOGUE_KIND_LABEL[kind].title.toLowerCase()} yet. Add them in More → Catalogue.
+          No {CATALOGUE_KIND_LABEL[kind].title.toLowerCase()} yet. Tap Manage to add them.
         </Caption>
       ) : null}
       {adding ? (
@@ -178,5 +183,26 @@ export function CataloguePicker({
         </View>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * Staff and the committee keep the catalogue from wherever they meet it: the
+ * picker's own "Manage" link opens the catalogue screen.
+ */
+export function ManageCatalogueLink() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const { role } = useAuth();
+  if (!can(role, 'events:manage')) return null;
+  return (
+    <Pressable
+      accessibilityRole="link"
+      hitSlop={8}
+      onPress={() => router.push('/admin/catalogue')}
+      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+    >
+      <Text style={{ color: colors.accent, fontSize: 13, fontWeight: '600' }}>Manage</Text>
+    </Pressable>
   );
 }

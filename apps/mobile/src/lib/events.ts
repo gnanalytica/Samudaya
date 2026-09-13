@@ -12,7 +12,7 @@ import { supabase } from './supabase';
 // A single string literal: supabase-js infers the row type from the select
 // text, and `+` concatenation widens it to `string`.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, description, status, kind, fund_target, fund_rule, fund_rule_note, closed_at, created_by';
+  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, event_type_id, description, status, kind, fund_target, fund_rule, fund_rule_note, closed_at, created_by';
 
 export async function fetchEvents(communityId: string) {
   const { data } = await supabase
@@ -48,46 +48,62 @@ export async function fetchEventDetail(communityId: string, slug: string, member
   const event = await fetchEventBySlug(communityId, slug);
   if (!event) return null;
 
-  const [stats, budget, expenses, activities, activityStats, registrations, suggestions, payments] =
-    await Promise.all([
-      supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
-      supabase
-        .from('budget_lines')
-        .select('id, category, amount, notes')
-        .eq('event_id', event.id)
-        .order('position'),
-      // Residents only ever get approved rows back; that is the public ledger.
-      supabase
-        .from('expenses')
-        .select('id, name, category, amount, vendor, bill_url, spent_on, status')
-        .eq('event_id', event.id)
-        .eq('status', 'approved')
-        .order('spent_on', { ascending: false }),
-      supabase
-        .from('event_activities')
-        .select('id, name, emoji, description, is_open, capacity')
-        .eq('event_id', event.id)
-        .order('position'),
-      supabase.from('activity_stats').select('activity_id, interested').eq('event_id', event.id),
-      supabase
-        .from('activity_participants')
-        .select('id, activity_id, participant_name, event_activities!inner(event_id)')
-        .eq('membership_id', membershipId)
-        .eq('event_activities.event_id', event.id),
-      supabase
-        .from('activity_suggestions')
-        .select('id, kind, name, description, status, suggested_by, created_at')
-        .eq('event_id', event.id)
-        .in('status', ['new', 'reviewing', 'accepted'])
-        .order('created_at', { ascending: false }),
-      // The viewer's own payments for this event, confirmed or not.
-      supabase
-        .from('contributions')
-        .select('id, amount, status, reference, review_note, paid_at')
-        .eq('event_id', event.id)
-        .eq('membership_id', membershipId)
-        .order('paid_at', { ascending: false }),
-    ]);
+  const [
+    stats,
+    budget,
+    expenses,
+    activities,
+    activityStats,
+    registrations,
+    suggestions,
+    payments,
+    eventType,
+  ] = await Promise.all([
+    supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
+    supabase
+      .from('budget_lines')
+      .select('id, category, amount, notes')
+      .eq('event_id', event.id)
+      .order('position'),
+    // Residents only ever get approved rows back; that is the public ledger.
+    supabase
+      .from('expenses')
+      .select('id, name, category, amount, vendor, bill_url, spent_on, status')
+      .eq('event_id', event.id)
+      .eq('status', 'approved')
+      .order('spent_on', { ascending: false }),
+    supabase
+      .from('event_activities')
+      .select('id, name, emoji, description, is_open, capacity')
+      .eq('event_id', event.id)
+      .order('position'),
+    supabase.from('activity_stats').select('activity_id, interested').eq('event_id', event.id),
+    supabase
+      .from('activity_participants')
+      .select('id, activity_id, participant_name, event_activities!inner(event_id)')
+      .eq('membership_id', membershipId)
+      .eq('event_activities.event_id', event.id),
+    supabase
+      .from('activity_suggestions')
+      .select('id, kind, name, description, status, suggested_by, created_at')
+      .eq('event_id', event.id)
+      .in('status', ['new', 'reviewing', 'accepted'])
+      .order('created_at', { ascending: false }),
+    // The viewer's own payments for this event, confirmed or not.
+    supabase
+      .from('contributions')
+      .select('id, amount, status, reference, review_note, paid_at')
+      .eq('event_id', event.id)
+      .eq('membership_id', membershipId)
+      .order('paid_at', { ascending: false }),
+    event.event_type_id
+      ? supabase
+          .from('catalogue_items')
+          .select('label, emoji')
+          .eq('id', event.event_type_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   const suggestionRows = suggestions.data ?? [];
   const votes = suggestionRows.length
@@ -115,6 +131,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
 
   return {
     event,
+    eventType: eventType.data?.label ?? null,
     stats: normalizeStats(stats.data),
     budget: budget.data ?? [],
     expenses: expenses.data ?? [],

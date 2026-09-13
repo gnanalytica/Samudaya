@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
@@ -79,6 +79,111 @@ export function LinkRow({
       </View>
       <Text style={{ color: colors.inkSubtle, fontSize: 18 }}>›</Text>
     </Pressable>
+  );
+}
+
+/**
+ * A row of equal-width segments, for switching between views on one screen
+ * (the event page's About / Money / Activities / Vote).
+ */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { id: T; label: string }[];
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessibilityRole="tablist"
+      style={{
+        flexDirection: 'row',
+        backgroundColor: colors.surfaceSunken,
+        borderRadius: radius.sm,
+        padding: 3,
+        gap: 3,
+      }}
+    >
+      {options.map((option) => {
+        const selected = option.id === value;
+        return (
+          <Pressable
+            key={option.id}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(option.id)}
+            style={({ pressed }) => ({
+              flex: 1,
+              alignItems: 'center',
+              paddingVertical: 8,
+              borderRadius: radius.sm - 2,
+              backgroundColor: selected ? colors.surfaceRaised : 'transparent',
+              borderColor: selected ? colors.border : 'transparent',
+              borderWidth: StyleSheet.hairlineWidth,
+              opacity: pressed ? 0.8 : 1,
+            })}
+          >
+            <Text
+              style={{
+                color: selected ? colors.ink : colors.inkMuted,
+                fontSize: 13,
+                fontWeight: '600',
+              }}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * A collapsible group of fields that most people can skip ("More options").
+ * Collapsed content stays mounted so typed values survive closing it.
+ */
+export function Disclosure({
+  label,
+  summary,
+  defaultOpen = false,
+  children,
+}: {
+  label: string;
+  summary?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <View style={{ gap: spacing.lg }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        onPress={() => setOpen((current) => !current)}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: spacing.md,
+          paddingVertical: spacing.xs,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: colors.accent, fontSize: 15, fontWeight: '600' }}>{label}</Text>
+          {summary && !open ? (
+            <Text style={{ color: colors.inkSubtle, fontSize: 12 }}>{summary}</Text>
+          ) : null}
+        </View>
+        <Text style={{ color: colors.accent, fontSize: 16 }}>{open ? '▴' : '▾'}</Text>
+      </Pressable>
+      <View style={{ gap: spacing.lg, display: open ? 'flex' : 'none' }}>{children}</View>
+    </View>
   );
 }
 
