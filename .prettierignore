@@ -11,4 +11,6 @@ packages/supabase/src/database.types.ts
 *.sql
 # Generated.
 apps/web/.next
+# Rewritten by `next build` with its own quote style.
+apps/web/next-env.d.ts
 apps/mobile/.expo
