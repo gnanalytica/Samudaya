@@ -346,6 +346,20 @@ export default function Join() {
 
           <ErrorText message={error} />
 
+          {step === 'code' && !editing ? (
+            <View style={{ gap: spacing.sm }}>
+              <Caption>
+                Nobody has put your society on Samudaya yet? Start it and you become its first
+                committee member.
+              </Caption>
+              <Button
+                label="Start a new society"
+                variant="secondary"
+                onPress={() => router.push('/found')}
+              />
+            </View>
+          ) : null}
+
           {editing ? (
             <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
           ) : admitted ? (

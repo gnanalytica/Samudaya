@@ -1,6 +1,33 @@
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
+// Founding a society
+// ---------------------------------------------------------------------------
+
+/** The statuses public.create_society() can return. */
+export type FoundSocietyStatus =
+  'ok' | 'unauthenticated' | 'invalid_name' | 'too_many' | 'no_slug_free';
+
+/** How many societies one account may open before the platform team steps in. */
+export const SOCIETY_LIMIT = 3;
+
+const FOUND_MESSAGES: Record<FoundSocietyStatus, string> = {
+  ok: 'Your society is ready.',
+  unauthenticated: 'Please sign in first.',
+  invalid_name: 'Give your society a name of at least two characters.',
+  too_many: `You have already opened ${SOCIETY_LIMIT} societies. Write to us and we'll set the next one up with you.`,
+  no_slug_free:
+    'That name is taken by too many societies already. Add your area or city to tell them apart.',
+};
+
+export function foundSocietyMessage(status: string): string {
+  return (
+    FOUND_MESSAGES[status as FoundSocietyStatus] ??
+    'We could not create that society. Please try again.'
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Catalogue
 // ---------------------------------------------------------------------------
 

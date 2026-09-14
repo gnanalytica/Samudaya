@@ -2,10 +2,17 @@
 
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { joinMessage, normalizeJoinCode, phoneSchema, uuid } from '@samudaya/core';
+import {
+  foundSocietyMessage,
+  foundSocietySchema,
+  joinMessage,
+  normalizeJoinCode,
+  phoneSchema,
+  uuid,
+} from '@samudaya/core';
 import { getSupabase } from '@/lib/supabase/server';
 import { requireUser } from '@/lib/auth';
-import { fieldErrors, type ActionState } from '@/lib/action-state';
+import { fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
 
 /**
  * Joining a society: one society code for everyone, one request.
@@ -131,4 +138,46 @@ export async function withdrawJoinRequest(formData: FormData): Promise<void> {
     .eq('user_id', user.id)
     .eq('status', 'pending');
   redirect('/onboarding?mode=join');
+}
+
+/**
+ * Founding a society. The committee member who does this becomes its first
+ * committee member and lands on the setup checklist.
+ *
+ * create_society() decides the web address, the Society ID and the founder,
+ * none of which are sent from here: the founder comes from the session, so a
+ * forged form cannot put someone else's name on a society, or this account's
+ * name on someone else's.
+ */
+export async function createSociety(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireUser();
+
+  const parsed = foundSocietySchema.safeParse({
+    name: formData.get('name'),
+    city: formData.get('city'),
+    address: String(formData.get('address') ?? ''),
+    pincode: String(formData.get('pincode') ?? ''),
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.rpc('create_society', {
+    p_name: parsed.data.name,
+    p_city: parsed.data.city,
+    p_address: parsed.data.address,
+    p_pincode: parsed.data.pincode,
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  const row = data?.[0];
+  if (row?.status !== 'ok' || !row.slug) {
+    // A name the database turned down belongs on the name field, not in a
+    // banner the founder has to map back to an input themselves.
+    return row?.status === 'invalid_name' || row?.status === 'no_slug_free'
+      ? { fieldErrors: { name: foundSocietyMessage(row.status) } }
+      : { error: foundSocietyMessage(row?.status ?? '') };
+  }
+
+  // The welcome card on the society's home page takes it from here.
+  redirect(`/app/${row.slug}`);
 }

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ChevronsUpDown, Plus } from 'lucide-react';
+import { Building2, ChevronsUpDown, Plus } from 'lucide-react';
 import { ROLE_LABEL, normalizeRole, type MemberRole } from '@samudaya/core';
 import type { MembershipWithCommunity } from '@/lib/auth';
 
@@ -61,6 +61,15 @@ export function CommunitySwitcher({
             >
               <Plus className="size-3.5" aria-hidden="true" />
               Join another
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/onboarding?mode=create"
+              className="text-ink-muted hover:bg-surface-sunken hover:text-ink flex items-center gap-2 px-3 py-2 text-sm"
+            >
+              <Building2 className="size-3.5" aria-hidden="true" />
+              Start a new society
             </Link>
           </li>
         </ul>

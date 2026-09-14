@@ -121,13 +121,23 @@ opens the Expo dev server.
 
 ### 5. First run
 
-1. Sign in, then choose **Create a community** — you become its owner.
+1. Sign in. With no society yet you are asked which you are: someone with a
+   **Society code**, or the committee member **setting the society up**. Choose
+   the second, give it a name and a city, and you become its first committee
+   member.
 2. **Admin → Flats**: paste your flat list (`A,101` one per line).
 3. Share the **Society ID** from the admin console; residents ask to join and
    you approve them under **Admin → Join requests**.
 4. **Create event** walks through seven steps — details, budget, requirements,
    activities, checklist, surplus rule, preview — and leaves you a draft to
    publish when you are ready.
+
+A society is created by `public.create_society()`, never by a plain insert:
+`public.communities` has no INSERT policy, so the function is the only door and
+it decides the web address, the Society ID and who the founder is. One account
+may open three societies; the platform team sets up anything beyond that with
+`pnpm society:create`, which also takes the flats, a chosen Society ID and more
+than one committee member up front.
 
 `pnpm db:seed` fills a development project with a society mid-flight: a
 part-raised fund, a part-done checklist, approved spending with bills, and one

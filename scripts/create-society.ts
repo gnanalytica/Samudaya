@@ -1,6 +1,9 @@
 /**
- * Creates a society for a new pilot. Societies are set up by the platform team,
- * never by users.
+ * Creates a society for a new pilot, with its flats and full committee in one
+ * go. Committee members can now open a society themselves from the app, which
+ * is the ordinary path; this is the platform team's version of the same thing,
+ * for a pilot that arrives with a spreadsheet of flats, a Society ID someone
+ * has already printed, or more committee members than the founder.
  *
  *   tsx scripts/create-society.ts \
  *     --name "Shraddha Whitecliff" --city Bengaluru --code WHITECLIFF \
@@ -27,6 +30,7 @@ import {
   joinLink,
   parseFlatsCsv,
   residentInviteMessage,
+  societySlug,
   upiVpaSchema,
   type FlatRow,
 } from '../packages/core/src/index';
@@ -60,13 +64,6 @@ const text = (args: Args, key: string) => {
   return typeof value === 'string' ? value.trim() : undefined;
 };
 
-const slugify = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50);
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const dryRun = args['dry-run'] === true;
@@ -77,7 +74,7 @@ async function main() {
     text(args, 'code') ?? fail('--code is required (4–16 letters, digits or -).')
   ).toUpperCase();
   if (!/^[A-Z0-9-]{4,16}$/.test(code)) fail('--code must be 4–16 letters, digits or hyphens.');
-  const slug = text(args, 'slug') ?? slugify(name);
+  const slug = text(args, 'slug') ?? societySlug(name);
   if (!/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/.test(slug))
     fail(`Slug "${slug}" is not valid; pass --slug.`);
   const pincode = text(args, 'pincode');

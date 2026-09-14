@@ -60,16 +60,40 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected a date like 20
 // Society
 // ---------------------------------------------------------------------------
 
-export const createCommunitySchema = z.object({
-  name: z.string().trim().min(2, 'Give the community a name').max(120),
-  slug: slug,
-  city: z.string().trim().max(80).optional(),
-  state: z.string().trim().max(80).optional(),
-  country: z.string().trim().length(2).default('IN'),
-  timezone: z.string().trim().default('Asia/Kolkata'),
-  currency: z.string().trim().length(3).default('INR'),
+/** Matches communities_pincode_format: a six-digit Indian PIN code. */
+export const pincodeSchema = z
+  .string()
+  .trim()
+  .regex(/^[1-9][0-9]{5}$/, 'Enter a 6-digit PIN code');
+
+const optionalText = (max: number, message?: string) =>
+  z
+    .string()
+    .trim()
+    .max(max, message ?? `Keep it under ${max} characters`)
+    .optional()
+    .transform((value) => value || undefined);
+
+/**
+ * Founding a society from the app. The web address, the Society ID and the
+ * founder are all decided by public.create_society(), so they are deliberately
+ * not accepted here: a client that could pick its own `created_by` could hand
+ * itself a committee seat in someone else's society.
+ *
+ * Only the name and city are asked for up front. The address, the flats, the
+ * UPI ID and everything else come later, on the committee's setup checklist.
+ */
+export const foundSocietySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(2, 'Give your society a name')
+    .max(120, 'Keep the name under 120 characters'),
+  city: z.string().trim().min(2, 'Which city is it in?').max(80),
+  address: optionalText(300, 'Keep the address under 300 characters'),
+  pincode: pincodeSchema.optional().or(z.literal('').transform(() => undefined)),
 });
-export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
+export type FoundSocietyInput = z.infer<typeof foundSocietySchema>;
 
 export const createUnitSchema = z.object({
   community_id: uuid,
