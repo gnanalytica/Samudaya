@@ -2300,6 +2300,20 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["invite_codes"]["Row"]
       }
+      create_society: {
+        Args: {
+        p_name: string
+        p_city?: string
+        p_address?: string
+        p_pincode?: string
+      }
+        Returns: {
+        status: string | null
+        community_id: string | null
+        slug: string | null
+        join_code: string | null
+      }[]
+      }
       create_whatsapp_link_code: {
         Args: {
         p_community_id?: string

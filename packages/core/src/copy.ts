@@ -71,3 +71,25 @@ export function eventSlug(name: string, suffix?: string): string {
       .slice(0, 50) || 'event';
   return suffix ? `${base}-${suffix}`.slice(0, 60) : base;
 }
+
+/**
+ * Web address for a society, e.g. "Shraddha Whitecliff" → "shraddha-whitecliff".
+ *
+ * Mirrors app.society_slug() in the database, which has the final say:
+ * create_society() derives the slug itself and hands the real one back, so
+ * this is for previews and for the platform team's script. Keep the two in
+ * step — note there is deliberately no Unicode normalisation, because Postgres
+ * has no unaccent extension here to match it. communities_slug_format wants
+ * 3–50 characters, so a name that slugifies to nothing (or to one or two
+ * characters) falls back instead of failing the constraint.
+ */
+export function societySlug(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '');
+  if (!base) return 'society';
+  return base.length >= 3 ? base : `${base}-society`;
+}

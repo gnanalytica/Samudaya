@@ -1,11 +1,13 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Clock, RefreshCw, XCircle } from 'lucide-react';
+import { Building2, Clock, KeyRound, RefreshCw, XCircle } from 'lucide-react';
 import { relativeTime } from '@samudaya/core';
 import { getMemberships, getProfile, requireUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button, ButtonLink } from '@/components/ui/button';
+import { CreateFlow } from './create-flow';
 import { JoinFlow } from './join-flow';
 import { withdrawJoinRequest } from './actions';
 
@@ -31,21 +33,30 @@ async function latestRequest(userId: string) {
   return request;
 }
 
+/**
+ * Two ways in, and a screen that asks which. Most people arrive from a join
+ * link and never see the choice; the committee member setting their society up
+ * for the first time has nobody to give them a code, and used to have nobody
+ * to ask either.
+ */
 export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
   const user = await requireUser();
   const { mode, code } = await props.searchParams;
   const profile = await getProfile();
   // From a shared join link: /join/CODE fills the society code in.
   const initialCode = typeof code === 'string' ? code.toUpperCase().slice(0, 16) : '';
+  // A deliberate choice, as opposed to "I just landed here".
+  const intent = mode === 'join' || mode === 'create' ? mode : null;
 
   const memberships = await getMemberships();
   const firstSlug = memberships[0]?.communities?.slug;
-  if (firstSlug && mode !== 'join') redirect(`/app/${firstSlug}`);
+  if (firstSlug && !intent) redirect(`/app/${firstSlug}`);
 
-  const request = mode === 'join' && firstSlug ? null : await latestRequest(user.id);
-  // Joining files one complete request, so any pending request is waiting on staff.
-  const pending = request?.status === 'pending' ? request : null;
-  const declined = request?.status === 'rejected' && mode !== 'join' ? request : null;
+  const request = intent && firstSlug ? null : await latestRequest(user.id);
+  // Joining files one complete request, so any pending request is waiting on
+  // staff — but it is no reason to stand between someone and their own society.
+  const pending = request?.status === 'pending' && intent !== 'create' ? request : null;
+  const declined = request?.status === 'rejected' && !intent ? request : null;
 
   return (
     <main id="main" className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-12">
@@ -105,12 +116,6 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
         </Card>
       ) : (
         <>
-          <h1 className="text-2xl font-semibold tracking-tight">Join your society</h1>
-          <p className="text-ink-muted mt-1.5 mb-6 text-sm">
-            Enter the society code your committee shared, then tell us who you are and which flat is
-            yours.
-          </p>
-
           {declined ? (
             <div className="border-danger/30 bg-danger/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
               <XCircle className="text-danger mt-0.5 size-5 shrink-0" aria-hidden="true" />
@@ -123,7 +128,58 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
             </div>
           ) : null}
 
-          <JoinFlow initialCode={initialCode} initialName={profile?.full_name ?? ''} />
+          {intent === 'create' ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight">Start your society</h1>
+              <p className="text-ink-muted mt-1.5 mb-6 text-sm">
+                Two details now; flats, categories and your UPI ID come next, on a checklist that
+                keeps your place.
+              </p>
+              <CreateFlow />
+              <p className="text-ink-muted mt-5 text-center text-sm">
+                Already on Samudaya?{' '}
+                <Link href="/onboarding?mode=join" className="text-accent hover:underline">
+                  Join with your society code
+                </Link>
+              </p>
+            </>
+          ) : intent === 'join' || initialCode ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight">Join your society</h1>
+              <p className="text-ink-muted mt-1.5 mb-6 text-sm">
+                Enter the society code your committee shared, then tell us who you are and which
+                flat is yours.
+              </p>
+              <JoinFlow initialCode={initialCode} initialName={profile?.full_name ?? ''} />
+              <p className="text-ink-muted mt-5 text-center text-sm">
+                Nobody has set your society up yet?{' '}
+                <Link href="/onboarding?mode=create" className="text-accent hover:underline">
+                  Start it yourself
+                </Link>
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight">Welcome to Samudaya</h1>
+              <p className="text-ink-muted mt-1.5 mb-6 text-sm">
+                Your society’s events, and every rupee behind them, in one place.
+              </p>
+              <div className="space-y-3">
+                <ChoiceCard
+                  href="/onboarding?mode=join"
+                  icon={<KeyRound className="size-5" aria-hidden="true" />}
+                  title="I have a society code"
+                  detail="Your committee shares one code with every resident. Pick your flat and staff let you in."
+                />
+                <ChoiceCard
+                  href="/onboarding?mode=create"
+                  icon={<Building2 className="size-5" aria-hidden="true" />}
+                  title="I’m setting up my society"
+                  detail="Create it now and you become its first committee member, with a code to share."
+                />
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -133,5 +189,32 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
         </button>
       </form>
     </main>
+  );
+}
+
+function ChoiceCard({
+  href,
+  icon,
+  title,
+  detail,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="border-border-base bg-surface-raised hover:border-accent/50 hover:bg-surface-sunken flex gap-3 rounded-xl border p-4 text-left transition-colors"
+    >
+      <span className="bg-accent/10 text-accent grid size-10 shrink-0 place-items-center rounded-lg">
+        {icon}
+      </span>
+      <span>
+        <span className="text-ink block text-sm font-medium">{title}</span>
+        <span className="text-ink-muted mt-0.5 block text-sm">{detail}</span>
+      </span>
+    </Link>
   );
 }

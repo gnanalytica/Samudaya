@@ -77,24 +77,75 @@ select test.eq(test.visible('select id from public.communities'), 1::bigint,
   'a committee member sees only their own society');
 
 -- ---------------------------------------------------------------------------
--- Only the platform team creates societies
+-- Founding a society from the app
 -- ---------------------------------------------------------------------------
+-- public.communities still has no INSERT policy, so create_society() is the
+-- only door in. That is what stops a client naming itself the founder of a
+-- society it invented, or of one that already exists.
 reset role;
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('88888888-8888-4888-8888-888888888888', 'hana@example.com', '{"full_name":"Hana Iyer"}');
+  ('88888888-8888-4888-8888-888888888888', 'hana@example.com',   '{"full_name":"Hana Iyer"}'),
+  ('b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9', 'ismail@example.com', '{"full_name":"Ismail Rahman"}');
 
 select test.act_as('88888888-8888-4888-8888-888888888888');
 select test.raises(
   $q$insert into public.communities (slug, name, created_by)
      values ('hill-crest', 'Hill Crest', '88888888-8888-4888-8888-888888888888')$q$,
-  'a signed-in user cannot create a society');
+  'a signed-in user cannot insert a society directly');
+
+select test.eq(
+  (select status from public.create_society('Hill Crest', 'Bengaluru')),
+  'ok', 'a signed-in user can found a society through create_society()');
+select test.eq(
+  (select slug from public.communities where name = 'Hill Crest'),
+  'hill-crest', 'the web address is derived from the name');
+select test.eq(
+  (select role::text from public.memberships m
+     join public.communities c on c.id = m.community_id
+    where c.slug = 'hill-crest'
+      and m.user_id = '88888888-8888-4888-8888-888888888888'),
+  'committee', 'the founder joins their own society as committee');
+select test.ok(
+  (select count(*) from public.catalogue_items ci
+     join public.communities c on c.id = ci.community_id
+    where c.slug = 'hill-crest') > 0,
+  'a founded society starts with the default catalogue');
+select test.eq(test.visible($q$select id from public.communities where slug = 'hill-crest'$q$), 1::bigint,
+  'the founder can see the society they just opened');
+select test.eq(
+  (select created_by from public.communities where slug = 'hill-crest'),
+  '88888888-8888-4888-8888-888888888888'::uuid,
+  'the founder is recorded from the session, not from the request');
+select test.eq((select status from public.create_society('x')), 'invalid_name',
+  'a one-character name is refused');
+
+-- Two societies may share a name; they cannot share a web address.
+select test.act_as('b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9');
+select test.ok(
+  (select slug from public.create_society('Hill Crest', 'Pune')) not in ('hill-crest'),
+  'a name already taken still gets a free web address of its own');
+select test.eq((select status from public.create_society('Ismail Gardens')), 'ok',
+  'a second society is fine');
+select test.eq((select status from public.create_society('Ismail Heights')), 'ok',
+  'and a third');
+select test.eq((select status from public.create_society('Ismail Towers')), 'too_many',
+  'one account cannot open more than three societies');
+
+-- A founder may undo a society nobody has joined; that is all delete is for.
+-- Both statements run as Ismail: RLS silently narrows the second to no rows.
+delete from public.communities where slug = 'ismail-heights';
+delete from public.communities where slug = 'hill-crest';
 
 reset role;
-insert into public.communities (slug, join_code, name, created_by)
-  values ('hill-crest', 'HILL2026', 'Hill Crest', '88888888-8888-4888-8888-888888888888');
-select test.act_as('88888888-8888-4888-8888-888888888888');
-select test.eq(test.visible($q$select id from public.communities where slug = 'hill-crest'$q$), 1::bigint,
-  'the committee member the platform named can see the society');
+select test.eq((select count(*) from public.communities where slug = 'ismail-heights'), 0::bigint,
+  'the founder can delete a society nobody else is in');
+select test.eq((select count(*) from public.communities where slug = 'hill-crest'), 1::bigint,
+  'and cannot touch a society somebody else founded');
+
+-- The rest of the suite shares one Society ID for Hill Crest, so pin the
+-- generated one to something readable.
+reset role;
+update public.communities set join_code = 'HILL2026' where slug = 'hill-crest';
 
 -- ---------------------------------------------------------------------------
 -- Joining by Society ID, with admin approval
@@ -1116,5 +1167,22 @@ select test.act_as('77777777-7777-4777-8777-777777777777');
 select test.eq(
   public.todo_count((select id from public.communities where slug = 'hill-crest')),
   0, 'another society''s committee gets no count');
+
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- A society people actually live in cannot be deleted
+-- ---------------------------------------------------------------------------
+-- Founding from the app needs an undo for the society opened by mistake. It
+-- must not become a way to cascade away a live ledger, so the guard closes the
+-- moment anyone else is in.
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.raises(
+  $q$delete from public.communities where slug = 'hill-crest'$q$,
+  'even the founder cannot delete a society once others have joined');
+select test.eq(
+  (select count(*) from public.communities where slug = 'hill-crest'),
+  1::bigint, 'and the society is still there');
 
 reset role;
