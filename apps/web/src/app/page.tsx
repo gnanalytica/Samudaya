@@ -37,6 +37,14 @@ const FEATURES = [
   },
 ];
 
+/**
+ * Both doors, named on the front page. Signing in is the step before either,
+ * not a third choice: the intent rides through login in `next`, so someone who
+ * clicked "Start a society" lands on the create form rather than back here.
+ */
+const withIntent = (mode: 'join' | 'create') =>
+  `/login?next=${encodeURIComponent(`/onboarding?mode=${mode}`)}`;
+
 export default async function LandingPage() {
   // Signed-in visitors have no use for the pitch.
   const user = await getCurrentUser();
@@ -68,12 +76,16 @@ export default async function LandingPage() {
             and on your phone.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <ButtonLink href="/login" size="lg">
-              Get started
+            <ButtonLink href={withIntent('join')} size="lg">
+              Join your society
+            </ButtonLink>
+            <ButtonLink href={withIntent('create')} variant="secondary" size="lg">
+              Start a society
             </ButtonLink>
           </div>
-          <p className="text-ink-subtle mt-4 text-sm">
-            Residents join with their society’s code, and staff approve each one.
+          <p className="text-ink-subtle mt-4 max-w-md text-sm">
+            Residents join with the code their committee shares, and staff approve each one. Setting
+            your society up for the first time? You don’t need a code.
           </p>
         </section>
 

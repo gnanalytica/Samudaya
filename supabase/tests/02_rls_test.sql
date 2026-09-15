@@ -1186,3 +1186,57 @@ select test.eq(
   1::bigint, 'and the society is still there');
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- One person, two societies, two different roles
+-- ---------------------------------------------------------------------------
+-- The committee member who founded Hill Crest also rents a flat in Green
+-- Valley. Role is a property of the membership, not of the person, so every
+-- permission has to resolve per society and never leak from the stronger one.
+reset role;
+insert into public.units (id, community_id, block, number)
+select 'b3b3b3b3-0000-4000-8000-000000000001', c.id, 'C', '302'
+  from public.communities c where c.slug = 'green-valley';
+insert into public.memberships (community_id, user_id, role, status)
+select c.id, '88888888-8888-4888-8888-888888888888', 'resident', 'active'
+  from public.communities c where c.slug = 'green-valley';
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+
+select test.eq(test.visible('select id from public.communities'), 2::bigint,
+  'one account can belong to two societies at once');
+select test.eq(
+  (select m.role::text from public.memberships m
+     join public.communities c on c.id = m.community_id
+    where c.slug = 'hill-crest' and m.user_id = '88888888-8888-4888-8888-888888888888'),
+  'committee', 'committee in the society they founded');
+select test.eq(
+  (select m.role::text from public.memberships m
+     join public.communities c on c.id = m.community_id
+    where c.slug = 'green-valley' and m.user_id = '88888888-8888-4888-8888-888888888888'),
+  'resident', 'and a plain resident in the other');
+
+-- todo_count is role-sensitive, so it reads the two memberships apart.
+select test.ok(
+  public.todo_count((select id from public.communities where slug = 'hill-crest')) > 0,
+  'their committee queue in one society is not empty');
+select test.eq(
+  public.todo_count((select id from public.communities where slug = 'green-valley')),
+  0, 'and being committee elsewhere earns them no queue here');
+
+-- Promoting someone is a committee act. Being committee in Hill Crest must buy
+-- nothing in Green Valley: RLS narrows the statement to no rows, so it reports
+-- success and changes nothing rather than raising.
+update public.memberships m
+   set role = 'staff'
+  from public.communities c
+ where c.id = m.community_id and c.slug = 'green-valley'
+   and m.user_id = '44444444-4444-4444-8444-444444444444';
+
+reset role;
+select test.eq(
+  (select m.role::text from public.memberships m
+     join public.communities c on c.id = m.community_id
+    where c.slug = 'green-valley'
+      and m.user_id = '44444444-4444-4444-8444-444444444444'),
+  'resident', 'committee in one society changes no roles in another');

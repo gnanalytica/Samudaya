@@ -182,7 +182,10 @@ export default function Me() {
                     paddingVertical: spacing.sm,
                   }}
                 >
-                  <Body>{membership.communities?.name ?? 'Society'}</Body>
+                  <View style={{ gap: 1 }}>
+                    <Body>{membership.communities?.name ?? 'Society'}</Body>
+                    <Caption>{ROLE_LABEL[normalizeRole(membership.role) ?? 'resident']}</Caption>
+                  </View>
                   {isActive ? <Body muted>Current</Body> : null}
                 </Pressable>
               );
@@ -194,6 +197,12 @@ export default function Me() {
           label="Join another society"
           variant="secondary"
           onPress={() => router.push('/join')}
+        />
+
+        <Button
+          label="Start a new society"
+          variant="secondary"
+          onPress={() => router.push('/found')}
         />
 
         <Pressable
