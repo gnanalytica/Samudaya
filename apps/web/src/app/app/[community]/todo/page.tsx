@@ -34,8 +34,9 @@ function detailHref(base: string, item: TodoItem): string | null {
       return event ? `${base}/admin/events/${event}?tab=bills` : null;
     case 'campaign_to_review':
       return event ? `${base}/events/${event}` : null;
+    // A suggestion belongs either to an event or to the society itself.
     case 'suggestion_to_review':
-      return event ? `${base}/events/${event}?tab=vote` : null;
+      return event ? `${base}/events/${event}?tab=vote` : `${base}/suggest`;
   }
 }
 
@@ -47,6 +48,11 @@ const DETAIL_LABEL: Record<TodoKind, string> = {
   campaign_to_review: 'See the campaign',
   suggestion_to_review: 'See the event',
 };
+
+function detailLabel(item: TodoItem): string {
+  if (item.kind === 'suggestion_to_review' && !item.eventSlug) return 'See all ideas';
+  return DETAIL_LABEL[item.kind];
+}
 
 /**
  * One queue for everything waiting on staff or the committee, across every
@@ -117,7 +123,7 @@ export default async function TodoPage(props: PageProps<'/app/[community]/todo'>
                             href={href}
                             className="text-accent inline-flex items-center gap-1 text-xs hover:underline"
                           >
-                            {DETAIL_LABEL[item.kind]}
+                            {detailLabel(item)}
                             <ArrowRight className="size-3.5" aria-hidden="true" />
                           </Link>
                         ) : null}

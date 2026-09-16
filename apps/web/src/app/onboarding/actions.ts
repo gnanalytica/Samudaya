@@ -7,7 +7,7 @@ import {
   foundSocietySchema,
   joinMessage,
   normalizeJoinCode,
-  phoneSchema,
+  residentPhoneSchema,
   uuid,
 } from '@samudaya/core';
 import { getSupabase } from '@/lib/supabase/server';
@@ -25,14 +25,6 @@ import { fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-sta
  */
 
 export type Unit = { id: string; block: string | null; number: string };
-
-/** Accepts a 10-digit Indian mobile number or the full international form. */
-const residentPhone = z
-  .string()
-  .trim()
-  .transform((value) => value.replace(/[\s-]/g, ''))
-  .transform((value) => (/^[6-9]\d{9}$/.test(value) ? `+91${value}` : value))
-  .pipe(phoneSchema);
 
 export type CodeState = ActionState & {
   code?: string;
@@ -77,7 +69,7 @@ export async function checkJoinCode(_prev: CodeState, formData: FormData): Promi
 const joinSchema = z.object({
   join_code: z.string().trim().min(4, 'Enter the society code your committee shared'),
   name: z.string().trim().min(2, 'Tell us your name').max(120),
-  phone: residentPhone,
+  phone: residentPhoneSchema,
   unit_id: uuid.nullable(),
   // 'other' is someone who works for the society (a supervisor, a manager):
   // they have no flat, and staff decide their role when admitting them.
@@ -157,6 +149,7 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
     city: formData.get('city'),
     address: String(formData.get('address') ?? ''),
     pincode: String(formData.get('pincode') ?? ''),
+    phone: formData.get('phone'),
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
@@ -166,6 +159,7 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
     p_city: parsed.data.city,
     p_address: parsed.data.address,
     p_pincode: parsed.data.pincode,
+    p_phone: parsed.data.phone,
   });
   if (error) return { error: friendlyDbError(error) };
 
@@ -173,9 +167,13 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
   if (row?.status !== 'ok' || !row.slug) {
     // A name the database turned down belongs on the name field, not in a
     // banner the founder has to map back to an input themselves.
-    return row?.status === 'invalid_name' || row?.status === 'no_slug_free'
-      ? { fieldErrors: { name: foundSocietyMessage(row.status) } }
-      : { error: foundSocietyMessage(row?.status ?? '') };
+    if (row?.status === 'invalid_name' || row?.status === 'no_slug_free') {
+      return { fieldErrors: { name: foundSocietyMessage(row.status) } };
+    }
+    if (row?.status === 'invalid_phone') {
+      return { fieldErrors: { phone: foundSocietyMessage(row.status) } };
+    }
+    return { error: foundSocietyMessage(row?.status ?? '') };
   }
 
   // The welcome card on the society's home page takes it from here.

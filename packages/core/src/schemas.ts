@@ -14,6 +14,19 @@ export const phoneSchema = z
   .trim()
   .regex(/^\+[1-9]\d{7,14}$/, 'Use the international format, e.g. +919876543210');
 
+/**
+ * What a resident actually types: a ten-digit Indian mobile, often with spaces
+ * or dashes, sometimes already international. Normalised to E.164 before it
+ * goes anywhere. `app.e164()` in the database applies the same rule, so a
+ * client that forgets cannot write something the check constraint refuses.
+ */
+export const residentPhoneSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/[\s()-]/g, ''))
+  .transform((value) => (/^[6-9]\d{9}$/.test(value) ? `+91${value}` : value))
+  .pipe(phoneSchema);
+
 export const memberRoleSchema = z.enum(['resident', 'staff', 'committee']);
 /** Every role can be assigned; the database keeps at least one committee member. */
 export const assignableRoleSchema = z.enum(['resident', 'staff', 'committee']);
@@ -80,8 +93,9 @@ const optionalText = (max: number, message?: string) =>
  * not accepted here: a client that could pick its own `created_by` could hand
  * itself a committee seat in someone else's society.
  *
- * Only the name and city are asked for up front. The address, the flats, the
- * UPI ID and everything else come later, on the committee's setup checklist.
+ * Only the name, city and the founder's phone are asked for up front. The
+ * flats, the UPI ID and everything else come later, on the committee's setup
+ * checklist.
  */
 export const foundSocietySchema = z.object({
   name: z
@@ -92,6 +106,9 @@ export const foundSocietySchema = z.object({
   city: z.string().trim().min(2, 'Which city is it in?').max(80),
   address: optionalText(300, 'Keep the address under 300 characters'),
   pincode: pincodeSchema.optional().or(z.literal('').transform(() => undefined)),
+  // Asked for here rather than left to the checklist: the founder is the
+  // committee, and was the one member nobody could reach.
+  phone: residentPhoneSchema,
 });
 export type FoundSocietyInput = z.infer<typeof foundSocietySchema>;
 

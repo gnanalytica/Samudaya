@@ -28,8 +28,11 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
 
       # SUPABASE_DB_URL is the production connection string, from Supabase →
-      # Project Settings → Database. Without it this job fails rather than
-      # skipping: a check that silently passes is the failure it guards against.
+      # Connect → Session pooler. It has to be the pooler one: the direct
+      # db.<ref>.supabase.co name resolves to IPv6 only and these runners are
+      # IPv4, so a direct string fails on the network instead of on the schema.
+      # Without the secret this job fails rather than skipping: a check that
+      # silently passes is the failure it guards against.
       - name: Compare supabase/migrations with the database
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

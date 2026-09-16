@@ -101,6 +101,17 @@ behind turns a check red instead of turning a feature into "Something went
 wrong". It needs a `SUPABASE_DB_URL` repository secret, and fails rather than
 skips without one.
 
+Use the **Session pooler** string for that secret — Supabase dashboard →
+**Connect** → **Session pooler**:
+
+```
+postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres
+```
+
+Not the direct `db.<ref>.supabase.co` one. It resolves to IPv6 only, and GitHub
+Actions runners are IPv4, so the job would fail on the network rather than on
+the schema.
+
 ### 3. Turn on Google sign-in
 
 In the Supabase dashboard → **Authentication → Providers → Google**, add your
@@ -131,14 +142,13 @@ opens the Expo dev server.
 
 1. Sign in. With no society yet you are asked which you are: someone with a
    **Society code**, or the committee member **setting the society up**. Choose
-   the second, give it a name and a city, and you become its first committee
-   member.
+   the second, give it a name, a city and your phone number, and you become its
+   first committee member.
 2. **Admin → Flats**: paste your flat list (`A,101` one per line).
 3. Share the **Society ID** from the admin console; residents ask to join and
-   you approve them under **Admin → Join requests**.
-4. **Create event** walks through seven steps — details, budget, requirements,
-   activities, checklist, surplus rule, preview — and leaves you a draft to
-   publish when you are ready.
+   you approve them under **People → Requests**.
+4. **Create event** walks through four steps — the event, budget, activities,
+   review — and leaves you a draft to publish when you are ready.
 
 A society is created by `public.create_society()`, never by a plain insert:
 `public.communities` has no INSERT policy, so the function is the only door and
@@ -146,6 +156,11 @@ it decides the web address, the Society ID and who the founder is. One account
 may open three societies; the platform team sets up anything beyond that with
 `pnpm society:create`, which also takes the flats, a chosen Society ID and more
 than one committee member up front.
+
+Everyone who registers gives a phone number — the founder when they open the
+society, every resident when they ask to join — and it lands on their profile,
+which is what staff and the committee read in the people directory. Residents
+never see it.
 
 `pnpm db:seed` fills a development project with a society mid-flight: a
 part-raised fund, a part-done checklist, approved spending with bills, and one

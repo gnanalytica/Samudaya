@@ -1,8 +1,17 @@
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Megaphone, Plus } from 'lucide-react';
-import { can, countdown, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
+import {
+  can,
+  countdown,
+  festivalFor,
+  formatDate,
+  formatMoney,
+  fundedPercent,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { listEvents, getStatsFor } from '@/lib/events';
+import { getCatalogue } from '@/lib/catalogue';
+import { festivalVars } from '@/components/festival';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
@@ -21,6 +30,8 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
   const events = await listEvents(community.id);
   const stats = await getStatsFor(events.map((event) => event.id));
   const staff = can(role, 'events:manage');
+  const catalogue = await getCatalogue(community.id);
+  const typeLabel = new Map(catalogue.event_type.map((item) => [item.id, item.label]));
 
   // RLS already hides drafts and other people's proposals from residents.
   const mine = events.filter(
@@ -36,11 +47,15 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
   const card = (event: (typeof events)[number]) => {
     const s = stats.get(event.id);
     const funded = fundedPercent(s?.fundRaised ?? 0, s?.fundTarget ?? 0);
+    // A list of events should look like a year, not like a spreadsheet: each
+    // card carries its own festival's colour down its edge.
+    const festival = festivalFor(typeLabel.get(event.event_type_id ?? ''), event.name);
     return (
       <Link
         key={event.id}
         href={`/app/${slug}/events/${event.slug}`}
-        className="border-border-base bg-surface-raised hover:bg-surface-sunken block rounded-xl border p-5 transition-colors"
+        style={{ ...festivalVars(festival), borderLeftColor: 'var(--accent)' }}
+        className="border-border-base bg-surface-raised hover:bg-surface-sunken block rounded-xl border border-l-4 p-5 transition-colors"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

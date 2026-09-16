@@ -12,6 +12,7 @@ import {
   COPY,
   can,
   countdown,
+  festivalFor,
   formatDate,
   formatMoney,
   fundedPercent,
@@ -19,8 +20,10 @@ import {
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getTodoItems } from '@/lib/todo';
-import { listEvents, getStatsFor } from '@/lib/events';
-import { PageBody, PageHeader } from '@/components/page-header';
+import { getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
+import { getCatalogue } from '@/lib/catalogue';
+import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
+import { PageBody } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -48,18 +51,32 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
   const stats = await getStatsFor(
     [next?.id, ...campaigns.map((c) => c.id)].filter(Boolean) as string[],
   );
+  const typeLabel = new Map(
+    (await getCatalogue(community.id)).event_type.map((item) => [item.id, item.label]),
+  );
   const s = next ? stats.get(next.id) : undefined;
   const funded = fundedPercent(s?.fundRaised ?? 0, s?.fundTarget ?? 0);
   const firstName = profile?.full_name?.split(' ')[0];
 
   const staff = can(role, 'events:manage');
   const todo = await getTodoItems(community.id, role);
+  const nextFestival = festivalFor(
+    next?.event_type_id ? typeLabel.get(next.event_type_id) : null,
+    next?.name,
+  );
+  // Only the headline number: the page that holds them does the rest.
+  const societyIdeas = (await getSocietySuggestions(community.id, membership.id)).filter(
+    (row) => row.status === 'accepted',
+  ).length;
 
   return (
     <>
-      <PageHeader
+      {/* The whole page takes the colour of whatever the society is heading
+          towards next, so opening the app in October looks like October. */}
+      <FestivalHeader
+        festival={nextFestival}
         title={firstName ? `Hello, ${firstName}` : community.name}
-        description={community.name}
+        description={next ? `${community.name} · ${nextFestival.label} next` : community.name}
       />
 
       <PageBody>
@@ -95,16 +112,25 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
         {next ? (
           <>
             <h2 className="text-ink-soft mb-3 text-sm font-semibold">Next up</h2>
-            <div className="border-border-base bg-surface-raised overflow-hidden rounded-xl border">
-              <div className="from-brand-700 to-brand-900 bg-gradient-to-br p-5 text-white">
-                <div className="text-3xl">{next.emoji}</div>
-                <p className="mt-2 text-lg font-semibold">{next.name}</p>
-                <p className="text-brand-100 mt-0.5 text-sm">
+            <div
+              style={festivalVars(nextFestival)}
+              className="border-border-base bg-surface-raised overflow-hidden rounded-xl border"
+            >
+              <div className="relative isolate overflow-hidden bg-gradient-to-br from-[var(--accent)] to-[var(--ribbon)] p-5 text-white">
+                <Rangoli
+                  petals={nextFestival.petals}
+                  strokeWidth={2}
+                  mono
+                  className="pointer-events-none absolute -top-8 -right-10 size-44 text-white opacity-25"
+                />
+                <div className="relative text-3xl">{next.emoji}</div>
+                <p className="relative mt-2 text-lg font-semibold">{next.name}</p>
+                <p className="relative mt-0.5 text-sm text-white/80">
                   {formatDate(next.starts_on)}
                   {next.venue ? ` · ${next.venue}` : ''}
                   {countdown(next.starts_on) ? ` · ${countdown(next.starts_on)}` : ''}
                 </p>
-                <div className="text-brand-100 mt-4 flex justify-between text-xs font-medium">
+                <div className="relative mt-4 flex justify-between text-xs font-medium text-white/80">
                   <span>
                     {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
                     {formatMoney(s?.fundTarget ?? 0, community.currency)} raised
@@ -112,7 +138,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   <span>{funded}%</span>
                 </div>
                 <div
-                  className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20"
+                  className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-black/20"
                   role="progressbar"
                   aria-valuenow={funded}
                   aria-valuemin={0}
@@ -120,11 +146,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   aria-label="Fund progress"
                 >
                   <div
-                    className="bg-brand-300 h-full rounded-full"
+                    className="h-full rounded-full bg-white/85"
                     style={{ width: `${funded}%` }}
                   />
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="relative mt-4 flex flex-wrap gap-2">
                   <ButtonLink
                     href={`${base}/events/${next.slug}`}
                     size="sm"
@@ -226,24 +252,54 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
           </>
         ) : null}
 
-        {can(role, 'campaigns:propose') ? (
-          <Link
-            href={`${base}/events/propose`}
-            className="border-border-base bg-surface-raised hover:bg-surface-sunken mt-8 flex items-center justify-between gap-3 rounded-xl border p-4"
-          >
-            <span className="flex items-center gap-3">
-              <Megaphone className="text-accent size-5" aria-hidden="true" />
-              <span>
-                <span className="text-ink block text-sm font-semibold">
-                  Start a fundraising campaign
-                </span>
-                <span className="text-ink-muted block text-xs">
-                  Raise money for something the society needs. The committee approves it first.
-                </span>
-              </span>
-            </span>
-            <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
-          </Link>
+        {/* Raising money was the only thing a resident could start from here.
+            Most of what a society actually argues about costs nothing. */}
+        {can(role, 'suggest') || can(role, 'campaigns:propose') ? (
+          <>
+            <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Start something</h2>
+            <div className="space-y-3">
+              {can(role, 'suggest') ? (
+                <Link
+                  href={`${base}/suggest`}
+                  className="border-border-base bg-surface-raised hover:bg-surface-sunken flex items-center justify-between gap-3 rounded-xl border p-4"
+                >
+                  <span className="flex items-center gap-3">
+                    <Lightbulb className="text-accent size-5" aria-hidden="true" />
+                    <span>
+                      <span className="text-ink block text-sm font-semibold">
+                        Suggest an idea or an activity
+                      </span>
+                      <span className="text-ink-muted block text-xs">
+                        For the society, not one event. The committee puts it to a vote.
+                        {societyIdeas ? ` ${societyIdeas} open for voting now.` : ''}
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
+                </Link>
+              ) : null}
+              {can(role, 'campaigns:propose') ? (
+                <Link
+                  href={`${base}/events/propose`}
+                  className="border-border-base bg-surface-raised hover:bg-surface-sunken flex items-center justify-between gap-3 rounded-xl border p-4"
+                >
+                  <span className="flex items-center gap-3">
+                    <Megaphone className="text-accent size-5" aria-hidden="true" />
+                    <span>
+                      <span className="text-ink block text-sm font-semibold">
+                        Start a fundraising campaign
+                      </span>
+                      <span className="text-ink-muted block text-xs">
+                        Raise money for something the society needs. The committee approves it
+                        first.
+                      </span>
+                    </span>
+                  </span>
+                  <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
+                </Link>
+              ) : null}
+            </div>
+          </>
         ) : null}
       </PageBody>
     </>

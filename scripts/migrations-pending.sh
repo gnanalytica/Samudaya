@@ -20,10 +20,17 @@ DIR="$ROOT/supabase/migrations"
 if [ -z "${SUPABASE_DB_URL:-}" ]; then
   echo "✗ SUPABASE_DB_URL is not set, so nothing was checked."
   echo
-  echo "  CI reads it from a repository secret; it is the database connection"
-  echo "  string under Supabase → Project Settings → Database. This fails rather"
-  echo "  than skips on purpose: a check that quietly does nothing is the bug"
-  echo "  it exists to catch."
+  echo "  CI reads it from a repository secret. Take the Session pooler string"
+  echo "  from Supabase → Connect → Session pooler:"
+  echo
+  echo "    postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres"
+  echo
+  echo "  Not the direct db.<ref>.supabase.co one. That name has no A record —"
+  echo "  it resolves to IPv6 only, and GitHub Actions runners are IPv4, so the"
+  echo "  job would fail on the network rather than on a missing migration."
+  echo
+  echo "  This fails rather than skips on purpose: a check that quietly does"
+  echo "  nothing is the bug it exists to catch."
   exit 1
 fi
 
@@ -37,6 +44,21 @@ if ! applied=$(psql "$SUPABASE_DB_URL" -tAc \
   'select version from supabase_migrations.schema_migrations' 2>&1); then
   echo "✗ Could not read supabase_migrations.schema_migrations:"
   echo "    $applied"
+  # Match on the URL, not on psql's wording: the message varies by client and
+  # resolver — it comes back empty on some — while a direct host is the actual
+  # misconfiguration and is always legible here. Never echo the URL: it carries
+  # the password.
+  case "$SUPABASE_DB_URL" in
+    *"@db."*".supabase.co"*)
+      echo
+      echo "  That host is the direct connection, which resolves to IPv6 only. On an"
+      echo "  IPv4-only network such as a GitHub Actions runner it cannot be reached."
+      echo "  Use the Session pooler string instead — Supabase → Connect → Session"
+      echo "  pooler:"
+      echo
+      echo "    postgresql://postgres.<ref>:<password>@aws-<n>-<region>.pooler.supabase.com:5432/postgres"
+      ;;
+  esac
   exit 1
 fi
 applied=$(echo "$applied" | sed '/^$/d' | sort)

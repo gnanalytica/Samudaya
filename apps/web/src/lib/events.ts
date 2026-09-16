@@ -234,41 +234,72 @@ export const getRegistrations = cache(async (eventId: string) => {
   return data ?? [];
 });
 
+const SUGGESTION_COLUMNS =
+  'id, kind, name, description, status, review_note, created_at, suggested_by, memberships(profiles(full_name))';
+
 /**
- * Suggestions for an event with their vote tally. Votes are readable by every
- * member, so the counts are computed here rather than in a view.
+ * Attaches each suggestion's tally and the caller's own vote. Votes are
+ * readable by every member, so the counts are computed here rather than in a
+ * view — one extra query for the whole list, not one per row.
  */
-export const getSuggestions = cache(async (eventId: string, membershipId: string | null) => {
+async function withVotes<T extends { id: string }>(suggestions: T[], membershipId: string | null) {
+  const ids = suggestions.map((row) => row.id);
+  if (!ids.length) return [];
+
   const supabase = await getSupabase();
-  const { data: suggestions } = await supabase
-    .from('activity_suggestions')
-    .select(
-      'id, kind, name, description, status, review_note, created_at, suggested_by, memberships(profiles(full_name))',
-    )
-    .eq('event_id', eventId)
-    .order('created_at', { ascending: false });
+  const { data: votes } = await supabase
+    .from('suggestion_votes')
+    .select('suggestion_id, membership_id, support')
+    .in('suggestion_id', ids);
 
-  const ids = (suggestions ?? []).map((row) => row.id);
-  const { data: votes } = ids.length
-    ? await supabase
-        .from('suggestion_votes')
-        .select('suggestion_id, membership_id, support')
-        .in('suggestion_id', ids)
-    : { data: [] as { suggestion_id: string; membership_id: string; support: boolean }[] };
-
-  return (suggestions ?? []).map((suggestion) => {
-    const mine = (votes ?? []).filter((vote) => vote.suggestion_id === suggestion.id);
+  return suggestions.map((suggestion) => {
+    const cast = (votes ?? []).filter((vote) => vote.suggestion_id === suggestion.id);
     return {
       ...suggestion,
-      votesFor: mine.filter((vote) => vote.support).length,
-      votesAgainst: mine.filter((vote) => !vote.support).length,
+      votesFor: cast.filter((vote) => vote.support).length,
+      votesAgainst: cast.filter((vote) => !vote.support).length,
       myVote:
         membershipId === null
           ? null
-          : (mine.find((vote) => vote.membership_id === membershipId)?.support ?? null),
+          : (cast.find((vote) => vote.membership_id === membershipId)?.support ?? null),
     };
   });
+}
+
+/** One suggestion with its tally — the shape both suggestion boards render. */
+export type SuggestionRow = Awaited<ReturnType<typeof getSuggestions>>[number];
+
+/** Suggestions for one event, with their vote tally. */
+export const getSuggestions = cache(async (eventId: string, membershipId: string | null) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('activity_suggestions')
+    .select(SUGGESTION_COLUMNS)
+    .eq('event_id', eventId)
+    .order('created_at', { ascending: false });
+
+  return withVotes(data ?? [], membershipId);
 });
+
+/**
+ * The society's own suggestions — the ones not tied to any event. Same three
+ * stages as an event's: a resident suggests, the committee opens it, everybody
+ * votes. Kept separate by `event_id is null` rather than by a second table, so
+ * one To do queue and one set of policies still cover both.
+ */
+export const getSocietySuggestions = cache(
+  async (communityId: string, membershipId: string | null) => {
+    const supabase = await getSupabase();
+    const { data: suggestions } = await supabase
+      .from('activity_suggestions')
+      .select(SUGGESTION_COLUMNS)
+      .eq('community_id', communityId)
+      .is('event_id', null)
+      .order('created_at', { ascending: false });
+
+    return withVotes(suggestions ?? [], membershipId);
+  },
+);
 
 /**
  * Every payment for an event with the flat and payer. RLS returns all rows to
