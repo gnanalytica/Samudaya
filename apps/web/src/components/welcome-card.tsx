@@ -11,9 +11,10 @@ import {
   Vote,
   type LucideIcon,
 } from 'lucide-react';
-import type { MemberRole } from '@samudaya/core';
+import { COPY, type MemberRole } from '@samudaya/core';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 import { dismissWelcome } from '@/app/app/[community]/welcome/actions';
 
 type Welcome = {
@@ -89,10 +90,13 @@ export function WelcomeCard({
   slug,
   role,
   societyName,
+  joinCode,
 }: {
   slug: string;
   role: MemberRole;
   societyName: string;
+  /** Shown to the committee: the first thing a founder needs is this code. */
+  joinCode?: string;
 }) {
   const welcome = welcomeFor(role, societyName);
   const base = `/app/${slug}`;
@@ -103,6 +107,17 @@ export function WelcomeCard({
           <h2 className="text-ink text-lg font-semibold tracking-tight">{welcome.title}</h2>
           <p className="text-ink-muted mt-1 text-sm">{welcome.intro}</p>
         </div>
+        {joinCode && (role === 'committee' || role === 'admin') ? (
+          <div className="border-border-base bg-surface-sunken flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+            <div>
+              <p className="text-ink-subtle text-xs tracking-wide uppercase">{COPY.societyCode}</p>
+              <p className="text-ink font-mono text-lg font-semibold tracking-[0.2em]">
+                {joinCode}
+              </p>
+            </div>
+            <CopyButton value={joinCode} label="Copy code" />
+          </div>
+        ) : null}
         <ul className="space-y-2.5">
           {welcome.points.map(({ icon: Icon, text }) => (
             <li key={text} className="text-ink flex items-start gap-3 text-sm">

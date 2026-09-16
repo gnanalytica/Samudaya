@@ -26,7 +26,7 @@ export default async function InvitePage(props: PageProps<'/app/[community]/admi
       <PageBody>
         <div className="mx-auto max-w-3xl space-y-5">
           <Link
-            href={committee ? `${base}/admin/settings#invite` : `${base}/admin/members`}
+            href={committee ? `${base}/admin/settings#invite` : `${base}/people`}
             className="text-ink-muted hover:text-ink inline-flex items-center gap-1.5 text-sm"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />

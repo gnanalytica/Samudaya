@@ -83,7 +83,7 @@ export default function Manage() {
           <LinkRow
             label="Residents"
             detail="Everyone admitted, by flat"
-            onPress={() => router.push('/admin/members')}
+            onPress={() => router.push('/people')}
           />
           <LinkRow
             label="Bills"

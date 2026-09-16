@@ -44,7 +44,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
   ]);
 
   const links = [
-    { href: `${base}/admin/members`, label: 'Residents', icon: Users, show: true },
+    { href: `${base}/people`, label: 'People', icon: Users, show: true },
     { href: `${base}/admin/invite`, label: 'Invite residents', icon: Send, show: !committee },
     { href: `${base}/admin/catalogue`, label: 'Catalogue', icon: Library, show: !committee },
     {
