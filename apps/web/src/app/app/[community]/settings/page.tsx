@@ -28,6 +28,7 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
             slug={slug}
             fullName={profile?.full_name ?? ''}
             email={profile?.email ?? user.email ?? ''}
+            phone={profile?.phone ?? ''}
           />
 
           <Card>

@@ -1,4 +1,5 @@
 import { Lightbulb, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { relativeTime } from '@samudaya/core';
 import type { SuggestionRow } from '@/lib/events';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +8,7 @@ import { Input } from '@/components/ui/field';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FundBar } from '@/components/badges';
 import { decideSuggestion } from '@/app/app/[community]/admin/events/actions';
-import { voteOnSuggestion } from '@/app/app/[community]/events/actions';
+import { closeSuggestionVote, voteOnSuggestion } from '@/app/app/[community]/events/actions';
 
 /**
  * A suggestion's three stages, on one board: open for voting, with the
@@ -43,6 +44,9 @@ export function SuggestionBoard({
 }) {
   const voting = rows.filter((row) => row.status === 'accepted');
   const waiting = rows.filter((row) => row.status === 'new');
+  // What the society actually decided, and when. Before this existed a vote
+  // simply ran for ever.
+  const decided = rows.filter((row) => row.status === 'adopted' || row.status === 'not_adopted');
   const declined = rows.filter(
     (row) => row.suggested_by === myMembershipId && row.status === 'declined',
   );
@@ -121,6 +125,24 @@ export function SuggestionBoard({
                     ) : null}
                   </form>
                 ) : null}
+                {canApprove ? (
+                  <form
+                    action={closeSuggestionVote}
+                    className="border-border-base mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
+                  >
+                    <input type="hidden" name="slug" value={slug} />
+                    {eventSlug ? <input type="hidden" name="event" value={eventSlug} /> : null}
+                    <input type="hidden" name="suggestion_id" value={row.id} />
+                    <span className="text-ink-subtle text-xs">
+                      {total
+                        ? `Close it and ${forPct >= 50 ? 'the society adopts this' : 'it is not taken forward'}.`
+                        : 'Nobody has voted yet.'}
+                    </span>
+                    <Button type="submit" size="sm" variant="secondary">
+                      Close voting
+                    </Button>
+                  </form>
+                ) : null}
               </CardBody>
             </Card>
           );
@@ -190,6 +212,34 @@ export function SuggestionBoard({
                 ) : null}
               </li>
             ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {decided.length ? (
+        <Card>
+          <CardHeader
+            title="Decided"
+            description="Votes the committee has closed, and what the society said."
+          />
+          <ul className="divide-border-base divide-y">
+            {decided.map((row) => {
+              const adopted = row.status === 'adopted';
+              return (
+                <li key={row.id} className="flex items-start justify-between gap-3 px-5 py-3">
+                  <div className="min-w-0">
+                    <p className="text-ink text-sm font-medium">{row.name}</p>
+                    <p className="text-ink-subtle mt-0.5 text-xs">
+                      {row.votesFor} for · {row.votesAgainst} against
+                      {row.resolved_at ? ` · closed ${relativeTime(row.resolved_at)}` : ''}
+                    </p>
+                  </div>
+                  <Badge tone={adopted ? 'success' : 'neutral'}>
+                    {adopted ? 'Adopted' : 'Not adopted'}
+                  </Badge>
+                </li>
+              );
+            })}
           </ul>
         </Card>
       ) : null}

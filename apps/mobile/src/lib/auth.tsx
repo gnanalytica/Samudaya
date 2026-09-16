@@ -51,10 +51,15 @@ export function completeSignIn(code: string) {
 
 export type Membership = Tables<'memberships'> & { communities: Tables<'communities'> | null };
 
+type PublicProfile = Pick<
+  Tables<'profiles'>,
+  'id' | 'full_name' | 'avatar_url' | 'locale' | 'is_platform_admin' | 'created_at' | 'updated_at'
+>;
+
 type AuthValue = {
   session: Session | null;
   user: User | null;
-  profile: Tables<'profiles'> | null;
+  profile: PublicProfile | null;
   memberships: Membership[];
   activeCommunity: Tables<'communities'> | null;
   /** The member's real role. Decides access and admin screens. */
@@ -85,7 +90,9 @@ const VIEW_MODE_STORAGE_KEY = 'samudaya:view-mode';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Tables<'profiles'> | null>(null);
+  // Only the columns a client may read: 0918.0100 took email and phone away
+  // from `authenticated`, and nothing on this app needs them.
+  const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadMemberships = useCallback(async (userId: string) => {
     const [{ data: profileRow }, { data: membershipRows }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+      supabase
+        .from('profiles')
+        // Not `*`: email and phone are no longer granted to clients, and asking
+        // for them is an error rather than a null. Nothing here needs them.
+        .select('id, full_name, avatar_url, locale, is_platform_admin, created_at, updated_at')
+        .eq('id', userId)
+        .maybeSingle(),
       supabase
         .from('memberships')
         .select('*, communities(*)')

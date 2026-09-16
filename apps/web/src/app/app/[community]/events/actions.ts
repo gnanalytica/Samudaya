@@ -295,6 +295,33 @@ export async function voteOnSuggestion(formData: FormData): Promise<void> {
   revalidatePath(eventSlug ? `/app/${slug}/events/${eventSlug}` : `/app/${slug}/suggest`);
 }
 
+/**
+ * Ends the vote and writes down what the society decided.
+ *
+ * Until this existed a suggestion that won 40 to 3 stayed "Voting" for ever.
+ * The count decides by default; the committee can override it, because a
+ * society sometimes settles something in the room that the tally missed.
+ *
+ * Voting stops of its own accord: every policy on suggestion_votes is keyed on
+ * status = 'accepted', so moving the status closes the box.
+ */
+export async function closeSuggestionVote(formData: FormData): Promise<void> {
+  const slug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  await requireCapability(slug, 'suggestions:approve');
+
+  const override = formData.get('adopt');
+  const supabase = await getSupabase();
+  await supabase.rpc('close_suggestion_vote', {
+    p_suggestion_id: String(formData.get('suggestion_id') ?? ''),
+    // Absent means "let the count decide".
+    p_adopt: override === null ? undefined : override === '1',
+  });
+
+  revalidatePath(eventSlug ? `/app/${slug}/events/${eventSlug}` : `/app/${slug}/suggest`);
+  revalidatePath(`/app/${slug}/todo`);
+}
+
 const campaignSchema = z.object({
   name: z.string().trim().min(3, 'Name the campaign').max(140),
   description: z.string().trim().min(10, 'Say what the money is for').max(2000),

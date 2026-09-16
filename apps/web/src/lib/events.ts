@@ -235,33 +235,45 @@ export const getRegistrations = cache(async (eventId: string) => {
 });
 
 const SUGGESTION_COLUMNS =
-  'id, kind, name, description, status, review_note, created_at, suggested_by, memberships(profiles(full_name))';
+  'id, kind, name, description, status, review_note, resolved_at, created_at, suggested_by, memberships(profiles(full_name))';
 
 /**
- * Attaches each suggestion's tally and the caller's own vote. Votes are
- * readable by every member, so the counts are computed here rather than in a
- * view — one extra query for the whole list, not one per row.
+ * Attaches each suggestion's tally and the caller's own vote.
+ *
+ * Two queries, because they answer to different rules. The totals come from
+ * suggestion_stats, a view that counts without handing over the rows it counts.
+ * The second reads suggestion_votes, where the policy now returns your own
+ * ballot and nobody else's — so the `mine` below is already only yours, and
+ * `membershipId` is a belt to its braces.
  */
 async function withVotes<T extends { id: string }>(suggestions: T[], membershipId: string | null) {
   const ids = suggestions.map((row) => row.id);
   if (!ids.length) return [];
 
   const supabase = await getSupabase();
-  const { data: votes } = await supabase
-    .from('suggestion_votes')
-    .select('suggestion_id, membership_id, support')
-    .in('suggestion_id', ids);
+  const [{ data: tallies }, { data: mine }] = await Promise.all([
+    supabase
+      .from('suggestion_stats')
+      .select('suggestion_id, votes_for, votes_against')
+      .in('suggestion_id', ids),
+    supabase
+      .from('suggestion_votes')
+      .select('suggestion_id, membership_id, support')
+      .in('suggestion_id', ids),
+  ]);
+
+  const tallyFor = new Map((tallies ?? []).map((row) => [row.suggestion_id, row]));
 
   return suggestions.map((suggestion) => {
-    const cast = (votes ?? []).filter((vote) => vote.suggestion_id === suggestion.id);
+    const tally = tallyFor.get(suggestion.id);
+    const ballot = (mine ?? []).find(
+      (vote) => vote.suggestion_id === suggestion.id && vote.membership_id === membershipId,
+    );
     return {
       ...suggestion,
-      votesFor: cast.filter((vote) => vote.support).length,
-      votesAgainst: cast.filter((vote) => !vote.support).length,
-      myVote:
-        membershipId === null
-          ? null
-          : (cast.find((vote) => vote.membership_id === membershipId)?.support ?? null),
+      votesFor: tally?.votes_for ?? 0,
+      votesAgainst: tally?.votes_against ?? 0,
+      myVote: membershipId === null ? null : (ballot?.support ?? null),
     };
   });
 }

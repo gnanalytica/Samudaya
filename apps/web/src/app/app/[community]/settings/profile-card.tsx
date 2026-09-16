@@ -21,10 +21,13 @@ export function ProfileCard({
   slug,
   fullName,
   email,
+  phone,
 }: {
   slug: string;
   fullName: string;
   email: string;
+  /** Empty for everybody who registered before the forms asked for one. */
+  phone: string;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(updateProfile, EMPTY_STATE);
 
@@ -36,6 +39,25 @@ export function ProfileCard({
           <input type="hidden" name="slug" value={slug} />
           <Field label="Name" htmlFor="full_name" error={state.fieldErrors?.full_name} required>
             {(control) => <Input {...control} name="full_name" defaultValue={fullName} required />}
+          </Field>
+          <Field
+            label="Phone number"
+            htmlFor="phone"
+            error={state.fieldErrors?.phone}
+            hint="Staff and the committee see it, so they can reach you. Neighbours do not."
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                defaultValue={phone}
+                placeholder="98450 10101"
+                autoComplete="tel"
+                maxLength={20}
+              />
+            )}
           </Field>
           <Field
             label="Email"

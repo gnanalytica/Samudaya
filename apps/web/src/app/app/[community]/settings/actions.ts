@@ -2,19 +2,27 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { residentPhoneSchema } from '@samudaya/core';
 import { requireCommunity, requireUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
 
 const profileSchema = z.object({
   full_name: z.string().trim().min(1, 'Tell us your name').max(120),
+  // Optional here, unlike registration: this is also how somebody who joined
+  // before the forms asked for one finally becomes reachable, and making it
+  // compulsory would block them from saving their name.
+  phone: residentPhoneSchema.optional().or(z.literal('').transform(() => null)),
 });
 
 export async function updateProfile(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const user = await requireUser();
   const slug = String(formData.get('slug') ?? '');
 
-  const parsed = profileSchema.safeParse({ full_name: formData.get('full_name') });
+  const parsed = profileSchema.safeParse({
+    full_name: formData.get('full_name'),
+    phone: formData.get('phone'),
+  });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();

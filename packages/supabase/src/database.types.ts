@@ -78,6 +78,7 @@ export type Database = {
           created_at: string
           updated_at: string
           kind: string
+          resolved_at: string | null
         }
         Insert: {
           id?: string
@@ -93,6 +94,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           kind?: string
+          resolved_at?: string | null
         }
         Update: {
           id?: string
@@ -108,6 +110,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           kind?: string
+          resolved_at?: string | null
         }
         Relationships: [
           {
@@ -2268,6 +2271,8 @@ export type Database = {
           suggestion_id: string | null
           community_id: string | null
           interested: number | null
+          votes_for: number | null
+          votes_against: number | null
         }
         Relationships: [
 
@@ -2288,6 +2293,13 @@ export type Database = {
       }
     }
     Functions: {
+      close_suggestion_vote: {
+        Args: {
+        p_suggestion_id: string
+        p_adopt?: boolean
+      }
+        Returns: Database["public"]["Tables"]["activity_suggestions"]["Row"]
+      }
       create_invite_code: {
         Args: {
         p_community_id: string
@@ -2321,6 +2333,15 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["whatsapp_link_codes"]["Row"]
       }
+      join_request_contacts: {
+        Args: {
+        p_community_id: string
+      }
+        Returns: {
+        request_id: string | null
+        email: string | null
+      }[]
+      }
       mark_notifications_read: {
         Args: {
         p_ids?: string[]
@@ -2332,6 +2353,13 @@ export type Database = {
         p_community_id: string
       }
         Returns: undefined
+      }
+      my_contact: {
+        Args: { [_ in never]: never }
+        Returns: {
+        email: string | null
+        phone: string | null
+      }[]
       }
       normalize_invite_code: {
         Args: {
@@ -2495,7 +2523,7 @@ export type Database = {
       origin_channel: "web" | "mobile" | "whatsapp" | "api" | "system"
       payment_method: "upi" | "card" | "netbanking" | "bank_transfer" | "cash" | "cheque" | "other"
       proposal_status: "voting" | "approved" | "rejected" | "withdrawn"
-      suggestion_status: "new" | "reviewing" | "accepted" | "declined"
+      suggestion_status: "new" | "reviewing" | "accepted" | "declined" | "adopted" | "not_adopted"
       task_status: "todo" | "in_progress" | "done" | "blocked"
     }
     CompositeTypes: {
