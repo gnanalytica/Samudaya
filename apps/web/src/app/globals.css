@@ -28,16 +28,19 @@
 }
 
 :root {
-  --surface: oklch(0.995 0.002 160);
+  --surface: oklch(0.993 0.005 85);
   --surface-raised: oklch(1 0 0);
-  --surface-sunken: oklch(0.968 0.005 160);
-  --border: oklch(0.9 0.008 160);
-  --border-strong: oklch(0.82 0.012 160);
-  --ink: oklch(0.24 0.015 165);
-  --ink-muted: oklch(0.52 0.014 165);
-  --ink-subtle: oklch(0.64 0.012 165);
+  --surface-sunken: oklch(0.964 0.008 85);
+  --border: oklch(0.898 0.009 85);
+  --border-strong: oklch(0.818 0.013 85);
+  --ink: oklch(0.235 0.014 75);
+  --ink-muted: oklch(0.515 0.013 75);
+  --ink-subtle: oklch(0.635 0.011 75);
   --accent: var(--color-brand-600);
   --accent-ink: oklch(1 0 0);
+  /* Re-pointed per festival; these are the society's own colours. */
+  --ribbon: oklch(0.6 0.13 250);
+  --festival-wash: oklch(0.975 0.02 166);
   --danger: oklch(0.58 0.2 25);
   --warning: oklch(0.72 0.16 70);
   --success: oklch(0.6 0.15 150);
@@ -46,16 +49,18 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: oklch(0.19 0.012 165);
-    --surface-raised: oklch(0.235 0.014 165);
-    --surface-sunken: oklch(0.155 0.01 165);
-    --border: oklch(0.32 0.014 165);
-    --border-strong: oklch(0.42 0.016 165);
-    --ink: oklch(0.96 0.005 165);
-    --ink-muted: oklch(0.73 0.012 165);
-    --ink-subtle: oklch(0.6 0.012 165);
+    --surface: oklch(0.188 0.011 70);
+    --surface-raised: oklch(0.233 0.013 70);
+    --surface-sunken: oklch(0.153 0.009 70);
+    --border: oklch(0.318 0.013 70);
+    --border-strong: oklch(0.418 0.015 70);
+    --ink: oklch(0.958 0.005 80);
+    --ink-muted: oklch(0.728 0.011 80);
+    --ink-subtle: oklch(0.598 0.011 80);
     --accent: var(--color-brand-400);
     --accent-ink: oklch(0.18 0.03 168);
+    --ribbon: oklch(0.74 0.12 250);
+    --festival-wash: oklch(0.235 0.026 166);
     --danger: oklch(0.68 0.18 25);
     --warning: oklch(0.8 0.14 75);
     --success: oklch(0.72 0.14 155);
@@ -74,6 +79,7 @@
   --color-ink-subtle: var(--ink-subtle);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-ribbon: var(--ribbon);
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-success: var(--success);

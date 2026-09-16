@@ -788,7 +788,10 @@ export async function decideSuggestion(formData: FormData): Promise<void> {
     .maybeSingle();
 
   revalidatePath(`/app/${communitySlug}/todo`);
+  // An event's suggestion goes back to that event; the society's own go to the
+  // page that holds them.
   if (data?.events?.slug) revalidatePath(`/app/${communitySlug}/events/${data.events.slug}`);
+  else revalidatePath(`/app/${communitySlug}/suggest`);
 }
 
 export type CloseState = ActionState & { closed?: boolean };

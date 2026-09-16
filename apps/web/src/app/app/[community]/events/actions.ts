@@ -182,12 +182,14 @@ export async function leaveActivity(formData: FormData): Promise<void> {
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
 }
 
-const eventSuggestionSchema = z.object({
-  event_id: uuid,
+const suggestionFields = {
   kind: suggestionKindSchema,
   name: z.string().trim().min(3, 'Give your suggestion a short title').max(120),
   description: z.string().trim().max(2000).optional(),
-});
+};
+
+const eventSuggestionSchema = z.object({ event_id: uuid, ...suggestionFields });
+const societySuggestionSchema = z.object(suggestionFields);
 
 /** A resident suggests an idea or an activity for an event; the committee reviews it. */
 export async function suggestForEvent(
@@ -223,6 +225,44 @@ export async function suggestForEvent(
   };
 }
 
+/**
+ * The same three stages, for something that belongs to the society rather than
+ * to one event — a request to the committee, or an activity worth doing
+ * whenever. `event_id` stays null; everything else, from the row-level policies
+ * to the To do queue, treats it exactly like an event's suggestion.
+ */
+export async function suggestToSociety(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const slug = String(formData.get('slug') ?? '');
+  const context = await requireCapability(slug, 'suggest');
+
+  const parsed = societySuggestionSchema.safeParse({
+    kind: formData.get('kind') || 'idea',
+    name: formData.get('name'),
+    description: formData.get('description') || undefined,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('activity_suggestions').insert({
+    ...parsed.data,
+    event_id: null,
+    community_id: context.community.id,
+    suggested_by: context.membership.id,
+    status: 'new',
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  revalidatePath(`/app/${slug}/suggest`);
+  revalidatePath(`/app/${slug}/todo`);
+  return {
+    ...EMPTY_STATE,
+    success: 'Sent to the committee. Once they open it, residents can vote on it.',
+  };
+}
+
 /** One vote per person, for or against; voting again changes the vote. */
 export async function voteOnSuggestion(formData: FormData): Promise<void> {
   const slug = String(formData.get('slug') ?? '');
@@ -251,7 +291,8 @@ export async function voteOnSuggestion(formData: FormData): Promise<void> {
     );
   }
 
-  revalidatePath(`/app/${slug}/events/${eventSlug}`);
+  // Society-wide suggestions carry no event, and live on their own page.
+  revalidatePath(eventSlug ? `/app/${slug}/events/${eventSlug}` : `/app/${slug}/suggest`);
 }
 
 const campaignSchema = z.object({

@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   LayoutDashboard,
+  Lightbulb,
   Settings2,
   UserRound,
   Users,
@@ -25,7 +26,7 @@ export type NavItem = {
 };
 
 /**
- * Residents see Home, Events, People and Me. Staff add a Manage group with
+ * Residents see Home, Events, People, Ideas and Me. Staff add a Manage group with
  * their To do queue and events; the committee also gets Society settings.
  * Notifications and personal settings live in the profile menu.
  *
@@ -41,6 +42,8 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
         { href: base, label: 'Home', icon: LayoutDashboard, primary: true },
         { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
         { href: `${base}/people`, label: 'People', icon: Users, primary: true },
+        // Not primary: the bottom bar is full, and Home already points here.
+        { href: `${base}/suggest`, label: 'Ideas', icon: Lightbulb },
         { href: `${base}/me`, label: 'Me', icon: UserRound, primary: true },
       ],
     },

@@ -4,14 +4,11 @@ import {
   CalendarDays,
   Check,
   Clock,
-  Lightbulb,
   MapPin,
   Receipt,
   Settings2,
   Sparkles,
   Tag,
-  ThumbsDown,
-  ThumbsUp,
   Users,
   Wallet,
 } from 'lucide-react';
@@ -22,6 +19,7 @@ import {
   can,
   countdown,
   formatDate,
+  festivalFor,
   formatMoney,
   fundedPercent,
   receiptRef,
@@ -40,9 +38,10 @@ import {
   requireEvent,
 } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
-import { PageBody, PageHeader } from '@/components/page-header';
+import { PageBody } from '@/components/page-header';
+import { FestivalHeader, festivalVars } from '@/components/festival';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
-import { Button, ButtonLink } from '@/components/ui/button';
+import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import {
@@ -54,8 +53,9 @@ import {
 } from '@/components/badges';
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
+import { SuggestionBoard } from '@/components/suggestion-board';
 import { cn } from '@/lib/utils';
-import { cancelRegistration, voteOnSuggestion } from '../actions';
+import { cancelRegistration } from '../actions';
 import { RegisterForm, SuggestionForm } from './participation-forms';
 
 /**
@@ -93,16 +93,18 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
+  const canApprove = can(role, 'suggestions:approve');
+  // The Vote tab's badge counts what is waiting on *this* person: a vote they
+  // have not cast, or — for the committee — a suggestion nobody has opened yet.
+  const needsMe = suggestions.filter((s) =>
+    s.status === 'accepted' ? s.myVote === null : canApprove && s.status === 'new',
+  ).length;
   const approved = expenses.filter((expense) => expense.status === 'approved');
   const awaiting = expenses.filter((expense) => expense.status !== 'approved');
   const categories = budgetVsSpent(budget, expenses);
   const plannedTotal = categories.reduce((sum, row) => sum + row.planned, 0);
   const largest = Math.max(1, ...categories.map((row) => Math.max(row.planned, row.spent)));
   const myRegistrations = registrations.filter((r) => r.membership_id === membership.id);
-  const voting = suggestions.filter((s) => s.status === 'accepted');
-  const mySuggestions = suggestions.filter(
-    (s) => s.suggested_by === membership.id && s.status !== 'accepted',
-  );
 
   // Campaigns have no activities; a proposed campaign has nothing to vote on yet.
   const tabs = EVENT_TABS.filter(
@@ -115,10 +117,14 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
     ? (await getCatalogue(community.id)).event_type.find((item) => item.id === event.event_type_id)
     : null;
   const canContribute = open && can(role, 'contribute');
+  // Deepavali is marigold, Dasara vermilion, a clean-up drive the society's own
+  // green. The whole page takes the colour, not just its header.
+  const festival = festivalFor(eventType?.label, event.name);
 
   return (
-    <>
-      <PageHeader
+    <div style={festivalVars(festival)}>
+      <FestivalHeader
+        festival={festival}
         title={`${event.emoji} ${event.name}`}
         description={[
           isCampaign ? 'Fundraising campaign' : null,
@@ -183,9 +189,9 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               )}
             >
               {t.label}
-              {t.id === 'vote' && voting.length ? (
+              {t.id === 'vote' && needsMe ? (
                 <span className="bg-accent/15 text-accent ml-1.5 rounded-full px-1.5 text-xs">
-                  {voting.length}
+                  {needsMe}
                 </span>
               ) : null}
             </Link>
@@ -600,118 +606,15 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
         {/* ----------------------------------------------------------- vote */}
         {active === 'vote' ? (
           <div className="space-y-3">
-            {voting.length ? (
-              voting.map((suggestion) => {
-                const total = suggestion.votesFor + suggestion.votesAgainst;
-                const forPct = total ? Math.round((suggestion.votesFor / total) * 100) : 0;
-                return (
-                  <Card key={suggestion.id}>
-                    <CardBody>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-ink text-sm font-semibold">{suggestion.name}</p>
-                          <p className="text-ink-subtle mt-0.5 text-xs">
-                            {suggestion.kind === 'idea' ? 'Idea' : 'Activity'} suggested by{' '}
-                            {suggestion.memberships?.profiles?.full_name ?? 'a resident'}
-                          </p>
-                          {suggestion.description ? (
-                            <p className="text-ink-muted mt-1.5 text-sm">
-                              {suggestion.description}
-                            </p>
-                          ) : null}
-                        </div>
-                        <Badge tone="success">Voting</Badge>
-                      </div>
-                      <div className="mt-3">
-                        <div className="text-ink-muted mb-1 flex justify-between text-xs font-medium">
-                          <span>
-                            {suggestion.votesFor} for · {suggestion.votesAgainst} against
-                          </span>
-                          <span>{total ? `${forPct}% in favour` : 'No votes yet'}</span>
-                        </div>
-                        <FundBar percent={forPct} />
-                      </div>
-                      {can(role, 'vote') && event.status !== 'completed' ? (
-                        <form
-                          action={voteOnSuggestion}
-                          className="mt-3 flex flex-wrap items-center gap-2"
-                        >
-                          <input type="hidden" name="slug" value={slug} />
-                          <input type="hidden" name="event" value={event.slug} />
-                          <input type="hidden" name="suggestion_id" value={suggestion.id} />
-                          <Button
-                            type="submit"
-                            name="support"
-                            value="1"
-                            size="sm"
-                            variant={suggestion.myVote === true ? 'primary' : 'secondary'}
-                            aria-pressed={suggestion.myVote === true}
-                          >
-                            <ThumbsUp className="size-4" aria-hidden="true" />
-                            For
-                          </Button>
-                          <Button
-                            type="submit"
-                            name="support"
-                            value="0"
-                            size="sm"
-                            variant={suggestion.myVote === false ? 'primary' : 'secondary'}
-                            aria-pressed={suggestion.myVote === false}
-                          >
-                            <ThumbsDown className="size-4" aria-hidden="true" />
-                            Against
-                          </Button>
-                          {suggestion.myVote !== null ? (
-                            <Button
-                              type="submit"
-                              name="withdraw"
-                              value="1"
-                              size="sm"
-                              variant="ghost"
-                            >
-                              Withdraw vote
-                            </Button>
-                          ) : null}
-                        </form>
-                      ) : null}
-                    </CardBody>
-                  </Card>
-                );
-              })
-            ) : (
-              <Card>
-                <EmptyState
-                  icon={<Lightbulb className="size-6" />}
-                  title="Nothing to vote on yet"
-                  description="Suggestions the committee approves are put to residents here."
-                />
-              </Card>
-            )}
-
-            {mySuggestions.length ? (
-              <Card>
-                <CardHeader title="Your suggestions" />
-                <ul className="divide-border-base divide-y">
-                  {mySuggestions.map((suggestion) => (
-                    <li
-                      key={suggestion.id}
-                      className="flex items-center justify-between gap-3 px-5 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-ink text-sm">{suggestion.name}</p>
-                        {suggestion.review_note ? (
-                          <p className="text-ink-subtle text-xs">“{suggestion.review_note}”</p>
-                        ) : null}
-                      </div>
-                      <Badge tone={suggestion.status === 'declined' ? 'neutral' : 'warning'}>
-                        {suggestion.status === 'declined' ? 'Declined' : 'With the committee'}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </Card>
-            ) : null}
-
+            <SuggestionBoard
+              slug={slug}
+              eventSlug={event.slug}
+              rows={suggestions}
+              myMembershipId={membership.id}
+              canVote={can(role, 'vote') && event.status !== 'completed'}
+              canApprove={canApprove}
+              emptyDescription="Suggestions the committee approves are put to residents here."
+            />
             {can(role, 'suggest') && event.status === 'published' ? (
               <Card>
                 <CardHeader
@@ -726,6 +629,6 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
           </div>
         ) : null}
       </PageBody>
-    </>
+    </div>
   );
 }
