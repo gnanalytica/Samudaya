@@ -119,6 +119,50 @@ select test.eq(
 select test.eq((select status from public.create_society('x')), 'invalid_name',
   'a one-character name is refused');
 
+-- ---------------------------------------------------------------------------
+-- The founder's phone number
+-- ---------------------------------------------------------------------------
+-- Nobody had one. Founding never asked, so the person every resident needs to
+-- reach was the one member with no way to be reached.
+reset role;
+select test.eq(app.e164('98450 10101'), '+919845010101',
+  'a ten-digit Indian mobile is given its country code');
+select test.eq(app.e164('+91 98450-10101'), '+919845010101',
+  'spaces and dashes are not part of a phone number');
+select test.eq(app.e164('919845010101'), '+919845010101',
+  'an international number missing its plus gets one');
+select test.eq(app.e164('12345'), null::text, 'too short is not a phone number');
+select test.eq(app.e164('not a phone'), null::text, 'nor is a sentence');
+select test.eq(app.e164(null), null::text, 'and null stays null');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq((select phone from public.profiles where id = '88888888-8888-4888-8888-888888888888'),
+  null::text, 'founding without a phone leaves the profile as it was');
+
+select test.eq(
+  (select status from public.create_society('Hill Crest Annexe', 'Bengaluru', null, null, '98450 10101')),
+  'ok', 'a society can be founded with a phone number');
+reset role;
+select test.eq((select phone from public.profiles where id = '88888888-8888-4888-8888-888888888888'),
+  '+919845010101', 'and the founder ends up reachable');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select status from public.create_society('Hill Crest Gardens', 'Bengaluru', null, null, 'not a phone')),
+  'invalid_phone', 'a phone that cannot be dialled is named, not silently dropped');
+reset role;
+select test.eq((select count(*) from public.communities where name = 'Hill Crest Gardens'), 0::bigint,
+  'and nothing is created when it is refused');
+select test.eq((select phone from public.profiles where id = '88888888-8888-4888-8888-888888888888'),
+  '+919845010101', 'a number already set is never overwritten by a later society');
+
+-- Hand the suite back the society count it was written against.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+delete from public.communities where slug = 'hill-crest-annexe';
+reset role;
+select test.eq((select count(*) from public.communities where slug = 'hill-crest-annexe'), 0::bigint,
+  'and the society founded to prove it is cleaned up again');
+
 -- Two societies may share a name; they cannot share a web address.
 select test.act_as('b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9');
 select test.ok(
@@ -174,6 +218,23 @@ reset role;
 select test.eq((select count(*)::int from public.join_requests
                  where user_id = '33333333-3333-4333-8333-333333333333'), 1,
   'and does not create a second row for staff to wade through');
+
+-- The number typed while joining used to stop at the join request: staff read
+-- it once while admitting the person, and the profile stayed blank for ever.
+-- The request filed above carried '9876543210'.
+select test.eq((select phone from public.profiles where id = '33333333-3333-4333-8333-333333333333'),
+  '+919876543210',
+  'the number given while joining becomes the resident’s, before anyone admits them');
+
+-- Their own number outlasts every later application.
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.eq(
+  (select status from public.request_to_join(
+     'MHR4827', 'bbbbbbbb-0000-4000-8000-000000000001', 'Chitra Rao', '9845010303')),
+  'pending', 'a later request is still accepted');
+reset role;
+select test.eq((select phone from public.profiles where id = '33333333-3333-4333-8333-333333333333'),
+  '+919876543210', 'without quietly replacing the number already on the profile');
 
 -- A resident cannot admit themselves.
 select test.act_as('33333333-3333-4333-8333-333333333333');

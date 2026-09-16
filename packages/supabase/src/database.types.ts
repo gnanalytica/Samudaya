@@ -2306,6 +2306,7 @@ export type Database = {
         p_city?: string
         p_address?: string
         p_pincode?: string
+        p_phone?: string
       }
         Returns: {
         status: string | null

@@ -22,12 +22,17 @@ function Submit() {
 }
 
 /**
- * Founding a society: the name, the city, and nothing else that can wait.
+ * Founding a society: the name, the city, the founder's phone, and nothing
+ * else that can wait.
  *
  * Flats, the catalogue and the UPI ID are the setup checklist's job — asking
  * for them here would turn "start your society" into a form nobody finishes on
  * a phone. The address is offered because it is the one checklist step whose
  * answer the founder already has in their head.
+ *
+ * The phone is not optional. The founder is the committee, and until this was
+ * asked for they were the one member of a society nobody could reach — the
+ * join form has always asked every resident for theirs.
  */
 export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
   const [state, action] = useActionState(createSociety, initial);
@@ -80,6 +85,27 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
                 placeholder="Bengaluru"
                 autoComplete="address-level2"
                 maxLength={80}
+                required
+              />
+            )}
+          </Field>
+
+          <Field
+            label="Your phone number"
+            htmlFor="cs-phone"
+            error={state.fieldErrors?.phone}
+            hint="Residents and the committee see it. Nobody else does."
+            required
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                placeholder="98450 10101"
+                autoComplete="tel"
+                maxLength={20}
                 required
               />
             )}

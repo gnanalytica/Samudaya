@@ -10,7 +10,7 @@ import { spacing } from '../src/lib/theme';
 
 /**
  * Starting a society, for the committee member who has nobody to give them a
- * code. The web app asks the same two questions on /onboarding?mode=create.
+ * code. The web app asks the same questions on /onboarding?mode=create.
  *
  * create_society() decides the web address, the Society code and the founder,
  * so nothing here can claim a society that already exists. Everything else —
@@ -22,6 +22,7 @@ export default function Found() {
 
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
+  const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -30,7 +31,7 @@ export default function Found() {
   const preview = name.trim() ? societySlug(name) : '';
 
   const submit = async () => {
-    const parsed = foundSocietySchema.safeParse({ name, city, address, pincode });
+    const parsed = foundSocietySchema.safeParse({ name, city, address, pincode, phone });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Check the details and try again.');
       return;
@@ -43,6 +44,7 @@ export default function Found() {
       p_city: parsed.data.city,
       p_address: parsed.data.address,
       p_pincode: parsed.data.pincode,
+      p_phone: parsed.data.phone,
     });
     setBusy(false);
 
@@ -72,7 +74,7 @@ export default function Found() {
           <View style={{ gap: 2 }}>
             <Title>Start your society</Title>
             <Body muted>
-              Two details now. Flats, categories and your UPI ID come next, on a checklist that
+              A few details now. Flats, categories and your UPI ID come next, on a checklist that
               keeps your place.
             </Body>
           </View>
@@ -102,6 +104,19 @@ export default function Found() {
               autoCapitalize="words"
               maxLength={80}
             />
+
+            <View style={{ gap: spacing.xs }}>
+              <Input
+                label="Your phone number"
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="98450 10101"
+                keyboardType="phone-pad"
+                autoCapitalize="none"
+                maxLength={20}
+              />
+              <Caption>Residents and the committee see it. Nobody else does.</Caption>
+            </View>
 
             <View style={{ gap: spacing.xs }}>
               <Input
