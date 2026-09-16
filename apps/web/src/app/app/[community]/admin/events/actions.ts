@@ -743,7 +743,7 @@ export async function reviewJoinRequest(formData: FormData): Promise<void> {
     p_reason: String(formData.get('reason') ?? '').trim() || undefined,
   });
 
-  revalidatePath(`/app/${communitySlug}/admin/requests`);
+  revalidatePath(`/app/${communitySlug}/people/requests`);
   revalidatePath(`/app/${communitySlug}/todo`);
   revalidatePath(`/app/${communitySlug}/admin`);
 }

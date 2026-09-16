@@ -31,7 +31,7 @@ export async function changeMemberRole(
     .eq('community_id', context.community.id);
   if (error) return { error: friendlyDbError(error) };
 
-  revalidatePath(`/app/${slug}/admin/members`);
+  revalidatePath(`/app/${slug}/people`);
   return { ...EMPTY_STATE, success: 'Role updated.' };
 }
 
@@ -57,6 +57,6 @@ export async function removeMember(_prev: ActionState, formData: FormData): Prom
   if (error) return { error: friendlyDbError(error) };
   if (!data?.length) return { error: 'Staff can remove residents only.' };
 
-  revalidatePath(`/app/${slug}/admin/members`);
+  revalidatePath(`/app/${slug}/people`);
   return { ...EMPTY_STATE, success: 'Removed.' };
 }

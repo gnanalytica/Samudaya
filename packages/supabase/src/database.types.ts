@@ -2406,6 +2406,22 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["join_requests"]["Row"]
       }
+      society_people: {
+        Args: {
+        p_community_id: string
+      }
+        Returns: {
+        membership_id: string | null
+        user_id: string | null
+        full_name: string | null
+        role: Database["public"]["Enums"]["member_role"] | null
+        flat: string | null
+        relation: Database["public"]["Enums"]["occupant_relation"] | null
+        joined_at: string | null
+        email: string | null
+        phone: string | null
+      }[]
+      }
       society_units: {
         Args: {
         p_join_code: string

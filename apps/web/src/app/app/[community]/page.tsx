@@ -64,7 +64,12 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
 
       <PageBody>
         {!membership.welcomed_at ? (
-          <WelcomeCard slug={community.slug} role={role} societyName={community.name} />
+          <WelcomeCard
+            slug={community.slug}
+            role={role}
+            societyName={community.name}
+            joinCode={community.join_code}
+          />
         ) : null}
 
         {joined && membership.welcomed_at ? (

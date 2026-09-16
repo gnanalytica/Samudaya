@@ -28,7 +28,7 @@ function detailHref(base: string, item: TodoItem): string | null {
     case 'payment_to_confirm':
       return event ? `${base}/admin/events/${event}?tab=payments` : null;
     case 'join_request':
-      return `${base}/admin/requests`;
+      return `${base}/people/requests`;
     case 'bill_to_approve':
     case 'bill_sent_back':
       return event ? `${base}/admin/events/${event}?tab=bills` : null;

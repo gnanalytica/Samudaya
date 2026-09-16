@@ -1,0 +1,36 @@
+name: Migrations
+
+# Vercel deploys the app the moment main moves; the schema waits for a person
+# to run `pnpm db:push`. This watches the gap between the two, so a migration
+# that never got applied shows up as a red check rather than as a resident
+# reporting that a button does nothing.
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Catches drift that no push would notice — a migration applied by hand and
+    # rolled back, or a branch merged while the database was unreachable.
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  pending:
+    name: Production has every migration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      # SUPABASE_DB_URL is the production connection string, from Supabase →
+      # Project Settings → Database. Without it this job fails rather than
+      # skipping: a check that silently passes is the failure it guards against.
+      - name: Compare supabase/migrations with the database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: bash scripts/migrations-pending.sh

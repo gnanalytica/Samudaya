@@ -16,7 +16,8 @@ function useIsActive(slug: string) {
     if (pathname === href) return true;
     if (!pathname.startsWith(`${href}/`)) return false;
     // Home and the events console own their exact page, not everything below
-    // them, so /admin/members does not light up "Events" as well.
+    // them, so /admin/units does not light up "Events" as well. People is not a
+    // root, so its Requests tab keeps the People item lit.
     if (!roots.has(href)) return true;
     return href === `/app/${slug}/admin` && pathname.startsWith(`${href}/events`);
   };

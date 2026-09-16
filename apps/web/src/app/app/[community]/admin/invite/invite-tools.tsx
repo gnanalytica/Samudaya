@@ -2,42 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Check, Copy, MessageCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { residentInviteMessage, whatsappShareUrl } from '@samudaya/core';
 import { buttonClass } from '@/components/ui/button';
+import { CopyButton } from '@/components/ui/copy-button';
 
-export function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={async () => {
-        try {
-          await navigator.clipboard.writeText(value);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        } catch {
-          // Clipboard access can be refused; the value is on screen to copy by hand.
-        }
-      }}
-      className={buttonClass('secondary', 'sm')}
-    >
-      {copied ? (
-        <>
-          <Check className="text-success size-4" aria-hidden="true" />
-          Copied
-        </>
-      ) : (
-        <>
-          <Copy className="size-4" aria-hidden="true" />
-          {label}
-        </>
-      )}
-    </button>
-  );
-}
+export { CopyButton };
 
-/** The join link as a QR code, for a printed notice or a phone held up at a meeting. */
 export function JoinQr({ link, societyName }: { link: string; societyName: string }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {

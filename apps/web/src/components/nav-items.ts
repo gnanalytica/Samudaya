@@ -25,9 +25,12 @@ export type NavItem = {
 };
 
 /**
- * Residents see Home, Events and Me. Staff add a Manage group with their To do
- * queue, events and residents; the committee also gets Society settings.
+ * Residents see Home, Events, People and Me. Staff add a Manage group with
+ * their To do queue and events; the committee also gets Society settings.
  * Notifications and personal settings live in the profile menu.
+ *
+ * People is deliberately outside Manage: everybody may see who is in the
+ * society, and only what they may *do* there changes with the role.
  */
 export function navItems(slug: string): { section: string; items: NavItem[] }[] {
   const base = `/app/${slug}`;
@@ -37,6 +40,7 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
       items: [
         { href: base, label: 'Home', icon: LayoutDashboard, primary: true },
         { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
+        { href: `${base}/people`, label: 'People', icon: Users, primary: true },
         { href: `${base}/me`, label: 'Me', icon: UserRound, primary: true },
       ],
     },
@@ -60,12 +64,6 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
           primary: true,
         },
         {
-          href: `${base}/admin/members`,
-          label: 'Residents',
-          icon: Users,
-          capability: 'residents:remove',
-        },
-        {
           href: `${base}/admin/settings`,
           label: COPY.societySettings,
           icon: Settings2,
@@ -86,11 +84,19 @@ export function visibleNav(slug: string, role: MemberRole) {
     .filter((group) => group.items.length > 0);
 }
 
-/** Bottom bar order: the resident's three, with To do and Manage before Me. */
+/**
+ * Bottom bar order: the resident's screens, with To do and Manage before Me.
+ * Staff and the committee already carry two extra tabs, so People drops out of
+ * their bar rather than squeezing six across a phone — the sidebar and the
+ * console both still link it.
+ */
 export function bottomNavItems(slug: string, role: MemberRole) {
-  const items = visibleNav(slug, role)
+  const groups = visibleNav(slug, role);
+  const manages = groups.some((group) => group.section === COPY.manage);
+  const items = groups
     .flatMap((group) => group.items)
-    .filter((item) => item.primary);
+    .filter((item) => item.primary)
+    .filter((item) => !(manages && item.href === `/app/${slug}/people`));
   const me = items.filter((item) => item.href === `/app/${slug}/me`);
   return [...items.filter((item) => item.href !== `/app/${slug}/me`), ...me];
 }

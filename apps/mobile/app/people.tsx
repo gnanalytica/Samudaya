@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Pressable, RefreshControl, SectionList, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ROLE_LABEL, ROLES, can, normalizeRole, unitLabel, type Role } from '@samudaya/core';
-import { useAuth } from '../../src/lib/auth';
-import { supabase } from '../../src/lib/supabase';
-import { useCommunityData } from '../../src/lib/use-community-data';
+import { ROLE_LABEL, ROLES, can, normalizeRole, type Role } from '@samudaya/core';
+import { useAuth } from '../src/lib/auth';
+import { supabase } from '../src/lib/supabase';
+import { useCommunityData } from '../src/lib/use-community-data';
 import {
   Badge,
   Body,
@@ -15,39 +15,30 @@ import {
   Input,
   Loading,
   Screen,
-} from '../../src/components/ui';
-import { spacing } from '../../src/lib/theme';
+} from '../src/components/ui';
+import { spacing } from '../src/lib/theme';
 
 /**
- * Everyone admitted to the society, grouped by role, with their flat. Staff can
- * open a resident to remove them; the committee can also change roles.
+ * Everyone admitted to the society, grouped by role, with their flat.
+ *
+ * Residents get the same list their neighbours are on, minus any way to act on
+ * it — society_people() withholds contact details from them, so there is
+ * nothing here to leak. Staff can open a resident to remove them; the committee
+ * can also change roles.
  */
-export default function Members() {
+export default function People() {
   const router = useRouter();
   const { role } = useAuth();
   const [search, setSearch] = useState('');
 
-  const { data, loading, refreshing, refresh } = useCommunityData(
-    'admin:members',
-    async (communityId) => {
-      const { data: rows } = await supabase
-        .from('memberships')
-        .select(
-          'id, role, joined_at, profiles(full_name, email), unit_occupants(relation, units(block, number))',
-        )
-        .eq('community_id', communityId)
-        .eq('status', 'active');
-      return rows ?? [];
-    },
-  );
+  const staff = can(role, 'residents:remove');
 
-  if (!can(role, 'residents:remove')) {
-    return (
-      <Screen>
-        <EmptyState title="Staff and committee only" />
-      </Screen>
-    );
-  }
+  const { data, loading, refreshing, refresh } = useCommunityData('people', async (communityId) => {
+    const { data: rows } = await supabase.rpc('society_people', {
+      p_community_id: communityId,
+    });
+    return rows ?? [];
+  });
 
   if (loading && !data) {
     return (
@@ -59,16 +50,19 @@ export default function Members() {
 
   const query = search.trim().toLowerCase();
   const rows = (data ?? [])
-    .map((row) => {
-      const occupancy = row.unit_occupants[0];
-      return {
-        id: row.id,
-        role: normalizeRole(row.role) ?? 'resident',
-        name: row.profiles?.full_name ?? row.profiles?.email ?? 'Unnamed',
-        flat: occupancy?.units ? unitLabel(occupancy.units) : null,
-        relation: occupancy?.relation ?? null,
-      };
-    })
+    .flatMap((row) =>
+      row.membership_id
+        ? [
+            {
+              id: row.membership_id,
+              role: normalizeRole(row.role) ?? 'resident',
+              name: row.full_name ?? 'Unnamed',
+              flat: row.flat,
+              relation: row.relation,
+            },
+          ]
+        : [],
+    )
     .filter(
       (row) =>
         !query ||
@@ -103,7 +97,7 @@ export default function Members() {
           </View>
         )}
         renderItem={({ item }) => {
-          const editable = item.role === 'resident' || can(role, 'roles:manage');
+          const editable = staff && (item.role === 'resident' || can(role, 'roles:manage'));
           return (
             <Pressable
               accessibilityRole="button"

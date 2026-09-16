@@ -1240,3 +1240,45 @@ select test.eq(
     where c.slug = 'green-valley'
       and m.user_id = '44444444-4444-4444-8444-444444444444'),
   'resident', 'committee in one society changes no roles in another');
+
+-- ---------------------------------------------------------------------------
+-- The people list: everyone sees who is here, not how to reach them
+-- ---------------------------------------------------------------------------
+-- society_people() is the only source for the directory, so a resident cannot
+-- be handed a neighbour's phone number by a screen that forgot to drop it.
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+
+select test.ok(
+  (select count(*) from public.society_people(
+     (select id from public.communities where slug = 'hill-crest'))) > 1,
+  'a resident sees the whole society in the directory');
+select test.eq(
+  (select count(*) from public.society_people(
+     (select id from public.communities where slug = 'hill-crest'))
+    where email is not null or phone is not null),
+  0::bigint, 'and no contact details at all');
+select test.ok(
+  (select count(*) from public.society_people(
+     (select id from public.communities where slug = 'hill-crest'))
+    where role = 'committee') > 0,
+  'roles are visible, so residents know who decides');
+
+-- Staff keep the contact details they need to check somebody in.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.ok(
+  (select count(*) from public.society_people(
+     (select id from public.communities where slug = 'hill-crest'))
+    where email is not null) > 0,
+  'staff still see contact details');
+
+-- A different society's committee gets nothing, not a lean list.
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(
+  (select count(*) from public.society_people(
+     (select id from public.communities where slug = 'hill-crest'))),
+  0::bigint, 'the directory does not leak across societies');
+
+reset role;

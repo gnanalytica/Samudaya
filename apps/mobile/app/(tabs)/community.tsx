@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { relativeTime } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
@@ -21,6 +22,7 @@ import { Meter } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function Community() {
+  const router = useRouter();
   const { membershipId, activeCommunity } = useAuth();
   const [idea, setIdea] = useState('');
   const [busy, setBusy] = useState(false);
@@ -142,6 +144,12 @@ export default function Community() {
         keyboardShouldPersistTaps="handled"
       >
         <Title>Community</Title>
+
+        <Button
+          label="See everyone in the society"
+          variant="secondary"
+          onPress={() => router.push('/people')}
+        />
 
         {data?.polls.length ? (
           <Card style={{ gap: spacing.md }}>
