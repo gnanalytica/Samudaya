@@ -91,7 +91,15 @@ You need the project URL, the anon key and the service-role key.
 ```bash
 pnpm dlx supabase link --project-ref <your-ref>
 pnpm db:push          # applies supabase/migrations in order
+pnpm db:status        # SUPABASE_DB_URL=… — names any migration the database is missing
 ```
+
+Deploys and migrations travel separately: the web app ships when `main` moves,
+the schema waits for `db:push`. The **Migrations** workflow runs `db:status`
+against production on every push to `main` and once a day, so a migration left
+behind turns a check red instead of turning a feature into "Something went
+wrong". It needs a `SUPABASE_DB_URL` repository secret, and fails rather than
+skips without one.
 
 ### 3. Turn on Google sign-in
 
@@ -228,6 +236,7 @@ something you own before submitting to either store.
 
 ```bash
 pnpm db:test      # applies every migration to a throwaway Postgres, runs the RLS suite
+pnpm db:status    # checks a real database has every migration (needs SUPABASE_DB_URL)
 pnpm test         # unit tests across the workspace
 pnpm typecheck
 pnpm lint
