@@ -63,6 +63,13 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
 };
 
 /**
+ * PostgREST codes for a function the database does not have, or has twice.
+ * Both mean code shipped ahead of its migration rather than anything the
+ * person at the keyboard did.
+ */
+const SCHEMA_MISMATCH = ['PGRST202', 'PGRST203'];
+
+/**
  * Turns a PostgREST error into something a resident can act on.
  *
  * RLS denials surface as 42501; a violated exclusion constraint (two bookings
@@ -71,6 +78,16 @@ const CONSTRAINT_MESSAGES: Record<string, string> = {
  */
 export function friendlyDbError(error: { code?: string; message?: string } | null): string {
   if (!error) return 'Something went wrong. Please try again.';
+
+  // A missing function is an environment that never got the migration. Telling
+  // someone to try again sends them round a loop that cannot end, so say it is
+  // us, and log loudly enough to reach the runtime error dashboard — an error
+  // we swallow into form state is otherwise invisible there.
+  if (error.code && SCHEMA_MISMATCH.includes(error.code)) {
+    console.error('[samudaya] database is behind the app', error.code, error.message);
+    return 'This isn’t available yet — our side, not yours. We’ve been alerted.';
+  }
+
   const known = KNOWN_DB_MESSAGES.find((message) => error.message?.includes(message));
   if (known) return known.endsWith('.') ? known : `${known}.`;
   const constraint = Object.keys(CONSTRAINT_MESSAGES).find((name) => error.message?.includes(name));
