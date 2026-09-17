@@ -34,7 +34,9 @@ export async function CommentThread({
   const supabase = await getSupabase();
   const query = supabase
     .from('comments')
-    .select('id, body, created_at, membership_id, memberships(profiles(full_name))')
+    .select(
+      'id, body, created_at, membership_id, memberships!comments_membership_id_fkey(profiles(full_name))',
+    )
     .order('created_at')
     .limit(200);
 

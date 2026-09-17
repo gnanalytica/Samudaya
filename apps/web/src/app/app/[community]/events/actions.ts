@@ -273,22 +273,29 @@ export async function voteOnSuggestion(formData: FormData): Promise<void> {
   const support = formData.get('support') === '1';
   const supabase = await getSupabase();
 
-  if (formData.get('withdraw') === '1') {
-    await supabase
-      .from('suggestion_votes')
-      .delete()
-      .eq('suggestion_id', suggestionId)
-      .eq('membership_id', context.membership.id);
-  } else {
-    await supabase.from('suggestion_votes').upsert(
-      {
-        suggestion_id: suggestionId,
-        membership_id: context.membership.id,
-        support,
-        voted_at: new Date().toISOString(),
-      },
-      { onConflict: 'suggestion_id,membership_id' },
-    );
+  // A refused vote used to be indistinguishable from a cast one: the error was
+  // dropped on the floor, the page revalidated, and the ballot you thought you
+  // had cast simply was not there. It cannot be shown inline from a void action,
+  // but it belongs in the error dashboard rather than nowhere.
+  const { error } =
+    formData.get('withdraw') === '1'
+      ? await supabase
+          .from('suggestion_votes')
+          .delete()
+          .eq('suggestion_id', suggestionId)
+          .eq('membership_id', context.membership.id)
+      : await supabase.from('suggestion_votes').upsert(
+          {
+            suggestion_id: suggestionId,
+            membership_id: context.membership.id,
+            support,
+            voted_at: new Date().toISOString(),
+          },
+          { onConflict: 'suggestion_id,membership_id' },
+        );
+
+  if (error) {
+    console.error('[samudaya] vote was not recorded', error.code, error.message);
   }
 
   // Society-wide suggestions carry no event, and live on their own page.
