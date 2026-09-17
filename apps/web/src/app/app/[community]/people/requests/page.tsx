@@ -21,15 +21,23 @@ export default async function JoinRequestsPage(
   const committee = can(role, 'roles:manage');
   const supabase = await getSupabase();
 
-  const { data: requests } = await supabase
-    .from('join_requests')
-    .select(
-      'id, claimed_name, claimed_phone, relation, status, created_at, reviewed_at, units(block, number), profiles!join_requests_user_id_fkey(full_name, email)',
-    )
-    .eq('community_id', community.id)
-    .order('status')
-    .order('created_at', { ascending: false })
-    .limit(100);
+  // The account email is no longer a column a client may select, so it comes
+  // from the function that checks the reader is staff of this society.
+  const [{ data: requests }, { data: contacts }] = await Promise.all([
+    supabase
+      .from('join_requests')
+      .select(
+        'id, claimed_name, claimed_phone, relation, status, created_at, reviewed_at, units(block, number), profiles!join_requests_user_id_fkey(full_name)',
+      )
+      .eq('community_id', community.id)
+      .order('status')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase.rpc('join_request_contacts', { p_community_id: community.id }),
+  ]);
+  const emailFor = new Map(
+    (contacts ?? []).flatMap((row) => (row.request_id ? [[row.request_id, row.email]] : [])),
+  );
 
   const pending = (requests ?? []).filter((request) => request.status === 'pending');
   const decided = (requests ?? []).filter((request) => request.status !== 'pending');
@@ -58,7 +66,7 @@ export default async function JoinRequestsPage(
                             ? unitLabel(request.units)
                             : 'Flat not chosen yet'}
                         {request.claimed_phone ? ` · ${request.claimed_phone}` : ''}
-                        {request.profiles?.email ? ` · ${request.profiles.email}` : ''}
+                        {emailFor.get(request.id) ? ` · ${emailFor.get(request.id)}` : ''}
                       </p>
                       <p className="text-ink-subtle mt-0.5 text-xs">
                         asked {relativeTime(request.created_at)}

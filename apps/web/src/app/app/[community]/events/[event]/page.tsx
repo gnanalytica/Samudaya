@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import {
   COPY,
-  EVENT_TABS,
   FUND_RULE_LABEL,
   can,
   countdown,
@@ -23,7 +22,6 @@ import {
   formatMoney,
   fundedPercent,
   receiptRef,
-  type EventTab,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import {
@@ -54,6 +52,9 @@ import {
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
 import { SuggestionBoard } from '@/components/suggestion-board';
+import { CommentThread } from '@/components/comment-thread';
+import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
+import { EventTabs, eventTabsFor } from '@/components/event-tabs';
 import { cn } from '@/lib/utils';
 import { cancelRegistration } from '../actions';
 import { RegisterForm, SuggestionForm } from './participation-forms';
@@ -106,12 +107,11 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const largest = Math.max(1, ...categories.map((row) => Math.max(row.planned, row.spent)));
   const myRegistrations = registrations.filter((r) => r.membership_id === membership.id);
 
-  // Campaigns have no activities; a proposed campaign has nothing to vote on yet.
-  const tabs = EVENT_TABS.filter(
-    (t) =>
-      !(t.id === 'activities' && isCampaign) && !(t.id === 'vote' && event.status === 'proposed'),
+  // One list, shared with the console, so the two bars cannot drift apart.
+  const tabs = eventTabsFor({ role, kind: event.kind, status: event.status }).filter(
+    (t) => !t.admin,
   );
-  const active: EventTab = tabs.find((t) => t.id === tab)?.id ?? 'about';
+  const active = tabs.find((t) => t.id === tab)?.id ?? 'about';
 
   const eventType = event.event_type_id
     ? (await getCatalogue(community.id)).event_type.find((item) => item.id === event.event_type_id)
@@ -171,32 +171,15 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
           </div>
         ) : null}
 
-        <nav
-          aria-label="Event sections"
-          className="border-border-base bg-surface-raised mb-5 flex gap-1 overflow-x-auto rounded-lg border p-1 text-sm"
-        >
-          {tabs.map((t) => (
-            <Link
-              key={t.id}
-              href={t.id === 'about' ? here : `${here}?tab=${t.id}`}
-              aria-current={active === t.id ? 'page' : undefined}
-              scroll={false}
-              className={cn(
-                'flex-1 rounded-md px-3 py-1.5 text-center whitespace-nowrap',
-                active === t.id
-                  ? 'bg-surface-sunken text-ink font-medium'
-                  : 'text-ink-muted hover:text-ink',
-              )}
-            >
-              {t.label}
-              {t.id === 'vote' && needsMe ? (
-                <span className="bg-accent/15 text-accent ml-1.5 rounded-full px-1.5 text-xs">
-                  {needsMe}
-                </span>
-              ) : null}
-            </Link>
-          ))}
-        </nav>
+        <EventTabs
+          base={base}
+          eventSlug={event.slug}
+          active={active}
+          role={role}
+          kind={event.kind}
+          status={event.status}
+          counts={{ vote: needsMe }}
+        />
 
         {/* ---------------------------------------------------------- about */}
         {active === 'about' ? (
@@ -275,6 +258,41 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               </div>
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
+
+            {event.whatsapp_group_url ? (
+              <Card>
+                <CardBody className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-ink text-sm font-medium">
+                      There is a WhatsApp group for this
+                    </p>
+                    <p className="text-ink-muted text-xs">
+                      The app keeps the plan and the money. The chatting happens where it already
+                      does.
+                    </p>
+                  </div>
+                  <WhatsappGroupLink url={event.whatsapp_group_url} />
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {/* The argument that produced the decision, kept next to it. A tab
+                of its own would have made five; it belongs under About. */}
+            <Card>
+              <CardHeader
+                title="Discussion"
+                description="Anything worth settling about this event. Everyone in the society can read it."
+              />
+              <CardBody>
+                <CommentThread
+                  slug={slug}
+                  subject={{ eventId: event.id }}
+                  eventSlug={event.slug}
+                  myMembershipId={membership.id}
+                  canModerate={isStaff}
+                />
+              </CardBody>
+            </Card>
           </div>
         ) : null}
 

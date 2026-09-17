@@ -136,7 +136,8 @@ select test.eq(app.e164('not a phone'), null::text, 'nor is a sentence');
 select test.eq(app.e164(null), null::text, 'and null stays null');
 
 select test.act_as('88888888-8888-4888-8888-888888888888');
-select test.eq((select phone from public.profiles where id = '88888888-8888-4888-8888-888888888888'),
+-- Read through my_contact(): since 0918.0100 a client cannot select the column.
+select test.eq((select phone from public.my_contact()),
   null::text, 'founding without a phone leaves the profile as it was');
 
 select test.eq(
@@ -1343,3 +1344,218 @@ select test.eq(
   0::bigint, 'the directory does not leak across societies');
 
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Contact details are not a column a neighbour can select
+-- ---------------------------------------------------------------------------
+-- society_people() withheld email and phone from residents from the day it
+-- shipped. profiles_select_self_or_neighbour is a *row* policy, so the table
+-- underneath handed them over anyway. Column privileges settle it.
+reset role;
+update public.profiles set phone = '+919845012345'
+ where id = '99999999-9999-4999-8999-999999999999';
+
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.raises(
+  $q$select phone from public.profiles where id = '99999999-9999-4999-8999-999999999999'$q$,
+  'a member cannot read a neighbour''s phone straight from the table');
+select test.raises(
+  $q$select email from public.profiles limit 1$q$,
+  'nor their email');
+select test.ok(
+  (select count(*) from (select full_name from public.profiles) t) > 1,
+  'names are still readable — that is what a directory is for');
+
+-- Your own, through the function that only ever answers for auth.uid().
+select test.eq((select phone from public.my_contact()), '+919876543210',
+  'you can still read your own number');
+select test.eq((select count(*) from public.my_contact()), 1::bigint,
+  'and only ever one row: your own');
+
+-- Setting it is still allowed; the column grant is what makes that safe.
+update public.profiles set phone = '+919845055555'
+ where id = '33333333-3333-4333-8333-333333333333';
+select test.eq((select phone from public.my_contact()), '+919845055555',
+  'a member may set their own number');
+select test.raises(
+  $q$update public.profiles set is_platform_admin = true
+      where id = '33333333-3333-4333-8333-333333333333'$q$,
+  'and still cannot make themselves a platform admin');
+
+-- ---------------------------------------------------------------------------
+-- A vote nobody can watch you cast, and one that ends
+-- ---------------------------------------------------------------------------
+-- Hill Crest: Hana is the committee, Ria and Tom are residents, Sam is staff.
+-- A fresh suggestion of its own, so nothing here depends on what earlier
+-- sections left lying around.
+reset role;
+insert into public.activity_suggestions (community_id, name, kind, status, suggested_by)
+select c.id, 'Terrace garden', 'idea', 'accepted', m.id
+  from public.communities c
+  join public.memberships m
+    on m.community_id = c.id and m.user_id = 'abababab-abab-4bab-8bab-abababababab'
+ where c.slug = 'hill-crest';
+
+create temporary table t_ballot as
+select s.id, s.community_id
+  from public.activity_suggestions s
+  join public.communities c on c.id = s.community_id
+ where c.slug = 'hill-crest' and s.name = 'Terrace garden';
+grant select on t_ballot to authenticated;
+
+-- Two residents, one for and one against.
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.suggestion_votes (suggestion_id, membership_id, support)
+select b.id, app.my_membership_id(b.community_id), true from t_ballot b;
+
+select test.eq(test.visible('select id from public.suggestion_votes where suggestion_id = (select id from t_ballot)'),
+  1::bigint, 'you can see your own vote');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.suggestion_votes (suggestion_id, membership_id, support)
+select b.id, app.my_membership_id(b.community_id), false from t_ballot b;
+
+select test.eq(test.visible('select id from public.suggestion_votes where suggestion_id = (select id from t_ballot)'),
+  1::bigint, 'and still only your own once a neighbour has voted too');
+select test.eq(
+  (select votes_for + votes_against from public.suggestion_stats
+    where suggestion_id = (select id from t_ballot)),
+  2, 'while the tally counts both');
+
+-- Staff run the society; they do not take part in it, so they cannot vote.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.raises(
+  $q$insert into public.suggestion_votes (suggestion_id, membership_id, support)
+     select b.id, app.my_membership_id(b.community_id), true from t_ballot b$q$,
+  'staff are not participants, so they have no vote');
+select test.raises(
+  $q$select public.close_suggestion_vote((select id from t_ballot))$q$,
+  'nor can staff close one');
+
+-- The committee closes it, and the count decides: one for, one against.
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select (public.close_suggestion_vote((select id from t_ballot))).status::text),
+  'not_adopted', 'a tie is not a mandate');
+
+-- Closing freezes it: every suggestion_votes policy keys on status='accepted'.
+reset role;
+select test.act_as('f0f0f0f0-f0f0-4f0f-8f0f-f0f0f0f0f0f0');
+select test.raises(
+  $q$insert into public.suggestion_votes (suggestion_id, membership_id, support)
+     select b.id, app.my_membership_id(b.community_id), true from t_ballot b$q$,
+  'and a late vote is refused');
+
+reset role;
+select test.ok(
+  (select resolved_at is not null from public.activity_suggestions
+    where id = (select id from t_ballot)),
+  'the decision is written down, not just implied by the numbers');
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select (public.close_suggestion_vote((select id from t_ballot))).status::text),
+  'not_adopted', 'and closing it again changes nothing');
+reset role;
+
+-- ---------------------------------------------------------------------------
+-- Comments: a thread hangs off the thing it is about
+-- ---------------------------------------------------------------------------
+reset role;
+create temporary table t_thread as
+select e.id as event_id, e.community_id
+  from public.events e
+  join public.communities c on c.id = e.community_id
+ where c.slug = 'hill-crest' limit 1;
+grant select on t_thread to authenticated;
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.comments (community_id, event_id, membership_id, body)
+select t.community_id, t.event_id, app.my_membership_id(t.community_id),
+       'Can we start the rangoli at 6 instead?'
+  from t_thread t;
+
+select test.eq(test.visible('select id from public.comments'), 1::bigint,
+  'a resident can leave a comment on an event');
+
+-- Staff run the society and answer for it, so they are in the conversation
+-- even though they have no vote in it.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.comments (community_id, event_id, membership_id, body)
+select t.community_id, t.event_id, app.my_membership_id(t.community_id),
+       'The decorator arrives at 5.'
+  from t_thread t;
+select test.eq(test.visible('select id from public.comments'), 2::bigint,
+  'staff can too, and everybody reads the whole thread');
+
+-- The person who started the thread hears about the reply.
+reset role;
+select test.ok(
+  (select count(*) from public.notifications
+    where kind = 'comment'
+      and user_id = 'abababab-abab-4bab-8bab-abababababab') > 0,
+  'and whoever raised it is told');
+
+-- A comment belongs to exactly one thing.
+-- Both subjects at once.
+select test.raises(
+  $q$insert into public.comments (community_id, event_id, suggestion_id, membership_id, body)
+     select t.community_id, t.event_id, s.id, app.my_membership_id(t.community_id), 'about two things'
+       from t_thread t
+       join public.activity_suggestions s on s.community_id = t.community_id limit 1$q$,
+  'a comment about two things at once is refused');
+-- And neither.
+select test.raises(
+  $q$insert into public.comments (community_id, event_id, suggestion_id, membership_id, body)
+     select t.community_id, null, null, app.my_membership_id(t.community_id), 'about nothing'
+       from t_thread t$q$,
+  'and so is one about nothing');
+
+-- Another society sees nothing of it.
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(test.visible('select id from public.comments'), 0::bigint,
+  'a thread does not cross societies');
+
+-- You may withdraw your own words; you may not rewrite somebody else's.
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+delete from public.comments;
+reset role;
+select test.eq((select count(*) from public.comments), 2::bigint,
+  'a passer-by deletes nothing');
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+delete from public.comments where membership_id = app.my_membership_id(
+  (select community_id from t_thread));
+reset role;
+select test.eq((select count(*) from public.comments), 1::bigint,
+  'but you can take back what you said');
+
+-- Staff can take down what should not have been said.
+select test.act_as('99999999-9999-4999-8999-999999999999');
+delete from public.comments;
+reset role;
+select test.eq((select count(*) from public.comments), 0::bigint,
+  'and staff can take down anything');
+
+-- ---------------------------------------------------------------------------
+-- The WhatsApp group link
+-- ---------------------------------------------------------------------------
+reset role;
+update public.communities set whatsapp_group_url = 'https://chat.whatsapp.com/AbCdEfGh12345678'
+ where slug = 'hill-crest';
+select test.eq(
+  (select whatsapp_group_url from public.communities where slug = 'hill-crest'),
+  'https://chat.whatsapp.com/AbCdEfGh12345678', 'a society can hold its group''s invite link');
+
+select test.raises(
+  $q$update public.communities set whatsapp_group_url = 'https://example.com/not-whatsapp'
+      where slug = 'hill-crest'$q$,
+  'and only an invite link: this is rendered as something people tap');
+select test.raises(
+  $q$update public.events set whatsapp_group_url = 'javascript:alert(1)'
+      where id = (select event_id from t_thread)$q$,
+  'an event''s link is held to the same shape');

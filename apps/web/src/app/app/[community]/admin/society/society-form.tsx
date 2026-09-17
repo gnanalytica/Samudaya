@@ -22,12 +22,14 @@ export function SocietyDetailsForm({
   address,
   pincode,
   city,
+  whatsappGroupUrl,
 }: {
   slug: string;
   name: string;
   address: string | null;
   pincode: string | null;
   city: string | null;
+  whatsappGroupUrl: string | null;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(updateSocietyDetails, EMPTY_STATE);
   return (
@@ -70,6 +72,24 @@ export function SocietyDetailsForm({
           )}
         </Field>
       </div>
+      <Field
+        label="WhatsApp group"
+        htmlFor="soc-whatsapp"
+        error={state.fieldErrors?.whatsapp_group_url}
+        hint="WhatsApp → the group → Group info → Invite via link. Every member sees a button to join."
+      >
+        {(control) => (
+          <Input
+            {...control}
+            name="whatsapp_group_url"
+            type="url"
+            inputMode="url"
+            defaultValue={whatsappGroupUrl ?? ''}
+            placeholder="https://chat.whatsapp.com/…"
+            maxLength={120}
+          />
+        )}
+      </Field>
       {state.error ? (
         <p role="alert" className="text-danger text-sm">
           {state.error}

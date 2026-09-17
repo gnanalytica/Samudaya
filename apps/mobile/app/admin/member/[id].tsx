@@ -41,7 +41,9 @@ export default function EditMember() {
     const { data: row } = await supabase
       .from('memberships')
       .select(
-        'id, role, joined_at, profiles(full_name, email), unit_occupants(relation, units(block, number))',
+        // Contact details are staff-only and come from society_people(); a plain
+        // select of profiles.email is no longer granted to any client.
+        'id, role, joined_at, profiles(full_name), unit_occupants(relation, units(block, number))',
       )
       .eq('community_id', communityId)
       .eq('id', String(id))
@@ -88,7 +90,7 @@ type MemberRow = {
   id: string;
   role: Parameters<typeof normalizeRole>[0];
   joined_at: string;
-  profiles: { full_name: string | null; email: string | null } | null;
+  profiles: { full_name: string | null } | null;
   unit_occupants: { relation: string; units: { block: string | null; number: string } | null }[];
 };
 
@@ -110,7 +112,7 @@ function MemberEditor({
   const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const name = member.profiles?.full_name ?? member.profiles?.email ?? 'This resident';
+  const name = member.profiles?.full_name ?? 'This resident';
   const flats = member.unit_occupants
     .filter((row) => row.units)
     .map((row) => `Flat ${unitLabel(row.units)} · ${row.relation}`);
@@ -159,10 +161,7 @@ function MemberEditor({
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <View style={{ gap: 2 }}>
           <Title>{name}</Title>
-          <Caption>
-            {ROLE_LABEL[current]}
-            {member.profiles?.email ? ` · ${member.profiles.email}` : ''}
-          </Caption>
+          <Caption>{ROLE_LABEL[current]}</Caption>
           {flats.map((flat) => (
             <Caption key={flat}>{flat}</Caption>
           ))}

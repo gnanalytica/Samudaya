@@ -78,6 +78,7 @@ export type Database = {
           created_at: string
           updated_at: string
           kind: string
+          resolved_at: string | null
         }
         Insert: {
           id?: string
@@ -93,6 +94,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           kind?: string
+          resolved_at?: string | null
         }
         Update: {
           id?: string
@@ -108,6 +110,7 @@ export type Database = {
           created_at?: string
           updated_at?: string
           kind?: string
+          resolved_at?: string | null
         }
         Relationships: [
           {
@@ -499,6 +502,68 @@ export type Database = {
           }
         ]
       }
+      comments: {
+        Row: {
+          id: string
+          community_id: string
+          event_id: string | null
+          suggestion_id: string | null
+          membership_id: string
+          body: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          event_id?: string | null
+          suggestion_id?: string | null
+          membership_id: string
+          body: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          event_id?: string | null
+          suggestion_id?: string | null
+          membership_id?: string
+          body?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "activity_suggestions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       communities: {
         Row: {
           id: string
@@ -525,6 +590,7 @@ export type Database = {
           pincode: string | null
           setup_completed_at: string | null
           catalogue_reviewed_at: string | null
+          whatsapp_group_url: string | null
         }
         Insert: {
           id?: string
@@ -551,6 +617,7 @@ export type Database = {
           pincode?: string | null
           setup_completed_at?: string | null
           catalogue_reviewed_at?: string | null
+          whatsapp_group_url?: string | null
         }
         Update: {
           id?: string
@@ -577,6 +644,7 @@ export type Database = {
           pincode?: string | null
           setup_completed_at?: string | null
           catalogue_reviewed_at?: string | null
+          whatsapp_group_url?: string | null
         }
         Relationships: [
           {
@@ -943,6 +1011,7 @@ export type Database = {
           kind: string
           event_type_id: string | null
           venue_id: string | null
+          whatsapp_group_url: string | null
         }
         Insert: {
           id?: string
@@ -969,6 +1038,7 @@ export type Database = {
           kind?: string
           event_type_id?: string | null
           venue_id?: string | null
+          whatsapp_group_url?: string | null
         }
         Update: {
           id?: string
@@ -995,6 +1065,7 @@ export type Database = {
           kind?: string
           event_type_id?: string | null
           venue_id?: string | null
+          whatsapp_group_url?: string | null
         }
         Relationships: [
           {
@@ -2268,6 +2339,8 @@ export type Database = {
           suggestion_id: string | null
           community_id: string | null
           interested: number | null
+          votes_for: number | null
+          votes_against: number | null
         }
         Relationships: [
 
@@ -2288,6 +2361,13 @@ export type Database = {
       }
     }
     Functions: {
+      close_suggestion_vote: {
+        Args: {
+        p_suggestion_id: string
+        p_adopt?: boolean
+      }
+        Returns: Database["public"]["Tables"]["activity_suggestions"]["Row"]
+      }
       create_invite_code: {
         Args: {
         p_community_id: string
@@ -2321,6 +2401,15 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["whatsapp_link_codes"]["Row"]
       }
+      join_request_contacts: {
+        Args: {
+        p_community_id: string
+      }
+        Returns: {
+        request_id: string | null
+        email: string | null
+      }[]
+      }
       mark_notifications_read: {
         Args: {
         p_ids?: string[]
@@ -2332,6 +2421,13 @@ export type Database = {
         p_community_id: string
       }
         Returns: undefined
+      }
+      my_contact: {
+        Args: { [_ in never]: never }
+        Returns: {
+        email: string | null
+        phone: string | null
+      }[]
       }
       normalize_invite_code: {
         Args: {
@@ -2495,7 +2591,7 @@ export type Database = {
       origin_channel: "web" | "mobile" | "whatsapp" | "api" | "system"
       payment_method: "upi" | "card" | "netbanking" | "bank_transfer" | "cash" | "cheque" | "other"
       proposal_status: "voting" | "approved" | "rejected" | "withdrawn"
-      suggestion_status: "new" | "reviewing" | "accepted" | "declined"
+      suggestion_status: "new" | "reviewing" | "accepted" | "declined" | "adopted" | "not_adopted"
       task_status: "todo" | "in_progress" | "done" | "blocked"
     }
     CompositeTypes: {

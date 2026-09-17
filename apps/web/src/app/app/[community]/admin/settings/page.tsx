@@ -71,6 +71,7 @@ export default async function SocietySettingsPage(
                 address={community.address}
                 pincode={community.pincode}
                 city={community.city}
+                whatsappGroupUrl={community.whatsapp_group_url}
               />
             </CardBody>
           </Card>

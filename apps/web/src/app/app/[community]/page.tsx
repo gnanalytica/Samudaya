@@ -23,6 +23,7 @@ import { getTodoItems } from '@/lib/todo';
 import { getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
+import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
 import { PageBody } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
@@ -64,9 +65,12 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     next?.event_type_id ? typeLabel.get(next.event_type_id) : null,
     next?.name,
   );
-  // Only the headline number: the page that holds them does the rest.
-  const societyIdeas = (await getSocietySuggestions(community.id, membership.id)).filter(
-    (row) => row.status === 'accepted',
+  const societySuggestions = await getSocietySuggestions(community.id, membership.id);
+  const societyIdeas = societySuggestions.filter((row) => row.status === 'accepted').length;
+  // Voting is the best thing in the app and it was four taps down. This is what
+  // is waiting on you — a vote you have not cast — rather than what exists.
+  const needsMySay = societySuggestions.filter(
+    (row) => row.status === 'accepted' && row.myVote === null,
   ).length;
 
   return (
@@ -104,6 +108,19 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
             <span className="text-ink flex items-center gap-2 text-sm font-medium">
               <ClipboardCheck className="text-warning size-5" aria-hidden="true" />
               {COPY.todo}: {todo.length} {todo.length === 1 ? 'thing needs' : 'things need'} you
+            </span>
+            <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
+          </Link>
+        ) : null}
+
+        {needsMySay && can(role, 'vote') ? (
+          <Link
+            href={`${base}/suggest`}
+            className="border-accent/40 bg-surface-raised hover:bg-surface-sunken mb-5 flex items-center justify-between gap-3 rounded-xl border p-4"
+          >
+            <span className="text-ink flex items-center gap-2 text-sm font-medium">
+              <Lightbulb className="text-accent size-5" aria-hidden="true" />
+              {needsMySay} {needsMySay === 1 ? 'idea is' : 'ideas are'} waiting for your vote
             </span>
             <ArrowRight className="text-ink-subtle size-4" aria-hidden="true" />
           </Link>
@@ -250,6 +267,15 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               })}
             </div>
           </>
+        ) : null}
+
+        {community.whatsapp_group_url ? (
+          <div className="mt-8">
+            <WhatsappGroupLink
+              url={community.whatsapp_group_url}
+              label={`Join the ${community.name} WhatsApp group`}
+            />
+          </div>
         ) : null}
 
         {/* Raising money was the only thing a resident could start from here.

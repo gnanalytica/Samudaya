@@ -25,6 +25,8 @@ const SUGGESTION_STATUS = {
   reviewing: 'With the committee',
   accepted: 'Open for voting',
   declined: 'Declined',
+  adopted: 'Adopted',
+  not_adopted: 'Not adopted',
 } as const;
 
 export default async function MyActivityPage(props: PageProps<'/app/[community]/me'>) {
@@ -189,9 +191,9 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                     </div>
                     <Badge
                       tone={
-                        row.status === 'accepted'
+                        row.status === 'accepted' || row.status === 'adopted'
                           ? 'success'
-                          : row.status === 'declined'
+                          : row.status === 'declined' || row.status === 'not_adopted'
                             ? 'neutral'
                             : 'warning'
                       }

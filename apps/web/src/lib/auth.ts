@@ -48,12 +48,29 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
+/**
+ * Your own profile, contact details included.
+ *
+ * `select('*')` stopped working when 0918.0100 took email and phone away from
+ * `authenticated`: a row policy cannot say "these two columns are different",
+ * so column privileges do it instead. my_contact() hands back your own two,
+ * and only ever your own, which is why this still returns a whole Profile.
+ */
 export const getProfile = cache(async (): Promise<Profile | null> => {
   const user = await getCurrentUser();
   if (!user) return null;
   const supabase = await getSupabase();
-  const { data } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle();
-  return data;
+  const [{ data: profile }, { data: contact }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, locale, is_platform_admin, created_at, updated_at')
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabase.rpc('my_contact'),
+  ]);
+  if (!profile) return null;
+  const mine = contact?.[0];
+  return { ...profile, email: mine?.email ?? null, phone: mine?.phone ?? null };
 });
 
 /** Every community the signed-in user belongs to, newest membership first. */

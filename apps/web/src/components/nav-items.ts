@@ -55,7 +55,6 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
           label: COPY.todo,
           icon: ClipboardCheck,
           capability: 'events:manage',
-          primary: true,
           badge: 'todo',
         },
         {
@@ -64,7 +63,6 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
           shortLabel: COPY.manage,
           icon: CalendarCog,
           capability: 'events:manage',
-          primary: true,
         },
         {
           href: `${base}/admin/settings`,
@@ -88,18 +86,17 @@ export function visibleNav(slug: string, role: MemberRole) {
 }
 
 /**
- * Bottom bar order: the resident's screens, with To do and Manage before Me.
- * Staff and the committee already carry two extra tabs, so People drops out of
- * their bar rather than squeezing six across a phone — the sidebar and the
- * console both still link it.
+ * Four tabs, the same four for everybody: Home, Events, People, Me.
+ *
+ * It used to be six for staff, which did not fit, so People was dropped from
+ * their bar — the nav quietly telling us it was full. To do and the event
+ * console are not places you navigate to; they are work waiting, and Home says
+ * so at the top and links straight through. A resident and a committee member
+ * now see the same shape of app, which is the whole idea: the role changes
+ * what you may do, not where things live.
  */
 export function bottomNavItems(slug: string, role: MemberRole) {
-  const groups = visibleNav(slug, role);
-  const manages = groups.some((group) => group.section === COPY.manage);
-  const items = groups
+  return visibleNav(slug, role)
     .flatMap((group) => group.items)
-    .filter((item) => item.primary)
-    .filter((item) => !(manages && item.href === `/app/${slug}/people`));
-  const me = items.filter((item) => item.href === `/app/${slug}/me`);
-  return [...items.filter((item) => item.href !== `/app/${slug}/me`), ...me];
+    .filter((item) => item.primary);
 }

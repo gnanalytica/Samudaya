@@ -51,15 +51,7 @@ import {
   type Pickers,
 } from './forms';
 import { removeBudgetLine, setEventStatus, updateActivity, updateBudgetLine } from '../actions';
-
-const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'budget', label: 'Budget' },
-  { key: 'activities', label: 'Activities' },
-  { key: 'bills', label: 'Bills' },
-  { key: 'payments', label: 'Payments' },
-  { key: 'close', label: 'Close' },
-] as const;
+import { EventTabs, eventTabsFor } from '@/components/event-tabs';
 
 export default async function ManageEventPage(
   props: PageProps<'/app/[community]/admin/events/[event]'>,
@@ -71,12 +63,12 @@ export default async function ManageEventPage(
   const supabase = await getSupabase();
 
   const isCommittee = can(role, 'expenses:approve');
-  const tabs = TABS.filter((t) => t.key !== 'close' || can(role, 'events:close')).filter(
-    (t) => event.kind !== 'campaign' || (t.key !== 'budget' && t.key !== 'activities'),
+  // The same list the event page renders, so one strip spans both routes.
+  const tabs = eventTabsFor({ role, kind: event.kind, status: event.status }).filter(
+    (t) => t.admin,
   );
-  const active = tabs.find((t) => t.key === tab)?.key ?? 'overview';
+  const active = tabs.find((t) => t.id === tab)?.id ?? 'overview';
   const base = `/app/${community.slug}`;
-  const here = `${base}/admin/events/${event.slug}`;
 
   const [stats, budget, expenses, activities, registrations, payments, units, catalogue] =
     await Promise.all([
@@ -161,30 +153,15 @@ export default async function ManageEventPage(
           All events
         </Link>
 
-        <nav
-          aria-label="Event sections"
-          className="border-border-base bg-surface-raised mb-5 flex gap-1 overflow-x-auto rounded-lg border p-1 text-sm"
-        >
-          {tabs.map((t) => (
-            <Link
-              key={t.key}
-              href={`${here}?tab=${t.key}`}
-              aria-current={active === t.key ? 'page' : undefined}
-              className={
-                active === t.key
-                  ? 'bg-surface-sunken text-ink rounded-md px-3 py-1.5 font-medium whitespace-nowrap'
-                  : 'text-ink-muted hover:text-ink rounded-md px-3 py-1.5 whitespace-nowrap'
-              }
-            >
-              {t.label}
-              {t.key === 'bills' && open.length ? (
-                <span className="bg-warning/20 text-warning ml-1.5 rounded-full px-1.5 text-xs">
-                  {open.length}
-                </span>
-              ) : null}
-            </Link>
-          ))}
-        </nav>
+        <EventTabs
+          base={base}
+          eventSlug={event.slug}
+          active={active}
+          role={role}
+          kind={event.kind}
+          status={event.status}
+          counts={{ bills: open.length }}
+        />
 
         {active === 'overview' ? (
           <div className="space-y-5">

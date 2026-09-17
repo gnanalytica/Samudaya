@@ -308,6 +308,23 @@ export function CreateEventForm({
                 </Field>
               </div>
               <Field
+                label="WhatsApp group"
+                htmlFor="ne-whatsapp"
+                error={state.fieldErrors?.whatsapp_group_url}
+                hint="If you made a group for this event, paste its invite link and everyone gets a button to join."
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    name="whatsapp_group_url"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://chat.whatsapp.com/…"
+                    maxLength={120}
+                  />
+                )}
+              </Field>
+              <Field
                 label="If money is left over"
                 htmlFor="ne-fund-rule"
                 hint="Decided now, before anyone pays, so nobody argues over a surplus later."

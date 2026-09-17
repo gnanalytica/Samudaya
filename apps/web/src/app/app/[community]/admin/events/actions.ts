@@ -10,6 +10,7 @@ import {
   createEventSchema,
   createExpenseSchema,
   eventSlug as makeEventSlug,
+  optionalWhatsappGroup,
   paymentMethodSchema,
   reviewExpenseSchema,
   uuid,
@@ -74,6 +75,7 @@ function eventFields(formData: FormData) {
     expected_attendance: formData.get('expected_attendance') || undefined,
     fund_rule: formData.get('fund_rule') || DEFAULT_FUND_RULE,
     fund_rule_note: formData.get('fund_rule_note') || undefined,
+    whatsapp_group_url: formData.get('whatsapp_group_url') ?? '',
   };
 }
 
@@ -226,6 +228,7 @@ const updateEventSchema = z.object({
   venue: z.string().trim().max(140).nullable(),
   organizer: z.string().trim().max(140).nullable(),
   description: z.string().trim().max(5000).nullable(),
+  whatsapp_group_url: optionalWhatsappGroup,
 });
 
 export async function updateEventDetails(
@@ -249,6 +252,7 @@ export async function updateEventDetails(
     venue: venue.label,
     organizer: String(formData.get('organizer') ?? '').trim() || null,
     description: String(formData.get('description') ?? '').trim() || null,
+    whatsapp_group_url: formData.get('whatsapp_group_url') ?? '',
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
   if (parsed.data.ends_on && parsed.data.ends_on < parsed.data.starts_on) {

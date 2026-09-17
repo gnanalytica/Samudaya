@@ -113,6 +113,7 @@ export function EventDetailsForm({
     event_type_id: string | null;
     organizer: string | null;
     description: string | null;
+    whatsapp_group_url: string | null;
   };
 }) {
   const [state, action] = useActionState<ActionState, FormData>(updateEventDetails, EMPTY_STATE);
@@ -182,6 +183,24 @@ export function EventDetailsForm({
           )}
         </Field>
       </div>
+      <Field
+        label="WhatsApp group"
+        htmlFor="ev-whatsapp"
+        error={state.fieldErrors?.whatsapp_group_url}
+        hint="WhatsApp → the group → Group info → Invite via link. Members get a button to join."
+      >
+        {(control) => (
+          <Input
+            {...control}
+            name="whatsapp_group_url"
+            type="url"
+            inputMode="url"
+            defaultValue={event.whatsapp_group_url ?? ''}
+            placeholder="https://chat.whatsapp.com/…"
+            maxLength={120}
+          />
+        )}
+      </Field>
       <Field label="Description" htmlFor="ev-desc">
         {(control) => (
           <Textarea {...control} name="description" defaultValue={event.description ?? ''} />
