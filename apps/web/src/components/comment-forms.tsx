@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
+import { useResetOnSuccess } from '@/lib/use-reset-on-success';
 import { deleteComment, postComment } from '@/app/app/[community]/events/actions';
 import type { CommentSubject } from './comment-thread';
 
@@ -29,17 +30,10 @@ export function CommentForm({
   eventSlug?: string;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(postComment, EMPTY_STATE);
-  const ref = useRef<HTMLFormElement>(null);
+  const ref = useResetOnSuccess(state);
 
   return (
-    <form
-      ref={ref}
-      action={async (formData) => {
-        await action(formData);
-        ref.current?.reset();
-      }}
-      className="space-y-2"
-    >
+    <form ref={ref} action={action} className="space-y-2">
       <input type="hidden" name="slug" value={slug} />
       {eventSlug ? <input type="hidden" name="event" value={eventSlug} /> : null}
       {'eventId' in subject ? (

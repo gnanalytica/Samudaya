@@ -139,8 +139,17 @@ export type ViewMode = 'committee' | 'resident';
 
 export const VIEW_MODE_LABEL: Record<ViewMode, string> = {
   committee: 'Committee view',
-  resident: 'Resident view',
+  resident: 'Resident preview',
 };
+
+/**
+ * Said wherever the preview is on. "Resident view" read as though the committee
+ * member had become a resident, which they have not: this only changes which
+ * screens and controls are offered. requireCapability() and row-level security
+ * both still answer to the real role, so an admin URL typed by hand still opens.
+ */
+export const VIEW_MODE_PREVIEW_NOTE =
+  'You are seeing what residents see. Your committee permissions are unchanged.';
 
 export const canSwitchView = (role: MemberRole | null | undefined) => isCommittee(role);
 

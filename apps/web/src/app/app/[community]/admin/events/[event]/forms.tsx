@@ -1,12 +1,12 @@
 'use client';
 
 import { COPY, todayIn } from '@samudaya/core';
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
-import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
+import { EMPTY_STATE, wasAccepted, type ActionState } from '@/lib/action-state';
 import { FileUpload } from '@/components/file-upload';
 import { CatalogueSelect, type PickerItem } from '@/components/catalogue-select';
 import {
@@ -66,14 +66,30 @@ export function Feedback({ state }: { state: ActionState }) {
  */
 function useResettingAction(fn: (prev: ActionState, formData: FormData) => Promise<ActionState>) {
   const [state, action] = useActionState<ActionState, FormData>(fn, EMPTY_STATE);
+  const [seen, setSeen] = useState(state);
   const [version, setVersion] = useState(0);
   const ref = useRef<HTMLFormElement>(null);
-  const wrapped = async (formData: FormData) => {
-    await action(formData);
-    ref.current?.reset();
-    setVersion((current) => current + 1);
-  };
-  return { state, action: wrapped, ref, version };
+
+  // Only a submit the server accepted clears the form. It used to clear in the
+  // wrapper right after awaiting the action, which runs either way — so a
+  // rejected budget line or activity was wiped from the fields it would have to
+  // be retyped into, with the error sitting above them.
+  //
+  // The counter advances during render rather than from an effect: bumping a key
+  // is adjusting state to new input, not synchronising with the outside world,
+  // and doing it in an effect costs a second commit. useActionState returns a
+  // fresh object per submit, so a second success still counts.
+  if (seen !== state) {
+    setSeen(state);
+    if (wasAccepted(state)) setVersion((current) => current + 1);
+  }
+
+  // Emptying the fields is a DOM change, so that part does belong here.
+  useEffect(() => {
+    if (wasAccepted(state)) ref.current?.reset();
+  }, [state]);
+
+  return { state, action, ref, version };
 }
 
 /** The catalogue items a form's pickers offer, and where staff can edit them. */

@@ -1,10 +1,12 @@
 'use client';
 
-import { useActionState, useRef } from 'react';
+import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
+import { FocusFirstError } from '@/components/focus-first-error';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
+import { useResetOnSuccess } from '@/lib/use-reset-on-success';
 import { suggestToSociety } from '../events/actions';
 
 function Submit() {
@@ -23,17 +25,11 @@ function Submit() {
  */
 export function SocietySuggestionForm({ slug }: { slug: string }) {
   const [state, action] = useActionState<ActionState, FormData>(suggestToSociety, EMPTY_STATE);
-  const ref = useRef<HTMLFormElement>(null);
+  const ref = useResetOnSuccess(state);
 
   return (
-    <form
-      ref={ref}
-      action={async (formData) => {
-        await action(formData);
-        ref.current?.reset();
-      }}
-      className="space-y-3"
-    >
+    <form ref={ref} action={action} className="space-y-3">
+      <FocusFirstError signal={state} />
       <input type="hidden" name="slug" value={slug} />
       <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
         <Field label="Type" htmlFor="ss-kind">
@@ -50,7 +46,6 @@ export function SocietySuggestionForm({ slug }: { slug: string }) {
               {...control}
               name="name"
               placeholder="Weekly badminton on the terrace"
-              required
               maxLength={120}
             />
           )}

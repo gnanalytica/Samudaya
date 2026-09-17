@@ -1,11 +1,12 @@
 'use client';
 
-import { useActionState, useRef, useState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
+import { useResetOnSuccess } from '@/lib/use-reset-on-success';
 import { registerForActivity, suggestForEvent } from '../actions';
 
 function Submit({ label, busy }: { label: string; busy: string }) {
@@ -54,17 +55,10 @@ export function RegisterForm({
 }) {
   const [state, action] = useActionState<ActionState, FormData>(registerForActivity, EMPTY_STATE);
   const [forFamily, setForFamily] = useState(selfRegistered);
-  const ref = useRef<HTMLFormElement>(null);
+  const ref = useResetOnSuccess(state);
 
   return (
-    <form
-      ref={ref}
-      action={async (formData) => {
-        await action(formData);
-        ref.current?.reset();
-      }}
-      className="space-y-3"
-    >
+    <form ref={ref} action={action} className="space-y-3">
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="event" value={eventSlug} />
       <input type="hidden" name="activity_id" value={activityId} />
@@ -125,16 +119,9 @@ export function SuggestionForm({
   eventId: string;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(suggestForEvent, EMPTY_STATE);
-  const ref = useRef<HTMLFormElement>(null);
+  const ref = useResetOnSuccess(state);
   return (
-    <form
-      ref={ref}
-      action={async (formData) => {
-        await action(formData);
-        ref.current?.reset();
-      }}
-      className="space-y-3"
-    >
+    <form ref={ref} action={action} className="space-y-3">
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="event" value={eventSlug} />
       <input type="hidden" name="event_id" value={eventId} />

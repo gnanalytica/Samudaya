@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { ROLE_LABEL, ASSIGNABLE_ROLES, type Role } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,18 @@ import { Select } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
 import { changeMemberRole, removeMember } from './actions';
 
-function Submit({ label, variant }: { label: string; variant?: 'secondary' | 'ghost' }) {
+function Submit({
+  label,
+  variant,
+  disabled,
+}: {
+  label: string;
+  variant?: 'secondary' | 'ghost';
+  disabled?: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" size="sm" variant={variant} disabled={pending}>
+    <Button type="submit" size="sm" variant={variant} disabled={pending || disabled}>
       {pending ? '…' : label}
     </Button>
   );
@@ -47,6 +55,12 @@ export function RoleForm({
   name: string;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(changeMemberRole, EMPTY_STATE);
+  // Save stays inert until the dropdown actually moves. Sitting live next to
+  // every name in a scrollable table, it was one stray click from a role change
+  // nobody meant to make — and a no-op save that still said "saved" taught you
+  // the button was harmless.
+  const [choice, setChoice] = useState<Role>(role);
+
   return (
     <form action={action}>
       <input type="hidden" name="slug" value={slug} />
@@ -58,7 +72,8 @@ export function RoleForm({
         <Select
           id={`role-${membershipId}`}
           name="role"
-          defaultValue={role}
+          value={choice}
+          onChange={(event) => setChoice(event.target.value as Role)}
           className="h-8 w-32 py-1 text-xs"
         >
           {ASSIGNABLE_ROLES.map((option) => (
@@ -67,7 +82,7 @@ export function RoleForm({
             </option>
           ))}
         </Select>
-        <Submit label="Save" variant="secondary" />
+        <Submit label="Save" variant="secondary" disabled={choice === role} />
       </div>
       <Message state={state} />
     </form>

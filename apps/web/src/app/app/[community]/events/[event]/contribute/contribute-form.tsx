@@ -9,6 +9,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { Card, CardBody } from '@/components/ui/card';
 import { FileUpload } from '@/components/file-upload';
+import { FocusFirstError } from '@/components/focus-first-error';
 import { contribute, type ContributeState } from '../../actions';
 
 const PRESETS = [500, 1001, 2001, 5001];
@@ -201,13 +202,23 @@ export function ContributeForm({
                 <dd className="text-ink font-mono break-all">{note}</dd>
               </div>
             </dl>
+            {/* Most residents pay from the phone they are reading this on, where
+                "scan the QR code with your phone" is nonsense. Branched with CSS
+                rather than a viewport check, so the server and the client render
+                the same markup. */}
             <p className="text-ink-subtle text-xs">
-              On a computer, scan the QR code with your phone. You pay {upi.payeeName} directly;
-              Samudaya never handles the money.
+              <span className="sm:hidden">
+                On this phone, tap Open UPI app or copy the UPI ID above.
+              </span>
+              <span className="hidden sm:inline">
+                On a computer, scan the QR code with your phone.
+              </span>{' '}
+              You pay {upi.payeeName} directly; Samudaya never handles the money.
             </p>
           </section>
 
           <form action={action} className="space-y-4" aria-labelledby="report-heading">
+            <FocusFirstError signal={state} />
             <h2 id="report-heading" className="text-ink text-sm font-semibold">
               3. Tell us it’s done
             </h2>
@@ -229,7 +240,6 @@ export function ContributeForm({
                   inputMode="numeric"
                   autoComplete="off"
                   placeholder="612345678901"
-                  required
                 />
               )}
             </Field>
@@ -255,7 +265,10 @@ export function ContributeForm({
               </p>
             ) : null}
 
-            <Submit disabled={uploading || !amount} />
+            {/* Only the upload blocks the button. Missing an amount used to
+                disable it too, which said nothing about why — the action
+                answers that in the same branded style as every other error. */}
+            <Submit disabled={uploading} />
             <p className="text-ink-subtle text-center text-xs">
               It shows as waiting until staff confirm it against the bank statement.
             </p>

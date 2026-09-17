@@ -13,6 +13,21 @@ export type ActionState = {
 
 export const EMPTY_STATE: ActionState = {};
 
+/**
+ * Did the server take it?
+ *
+ * Not `Boolean(state.success)`: that message is optional, and the actions that
+ * skip it are the ones whose result is already visible — postComment returns
+ * EMPTY_STATE because the comment itself appears in the thread, and "Posted."
+ * underneath would just be noise. Acceptance is the absence of anything to fix.
+ *
+ * True of EMPTY_STATE too, which is what a form starts on. Callers use this to
+ * decide whether to clear a form, and clearing an untouched one is a no-op.
+ */
+export function wasAccepted(state: ActionState): boolean {
+  return !state.error && !state.fieldErrors;
+}
+
 /** First message per field — showing three complaints about one input is noise. */
 export function fieldErrors(error: ZodError): Record<string, string> {
   const out: Record<string, string> = {};

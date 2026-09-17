@@ -233,8 +233,11 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                     <div className="flex items-start gap-2.5">
                       <Users className="text-ink-subtle mt-0.5 size-4" aria-hidden="true" />
                       <div>
+                        {/* The label lives in the dt like every other row here. It
+                            used to be repeated in the value too, which a screen
+                            reader read back as "Organised by Organised by …". */}
                         <dt className="sr-only">Organised by</dt>
-                        <dd className="text-ink">Organised by {event.organizer}</dd>
+                        <dd className="text-ink">{event.organizer}</dd>
                       </div>
                     </div>
                   ) : null}

@@ -1,5 +1,5 @@
 import { View } from 'react-native';
-import { VIEW_MODE_LABEL } from '@samudaya/core';
+import { VIEW_MODE_LABEL, VIEW_MODE_PREVIEW_NOTE } from '@samudaya/core';
 import { useAuth } from '../lib/auth';
 import { spacing } from '../lib/theme';
 import { Body, Button, Caption, Card, Heading } from './ui';
@@ -18,8 +18,8 @@ export function ViewSwitchCard() {
       <View style={{ gap: 2 }}>
         <Heading>What you see</Heading>
         <Caption>
-          Resident view hides Manage so you see the app the way your neighbours do. You keep every
-          committee permission.
+          {VIEW_MODE_LABEL.resident} hides Manage so you see the app the way your neighbours do. You
+          keep every committee permission.
         </Caption>
       </View>
       <ChipRow>
@@ -44,7 +44,9 @@ export function ResidentViewBanner() {
   if (viewMode !== 'resident') return null;
   return (
     <Card style={{ gap: spacing.sm }}>
-      <Body>{VIEW_MODE_LABEL.resident}: you’re seeing what residents see.</Body>
+      <Body>
+        {VIEW_MODE_LABEL.resident}. {VIEW_MODE_PREVIEW_NOTE}
+      </Body>
       <Button
         label="Back to committee view"
         variant="secondary"

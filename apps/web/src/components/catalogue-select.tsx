@@ -111,7 +111,7 @@ export function CatalogueSelect({
           {placeholder}
         </option>
         {defaultLabel && !knownDefault && !legacy ? (
-          <option value="__legacy">{defaultLabel} (not in the catalogue)</option>
+          <option value="__legacy">{defaultLabel} (kept from before)</option>
         ) : null}
         {options.map((item) => (
           <option key={item.id} value={item.id}>
@@ -132,6 +132,15 @@ export function CatalogueSelect({
           {control}
         </Field>
       )}
+      {/* "(not in the catalogue)" read like a complaint about the committee's own
+          data. It is just a value typed before the catalogue had this entry, and
+          it keeps working — so say that, next to the button that files it. */}
+      {value === '__legacy' && defaultLabel ? (
+        <p className="text-ink-subtle text-xs">
+          Typed in before this was in the catalogue. It still works
+          {allowQuickAdd ? ', or add it below to reuse it next time' : ''}.
+        </p>
+      ) : null}
       {allowQuickAdd || manageHref ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
           {allowQuickAdd && !adding ? (
