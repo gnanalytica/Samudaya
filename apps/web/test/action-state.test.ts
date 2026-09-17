@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { friendlyDbError } from '@/lib/action-state';
+import { EMPTY_STATE, friendlyDbError, wasAccepted } from '@/lib/action-state';
 
 describe('friendlyDbError', () => {
   it('never tells someone to retry a function the database does not have', () => {
@@ -44,5 +44,34 @@ describe('friendlyDbError', () => {
     });
     expect(message).toBe('Something went wrong. Please try again.');
     expect(message).not.toMatch(/secrets|relation/i);
+  });
+});
+
+describe('wasAccepted', () => {
+  it('treats a fresh form as accepted, so clearing it is a no-op', () => {
+    expect(wasAccepted(EMPTY_STATE)).toBe(true);
+  });
+
+  it('accepts a result with no message, which is how postComment answers', () => {
+    // The comment appears in the thread on revalidation. A "Posted." line
+    // underneath would be noise, so success is silent — and a form that keyed
+    // off the message would have stopped clearing itself.
+    expect(wasAccepted({})).toBe(true);
+  });
+
+  it('accepts a result that does carry a message', () => {
+    expect(wasAccepted({ success: 'Activity added.' })).toBe(true);
+  });
+
+  it('refuses a form-wide error', () => {
+    expect(wasAccepted({ error: 'That event no longer exists.' })).toBe(false);
+  });
+
+  it('refuses field errors, so a rejected form keeps what was typed', () => {
+    expect(wasAccepted({ fieldErrors: { name: 'Give it a name.' } })).toBe(false);
+  });
+
+  it('refuses when a message and an error somehow arrive together', () => {
+    expect(wasAccepted({ success: 'Saved.', error: 'But not really.' })).toBe(false);
   });
 });

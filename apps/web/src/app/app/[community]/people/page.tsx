@@ -5,10 +5,12 @@ import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ButtonLink } from '@/components/ui/button';
+import { Input, Select } from '@/components/ui/field';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RemoveForm, RoleForm } from './member-controls';
 import { PeopleTabs } from './people-tabs';
+import { ROLE_FILTERS, filterPeople, roleFilterFrom } from '@/lib/people-filter';
 
 export const metadata = { title: 'People' };
 
@@ -23,6 +25,7 @@ export const metadata = { title: 'People' };
  */
 export default async function PeoplePage(props: PageProps<'/app/[community]/people'>) {
   const { community: slug } = await props.params;
+  const { q, role: roleFilter } = await props.searchParams;
   const { community, role, membership: me } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
@@ -50,6 +53,14 @@ export default async function PeoplePage(props: PageProps<'/app/[community]/peop
     staff: rows.filter((m) => m.role === 'staff').length,
     committee: rows.filter((m) => m.role === 'committee').length,
   };
+
+  // A GET form rather than a client filter: it survives a reload, it can be
+  // linked to, and it works before any JavaScript does — the same bargain the
+  // rest of this app makes.
+  const query = typeof q === 'string' ? q : '';
+  const wanted = roleFilterFrom(roleFilter);
+  const shown = filterPeople(rows, { query, role: wanted, canSeeContact: staff });
+  const filtered = Boolean(query.trim() || wanted);
 
   return (
     <>
@@ -85,85 +96,152 @@ export default async function PeoplePage(props: PageProps<'/app/[community]/peop
             }
           />
           {rows.length ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-border-base text-ink-subtle border-b text-left text-xs tracking-wide uppercase">
-                    <th scope="col" className="px-5 py-2.5 font-medium">
-                      Name
-                    </th>
-                    <th scope="col" className="px-5 py-2.5 font-medium">
-                      Flat
-                    </th>
-                    <th scope="col" className="px-5 py-2.5 font-medium">
-                      Role
-                    </th>
-                    {staff ? (
+            <>
+              <form
+                method="get"
+                role="search"
+                className="border-border-base flex flex-wrap items-end gap-2 border-b px-5 pb-4"
+              >
+                <div className="min-w-44 flex-1">
+                  <label htmlFor="people-q" className="text-ink mb-1.5 block text-sm font-medium">
+                    Find someone
+                  </label>
+                  <Input
+                    id="people-q"
+                    name="q"
+                    type="search"
+                    defaultValue={query}
+                    placeholder={staff ? 'Name, flat or phone' : 'Name or flat'}
+                    className="h-9 py-1"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="people-role"
+                    className="text-ink mb-1.5 block text-sm font-medium"
+                  >
+                    Role
+                  </label>
+                  <Select
+                    id="people-role"
+                    name="role"
+                    defaultValue={wanted ?? ''}
+                    className="h-9 w-36 py-1"
+                  >
+                    <option value="">Everyone</option>
+                    {ROLE_FILTERS.map((option) => (
+                      <option key={option} value={option}>
+                        {ROLE_LABEL[option]} ({counts[option]})
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <Button type="submit" size="sm" variant="secondary" className="h-9">
+                  Search
+                </Button>
+                {filtered ? (
+                  <ButtonLink
+                    href={`/app/${community.slug}/people`}
+                    size="sm"
+                    variant="ghost"
+                    className="h-9"
+                  >
+                    Clear
+                  </ButtonLink>
+                ) : null}
+                {filtered ? (
+                  <p role="status" className="text-ink-subtle basis-full text-xs">
+                    {shown.length} of {rows.length} people
+                  </p>
+                ) : null}
+              </form>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-border-base text-ink-subtle border-b text-left text-xs tracking-wide uppercase">
                       <th scope="col" className="px-5 py-2.5 font-medium">
-                        <span className="sr-only">Actions</span>
+                        Name
                       </th>
-                    ) : null}
-                  </tr>
-                </thead>
-                <tbody className="divide-border-base divide-y">
-                  {rows.map((member) => {
-                    const name = member.full_name ?? 'Unnamed';
-                    const flat = member.flat
-                      ? member.relation
-                        ? `${member.flat} (${member.relation})`
-                        : member.flat
-                      : '—';
-                    const isMe = member.membership_id === me.id;
-                    const removable = staff && !isMe && (committee || member.role === 'resident');
-                    // Null for residents: society_people() never hands them out.
-                    const contact = [member.phone, member.email].filter(Boolean).join(' · ');
+                      <th scope="col" className="px-5 py-2.5 font-medium">
+                        Flat
+                      </th>
+                      <th scope="col" className="px-5 py-2.5 font-medium">
+                        Role
+                      </th>
+                      {staff ? (
+                        <th scope="col" className="px-5 py-2.5 font-medium">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      ) : null}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-border-base divide-y">
+                    {shown.map((member) => {
+                      const name = member.full_name ?? 'Unnamed';
+                      const flat = member.flat
+                        ? member.relation
+                          ? `${member.flat} (${member.relation})`
+                          : member.flat
+                        : '—';
+                      const isMe = member.membership_id === me.id;
+                      const removable = staff && !isMe && (committee || member.role === 'resident');
+                      // Null for residents: society_people() never hands them out.
+                      const contact = [member.phone, member.email].filter(Boolean).join(' · ');
 
-                    return (
-                      <tr key={member.membership_id} className="align-top">
-                        <td className="px-5 py-3">
-                          <p className="text-ink font-medium">
-                            {name}
-                            {isMe ? (
-                              <span className="text-ink-subtle font-normal"> (you)</span>
-                            ) : null}
-                          </p>
-                          {contact ? <p className="text-ink-subtle text-xs">{contact}</p> : null}
-                          <p className="text-ink-subtle text-xs">
-                            joined {relativeTime(member.joined_at)}
-                          </p>
-                        </td>
-                        <td className="text-ink-muted px-5 py-3">{flat}</td>
-                        <td className="px-5 py-3">
-                          {committee && !isMe ? (
-                            <RoleForm
-                              slug={slug}
-                              membershipId={member.membership_id}
-                              role={member.role}
-                              name={name}
-                            />
-                          ) : (
-                            <Badge tone={member.role === 'resident' ? 'neutral' : 'brand'}>
-                              {ROLE_LABEL[member.role]}
-                            </Badge>
-                          )}
-                        </td>
-                        {staff ? (
-                          <td className="px-5 py-3 text-right">
-                            {removable ? (
-                              <RemoveForm
+                      return (
+                        <tr key={member.membership_id} className="align-top">
+                          <td className="px-5 py-3">
+                            <p className="text-ink font-medium">
+                              {name}
+                              {isMe ? (
+                                <span className="text-ink-subtle font-normal"> (you)</span>
+                              ) : null}
+                            </p>
+                            {contact ? <p className="text-ink-subtle text-xs">{contact}</p> : null}
+                            <p className="text-ink-subtle text-xs">
+                              joined {relativeTime(member.joined_at)}
+                            </p>
+                          </td>
+                          <td className="text-ink-muted px-5 py-3">{flat}</td>
+                          <td className="px-5 py-3">
+                            {committee && !isMe ? (
+                              <RoleForm
                                 slug={slug}
                                 membershipId={member.membership_id}
+                                role={member.role}
                                 name={name}
                               />
-                            ) : null}
+                            ) : (
+                              <Badge tone={member.role === 'resident' ? 'neutral' : 'brand'}>
+                                {ROLE_LABEL[member.role]}
+                              </Badge>
+                            )}
                           </td>
-                        ) : null}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          {staff ? (
+                            <td className="px-5 py-3 text-right">
+                              {removable ? (
+                                <RemoveForm
+                                  slug={slug}
+                                  membershipId={member.membership_id}
+                                  name={name}
+                                />
+                              ) : null}
+                            </td>
+                          ) : null}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {shown.length === 0 ? (
+                  <EmptyState
+                    icon={<Users className="size-6" />}
+                    title="Nobody matches that"
+                    description="Try a different name, flat or role."
+                  />
+                ) : null}
+              </div>
+            </>
           ) : (
             <EmptyState
               icon={<Users className="size-6" />}

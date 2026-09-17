@@ -1,5 +1,5 @@
 import { Eye } from 'lucide-react';
-import { VIEW_MODE_LABEL, type ViewMode } from '@samudaya/core';
+import { VIEW_MODE_LABEL, VIEW_MODE_PREVIEW_NOTE, type ViewMode } from '@samudaya/core';
 import { switchView } from '@/app/app/[community]/view-actions';
 import { cn } from '@/lib/utils';
 
@@ -43,9 +43,12 @@ export function ViewSwitch({ slug, mode }: { slug: string; mode: ViewMode }) {
 export function ResidentViewBanner({ slug }: { slug: string }) {
   return (
     <div className="border-border-base bg-accent/10 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2 text-sm md:px-6">
-      <p className="text-ink flex items-center gap-2">
-        <Eye className="size-4 shrink-0" aria-hidden="true" />
-        {VIEW_MODE_LABEL.resident}: you’re seeing what residents see.
+      <p className="text-ink flex items-start gap-2">
+        <Eye className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        <span>
+          <strong className="font-semibold">{VIEW_MODE_LABEL.resident}.</strong>{' '}
+          {VIEW_MODE_PREVIEW_NOTE}
+        </span>
       </p>
       <form action={switchView}>
         <input type="hidden" name="slug" value={slug} />
