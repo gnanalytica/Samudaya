@@ -27,6 +27,27 @@ export const residentPhoneSchema = z
   .transform((value) => (/^[6-9]\d{9}$/.test(value) ? `+91${value}` : value))
   .pipe(phoneSchema);
 
+/**
+ * A WhatsApp group invite link, and nothing else.
+ *
+ * Societies run on WhatsApp and every festival spawns another group; the app
+ * holds the link rather than trying to replace the group. It is rendered as
+ * something people tap, so it must not be a place to park an arbitrary URL —
+ * the same shape is enforced by a check constraint where it lands.
+ */
+export const whatsappGroupSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]{10,40}$/,
+    'Paste the invite link from WhatsApp → Group info → Invite via link',
+  );
+
+/** Empty means "no group", which is different from a link that is wrong. */
+export const optionalWhatsappGroup = whatsappGroupSchema
+  .optional()
+  .or(z.literal('').transform(() => null));
+
 export const memberRoleSchema = z.enum(['resident', 'staff', 'committee']);
 /** Every role can be assigned; the database keeps at least one committee member. */
 export const assignableRoleSchema = z.enum(['resident', 'staff', 'committee']);
@@ -181,6 +202,9 @@ export const createEventSchema = z
     fund_target: z.coerce.number().min(0).max(100_000_000).default(0),
     fund_rule: fundRuleSchema.default('general_fund'),
     fund_rule_note: z.string().trim().max(300).optional(),
+    // A group for this event specifically — "Deepavali volunteers" — as
+    // opposed to the society's own.
+    whatsapp_group_url: optionalWhatsappGroup,
   })
   .refine((v) => !v.ends_on || v.ends_on >= v.starts_on, {
     message: 'The event cannot end before it starts',

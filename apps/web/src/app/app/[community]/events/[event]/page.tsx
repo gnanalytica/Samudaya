@@ -54,6 +54,8 @@ import {
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
 import { SuggestionBoard } from '@/components/suggestion-board';
+import { CommentThread } from '@/components/comment-thread';
+import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
 import { cn } from '@/lib/utils';
 import { cancelRegistration } from '../actions';
 import { RegisterForm, SuggestionForm } from './participation-forms';
@@ -275,6 +277,41 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               </div>
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
+
+            {event.whatsapp_group_url ? (
+              <Card>
+                <CardBody className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-ink text-sm font-medium">
+                      There is a WhatsApp group for this
+                    </p>
+                    <p className="text-ink-muted text-xs">
+                      The app keeps the plan and the money. The chatting happens where it already
+                      does.
+                    </p>
+                  </div>
+                  <WhatsappGroupLink url={event.whatsapp_group_url} />
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {/* The argument that produced the decision, kept next to it. A tab
+                of its own would have made five; it belongs under About. */}
+            <Card>
+              <CardHeader
+                title="Discussion"
+                description="Anything worth settling about this event. Everyone in the society can read it."
+              />
+              <CardBody>
+                <CommentThread
+                  slug={slug}
+                  subject={{ eventId: event.id }}
+                  eventSlug={event.slug}
+                  myMembershipId={membership.id}
+                  canModerate={isStaff}
+                />
+              </CardBody>
+            </Card>
           </div>
         ) : null}
 

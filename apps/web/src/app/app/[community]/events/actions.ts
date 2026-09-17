@@ -322,6 +322,72 @@ export async function closeSuggestionVote(formData: FormData): Promise<void> {
   revalidatePath(`/app/${slug}/todo`);
 }
 
+const commentSchema = z
+  .object({
+    event_id: uuid.nullable(),
+    suggestion_id: uuid.nullable(),
+    body: z
+      .string()
+      .trim()
+      .min(1, 'Say something first')
+      .max(2000, 'Keep it under 2000 characters'),
+  })
+  // The database says the same thing with a check constraint; saying it here
+  // too means the person gets a sentence rather than a constraint name.
+  .refine((v) => (v.event_id === null) !== (v.suggestion_id === null), {
+    message: 'A comment belongs to one event or one suggestion',
+  });
+
+/** Adds to the thread on an event or a suggestion. */
+export async function postComment(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const slug = String(formData.get('slug') ?? '');
+  const context = await requireCommunity(slug);
+
+  const parsed = commentSchema.safeParse({
+    event_id: String(formData.get('event_id') ?? '') || null,
+    suggestion_id: String(formData.get('suggestion_id') ?? '') || null,
+    body: formData.get('body'),
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.from('comments').insert({
+    ...parsed.data,
+    community_id: context.community.id,
+    membership_id: context.membership.id,
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  revalidateComment(slug, formData);
+  return EMPTY_STATE;
+}
+
+/**
+ * Takes a comment back. The policies decide whose: your own always, anybody's
+ * if you are staff. Nothing is editable — a thread people have replied to
+ * should not change underneath them.
+ */
+export async function deleteComment(formData: FormData): Promise<void> {
+  const slug = String(formData.get('slug') ?? '');
+  await requireCommunity(slug);
+
+  const supabase = await getSupabase();
+  await supabase
+    .from('comments')
+    .delete()
+    .eq('id', String(formData.get('comment_id') ?? ''));
+
+  revalidateComment(slug, formData);
+}
+
+/** Threads live on an event page and on the suggestions page; refresh both. */
+function revalidateComment(slug: string, formData: FormData) {
+  const eventSlug = String(formData.get('event') ?? '');
+  if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
+  revalidatePath(`/app/${slug}/suggest`, 'page');
+  revalidatePath(`/app/${slug}/events`, 'layout');
+}
+
 const campaignSchema = z.object({
   name: z.string().trim().min(3, 'Name the campaign').max(140),
   description: z.string().trim().min(10, 'Say what the money is for').max(2000),

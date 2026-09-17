@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/field';
 import { EmptyState } from '@/components/ui/empty-state';
 import { FundBar } from '@/components/badges';
+import { CommentThread } from '@/components/comment-thread';
 import { decideSuggestion } from '@/app/app/[community]/admin/events/actions';
 import { closeSuggestionVote, voteOnSuggestion } from '@/app/app/[community]/events/actions';
 
@@ -125,6 +126,15 @@ export function SuggestionBoard({
                     ) : null}
                   </form>
                 ) : null}
+                <CommentThread
+                  slug={slug}
+                  subject={{ suggestionId: row.id }}
+                  eventSlug={eventSlug}
+                  myMembershipId={myMembershipId}
+                  canModerate={canApprove}
+                  collapsed
+                  title="Discuss it"
+                />
                 {canApprove ? (
                   <form
                     action={closeSuggestionVote}

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { upiVpaSchema } from '@samudaya/core';
+import { optionalWhatsappGroup, upiVpaSchema } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
@@ -55,6 +55,7 @@ const societyDetailsSchema = z.object({
     .optional()
     .or(z.literal('').transform(() => undefined)),
   city: z.string().trim().min(2, 'Add the city').max(80),
+  whatsapp_group_url: optionalWhatsappGroup,
 });
 
 /** Committee confirms where the society is, as residents should see it. */
@@ -69,6 +70,7 @@ export async function updateSocietyDetails(
     address: formData.get('address'),
     pincode: formData.get('pincode') ?? '',
     city: formData.get('city'),
+    whatsapp_group_url: formData.get('whatsapp_group_url') ?? '',
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
@@ -79,6 +81,7 @@ export async function updateSocietyDetails(
       address: parsed.data.address,
       pincode: parsed.data.pincode ?? null,
       city: parsed.data.city,
+      whatsapp_group_url: parsed.data.whatsapp_group_url ?? null,
     })
     .eq('id', context.community.id)
     .select('id');

@@ -23,6 +23,7 @@ import { getTodoItems } from '@/lib/todo';
 import { getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
+import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
 import { PageBody } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
@@ -250,6 +251,15 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               })}
             </div>
           </>
+        ) : null}
+
+        {community.whatsapp_group_url ? (
+          <div className="mt-8">
+            <WhatsappGroupLink
+              url={community.whatsapp_group_url}
+              label={`Join the ${community.name} WhatsApp group`}
+            />
+          </div>
         ) : null}
 
         {/* Raising money was the only thing a resident could start from here.

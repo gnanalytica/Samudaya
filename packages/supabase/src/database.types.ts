@@ -502,6 +502,68 @@ export type Database = {
           }
         ]
       }
+      comments: {
+        Row: {
+          id: string
+          community_id: string
+          event_id: string | null
+          suggestion_id: string | null
+          membership_id: string
+          body: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          event_id?: string | null
+          suggestion_id?: string | null
+          membership_id: string
+          body: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          event_id?: string | null
+          suggestion_id?: string | null
+          membership_id?: string
+          body?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "activity_suggestions"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       communities: {
         Row: {
           id: string
@@ -528,6 +590,7 @@ export type Database = {
           pincode: string | null
           setup_completed_at: string | null
           catalogue_reviewed_at: string | null
+          whatsapp_group_url: string | null
         }
         Insert: {
           id?: string
@@ -554,6 +617,7 @@ export type Database = {
           pincode?: string | null
           setup_completed_at?: string | null
           catalogue_reviewed_at?: string | null
+          whatsapp_group_url?: string | null
         }
         Update: {
           id?: string
@@ -580,6 +644,7 @@ export type Database = {
           pincode?: string | null
           setup_completed_at?: string | null
           catalogue_reviewed_at?: string | null
+          whatsapp_group_url?: string | null
         }
         Relationships: [
           {
@@ -946,6 +1011,7 @@ export type Database = {
           kind: string
           event_type_id: string | null
           venue_id: string | null
+          whatsapp_group_url: string | null
         }
         Insert: {
           id?: string
@@ -972,6 +1038,7 @@ export type Database = {
           kind?: string
           event_type_id?: string | null
           venue_id?: string | null
+          whatsapp_group_url?: string | null
         }
         Update: {
           id?: string
@@ -998,6 +1065,7 @@ export type Database = {
           kind?: string
           event_type_id?: string | null
           venue_id?: string | null
+          whatsapp_group_url?: string | null
         }
         Relationships: [
           {

@@ -18,7 +18,7 @@ import { getSupabase } from './supabase/server';
 // select text, and concatenating with `+` widens it to `string`, which
 // collapses the result to an error type.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, kind, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, status, expected_attendance, fund_target, fund_rule, fund_rule_note, published_at, closed_at, closing_summary, created_by, created_at';
+  'id, slug, emoji, name, kind, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, status, expected_attendance, fund_target, fund_rule, fund_rule_note, whatsapp_group_url, published_at, closed_at, closing_summary, created_by, created_at';
 
 export const getEvent = cache(async (communityId: string, slug: string) => {
   const supabase = await getSupabase();

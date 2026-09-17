@@ -1459,3 +1459,103 @@ select test.eq(
   (select (public.close_suggestion_vote((select id from t_ballot))).status::text),
   'not_adopted', 'and closing it again changes nothing');
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Comments: a thread hangs off the thing it is about
+-- ---------------------------------------------------------------------------
+reset role;
+create temporary table t_thread as
+select e.id as event_id, e.community_id
+  from public.events e
+  join public.communities c on c.id = e.community_id
+ where c.slug = 'hill-crest' limit 1;
+grant select on t_thread to authenticated;
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.comments (community_id, event_id, membership_id, body)
+select t.community_id, t.event_id, app.my_membership_id(t.community_id),
+       'Can we start the rangoli at 6 instead?'
+  from t_thread t;
+
+select test.eq(test.visible('select id from public.comments'), 1::bigint,
+  'a resident can leave a comment on an event');
+
+-- Staff run the society and answer for it, so they are in the conversation
+-- even though they have no vote in it.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.comments (community_id, event_id, membership_id, body)
+select t.community_id, t.event_id, app.my_membership_id(t.community_id),
+       'The decorator arrives at 5.'
+  from t_thread t;
+select test.eq(test.visible('select id from public.comments'), 2::bigint,
+  'staff can too, and everybody reads the whole thread');
+
+-- The person who started the thread hears about the reply.
+reset role;
+select test.ok(
+  (select count(*) from public.notifications
+    where kind = 'comment'
+      and user_id = 'abababab-abab-4bab-8bab-abababababab') > 0,
+  'and whoever raised it is told');
+
+-- A comment belongs to exactly one thing.
+-- Both subjects at once.
+select test.raises(
+  $q$insert into public.comments (community_id, event_id, suggestion_id, membership_id, body)
+     select t.community_id, t.event_id, s.id, app.my_membership_id(t.community_id), 'about two things'
+       from t_thread t
+       join public.activity_suggestions s on s.community_id = t.community_id limit 1$q$,
+  'a comment about two things at once is refused');
+-- And neither.
+select test.raises(
+  $q$insert into public.comments (community_id, event_id, suggestion_id, membership_id, body)
+     select t.community_id, null, null, app.my_membership_id(t.community_id), 'about nothing'
+       from t_thread t$q$,
+  'and so is one about nothing');
+
+-- Another society sees nothing of it.
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(test.visible('select id from public.comments'), 0::bigint,
+  'a thread does not cross societies');
+
+-- You may withdraw your own words; you may not rewrite somebody else's.
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+delete from public.comments;
+reset role;
+select test.eq((select count(*) from public.comments), 2::bigint,
+  'a passer-by deletes nothing');
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+delete from public.comments where membership_id = app.my_membership_id(
+  (select community_id from t_thread));
+reset role;
+select test.eq((select count(*) from public.comments), 1::bigint,
+  'but you can take back what you said');
+
+-- Staff can take down what should not have been said.
+select test.act_as('99999999-9999-4999-8999-999999999999');
+delete from public.comments;
+reset role;
+select test.eq((select count(*) from public.comments), 0::bigint,
+  'and staff can take down anything');
+
+-- ---------------------------------------------------------------------------
+-- The WhatsApp group link
+-- ---------------------------------------------------------------------------
+reset role;
+update public.communities set whatsapp_group_url = 'https://chat.whatsapp.com/AbCdEfGh12345678'
+ where slug = 'hill-crest';
+select test.eq(
+  (select whatsapp_group_url from public.communities where slug = 'hill-crest'),
+  'https://chat.whatsapp.com/AbCdEfGh12345678', 'a society can hold its group''s invite link');
+
+select test.raises(
+  $q$update public.communities set whatsapp_group_url = 'https://example.com/not-whatsapp'
+      where slug = 'hill-crest'$q$,
+  'and only an invite link: this is rendered as something people tap');
+select test.raises(
+  $q$update public.events set whatsapp_group_url = 'javascript:alert(1)'
+      where id = (select event_id from t_thread)$q$,
+  'an event''s link is held to the same shape');
