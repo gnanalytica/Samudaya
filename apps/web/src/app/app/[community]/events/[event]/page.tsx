@@ -51,6 +51,7 @@ import {
 } from '@/components/badges';
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
+import { AuditTrail } from '@/components/audit-trail';
 import { SuggestionBoard } from '@/components/suggestion-board';
 import { CommentThread } from '@/components/comment-thread';
 import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
@@ -464,12 +465,20 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                               expense.category,
                               expense.vendor ?? 'Vendor not recorded',
                               formatDate(expense.spent_on),
-                              expense.approver?.profiles?.full_name
-                                ? `approved by ${expense.approver.profiles.full_name}`
-                                : null,
                             ]
                               .filter(Boolean)
                               .join(' · ')}
+                          </p>
+                          {/* Who signed this off and when, on the bill itself,
+                              where a resident reading the ledger can see it. */}
+                          <p className="text-ink-subtle mt-0.5 text-xs">
+                            <AuditTrail
+                              confirmedBy={expense.approver?.profiles?.full_name}
+                              confirmedAt={expense.approved_at}
+                              editedBy={expense.editor?.profiles?.full_name}
+                              editedAt={expense.updated_at}
+                              confirmedLabel="Approved"
+                            />
                           </p>
                           <BillLink url={expense.bill_url} />
                         </div>

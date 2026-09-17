@@ -1416,12 +1416,26 @@ select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
 insert into public.suggestion_votes (suggestion_id, membership_id, support)
 select b.id, app.my_membership_id(b.community_id), false from t_ballot b;
 
+-- 0920.0300 narrowed the secret ballot: a vote in favour is public to the
+-- society, a vote against is the committee's to see. Tom voted against, so he
+-- sees his own row and Ria's public one.
 select test.eq(test.visible('select id from public.suggestion_votes where suggestion_id = (select id from t_ballot)'),
-  1::bigint, 'and still only your own once a neighbour has voted too');
+  2::bigint, 'a neighbour who voted for it is named');
+select test.eq(test.visible($q$select id from public.suggestion_votes
+   where suggestion_id = (select id from t_ballot) and not support$q$),
+  1::bigint, 'and the only vote against you can see is your own');
+
+-- Ria voted for it, so there is nothing of Tom's for her to see.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(test.visible('select id from public.suggestion_votes where suggestion_id = (select id from t_ballot)'),
+  1::bigint, 'while a resident never learns who voted against');
+
+reset role;
 select test.eq(
   (select votes_for + votes_against from public.suggestion_stats
     where suggestion_id = (select id from t_ballot)),
-  2, 'while the tally counts both');
+  2, 'though the tally counts both either way');
 
 -- Staff run the society; they do not take part in it, so they cannot vote.
 reset role;
@@ -1433,6 +1447,17 @@ select test.raises(
 select test.raises(
   $q$select public.close_suggestion_vote((select id from t_ballot))$q$,
   'nor can staff close one');
+-- Staff are members, so the public "for" is public to them too. The "against"
+-- is not: running the society is not the same as deciding for it.
+select test.eq(test.visible('select id from public.suggestion_votes where suggestion_id = (select id from t_ballot)'),
+  1::bigint, 'staff see the votes in favour, like any other member');
+
+-- The committee sees the whole ballot, because they are the ones who have to
+-- weigh an objection rather than just count it.
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(test.visible('select id from public.suggestion_votes where suggestion_id = (select id from t_ballot)'),
+  2::bigint, 'and the committee sees both sides');
 
 -- The committee closes it, and the count decides: one for, one against.
 reset role;
@@ -1559,3 +1584,278 @@ select test.raises(
   $q$update public.events set whatsapp_group_url = 'javascript:alert(1)'
       where id = (select event_id from t_thread)$q$,
   'an event''s link is held to the same shape');
+
+-- ---------------------------------------------------------------------------
+-- Money that counts names the person who said so
+-- ---------------------------------------------------------------------------
+-- Staff recording cash insert 'succeeded' straight away; before 0920.0200
+-- nothing recorded who. A year later the books said a payment was accepted and
+-- could not say by whom, which is the one question an audit asks.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.contributions (event_id, community_id, unit_id, amount, method, status, channel)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id,
+       'b2b2b2b2-0000-4000-8000-000000000001', 500, 'cash', 'succeeded', 'system'
+  from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999';
+
+select test.eq(
+  (select p.full_name
+     from public.contributions c
+     join public.memberships m on m.id = c.verified_by
+     join public.profiles p on p.id = m.user_id
+    where c.method = 'cash' and c.amount = 500),
+  'Sam Supervisor', 'staff recording cash are recorded as having confirmed it');
+select test.ok(
+  (select verified_at is not null from public.contributions
+    where method = 'cash' and amount = 500),
+  'and when they did');
+
+-- ---------------------------------------------------------------------------
+-- The audit log: what changed, who changed it, and no rubbing it out
+-- ---------------------------------------------------------------------------
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+update public.contributions set amount = 450
+ where method = 'cash' and amount = 500;
+
+select test.eq(
+  (select (changed -> 'amount' ->> 'from')
+     from public.audit_log
+    where table_name = 'contributions' and action = 'update'
+      and changed ? 'amount'
+    order by at desc limit 1),
+  '500.00', 'an edited amount keeps what it used to be');
+select test.eq(
+  (select (changed -> 'amount' ->> 'to')
+     from public.audit_log
+    where table_name = 'contributions' and action = 'update'
+      and changed ? 'amount'
+    order by at desc limit 1),
+  '450.00', 'and what it became');
+select test.eq(
+  (select p.full_name
+     from public.audit_log l
+     join public.memberships m on m.id = l.actor_id
+     join public.profiles p on p.id = m.user_id
+    where l.table_name = 'contributions' and l.action = 'update' and l.changed ? 'amount'
+    order by l.at desc limit 1),
+  'Hana Iyer', 'and who did it');
+select test.eq(
+  (select updated_by from public.contributions where method = 'cash' and amount = 450),
+  (select id from public.memberships m
+     where m.user_id = '88888888-8888-4888-8888-888888888888'
+       and m.community_id = (select id from public.communities where slug = 'hill-crest')),
+  'the row itself says who touched it last');
+
+-- The log is written by the trigger and by nothing else.
+select test.raises(
+  $q$insert into public.audit_log (community_id, table_name, row_id, action)
+     select id, 'contributions', id, 'update' from public.communities where slug = 'hill-crest'$q$,
+  'nobody can file an entry by hand');
+select test.raises(
+  $q$update public.audit_log set changed = '{}'::jsonb where id = (
+        select max(id) from public.audit_log)$q$,
+  'nor quietly correct one');
+select test.raises(
+  $q$delete from public.audit_log where id = (select max(id) from public.audit_log)$q$,
+  'nor make one go away');
+
+-- It holds every field of every change, including what a neighbour paid, so
+-- it stops at staff. What a resident is owed is on the record itself.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(test.visible('select id from public.audit_log'), 0::bigint,
+  'a resident cannot read the log');
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.ok(test.visible('select id from public.audit_log') > 0,
+  'staff can');
+
+-- ---------------------------------------------------------------------------
+-- Reconciliation: the bank's version, next to ours
+-- ---------------------------------------------------------------------------
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+insert into public.bank_accounts (id, community_id, label, bank_name, last4)
+select 'eeeeeeee-0000-4000-8000-0000000000aa', id, 'Current account', 'Axis', '4417'
+  from public.communities where slug = 'hill-crest';
+
+select test.raises(
+  $q$insert into public.bank_accounts (community_id, label, last4)
+     select id, 'Bad', '44177' from public.communities where slug = 'hill-crest'$q$,
+  'an account number fragment is four digits or nothing');
+
+-- A resident reports a payment; the statement then shows it arriving.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.contributions (event_id, community_id, membership_id, amount, method, reference)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 2001, 'upi', '755500011122'
+  from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  app.record_bank_lines('eeeeeeee-0000-4000-8000-0000000000aa', $j$[
+    {"posted_on": "2026-09-16", "amount": 2001, "reference": "755500011122",
+     "narration": "UPI/755500011122/RIA MENON", "counterparty": "Ria Menon"},
+    {"posted_on": "2026-09-16", "amount": -350, "narration": "ACCOUNT MAINTENANCE CHARGE"}
+  ]$j$),
+  2, 'a statement goes in as lines');
+select test.eq(
+  app.record_bank_lines('eeeeeeee-0000-4000-8000-0000000000aa', $j$[
+    {"posted_on": "2026-09-16", "amount": 2001, "reference": "755500011122",
+     "narration": "UPI/755500011122/RIA MENON", "counterparty": "Ria Menon"}
+  ]$j$),
+  0, 'and the same statement imported twice is still one statement');
+
+reset role;
+create temporary table t_line as
+select id, amount from public.bank_transactions where reference = '755500011122';
+create temporary table t_charge as
+select id from public.bank_transactions where narration = 'ACCOUNT MAINTENANCE CHARGE';
+grant select on t_line, t_charge to authenticated;
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  (select confidence from public.bank_line_candidates((select id from t_line)) limit 1),
+  'reference', 'the UTR the resident typed is matched against the one the bank saw');
+select test.eq(
+  (select payer from public.bank_line_candidates((select id from t_line)) limit 1),
+  'Ria Menon', 'and the candidate says whose payment it would be');
+
+select test.eq(
+  (select status::text from public.reconcile_bank_line(
+     (select id from t_line),
+     (select contribution_id from public.bank_line_candidates((select id from t_line)) limit 1))),
+  'succeeded', 'pairing the line with the payment confirms the money');
+select test.eq(
+  (select p.full_name
+     from public.bank_transactions t
+     join public.memberships m on m.id = t.matched_by
+     join public.profiles p on p.id = m.user_id
+    where t.id = (select id from t_line)),
+  'Sam Supervisor', 'and the line records who paired it');
+select test.raises(
+  format($q$select public.reconcile_bank_line('%s', (select id from public.contributions
+            where reference = '755500011122'))$q$, (select id from t_line)),
+  'a line already matched cannot be spent twice');
+
+-- Undoing it is the committee's call, not the desk's.
+select test.raises(
+  format($q$select public.unreconcile_bank_line('%s')$q$, (select id from t_line)),
+  'staff cannot unpick a reconciliation');
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select public.unreconcile_bank_line((select id from t_line));
+select test.eq(
+  (select status::text from public.contributions where reference = '755500011122'),
+  'pending', 'undoing the match puts the payment back to waiting');
+
+-- A bank charge will never match anything; it is set aside, not deleted.
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.raises(
+  format($q$select public.ignore_bank_line('%s', '  ')$q$, (select id from t_charge)),
+  'setting a line aside needs a reason');
+select public.ignore_bank_line((select id from t_charge), 'Bank charge');
+select test.eq(
+  (select unexplained_lines from public.reconciliation_summary
+    where community_id = (select id from public.communities where slug = 'hill-crest')),
+  1::bigint, 'and it stops counting as unexplained');
+
+-- The feed is not for residents: a statement line carries the name and bank of
+-- whoever sent the money.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(test.visible('select id from public.bank_transactions'), 0::bigint,
+  'a resident cannot read the bank feed');
+select test.eq(test.visible('select id from public.bank_accounts'), 0::bigint,
+  'nor see which accounts the society keeps');
+select test.raises(
+  $q$select public.import_bank_lines('eeeeeeee-0000-4000-8000-0000000000aa',
+       $j$[{"posted_on": "2026-09-16", "amount": 9999}]$j$)$q$,
+  'nor post lines into it');
+
+-- ---------------------------------------------------------------------------
+-- One ledger, for everybody
+-- ---------------------------------------------------------------------------
+-- Confirmed money in and approved money out, across every event, readable by
+-- any member. Unconfirmed reports are not in it: a ledger of claims is what
+-- this replaces.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.ok(
+  test.visible($q$select id from public.society_ledger where direction = 'in'$q$) > 0,
+  'a resident can see money the society received');
+select test.ok(
+  test.visible($q$select id from public.society_ledger where direction = 'out'$q$) > 0,
+  'and what it was spent on');
+select test.eq(
+  test.visible($q$select id from public.society_ledger
+                 where id = 'in:' || (select c.id::text from public.contributions c
+                                       where c.reference = '755500011122')$q$),
+  0::bigint, 'but not a payment nobody has confirmed');
+select test.eq(
+  (select counterpart from public.society_ledger
+    where id = 'out:dddddddd-0000-4000-8000-0000000000bb'),
+  'Paper Glow', 'a bill names the vendor it was paid to');
+select test.eq(
+  (select confirmed_by from public.society_ledger
+    where id = 'out:dddddddd-0000-4000-8000-0000000000bb'),
+  'Hana Iyer', 'and the committee member who approved it');
+
+-- Money in is identified by the flat, which is on the door, rather than by the
+-- neighbour's name, which the People page already refuses to hand over.
+--
+-- The id is looked up as the platform on purpose: a resident cannot select the
+-- cash row from contributions at all, so looking it up as Ria would compare
+-- against null and pass without testing anything.
+reset role;
+create temporary table t_cash as
+select 'in:' || id::text as ledger_id from public.contributions
+ where method = 'cash' and amount = 450;
+grant select on t_cash to authenticated;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  (select counterpart from public.society_ledger
+    where id = (select ledger_id from t_cash)),
+  'A 1104', 'money in is identified by flat, not by name');
+
+select test.ok(
+  (select balance = total_in - total_out from public.society_money
+    where community_id = (select id from public.communities where slug = 'hill-crest')),
+  'the totals add up to what is left');
+
+-- ---------------------------------------------------------------------------
+-- A member's history: theirs, and the committee's to ask about
+-- ---------------------------------------------------------------------------
+reset role;
+create temporary table t_ria as
+select m.id from public.memberships m
+ where m.user_id = 'abababab-abab-4bab-8bab-abababababab'
+   and m.community_id = (select id from public.communities where slug = 'hill-crest');
+grant select on t_ria to authenticated;
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.ok(
+  (select count(*) from public.member_history((select id from t_ria))) > 0,
+  'you can see your own history');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(
+  (select count(*) from public.member_history((select id from t_ria))),
+  0::bigint, 'a neighbour cannot see yours');
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  (select count(*) from public.member_history((select id from t_ria))),
+  0::bigint, 'nor can staff, who run the events rather than the household');
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.ok(
+  (select count(*) from public.member_history((select id from t_ria))) > 0,
+  'the committee can, because "has A-204 paid?" is asked at every meeting');
+reset role;

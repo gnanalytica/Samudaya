@@ -39,6 +39,7 @@ import {
   StatTile,
 } from '@/components/badges';
 import { BillLink, StoredFileLink } from '@/components/bill-link';
+import { AuditTrail } from '@/components/audit-trail';
 import {
   AddActivityForm,
   AddBudgetLineForm,
@@ -640,6 +641,12 @@ export default async function ManageEventPage(
                         <th scope="col" className="px-5 py-2.5 font-medium">
                           Status
                         </th>
+                        {/* The four questions an audit asks, in one column:
+                            who accepted this money, when, and whether anybody
+                            has touched the row since. */}
+                        <th scope="col" className="px-5 py-2.5 font-medium">
+                          Trail
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-border-base divide-y">
@@ -668,6 +675,14 @@ export default async function ManageEventPage(
                             {payment.status === 'failed' && payment.review_note ? (
                               <p className="text-ink-subtle mt-1 text-xs">{payment.review_note}</p>
                             ) : null}
+                          </td>
+                          <td className="text-ink-subtle px-5 py-3 text-xs">
+                            <AuditTrail
+                              confirmedBy={payment.verifier?.profiles?.full_name}
+                              confirmedAt={payment.verified_at}
+                              editedBy={payment.editor?.profiles?.full_name}
+                              editedAt={payment.updated_at}
+                            />
                           </td>
                         </tr>
                       ))}

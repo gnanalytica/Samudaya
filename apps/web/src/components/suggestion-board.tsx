@@ -1,4 +1,4 @@
-import { Lightbulb, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Lightbulb, ThumbsDown, ThumbsUp, Users } from 'lucide-react';
 import { relativeTime } from '@samudaya/core';
 import type { SuggestionRow } from '@/lib/events';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -10,6 +10,58 @@ import { FundBar } from '@/components/badges';
 import { CommentThread } from '@/components/comment-thread';
 import { decideSuggestion } from '@/app/app/[community]/admin/events/actions';
 import { closeSuggestionVote, voteOnSuggestion } from '@/app/app/[community]/events/actions';
+
+/**
+ * Who voted, for the people allowed to know.
+ *
+ * A vote in favour is public to the society: fourteen named neighbours behind
+ * an idea is a petition, and that is worth more to the committee than the
+ * number fourteen. A vote against is shown to the committee only, because the
+ * people a "no" is usually aimed at are the ones who have to weigh it.
+ *
+ * Nobody is ever listed as not having voted. There is no row for an abstention,
+ * so the database cannot leak one, and the counts here are the rows this reader
+ * may see — the real tally, which may be larger, stays on the bar above.
+ */
+function Voters({ row, canApprove }: { row: SuggestionRow; canApprove: boolean }) {
+  const supporters = row.voters.filter((vote) => vote.support);
+  const opponents = row.voters.filter((vote) => !vote.support);
+  const named = canApprove ? supporters.length + opponents.length : supporters.length;
+  if (!named) return null;
+
+  return (
+    <details className="group mt-3">
+      <summary className="text-ink-muted hover:text-ink flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium [&::-webkit-details-marker]:hidden">
+        <Users className="size-3.5" aria-hidden="true" />
+        Who voted
+      </summary>
+      <div className="border-border-base mt-2 space-y-2 border-t pt-2">
+        {supporters.length ? (
+          <div>
+            <p className="text-ink-subtle text-xs font-medium">In favour</p>
+            <p className="text-ink mt-0.5 text-sm">
+              {supporters.map((vote) => vote.name).join(', ')}
+            </p>
+          </div>
+        ) : null}
+        {canApprove && opponents.length ? (
+          <div>
+            <p className="text-ink-subtle text-xs font-medium">Against · committee only</p>
+            <p className="text-ink mt-0.5 text-sm">
+              {opponents.map((vote) => vote.name).join(', ')}
+            </p>
+          </div>
+        ) : null}
+        {!canApprove && row.votesAgainst ? (
+          <p className="text-ink-subtle text-xs">
+            {row.votesAgainst} {row.votesAgainst === 1 ? 'vote' : 'votes'} against are counted but
+            not named.
+          </p>
+        ) : null}
+      </div>
+    </details>
+  );
+}
 
 /**
  * A suggestion's three stages, on one board: open for voting, with the
@@ -126,6 +178,7 @@ export function SuggestionBoard({
                     ) : null}
                   </form>
                 ) : null}
+                <Voters row={row} canApprove={canApprove} />
                 <CommentThread
                   slug={slug}
                   subject={{ suggestionId: row.id }}
@@ -243,6 +296,7 @@ export function SuggestionBoard({
                       {row.votesFor} for · {row.votesAgainst} against
                       {row.resolved_at ? ` · closed ${relativeTime(row.resolved_at)}` : ''}
                     </p>
+                    <Voters row={row} canApprove={canApprove} />
                   </div>
                   <Badge tone={adopted ? 'success' : 'neutral'}>
                     {adopted ? 'Adopted' : 'Not adopted'}

@@ -4,9 +4,11 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   Lightbulb,
+  Scale,
   Settings2,
   UserRound,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { COPY, can, type Capability, type MemberRole } from '@samudaya/core';
@@ -26,12 +28,14 @@ export type NavItem = {
 };
 
 /**
- * Residents see Home, Events, People, Ideas and Me. Staff add a Manage group with
- * their To do queue and events; the committee also gets Society settings.
- * Notifications and personal settings live in the profile menu.
+ * Residents see Home, Events, People, Money, Ideas and Me. Staff add a Manage
+ * group with their To do queue, events and the bank reconciliation; the
+ * committee also gets Society settings. Notifications and personal settings
+ * live in the profile menu.
  *
- * People is deliberately outside Manage: everybody may see who is in the
- * society, and only what they may *do* there changes with the role.
+ * People and Money are deliberately outside Manage: everybody may see who is in
+ * the society and what it did with its money, and only what they may *do* there
+ * changes with the role.
  */
 export function navItems(slug: string): { section: string; items: NavItem[] }[] {
   const base = `/app/${slug}`;
@@ -43,6 +47,7 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
         { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
         { href: `${base}/people`, label: 'People', icon: Users, primary: true },
         // Not primary: the bottom bar is full, and Home already points here.
+        { href: `${base}/money`, label: 'Money', icon: Wallet },
         { href: `${base}/suggest`, label: 'Ideas', icon: Lightbulb },
         { href: `${base}/me`, label: 'Me', icon: UserRound, primary: true },
       ],
@@ -63,6 +68,12 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
           shortLabel: COPY.manage,
           icon: CalendarCog,
           capability: 'events:manage',
+        },
+        {
+          href: `${base}/admin/reconcile`,
+          label: 'Reconcile',
+          icon: Scale,
+          capability: 'payments:record',
         },
         {
           href: `${base}/admin/settings`,

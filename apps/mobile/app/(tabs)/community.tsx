@@ -33,7 +33,13 @@ export default function Community() {
       const [suggestions, stats, mine, polls] = await Promise.all([
         supabase
           .from('activity_suggestions')
-          .select('id, name, description, created_at, memberships(profiles(full_name))')
+          // Named on purpose: suggestion_votes, suggestion_interests and
+          // comments all look like junction tables between activity_suggestions
+          // and memberships, so a bare embed is ambiguous and PostgREST answers
+          // 300 Multiple Choices instead of rows.
+          .select(
+            'id, name, description, created_at, memberships!activity_suggestions_suggested_by_fkey(profiles(full_name))',
+          )
           .eq('community_id', communityId)
           .in('status', ['new', 'reviewing', 'accepted'])
           .order('created_at', { ascending: false })
