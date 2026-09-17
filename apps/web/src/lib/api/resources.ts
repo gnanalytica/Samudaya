@@ -152,7 +152,9 @@ export async function createEvent(
 export async function listTasks(principal: ApiPrincipal, eventId: string) {
   const { data, error } = await principal.db
     .from('event_tasks')
-    .select('id, name, notes, status, due_on, completed_at, memberships(profiles(full_name))')
+    .select(
+      'id, name, notes, status, due_on, completed_at, memberships!event_tasks_assignee_id_fkey(profiles(full_name))',
+    )
     .eq('community_id', withCommunity(principal))
     .eq('event_id', eventId)
     .order('position');

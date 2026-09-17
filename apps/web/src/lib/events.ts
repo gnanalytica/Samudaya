@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { notFound } from 'next/navigation';
 import { normalizeStats } from '@samudaya/core';
 import { getSupabase } from './supabase/server';
+import { rowsOf } from './rows';
 
 /**
  * Event reads shared by several pages.
@@ -76,7 +77,7 @@ export const getTasks = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('event_tasks')
     .select(
-      'id, name, notes, status, due_on, position, completed_at, memberships(profiles(full_name))',
+      'id, name, notes, status, due_on, position, completed_at, memberships!event_tasks_assignee_id_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('position')
@@ -90,7 +91,7 @@ export const getActivities = cache(async (eventId: string) => {
     supabase
       .from('event_activities')
       .select(
-        'id, name, emoji, description, capacity, is_open, practice_dates, memberships(profiles(full_name))',
+        'id, name, emoji, description, capacity, is_open, practice_dates, memberships!event_activities_coordinator_id_fkey(profiles(full_name))',
       )
       .eq('event_id', eventId)
       .order('position')
@@ -99,7 +100,7 @@ export const getActivities = cache(async (eventId: string) => {
   ]);
 
   const counts = new Map((stats.data ?? []).map((row) => [row.activity_id, row.interested ?? 0]));
-  return (activities.data ?? []).map((activity) => ({
+  return rowsOf(activities, "an event's activities").map((activity) => ({
     ...activity,
     interested: counts.get(activity.id) ?? 0,
   }));
@@ -110,7 +111,9 @@ export const getVolunteerRoles = cache(async (eventId: string) => {
   const [roles, stats] = await Promise.all([
     supabase
       .from('volunteer_roles')
-      .select('id, name, emoji, description, target_count, memberships(profiles(full_name))')
+      .select(
+        'id, name, emoji, description, target_count, memberships!volunteer_roles_coordinator_id_fkey(profiles(full_name))',
+      )
       .eq('event_id', eventId)
       .order('position')
       .order('name'),
@@ -121,7 +124,7 @@ export const getVolunteerRoles = cache(async (eventId: string) => {
   ]);
 
   const counts = new Map((stats.data ?? []).map((row) => [row.role_id, row]));
-  return (roles.data ?? []).map((role) => ({
+  return rowsOf(roles, "an event's volunteer roles").map((role) => ({
     ...role,
     signedUp: counts.get(role.id)?.signed_up ?? 0,
     stillNeeded: counts.get(role.id)?.still_needed ?? role.target_count,
@@ -227,7 +230,7 @@ export const getRegistrations = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('activity_participants')
     .select(
-      'id, activity_id, membership_id, participant_name, joined_at, event_activities!inner(event_id), memberships(profiles(full_name))',
+      'id, activity_id, membership_id, participant_name, joined_at, event_activities!inner(event_id), memberships!activity_participants_membership_id_fkey(profiles(full_name))',
     )
     .eq('event_activities.event_id', eventId)
     .order('joined_at');
@@ -235,7 +238,7 @@ export const getRegistrations = cache(async (eventId: string) => {
 });
 
 const SUGGESTION_COLUMNS =
-  'id, kind, name, description, status, review_note, resolved_at, created_at, suggested_by, memberships(profiles(full_name))';
+  'id, kind, name, description, status, review_note, resolved_at, created_at, suggested_by, memberships!activity_suggestions_suggested_by_fkey(profiles(full_name))';
 
 /**
  * Attaches each suggestion's tally and the caller's own vote.
@@ -284,13 +287,13 @@ export type SuggestionRow = Awaited<ReturnType<typeof getSuggestions>>[number];
 /** Suggestions for one event, with their vote tally. */
 export const getSuggestions = cache(async (eventId: string, membershipId: string | null) => {
   const supabase = await getSupabase();
-  const { data } = await supabase
+  const result = await supabase
     .from('activity_suggestions')
     .select(SUGGESTION_COLUMNS)
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
 
-  return withVotes(data ?? [], membershipId);
+  return withVotes(rowsOf(result, 'suggestions for an event'), membershipId);
 });
 
 /**
@@ -302,14 +305,14 @@ export const getSuggestions = cache(async (eventId: string, membershipId: string
 export const getSocietySuggestions = cache(
   async (communityId: string, membershipId: string | null) => {
     const supabase = await getSupabase();
-    const { data: suggestions } = await supabase
+    const result = await supabase
       .from('activity_suggestions')
       .select(SUGGESTION_COLUMNS)
       .eq('community_id', communityId)
       .is('event_id', null)
       .order('created_at', { ascending: false });
 
-    return withVotes(suggestions ?? [], membershipId);
+    return withVotes(rowsOf(result, "the society's own suggestions"), membershipId);
   },
 );
 
