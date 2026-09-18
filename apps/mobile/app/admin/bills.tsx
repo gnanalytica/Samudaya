@@ -21,6 +21,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { ViewFileChip } from '../../src/components/file-ui';
+import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
 type Filter = 'pending' | 'changes_requested' | 'approved' | 'rejected';
@@ -51,7 +52,7 @@ export default function Bills() {
       const { data: rows } = await supabase
         .from('expenses')
         .select(
-          'id, name, category, amount, vendor, method, bill_url, spent_on, status, review_note, requested_by, created_at, events(name, emoji), requester:memberships!expenses_requested_by_fkey(profiles(full_name))',
+          'id, name, category, amount, vendor, method, bill_url, spent_on, status, review_note, requested_by, created_at, approved_at, updated_at, events(name, emoji), requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name))',
         )
         .eq('community_id', communityId)
         .order('created_at', { ascending: false })
@@ -144,8 +145,12 @@ type BillRow = {
   spent_on: string;
   status: string;
   review_note: string | null;
+  approved_at: string | null;
+  updated_at: string | null;
   events: { name: string; emoji: string } | null;
   requester: { profiles: { full_name: string | null } | null } | null;
+  approver: { profiles: { full_name: string | null } | null } | null;
+  editor: { profiles: { full_name: string | null } | null } | null;
 };
 
 function BillCard({
@@ -214,6 +219,14 @@ function BillCard({
         ) : null}
       </View>
       <ViewFileChip bucket="bills" value={bill.bill_url} label="View bill" />
+      {/* Who signed this off, and whether anybody has touched it since. */}
+      <AuditTrail
+        confirmedBy={bill.approver?.profiles?.full_name}
+        confirmedAt={bill.approved_at}
+        editedBy={bill.editor?.profiles?.full_name}
+        editedAt={bill.updated_at}
+        confirmedLabel="Approved"
+      />
       {bill.review_note ? <Body muted>Note: {bill.review_note}</Body> : null}
 
       {mayEdit ? (

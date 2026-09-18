@@ -20,6 +20,7 @@ import {
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { KeyValue } from '../../src/components/event-ui';
 import { ViewFileChip } from '../../src/components/file-ui';
+import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
 const METHODS = [
@@ -67,7 +68,7 @@ export default function Payments() {
         supabase
           .from('contributions')
           .select(
-            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, gateway_payload, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name))',
+            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, gateway_payload, verified_at, updated_at, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
           )
           .eq('community_id', communityId)
           .order('paid_at', { ascending: false })
@@ -247,8 +248,12 @@ type PendingRow = {
   paid_at: string;
   proof_path: string | null;
   gateway_payload?: unknown;
+  verified_at: string | null;
+  updated_at: string | null;
   units: { block: string | null; number: string } | null;
   payer: { profiles: { full_name: string | null } | null } | null;
+  verifier: { profiles: { full_name: string | null } | null } | null;
+  editor: { profiles: { full_name: string | null } | null } | null;
 };
 
 function PendingPayment({
@@ -307,6 +312,13 @@ function PendingPayment({
         <Caption>{upiCaptureNote(row.gateway_payload)}</Caption>
       ) : null}
       <ViewFileChip bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
+      {/* Who confirmed the money arrived, and any edit made after they did. */}
+      <AuditTrail
+        confirmedBy={row.verifier?.profiles?.full_name}
+        confirmedAt={row.verified_at}
+        editedBy={row.editor?.profiles?.full_name}
+        editedAt={row.updated_at}
+      />
       {mayReview ? (
         declining ? (
           <View style={{ gap: spacing.sm }}>

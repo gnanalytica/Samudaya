@@ -1,14 +1,18 @@
+import { Text, View } from 'react-native';
 import { auditTrail, hasAuditTrail, relativeTime } from '@samudaya/core';
+import { Caption } from './ui';
+import { useTheme } from '../lib/use-theme';
 
 /**
  * Who approved this, when, and whether anybody has changed it since.
  *
- * The four facts a society argues about a year later, in the place the argument
- * happens — next to the record itself, rather than in a log somebody has to go
- * and find.
+ * The same four facts the web shows beside a payment or a bill, decided by the
+ * same rule in `@samudaya/core`: an edit only counts once the approval has
+ * happened. A phone flagging an edit the laptop does not would be a
+ * disagreement about the society's own records.
  *
- * The rule about which edits are worth mentioning lives in `@samudaya/core`, so
- * the phone flags the same ones. What is left here is only how to draw them.
+ * Renders nothing at all when there is nothing to say — a dash under every
+ * unconfirmed payment is noise on a screen this narrow.
  */
 export function AuditTrail({
   confirmedBy,
@@ -24,22 +28,23 @@ export function AuditTrail({
   /** "Approved" reads better on a bill than "Confirmed". */
   confirmedLabel?: string;
 }) {
+  const { colors } = useTheme();
   const facts = auditTrail({ confirmedBy, confirmedAt, editedBy, editedAt });
 
-  if (!hasAuditTrail(facts)) return <span className="text-ink-subtle">—</span>;
+  if (!hasAuditTrail(facts)) return null;
 
   return (
-    <span className="block space-y-0.5">
+    <View style={{ gap: 2 }}>
       {facts.confirmed ? (
-        <span className="block">
+        <Caption>
           {confirmedLabel} by {facts.confirmed.by} · {relativeTime(facts.confirmed.at)}
-        </span>
+        </Caption>
       ) : null}
       {facts.editedAfter ? (
-        <span className="text-warning block">
+        <Text style={{ color: colors.warning, fontSize: 12 }}>
           Edited by {facts.editedAfter.by} · {relativeTime(facts.editedAfter.at)}
-        </span>
+        </Text>
       ) : null}
-    </span>
+    </View>
   );
 }
