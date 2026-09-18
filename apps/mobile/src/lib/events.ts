@@ -12,7 +12,7 @@ import { supabase } from './supabase';
 // A single string literal: supabase-js infers the row type from the select
 // text, and `+` concatenation widens it to `string`.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, event_type_id, description, status, kind, fund_target, fund_rule, fund_rule_note, closed_at, created_by';
+  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, event_type_id, description, status, kind, fund_target, suggested_amount, fund_rule, fund_rule_note, closed_at, created_by';
 
 export async function fetchEvents(communityId: string) {
   const { data } = await supabase

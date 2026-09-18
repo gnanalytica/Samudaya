@@ -20,7 +20,7 @@ import {
   formatDate,
   festivalFor,
   formatMoney,
-  fundedPercent,
+  fundBarSegments,
   receiptRef,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
@@ -92,7 +92,8 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
 
   const base = `/app/${community.slug}`;
   const here = `${base}/events/${event.slug}`;
-  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const funded = bar.confirmed;
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
@@ -259,7 +260,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <span>{funded}%</span>
               </div>
               <div className="mt-2">
-                <FundBar percent={funded} />
+                <FundBar percent={funded} pendingPercent={bar.pending} />
               </div>
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
@@ -332,8 +333,15 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                   ) : null}
                 </div>
                 <div className="mt-3">
-                  <FundBar percent={funded} />
+                  <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
+                {stats.fundPending > 0 ? (
+                  <p className="text-ink-subtle mt-2 text-xs">
+                    {formatMoney(stats.fundPending, community.currency)} more has been reported and
+                    is waiting to be matched against the bank. It counts towards the total once it
+                    is confirmed.
+                  </p>
+                ) : null}
                 <StatTiles className="mt-4 gap-2">
                   <StatTile
                     label="Raised"

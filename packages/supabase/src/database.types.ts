@@ -1240,6 +1240,7 @@ export type Database = {
           venue_id: string | null
           whatsapp_group_url: string | null
           updated_by: string | null
+          suggested_amount: number | null
         }
         Insert: {
           id?: string
@@ -1268,6 +1269,7 @@ export type Database = {
           venue_id?: string | null
           whatsapp_group_url?: string | null
           updated_by?: string | null
+          suggested_amount?: number | null
         }
         Update: {
           id?: string
@@ -1296,6 +1298,7 @@ export type Database = {
           venue_id?: string | null
           whatsapp_group_url?: string | null
           updated_by?: string | null
+          suggested_amount?: number | null
         }
         Relationships: [
           {
@@ -2558,6 +2561,8 @@ export type Database = {
           readiness: number | null
           participants: number | null
           volunteers: number | null
+          fund_pending: number | null
+          pending_contributors: number | null
         }
         Relationships: [
 

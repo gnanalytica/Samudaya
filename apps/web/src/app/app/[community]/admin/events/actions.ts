@@ -73,6 +73,7 @@ function eventFields(formData: FormData) {
     organizer: formData.get('organizer') || undefined,
     description: formData.get('description') || undefined,
     expected_attendance: formData.get('expected_attendance') || undefined,
+    suggested_amount: formData.get('suggested_amount') || null,
     fund_rule: formData.get('fund_rule') || DEFAULT_FUND_RULE,
     fund_rule_note: formData.get('fund_rule_note') || undefined,
     whatsapp_group_url: formData.get('whatsapp_group_url') ?? '',
@@ -228,6 +229,12 @@ const updateEventSchema = z.object({
   venue: z.string().trim().max(140).nullable(),
   organizer: z.string().trim().max(140).nullable(),
   description: z.string().trim().max(5000).nullable(),
+  // Null is a real answer: plenty of events take whatever people give.
+  suggested_amount: z.coerce
+    .number()
+    .positive('A suggested amount has to be more than nothing')
+    .max(10_000_000)
+    .nullable(),
   whatsapp_group_url: optionalWhatsappGroup,
 });
 
@@ -252,6 +259,7 @@ export async function updateEventDetails(
     venue: venue.label,
     organizer: String(formData.get('organizer') ?? '').trim() || null,
     description: String(formData.get('description') ?? '').trim() || null,
+    suggested_amount: String(formData.get('suggested_amount') ?? '').trim() || null,
     whatsapp_group_url: formData.get('whatsapp_group_url') ?? '',
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };

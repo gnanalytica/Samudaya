@@ -7,7 +7,7 @@ import {
   countdown,
   formatDate,
   formatMoney,
-  fundedPercent,
+  fundBarSegments,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { fetchEvents, fetchStats } from '../../src/lib/events';
@@ -117,7 +117,12 @@ export default function Events() {
           </View>
         )}
         renderItem={({ item }) => {
-          const funded = fundedPercent(item.stats?.fundRaised ?? 0, item.stats?.fundTarget ?? 0);
+          const fundBar = fundBarSegments(
+            item.stats?.fundRaised ?? 0,
+            item.stats?.fundPending ?? 0,
+            item.stats?.fundTarget ?? 0,
+          );
+          const funded = fundBar.confirmed;
           return (
             <Pressable
               accessibilityRole="button"
@@ -166,7 +171,12 @@ export default function Events() {
                       </Caption>
                       <Caption>{funded}%</Caption>
                     </View>
-                    <Meter percent={funded} tone="success" label="Fund progress" />
+                    <Meter
+                      percent={funded}
+                      pendingPercent={fundBar.pending}
+                      tone="success"
+                      label="Fund progress"
+                    />
                   </View>
                 ) : item.status === 'proposed' ? (
                   <Caption>Target {formatMoney(item.fund_target, currency)}</Caption>

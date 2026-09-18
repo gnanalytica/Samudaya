@@ -4,15 +4,20 @@ import { useActionState, useEffect, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import QRCode from 'qrcode';
 import { Clock, ExternalLink, Smartphone } from 'lucide-react';
-import { COPY, formatMoney, upiNote, upiPayUri } from '@samudaya/core';
+import {
+  COPY,
+  contributionPresets,
+  formatMoney,
+  isSuggestedAmount,
+  upiNote,
+  upiPayUri,
+} from '@samudaya/core';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { Card, CardBody } from '@/components/ui/card';
 import { FileUpload } from '@/components/file-upload';
 import { FocusFirstError } from '@/components/focus-first-error';
 import { contribute, type ContributeState } from '../../actions';
-
-const PRESETS = [500, 1001, 2001, 5001];
 
 const initial: ContributeState = {};
 
@@ -36,6 +41,7 @@ export function ContributeForm({
   eventName,
   currency,
   suggested,
+  askedPerFlat,
   upi,
   flatLabel,
   proofFolder,
@@ -46,15 +52,22 @@ export function ContributeForm({
   currency: string;
   /** Pre-filled from a link like ?amount=2000. */
   suggested: number | null;
+  /** What the committee asks each flat for, if they named a figure. */
+  askedPerFlat: number | null;
   upi: { vpa: string; payeeName: string };
   flatLabel: string | null;
   /** `{community_id}/{membership_id}`, where this resident's screenshots go. */
   proofFolder: string;
 }) {
   const [state, action] = useActionState(contribute, initial);
-  const [amount, setAmount] = useState<number | null>(suggested);
+  // A link's ?amount= wins, then the figure the committee asked for. Landing on
+  // the screen with the right number already chosen is the whole point of
+  // having asked for one.
+  const presets = contributionPresets(askedPerFlat);
+  const opening = suggested ?? askedPerFlat;
+  const [amount, setAmount] = useState<number | null>(opening);
   const [custom, setCustom] = useState(
-    suggested && !PRESETS.includes(suggested) ? String(suggested) : '',
+    opening && !presets.includes(opening) ? String(opening) : '',
   );
   const [uploading, setUploading] = useState(false);
   const [qr, setQr] = useState<{ uri: string; src: string } | null>(null);
@@ -70,7 +83,7 @@ export function ContributeForm({
    * typing it again would be silly — and stops following the moment they edit
    * it, unless they go back and pick a different amount.
    */
-  const [reported, setReported] = useState(suggested ? String(suggested) : '');
+  const [reported, setReported] = useState(opening ? String(opening) : '');
   const [followed, setFollowed] = useState(amount);
   if (followed !== amount) {
     setFollowed(amount);
@@ -132,8 +145,14 @@ export function ContributeForm({
       <CardBody className="space-y-6">
         <fieldset>
           <legend className="text-ink mb-2 block text-sm font-semibold">1. Amount</legend>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {PRESETS.map((preset) => (
+          <div
+            className={
+              presets.length > 2
+                ? 'grid grid-cols-2 gap-2 sm:grid-cols-5'
+                : 'grid grid-cols-2 gap-2 sm:grid-cols-3'
+            }
+          >
+            {presets.map((preset) => (
               <button
                 key={preset}
                 type="button"
@@ -144,11 +163,16 @@ export function ContributeForm({
                 }}
                 className={
                   amount === preset && custom === ''
-                    ? 'border-accent bg-surface-raised text-ink rounded-lg border-2 py-3 text-sm font-semibold'
-                    : 'border-border-base bg-surface-raised text-ink-muted hover:bg-surface-sunken rounded-lg border py-3 text-sm font-medium'
+                    ? 'border-accent bg-surface-raised text-ink rounded-lg border-2 py-2.5 text-sm font-semibold'
+                    : 'border-border-base bg-surface-raised text-ink-muted hover:bg-surface-sunken rounded-lg border py-2.5 text-sm font-medium'
                 }
               >
                 {formatMoney(preset, currency)}
+                {/* Named so nobody has to guess which of two numbers the
+                    society actually asked for. */}
+                {isSuggestedAmount(preset, askedPerFlat) ? (
+                  <span className="text-ink-subtle block text-xs font-normal">Suggested</span>
+                ) : null}
               </button>
             ))}
             <div className="col-span-2 sm:col-span-1">

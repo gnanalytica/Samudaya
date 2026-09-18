@@ -130,6 +130,7 @@ export function EventDetailsForm({
     organizer: string | null;
     description: string | null;
     whatsapp_group_url: string | null;
+    suggested_amount: number | null;
   };
 }) {
   const [state, action] = useActionState<ActionState, FormData>(updateEventDetails, EMPTY_STATE);
@@ -214,6 +215,25 @@ export function EventDetailsForm({
             defaultValue={event.whatsapp_group_url ?? ''}
             placeholder="https://chat.whatsapp.com/…"
             maxLength={120}
+          />
+        )}
+      </Field>
+      <Field
+        label="Suggested per flat"
+        htmlFor="ev-suggested"
+        error={state.fieldErrors?.suggested_amount}
+        hint="Offered first on the contribute screen, and chosen for the resident. Leave it empty to take whatever people give."
+      >
+        {(control) => (
+          <Input
+            {...control}
+            name="suggested_amount"
+            type="number"
+            min={1}
+            step="1"
+            defaultValue={event.suggested_amount ?? ''}
+            placeholder="₹"
+            className="max-w-40"
           />
         )}
       </Field>

@@ -10,7 +10,7 @@ import {
   countdown,
   formatDate,
   formatMoney,
-  fundedPercent,
+  fundBarSegments,
   type EventTab,
   type FundRule,
 } from '@samudaya/core';
@@ -71,7 +71,8 @@ export default function EventDetail() {
   }
 
   const { event, stats } = data;
-  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const funded = fundBar.confirmed;
   const open = event.status === 'published';
 
   const changed = () => {
@@ -180,6 +181,7 @@ function About({
   onMoney: () => void;
 }) {
   const { event, stats } = data;
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
   const dates =
     event.ends_on && event.ends_on !== event.starts_on
       ? `${formatDate(event.starts_on)} – ${formatDate(event.ends_on)}`
@@ -225,10 +227,17 @@ function About({
             {formatMoney(stats.fundTarget || event.fund_target, currency)}
           </Caption>
           <Meter
-            percent={fundedPercent(stats.fundRaised, stats.fundTarget)}
+            percent={fundBar.confirmed}
+            pendingPercent={fundBar.pending}
             tone="success"
             label="Fund progress"
           />
+          {stats.fundPending > 0 ? (
+            <Caption>
+              {formatMoney(stats.fundPending, currency)} reported and waiting to be confirmed
+              against the bank. It counts once staff match it.
+            </Caption>
+          ) : null}
         </Card>
       </Pressable>
     </>

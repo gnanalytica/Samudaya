@@ -195,3 +195,30 @@ export const UPLOAD_MIME_TYPES = [
   'image/heic',
   'application/pdf',
 ] as const;
+
+/**
+ * The amounts the contribute screen offers, given what the event asks for.
+ *
+ * Societies do not think in ladders, they think in a figure: "₹2,100 per flat
+ * this year." When the committee has named one it is the whole answer, and the
+ * only other chip worth offering is twice it — for the household paying for
+ * two flats they own, or doubling as a gesture, both of which happen often
+ * enough to be worth a tap. Everything else is what the custom field is for.
+ *
+ * With no figure named, the generic ladder stands in. There is one of it now:
+ * the web offered ₹500/₹1,001/₹2,001/₹5,001 and the phone ₹1,001/₹2,001/₹5,001,
+ * which is the kind of difference nobody decides on purpose.
+ */
+export const GENERIC_CONTRIBUTION_PRESETS = [500, 1001, 2001, 5001] as const;
+
+export function contributionPresets(suggested: number | null | undefined): number[] {
+  const asked = Number(suggested ?? 0);
+  if (!Number.isFinite(asked) || asked <= 0) return [...GENERIC_CONTRIBUTION_PRESETS];
+  return [asked, asked * 2];
+}
+
+/** True when this chip is the figure the committee actually asked for. */
+export function isSuggestedAmount(preset: number, suggested: number | null | undefined): boolean {
+  const asked = Number(suggested ?? 0);
+  return Number.isFinite(asked) && asked > 0 && preset === asked;
+}

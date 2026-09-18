@@ -48,7 +48,7 @@ async function loadEvent(communityId: string, slug: string) {
   const { data: event } = await supabase
     .from('events')
     .select(
-      'id, slug, emoji, name, kind, status, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, expected_attendance, fund_target, fund_rule, fund_rule_note, created_by',
+      'id, slug, emoji, name, kind, status, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, expected_attendance, fund_target, suggested_amount, fund_rule, fund_rule_note, created_by',
     )
     .eq('community_id', communityId)
     .eq('slug', slug)
@@ -324,6 +324,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
     description: event.description ?? '',
     organizer: event.organizer ?? '',
     attendance: event.expected_attendance ? String(event.expected_attendance) : '',
+    suggestedAmount: event.suggested_amount ? String(event.suggested_amount) : '',
     fundRule: event.fund_rule as FundRule,
     fundRuleNote: event.fund_rule_note ?? '',
   }));
@@ -355,6 +356,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
         organizer: values.organizer ?? null,
         description: values.description ?? null,
         expected_attendance: values.expected_attendance ?? null,
+        suggested_amount: values.suggested_amount ?? null,
         fund_rule: values.fund_rule,
         fund_rule_note: values.fund_rule_note ?? null,
       })

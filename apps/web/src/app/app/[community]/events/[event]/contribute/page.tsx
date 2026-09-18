@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
-import { can, formatDate, formatMoney, fundedPercent, unitLabel } from '@samudaya/core';
+import { can, formatDate, formatMoney, fundBarSegments, unitLabel } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { getEventStats, requireEvent } from '@/lib/events';
@@ -36,7 +36,8 @@ export default async function ContributePage(
       .eq('membership_id', membership.id)
       .order('paid_at', { ascending: false }),
   ]);
-  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const funded = bar.confirmed;
 
   const suggested = Number.parseInt(typeof amount === 'string' ? amount : '', 10);
 
@@ -65,11 +66,20 @@ export default async function ContributePage(
               <span>{funded}%</span>
             </div>
             <div className="mt-2">
-              <FundBar percent={funded} />
+              <FundBar percent={funded} pendingPercent={bar.pending} />
             </div>
             <p className="text-ink-subtle mt-2 text-xs">
               Confirmed payments only. {stats.contributors}{' '}
               {stats.contributors === 1 ? 'household has' : 'households have'} contributed so far.
+              {stats.fundPending > 0 ? (
+                <>
+                  {' '}
+                  A further {formatMoney(stats.fundPending, community.currency)} from{' '}
+                  {stats.pendingContributors}{' '}
+                  {stats.pendingContributors === 1 ? 'household is' : 'households are'} waiting to
+                  be matched against the bank.
+                </>
+              ) : null}
             </p>
           </div>
 
@@ -80,6 +90,7 @@ export default async function ContributePage(
               eventName={event.name}
               currency={community.currency}
               suggested={Number.isFinite(suggested) && suggested > 0 ? suggested : null}
+              askedPerFlat={event.suggested_amount ? Number(event.suggested_amount) : null}
               upi={{ vpa: community.upi_vpa, payeeName: community.upi_payee_name }}
               flatLabel={flat.data ? unitLabel(flat.data) : null}
               proofFolder={`${community.id}/${membership.id}`}

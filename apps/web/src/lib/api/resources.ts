@@ -43,7 +43,7 @@ const withCommunity = (principal: ApiPrincipal) => principal.communityId;
 // Single string literals: supabase-js infers the row type from the select
 // text, and `+` concatenation widens it to `string`, collapsing the result.
 const EVENT_FIELDS =
-  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, description, status, fund_target, fund_rule, fund_rule_note, published_at, closed_at';
+  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, description, status, fund_target, suggested_amount, fund_rule, fund_rule_note, published_at, closed_at';
 
 export async function whoami(principal: ApiPrincipal) {
   const { data: community } = await principal.db

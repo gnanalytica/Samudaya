@@ -82,16 +82,30 @@ until there is an account.
 
 ### Contributing
 
-Pick a preset or custom amount → pay it from a UPI app → report it back with the
-UPI transaction ID **and the amount that actually left the account**. The amount
-is pre-filled from the preset and stays editable, because a UPI app lets you
-change the figure on the way through and people do; what the payer types is what
-gets stored.
+An event carries the figure its committee asks each flat for, set beside the
+budget it came from. The contribute screen offers that figure first and has it
+already chosen — societies decide an amount ("₹2,100 per flat this year") rather
+than a ladder, and the ladder only stands in when nobody has named one. Twice
+the figure is the other chip, for a household paying for two flats. Anything
+else is typed.
+
+Pick an amount → pay it from a UPI app → report it back with the UPI transaction
+ID **and the amount that actually left the account**. The amount is pre-filled
+and stays editable, because a UPI app lets you change the figure on the way
+through and people do; what the payer types is what gets stored.
 
 Nothing counts until somebody confirms it. A reported payment sits at `pending`
-and is invisible to the fund total; staff confirm it against the statement (by
+and is **not** in the fund total; staff confirm it against the statement (by
 hand, or by pairing it with a bank line on the Reconcile screen) and the row
 records who confirmed it and when.
+
+It is not invisible, though, and that is a deliberate correction. A resident who
+has just paid was looking at the fund bar when they decided to, and a bar that
+does not move is the app telling them nothing happened. So `event_stats` reports
+money on its way as its own number, and the bar draws it as its own fainter
+segment behind the confirmed one. Two numbers side by side, never added
+together: the headline total stays confirmed money, because a ledger of claims
+is what this replaces.
 
 ### Reconciliation
 

@@ -70,20 +70,43 @@ export function ReadinessBar({ percent }: { percent: number }) {
 }
 
 /** Fund progress. Deliberately a different colour from readiness. */
-export function FundBar({ percent }: { percent: number }) {
+/**
+ * Money raised, and — optionally — money on its way behind it.
+ *
+ * The second segment is deliberately the same hue at lower opacity rather than
+ * a colour of its own: it is the same money one step earlier, not a different
+ * kind of thing, and a resident who has just paid should be able to find their
+ * own contribution on the bar without being told the fund is further along
+ * than it is. `aria-valuenow` stays the confirmed figure for the same reason.
+ */
+export function FundBar({
+  percent,
+  pendingPercent = 0,
+}: {
+  percent: number;
+  /** Reported and not yet confirmed. Clamped to whatever the bar has left. */
+  pendingPercent?: number;
+}) {
+  const confirmed = Math.min(100, Math.max(0, percent));
+  const pending = Math.min(100 - confirmed, Math.max(0, pendingPercent));
   return (
     <div
-      className="bg-surface-sunken h-2 overflow-hidden rounded-full"
+      className="bg-surface-sunken flex h-2 overflow-hidden rounded-full"
       role="progressbar"
-      aria-valuenow={percent}
+      aria-valuenow={confirmed}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label="Fund progress"
+      aria-valuetext={
+        pending > 0
+          ? `${confirmed}% confirmed, ${pending}% waiting to be confirmed`
+          : `${confirmed}% confirmed`
+      }
     >
-      <div
-        className="bg-success h-full rounded-full transition-[width]"
-        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-      />
+      <div className="bg-success h-full transition-[width]" style={{ width: `${confirmed}%` }} />
+      {pending > 0 ? (
+        <div className="bg-success/40 h-full transition-[width]" style={{ width: `${pending}%` }} />
+      ) : null}
     </div>
   );
 }
