@@ -5,8 +5,13 @@ import { z } from 'zod';
 import {
   foundSocietyMessage,
   foundSocietySchema,
+  isPlausibleInviteCode,
+  isRedeemSuccess,
   joinMessage,
+  normalizeInviteCode,
   normalizeJoinCode,
+  normalizeRole,
+  redeemMessage,
   residentPhoneSchema,
   uuid,
 } from '@samudaya/core';
@@ -178,4 +183,94 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
 
   // The welcome card on the society's home page takes it from here.
   redirect(`/app/${row.slug}`);
+}
+
+/**
+ * The other way in: a per-flat invite code, already approved.
+ *
+ * The society code asks; this one admits. A committee member mints a code
+ * against a flat and the person who redeems it is seated immediately — same
+ * role, same flat, no waiting screen. So the preview step matters more than it
+ * does for a society code: it shows which society, which role and which flat
+ * before anybody commits, because redeeming is not a request that somebody
+ * will look over afterwards.
+ */
+export type InviteState = ActionState & {
+  code?: string;
+  preview?: {
+    communityName: string;
+    communitySlug: string;
+    role: string;
+    unitLabel: string | null;
+    expiresAt: string | null;
+  };
+};
+
+/** Looks the code up and says what it is for. Files nothing. */
+export async function checkInviteCode(
+  _prev: InviteState,
+  formData: FormData,
+): Promise<InviteState> {
+  await requireUser();
+
+  const raw = String(formData.get('invite_code') ?? '').trim();
+  const code = normalizeInviteCode(raw);
+  if (!isPlausibleInviteCode(code)) {
+    return { fieldErrors: { invite_code: 'Enter the invite code your committee sent you' } };
+  }
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.rpc('preview_invite_code', { p_code: code });
+  if (error) return { error: 'We could not check that code. Please try again.' };
+
+  const row = data?.[0];
+  // preview and redeem share one vocabulary of statuses, and one set of
+  // sentences for them, so the two steps cannot describe the same code
+  // differently.
+  if (!row || row.status !== 'ok') {
+    return { code, fieldErrors: { invite_code: redeemMessage(row?.status ?? 'not_found') } };
+  }
+
+  return {
+    code,
+    preview: {
+      communityName: row.community_name ?? 'your society',
+      communitySlug: row.community_slug ?? '',
+      role: normalizeRole(row.role) ?? 'resident',
+      unitLabel: row.unit_label,
+      expiresAt: row.expires_at,
+    },
+  };
+}
+
+/**
+ * Redeems the code and drops the member inside their society.
+ *
+ * `already_member` is a success: somebody who taps an old link twice should
+ * land on their society rather than read an error about it.
+ */
+export async function redeemInvite(_prev: InviteState, formData: FormData): Promise<InviteState> {
+  await requireUser();
+
+  const code = normalizeInviteCode(String(formData.get('invite_code') ?? ''));
+  if (!isPlausibleInviteCode(code)) {
+    return { fieldErrors: { invite_code: 'Enter the invite code your committee sent you' } };
+  }
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.rpc('redeem_invite_code', {
+    p_code: code,
+    p_channel: 'web',
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  const row = data?.[0];
+  // A null status is not a success; the generated types allow one, the
+  // function never returns one, and guessing either way is how a failed
+  // redemption would read as a join.
+  if (!row || !isRedeemSuccess(row.status ?? '')) {
+    return { code, fieldErrors: { invite_code: redeemMessage(row?.status ?? 'not_found') } };
+  }
+
+  redirect(row.community_slug ? `/app/${row.community_slug}` : '/onboarding');
 }

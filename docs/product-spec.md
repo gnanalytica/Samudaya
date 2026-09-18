@@ -53,7 +53,15 @@ That transparency is the product.
 4. Admin approves → resident is in.
 
 Invite codes remain as a second path: a code that is already approved, so the
-resident skips the waiting step.
+resident skips the waiting step. The committee mints one against a flat on the
+admin invites page and shares `/invite/CODE`; the resident sees which society,
+which role and which flat it is for, and redeeming seats them straight away —
+in that flat, as primary occupant if it had none. One use by default, and
+re-entering a code you have already used returns your seat rather than a second
+membership.
+
+Both paths sign you in first. A code names a seat; there is nobody to seat
+until there is an account.
 
 ### Admin onboarding
 
