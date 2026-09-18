@@ -6,7 +6,7 @@ import { CATALOGUE_KIND_LABEL, can, type CatalogueKind } from '@samudaya/core';
 import { useAuth } from '../lib/auth';
 import { supabase } from '../lib/supabase';
 import { useCommunityData } from '../lib/use-community-data';
-import { spacing } from '../lib/theme';
+import { spacing, tapSlop } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 import { Body, Button, Caption, Input } from './ui';
 import { Chip, ChipRow, ErrorText } from './admin-ui';
@@ -198,7 +198,7 @@ export function ManageCatalogueLink() {
   return (
     <Pressable
       accessibilityRole="link"
-      hitSlop={8}
+      hitSlop={tapSlop}
       onPress={() => router.push('/admin/catalogue')}
       style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
     >

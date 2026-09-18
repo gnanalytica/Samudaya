@@ -32,7 +32,9 @@ export function ProfileMenu({
       <summary
         className={cn(
           'hover:bg-surface-sunken flex cursor-pointer list-none items-center gap-2 rounded-lg [&::-webkit-details-marker]:hidden',
-          compact ? 'p-1' : 'px-3 py-2',
+          // Compact is a 28px avatar in the phone header; a finger gets 44.
+          'pointer-coarse:min-h-11',
+          compact ? 'p-1 pointer-coarse:min-w-11 pointer-coarse:justify-center' : 'px-3 py-2',
         )}
         aria-label={compact ? `Account menu for ${name}` : undefined}
       >

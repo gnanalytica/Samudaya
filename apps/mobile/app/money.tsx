@@ -16,7 +16,7 @@ import { Body, Button, Caption, Card, EmptyState, Loading, Screen } from '../src
 import { Chip, ChipRow } from '../src/components/admin-ui';
 import { StatTile } from '../src/components/event-ui';
 import { ViewFileChip } from '../src/components/file-ui';
-import { spacing } from '../src/lib/theme';
+import { minTapTarget, spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
 
 /**
@@ -224,6 +224,10 @@ export default function Money() {
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => router.push(`/event/${item.event_slug}`)}
+                  // Not hitSlop here: the bill chip sits four points below and
+                  // is tappable too, so a slop big enough to matter would start
+                  // taking its taps. The row grows instead.
+                  style={{ minHeight: minTapTarget, justifyContent: 'center' }}
                 >
                   <Caption>{String(item.event_name ?? 'Event')} ›</Caption>
                 </Pressable>

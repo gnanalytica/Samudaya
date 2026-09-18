@@ -21,6 +21,10 @@ export function NotificationBell({
       aria-label={showLabel ? undefined : label}
       className={cn(
         'text-ink-muted hover:bg-surface-sunken hover:text-ink relative flex items-center gap-2.5 rounded-lg',
+        // On a phone this is a 16px icon in 6px of padding, sitting in the
+        // header of every page. A finger gets 44 square; the icon does not move.
+        'pointer-coarse:min-h-11',
+        showLabel ? null : 'pointer-coarse:min-w-11 pointer-coarse:justify-center',
         className,
       )}
     >

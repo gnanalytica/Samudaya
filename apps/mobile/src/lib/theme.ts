@@ -51,3 +51,24 @@ export const palette: Record<'light' | 'dark', Palette> = {
 
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
+
+/**
+ * The smallest a tappable thing may be, in points.
+ *
+ * Apple asks for 44, Android for 48dp, and WCAG 2.5.5 for 44 — so 44 is the
+ * floor everything must clear, not the size everything should be. Button and
+ * Input already sit above it at 48 and are left alone; this is for the smaller
+ * controls, where a pill sized to its text ends up around 30 and a row around
+ * 36. The pill keeps its looks: it is the target that grows, not the type.
+ */
+export const minTapTarget = 44;
+
+/**
+ * Extra touch area for a small inline link, without moving anything.
+ *
+ * A 13–14px link is about 16–18 points tall, and `hitSlop={8}` — the habit in
+ * this codebase — only lifts it to the low thirties. Fourteen top and bottom
+ * clears 44. Horizontal stays at 8: these links sit beside other controls, and
+ * a wide slop would start swallowing taps meant for the neighbour.
+ */
+export const tapSlop = { top: 14, bottom: 14, left: 8, right: 8 } as const;
