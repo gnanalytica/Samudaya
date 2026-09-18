@@ -111,7 +111,10 @@ and every one shows its vendor, amount, requester, approver and bill.
 ### The society ledger
 
 `society_ledger` is every confirmed contribution and every approved bill, across
-every event, on one page any member can read.
+every event, on one screen any member can read — Money on the web, Money on the
+phone, reached from Me. Both read the same two views and narrow them with the
+same filters from `@samudaya/core`, so the two cannot drift into disagreeing
+about what "money in" means.
 
 - **Money out** names the vendor, the amount, the approver and the bill.
 - **Money in** names the payer and their flat, and nothing else about them — no

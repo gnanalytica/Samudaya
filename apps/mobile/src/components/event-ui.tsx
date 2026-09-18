@@ -1,5 +1,5 @@
-import { View } from 'react-native';
-import { Body, Caption, Card, Heading } from './ui';
+import { Text, View } from 'react-native';
+import { Body, Caption, Card } from './ui';
 import { radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
@@ -39,10 +39,31 @@ export function Meter({
   );
 }
 
-export function StatTile({ label, value }: { label: string; value: string }) {
+export function StatTile({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: 'success' | 'danger';
+}) {
+  const { colors } = useTheme();
+  const color =
+    tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : colors.ink;
   return (
     <Card style={{ flex: 1, gap: 2, paddingVertical: spacing.md, alignItems: 'center' }}>
-      <Heading>{value}</Heading>
+      {/* Not Heading: it fixes its own colour, and a toned tile needs its own. */}
+      <Text
+        style={{ color, fontSize: 15, fontWeight: '600' }}
+        // A balance is the one figure people read at a glance, and it can be
+        // long. Let it shrink rather than wrap mid-number or clip.
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
+        {value}
+      </Text>
       <Caption>{label}</Caption>
     </Card>
   );
