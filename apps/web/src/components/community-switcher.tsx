@@ -30,7 +30,7 @@ export function CommunitySwitcher({
 
   return (
     <details className="group relative">
-      <summary className="hover:bg-surface-sunken flex cursor-pointer list-none items-center gap-2.5 rounded-lg px-2 py-1.5">
+      <summary className="hover:bg-surface-sunken flex cursor-pointer list-none items-center gap-2.5 rounded-lg px-2 py-1.5 pointer-coarse:min-h-11">
         <span className="bg-accent text-accent-ink grid size-8 shrink-0 place-items-center rounded-lg text-sm font-bold">
           {current.name.charAt(0).toUpperCase()}
         </span>

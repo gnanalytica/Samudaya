@@ -40,10 +40,12 @@ function RootStack() {
         <Stack.Screen name="campaign/new" options={{ title: 'New campaign' }} />
         <Stack.Screen name="admin/requests" options={{ title: 'Join requests' }} />
         <Stack.Screen name="people" options={{ title: 'People' }} />
+        <Stack.Screen name="money" options={{ title: 'Money' }} />
         <Stack.Screen name="admin/member/[id]" options={{ title: 'Resident' }} />
         <Stack.Screen name="admin/bills" options={{ title: 'Bills' }} />
         <Stack.Screen name="admin/bill" options={{ title: 'Bill' }} />
         <Stack.Screen name="admin/payments" options={{ title: 'Payments' }} />
+        <Stack.Screen name="admin/reconcile" options={{ title: 'Reconcile' }} />
         <Stack.Screen name="admin/upi" options={{ title: 'UPI ID' }} />
         {/* Old link for committee decisions; redirects to the To do queue. */}
         <Stack.Screen name="admin/queue" options={{ title: COPY.todo }} />

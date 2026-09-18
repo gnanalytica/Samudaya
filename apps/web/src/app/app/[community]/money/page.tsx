@@ -1,15 +1,21 @@
 import Link from 'next/link';
 import { ArrowDownLeft, ArrowUpRight, Scale, Wallet } from 'lucide-react';
-import { formatDate, formatMoney, relativeTime } from '@samudaya/core';
+import {
+  LEDGER_FILTERS,
+  filterLedger,
+  formatDate,
+  formatMoney,
+  ledgerFilterFrom,
+  relativeTime,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { rowsOf } from '@/lib/rows';
-import { LEDGER_FILTERS, filterLedger, ledgerFilterFrom } from '@/lib/ledger-filter';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatTile } from '@/components/badges';
+import { StatTile, StatTiles } from '@/components/badges';
 import { BillLink } from '@/components/bill-link';
 
 export const metadata = { title: 'Money' };
@@ -65,7 +71,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         description={`Every rupee ${community.name} has taken in and spent, since the day it started.`}
       />
       <PageBody>
-        <div className="grid grid-cols-3 gap-3">
+        <StatTiles>
           <StatTile
             label="Collected"
             value={formatMoney(Number(totals.data?.total_in ?? 0), community.currency)}
@@ -79,7 +85,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
             value={formatMoney(balance, community.currency)}
             tone={balance < 0 ? 'danger' : 'success'}
           />
-        </div>
+        </StatTiles>
 
         <Card className="mt-5">
           <CardHeader
@@ -98,7 +104,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                   id="show"
                   name="show"
                   defaultValue={filter}
-                  className="border-border-base bg-surface-raised text-ink rounded-lg border px-3 py-2 pr-8 text-sm"
+                  className="border-border-base bg-surface-raised text-ink rounded-lg border px-3 py-2 pr-8 text-base sm:text-sm"
                 >
                   {LEDGER_FILTERS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -116,7 +122,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                     id="event"
                     name="event"
                     defaultValue={eventFilter}
-                    className="border-border-base bg-surface-raised text-ink rounded-lg border px-3 py-2 pr-8 text-sm"
+                    className="border-border-base bg-surface-raised text-ink rounded-lg border px-3 py-2 pr-8 text-base sm:text-sm"
                   >
                     <option value="">Every event</option>
                     {events.map(([value, label]) => (

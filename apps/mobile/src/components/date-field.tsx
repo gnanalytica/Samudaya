@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import { radius, spacing } from '../lib/theme';
+import { radius, spacing, tapSlop } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 import { Button } from './ui';
 
@@ -125,7 +125,7 @@ export function DateField({
             accessibilityRole="button"
             accessibilityLabel={`Clear ${label}`}
             onPress={() => onChange(null)}
-            hitSlop={8}
+            hitSlop={tapSlop}
           >
             <Text style={{ color: colors.accent, fontSize: 14, fontWeight: '600' }}>Clear</Text>
           </Pressable>

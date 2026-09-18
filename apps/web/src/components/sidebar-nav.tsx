@@ -66,6 +66,9 @@ export function SidebarNav({
                     aria-current={active ? 'page' : undefined}
                     className={cn(
                       'flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors',
+                      // The sidebar is desktop-only by width, which is not the
+                      // same as mouse-only: a tablet in landscape is both.
+                      'pointer-coarse:min-h-11',
                       active
                         ? 'bg-surface-sunken text-ink font-medium'
                         : 'text-ink-muted hover:bg-surface-sunken hover:text-ink',

@@ -102,6 +102,12 @@ An automatic bank feed needs an RBI-licensed account aggregator in the middle.
 The import and a feed post through the same function, so connecting one changes
 nothing on the screen.
 
+Staff reconcile on the web or on the phone, through the same functions and the
+same statement reader. The phone fetches a line's candidate matches when the
+line is opened rather than all of them up front — forty round trips is a
+server's luxury, not a phone's — so an unopened line neither offers a match nor
+claims there is none.
+
 ### Expenses
 
 A committee member submits an expense with a bill. An admin approves, rejects,
@@ -111,7 +117,10 @@ and every one shows its vendor, amount, requester, approver and bill.
 ### The society ledger
 
 `society_ledger` is every confirmed contribution and every approved bill, across
-every event, on one page any member can read.
+every event, on one screen any member can read — Money on the web, Money on the
+phone, reached from Me. Both read the same two views and narrow them with the
+same filters from `@samudaya/core`, so the two cannot drift into disagreeing
+about what "money in" means.
 
 - **Money out** names the vendor, the amount, the approver and the bill.
 - **Money in** names the payer and their flat, and nothing else about them — no
@@ -140,7 +149,13 @@ quietly correct is not an audit log.
 It is readable by staff, because it holds every field of every change including
 a neighbour's contribution. What a resident is owed is on the record itself —
 who approved this bill, when, and whether anybody has touched it since — and that
-is shown next to the record.
+is shown next to the record, on the web and on the phone.
+
+One rule decides what that line says, and both apps read it from
+`@samudaya/core`: **an edit is only mentioned when it happened after the
+approval.** Every row has been modified at the moment it was made, and a column
+that says so on every line is one people stop reading — taking the edit that
+mattered with it.
 
 ### Voting
 

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { radius, spacing } from '../lib/theme';
+import { minTapTarget, radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
 /** A small selectable pill, used for role and title pickers. */
@@ -25,6 +25,8 @@ export function Chip({
         borderRadius: radius.pill,
         paddingHorizontal: spacing.md,
         paddingVertical: 7,
+        minHeight: minTapTarget,
+        justifyContent: 'center',
         backgroundColor: selected ? colors.accent : colors.surfaceRaised,
         borderColor: selected ? colors.accent : colors.border,
         borderWidth: StyleSheet.hairlineWidth,
@@ -70,6 +72,7 @@ export function LinkRow({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingVertical: spacing.sm,
+        minHeight: minTapTarget,
         opacity: pressed ? 0.7 : 1,
       })}
     >
@@ -118,7 +121,9 @@ export function Segmented<T extends string>({
             style={({ pressed }) => ({
               flex: 1,
               alignItems: 'center',
+              justifyContent: 'center',
               paddingVertical: 8,
+              minHeight: minTapTarget,
               borderRadius: radius.sm - 2,
               backgroundColor: selected ? colors.surfaceRaised : 'transparent',
               borderColor: selected ? colors.border : 'transparent',
@@ -171,6 +176,7 @@ export function Disclosure({
           justifyContent: 'space-between',
           gap: spacing.md,
           paddingVertical: spacing.xs,
+          minHeight: minTapTarget,
           opacity: pressed ? 0.7 : 1,
         })}
       >

@@ -95,6 +95,15 @@ export default function Manage() {
             detail="Who has paid for each event"
             onPress={() => router.push('/admin/payments')}
           />
+          {/* Same capability the screen itself checks, so the row is not an
+              invitation to a page that will turn you away. */}
+          {can(role, 'payments:record') ? (
+            <LinkRow
+              label="Reconcile"
+              detail="Pair the bank's statement with the payments people reported"
+              onPress={() => router.push('/admin/reconcile')}
+            />
+          ) : null}
           {can(role, 'roles:manage') ? (
             <LinkRow
               label={COPY.societySettings}

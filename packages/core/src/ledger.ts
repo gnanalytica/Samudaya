@@ -2,9 +2,14 @@
  * Narrowing the society ledger, in one place and without a database round trip.
  *
  * The ledger is bounded (500 rows, newest first) and already in memory, so
- * filtering it here keeps the page a single read and lets the filters live in a
- * GET form — which means a filtered ledger is a URL somebody can send to the
- * neighbour who is asking where the money went.
+ * filtering it here keeps the screen a single read. On the web that lets the
+ * filters live in a GET form, which means a filtered ledger is a URL somebody
+ * can send to the neighbour asking where the money went; the native app holds
+ * the same values in state and reads them through the same functions.
+ *
+ * Shared rather than copied: the two apps disagreeing about what "money in"
+ * means is the kind of difference nobody notices until a resident compares
+ * their phone with somebody's laptop and the totals do not match.
  */
 
 export const LEDGER_FILTERS = [

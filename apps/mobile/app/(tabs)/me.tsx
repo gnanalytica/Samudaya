@@ -100,6 +100,13 @@ export default function Me() {
             detail="Join requests, payments, bills and new events"
             onPress={() => router.push('/notifications')}
           />
+          {/* Everyone's, not just this member's: the tiles below are what you
+              gave, this is what the society took in and spent. */}
+          <LinkRow
+            label="Society money"
+            detail="Every rupee in and out, for every event"
+            onPress={() => router.push('/money')}
+          />
         </Card>
 
         {participant ? (

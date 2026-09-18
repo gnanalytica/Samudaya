@@ -19,7 +19,7 @@ import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventStatusBadge, FundBar, StatTile } from '@/components/badges';
+import { EventStatusBadge, FundBar, StatTile, StatTiles } from '@/components/badges';
 import { SetupChecklist } from './setup-checklist';
 
 export const metadata = { title: 'Manage events' };
@@ -85,7 +85,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
           </Link>
         ) : null}
 
-        <div className="grid grid-cols-3 gap-3">
+        <StatTiles>
           <StatTile
             label="Live"
             value={String(events.filter((event) => event.status === 'published').length)}
@@ -95,7 +95,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
             value={String(events.filter((event) => event.status === 'draft').length)}
           />
           <StatTile label="Members" value={String(members.count ?? 0)} />
-        </div>
+        </StatTiles>
 
         <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Events and campaigns</h2>
         {events.length ? (

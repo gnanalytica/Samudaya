@@ -28,7 +28,7 @@ import { PageBody } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatTile } from '@/components/badges';
+import { StatTile, StatTiles } from '@/components/badges';
 import { WelcomeCard } from '@/components/welcome-card';
 
 export default async function DashboardPage(props: PageProps<'/app/[community]'>) {
@@ -183,11 +183,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   ) : null}
                 </div>
               </div>
-              <div className="border-border-base grid grid-cols-3 gap-3 border-t p-4">
+              <StatTiles className="border-border-base border-t p-4">
                 <StatTile label="Spent" value={formatMoney(s?.spent ?? 0, community.currency)} />
                 <StatTile label={`${COPY.households} gave`} value={String(s?.contributors ?? 0)} />
                 <StatTile label="Registered" value={String(s?.participants ?? 0)} />
-              </div>
+              </StatTiles>
             </div>
 
             <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Take part</h2>
