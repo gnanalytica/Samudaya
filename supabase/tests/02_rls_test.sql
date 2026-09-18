@@ -1904,6 +1904,51 @@ select test.eq(
   0::bigint,
   'no security definer function in public is callable by anon');
 
+-- That sweep asks only about `public`, which is how forty definer functions in
+-- `app` went unnoticed until 0920.0800: anon held EXECUTE on every one of them.
+-- They were unreachable, because PostgREST exposes `public` and
+-- `graphql_public` only — but that is project config in a dashboard, not a
+-- grant, and this suite should not be resting on it. Reaching a function takes
+-- USAGE on its schema as well as EXECUTE on the function, so the honest sweep
+-- asks for both, and covers `app` the day somebody adds a function there.
+select test.eq(
+  (select count(*) from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname in ('public', 'app') and p.prosecdef
+      and has_schema_privilege('anon', n.oid, 'USAGE')
+      and has_function_privilege('anon', p.oid, 'EXECUTE')),
+  0::bigint,
+  'no security definer function in public or app is reachable by anon');
+
+select test.ok(
+  not has_schema_privilege('anon', 'app', 'USAGE'),
+  'anon cannot enter the app schema at all');
+
+-- Taking that USAGE away must not cost the roles that do the work. It is the
+-- SECURITY INVOKER paths that would notice: todo_items() lives in `public` and
+-- calls app.flat_label(), so it runs on the caller's own privileges.
+select test.ok(
+  has_schema_privilege('authenticated', 'app', 'USAGE')
+    and has_schema_privilege('service_role', 'app', 'USAGE'),
+  'authenticated and service_role keep their way into app');
+
+-- And the behaviour the revoke is not allowed to change. An RLS policy calling
+-- app.is_member() keeps filtering for a role that cannot enter `app`, because
+-- policy expressions are not privilege-checked against the querying role. This
+-- reads a table with rows in it on purpose: an empty table never evaluates its
+-- policy, so it would pass this whether or not the revoke broke anything.
+reset role;
+select test.ok(
+  (select count(*) from public.events) > 0,
+  'the policy check below is reading a table that actually has rows');
+
+select test.act_anon();
+select test.eq(
+  (select count(*) from public.events),
+  0::bigint,
+  'anon still reads an empty events list rather than hitting a schema error');
+reset role;
+
 -- The roles that do the work keep it. service_role matters on its own: the
 -- WhatsApp bot and the v1 API call these with it, and a revoke that took PUBLIC
 -- and its grant together would break both silently.
