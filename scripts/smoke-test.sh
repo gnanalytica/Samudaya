@@ -82,6 +82,15 @@ check "GET / renders the landing page" 200 "$(status "$BASE/")"
 check "GET /login renders" 200 "$(status "$BASE/login")"
 check "GET /app redirects a signed-out visitor" 307 \
   "$(status -o /dev/null "$BASE/app")"
+check "GET /privacy renders" 200 "$(status "$BASE/privacy")"
+check "GET /terms renders" 200 "$(status "$BASE/terms")"
+# This one is filed with Google Play as the app's account-deletion URL, and
+# has to answer for somebody who has uninstalled the app and cannot sign in.
+# A 404 here is not a broken page, it is a broken compliance commitment.
+check "GET /delete-account renders for a signed-out visitor" 200 \
+  "$(status "$BASE/delete-account")"
+contains "and tells them how to delete their account" "Delete your account" \
+  "$(curl -s "$BASE/delete-account")"
 
 echo "▸ REST API refuses anonymous callers"
 for path in /api/v1/me /api/v1/events /api/v1/announcements /api/v1/polls /api/v1/members; do

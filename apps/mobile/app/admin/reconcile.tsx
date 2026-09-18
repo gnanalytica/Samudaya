@@ -6,6 +6,7 @@ import { can, formatDate, formatMoney, parseStatement, relativeTime } from '@sam
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
+import { reportHandled } from '../../src/lib/observability';
 import {
   Badge,
   Body,
@@ -107,6 +108,7 @@ export default function Reconcile() {
           failure.message,
           failure.details ?? '',
         );
+        reportHandled(failure, 'reconciliation');
         throw new Error(failure.message);
       }
       return {

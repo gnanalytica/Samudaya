@@ -19,8 +19,17 @@ const PUBLIC_PATHS = [
   '/login',
   // Shared join links; the route sends signed-out visitors to sign in.
   '/join',
+  // The same, for a per-flat invite code. Without this the proxy sends them to
+  // /login first and the route's own signed-out branch — which lands them on
+  // the invite form rather than back here — never runs.
+  '/invite',
   '/privacy',
   '/terms',
+  // Google Play requires an account-deletion page reachable by somebody who
+  // has already uninstalled the app, which means somebody who cannot sign in.
+  // Putting it behind the session check would make the URL we file with Play
+  // useless to exactly the people it is for.
+  '/delete-account',
   '/auth',
   '/api/webhooks',
   '/api/v1',

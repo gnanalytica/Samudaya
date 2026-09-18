@@ -165,6 +165,23 @@ approval.** Every row has been modified at the moment it was made, and a column
 that says so on every line is one people stop reading — taking the edit that
 mattered with it.
 
+### Leaving
+
+A member can delete their account from inside either app, and from a public web
+page for anybody who has already uninstalled — both stores require all three.
+What goes is everything personal: the profile, every membership, the flat, join
+requests, votes, sign-ups, notifications, the WhatsApp link and the push token.
+What stays is the money: contributions and bills remain in the society's ledger
+with the link to the person removed, because a total that changes when somebody
+leaves is not a record.
+
+One case is refused, and says which society: the last committee member of a
+society that still has other members. Nobody would be left who could approve a
+bill or admit a resident, and appointing a committee member is itself a
+committee act, so nobody left could fix it either. A society whose _only_
+member leaves is deleted with them — an empty society cannot be read or joined
+by anyone ever again.
+
 ### Voting
 
 A resident suggests, the committee opens it for voting, everybody has their say,

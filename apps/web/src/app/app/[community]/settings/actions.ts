@@ -1,8 +1,15 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { residentPhoneSchema } from '@samudaya/core';
+import {
+  DELETE_ACCOUNT_CONFIRMATION,
+  deleteAccountMessage,
+  isAccountDeleted,
+  isDeleteConfirmed,
+  residentPhoneSchema,
+} from '@samudaya/core';
 import { requireCommunity, requireUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/lib/action-state';
@@ -66,4 +73,40 @@ export async function unlinkWhatsApp(formData: FormData): Promise<void> {
   await supabase.from('whatsapp_links').delete().eq('user_id', user.id);
 
   revalidatePath(`/app/${slug}/settings`);
+}
+
+/**
+ * Deletes the signed-in account, then signs the browser out of what is left.
+ *
+ * Both stores require this path to exist before they will take the app at all,
+ * and the database function is where the rules live — what goes, what the
+ * ledger keeps, and the one case it refuses. This is the form around it.
+ *
+ * The typed confirmation is checked here as well as in the browser, because a
+ * server action is a public endpoint: the field is a speed bump for the person
+ * and the check is the actual guard.
+ */
+export async function deleteAccount(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await requireUser();
+
+  if (!isDeleteConfirmed(String(formData.get('confirm') ?? ''))) {
+    return { fieldErrors: { confirm: `Type ${DELETE_ACCOUNT_CONFIRMATION} to confirm.` } };
+  }
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.rpc('delete_my_account');
+  if (error) return { error: friendlyDbError(error) };
+
+  const row = data?.[0];
+  // A null status is not a success. The generated type allows one and the
+  // function never returns one; guessing either way is how a refused deletion
+  // would sign somebody out and tell them their account is gone.
+  if (!row || !isAccountDeleted(row.status ?? '')) {
+    return { error: deleteAccountMessage(row?.status ?? '', row?.detail) };
+  }
+
+  // The session's user no longer exists. Signing out is what stops the next
+  // request from being an authenticated one against a deleted account.
+  await supabase.auth.signOut();
+  redirect('/?deleted=1');
 }

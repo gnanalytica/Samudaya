@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
 import { useCommunityData } from '../src/lib/use-community-data';
+import { reportHandled } from '../src/lib/observability';
 import { Body, Button, Caption, Card, EmptyState, Loading, Screen } from '../src/components/ui';
 import { Chip, ChipRow } from '../src/components/admin-ui';
 import { StatTile } from '../src/components/event-ui';
@@ -74,6 +75,7 @@ export default function Money() {
           failure.message,
           failure.details ?? '',
         );
+        reportHandled(failure, 'the society ledger');
         throw new Error(failure.message);
       }
       return { rows: ledger.data ?? [], totals: totals.data ?? null };

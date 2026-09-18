@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 /**
@@ -26,6 +27,14 @@ export function rowsOf<T>(
       result.error.message,
       result.error.details ?? '',
     );
+    // The console line only helps somebody already looking. This is the path
+    // where a broken query renders as an empty page, so it is exactly the
+    // failure nobody reports and everybody works around.
+    Sentry.captureMessage(`read failed: ${where}`, {
+      level: 'error',
+      tags: { where, pgcode: result.error.code },
+      extra: { message: result.error.message, details: result.error.details },
+    });
     return [];
   }
   return result.data ?? [];
