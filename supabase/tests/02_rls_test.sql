@@ -1879,10 +1879,52 @@ select test.ok(
   not has_function_privilege('anon', 'public.member_history(uuid)', 'EXECUTE'),
   'nor ask what a member has paid');
 
--- The ones that must stay open: joining happens before you have an account.
+-- 0920.0700 retired this exception. Joining needs a session: /join/CODE sends a
+-- visitor without one to /login first, and mobile's index to /sign-in, so
+-- request_to_join is only ever reached as `authenticated`. What a joiner lacks
+-- is a membership, not an account, and confusing the two is what carved this
+-- hole out in the first place.
 select test.ok(
-  has_function_privilege('anon', 'public.request_to_join(text,uuid,text,text,public.occupant_relation)', 'EXECUTE'),
-  'while the join flow still works for somebody who has no account yet');
+  not has_function_privilege('anon',
+    'public.request_to_join(text,uuid,text,text,public.occupant_relation)', 'EXECUTE'),
+  'and joining needs a session too — a joiner lacks a membership, not an account');
+select test.ok(
+  has_function_privilege('authenticated',
+    'public.request_to_join(text,uuid,text,text,public.occupant_relation)', 'EXECUTE'),
+  'which is exactly who the join form calls it as');
+
+-- Nothing in `public` is callable before sign-in any more. Written as a sweep
+-- rather than a list so a function added later is covered the day it lands,
+-- instead of the day somebody remembers to extend a list.
+select test.eq(
+  (select count(*) from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.prosecdef
+      and has_function_privilege('anon', p.oid, 'EXECUTE')),
+  0::bigint,
+  'no security definer function in public is callable by anon');
+
+-- The roles that do the work keep it. service_role matters on its own: the
+-- WhatsApp bot and the v1 API call these with it, and a revoke that took PUBLIC
+-- and its grant together would break both silently.
+select test.ok(
+  has_function_privilege('service_role', 'public.review_contribution(uuid,boolean,text)', 'EXECUTE'),
+  'the WhatsApp bot and the API keep their door');
+select test.ok(
+  has_function_privilege('authenticated', 'public.society_people(uuid)', 'EXECUTE'),
+  'and a signed-in member can still read the directory');
+
+-- Invite codes were switched off in 0913.0300 by a revoke that did not take,
+-- because it removed authenticated's grant and left PUBLIC's. Now they are off.
+select test.ok(
+  not has_function_privilege('authenticated',
+    'public.redeem_invite_code(text,public.origin_channel)', 'EXECUTE'),
+  'a retired function is retired from everybody, not just from its own grant');
+select test.ok(
+  has_function_privilege('authenticated',
+    'public.create_invite_code(uuid,public.member_role,uuid,public.occupant_relation,integer,timestamptz,text)',
+    'EXECUTE'),
+  'while the invites page the committee still uses keeps working');
 
 -- And the people who should be able to call them still can.
 select test.ok(
