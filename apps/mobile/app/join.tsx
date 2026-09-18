@@ -288,6 +288,13 @@ export default function Join() {
                 onPress={() => void continueToDetails()}
                 loading={lookingUp}
               />
+              {/* The other way in. A code addressed to one resident admits them
+                  without a request, so it does not belong on this form. */}
+              <Button
+                label="I was sent an invite code instead"
+                variant="secondary"
+                onPress={() => router.push('/invite')}
+              />
             </Card>
           ) : (
             <Card style={{ gap: spacing.lg }}>

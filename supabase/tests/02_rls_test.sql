@@ -1959,17 +1959,121 @@ select test.ok(
   has_function_privilege('authenticated', 'public.society_people(uuid)', 'EXECUTE'),
   'and a signed-in member can still read the directory');
 
--- Invite codes were switched off in 0913.0300 by a revoke that did not take,
--- because it removed authenticated's grant and left PUBLIC's. Now they are off.
-select test.ok(
-  not has_function_privilege('authenticated',
-    'public.redeem_invite_code(text,public.origin_channel)', 'EXECUTE'),
-  'a retired function is retired from everybody, not just from its own grant');
+-- Per-flat invite codes are a live feature, whatever 0913.0300's comment said
+-- while revoking all three from authenticated — a revoke that did nothing,
+-- because PUBLIC's grant stayed. 0920.0900 corrected the record: the codes stay.
+--
+-- So these two assertions are not two halves of one decision. The first is the
+-- feature, and must not be swept away again by a security pass reading that
+-- stale comment. The second is only that the redemption flow does not exist
+-- yet: nothing anywhere calls redeem_invite_code, so it is granted to
+-- service_role alone until the screen that needs it is written.
 select test.ok(
   has_function_privilege('authenticated',
     'public.create_invite_code(uuid,public.member_role,uuid,public.occupant_relation,integer,timestamptz,text)',
     'EXECUTE'),
-  'while the invites page the committee still uses keeps working');
+  'the committee can still mint a per-flat invite code');
+select test.ok(
+  has_function_privilege('authenticated',
+    'public.redeem_invite_code(text,public.origin_channel)', 'EXECUTE'),
+  'and since 0920.1000 a member can redeem one, because a screen now calls it');
+select test.ok(
+  has_function_privilege('authenticated', 'public.preview_invite_code(text)', 'EXECUTE'),
+  'and see which society it is for before committing to it');
+
+-- ---------------------------------------------------------------------------
+-- Redeeming a code, end to end
+-- ---------------------------------------------------------------------------
+-- The functions were written whole in 0912.0500 and sat unreachable for a
+-- fortnight, so nothing had ever exercised them from outside. This walks the
+-- path a resident actually takes: a committee member mints a code against a
+-- flat, somebody who is not a member previews it, redeems it, and lands inside
+-- with the flat already theirs.
+select test.act_as('11111111-1111-4111-8111-111111111111');
+create temporary table redeem_probe as
+select code from public.create_invite_code(
+  'aaaaaaaa-0000-4000-8000-000000000001',   -- My Home Residency
+  'resident',
+  'bbbbbbbb-0000-4000-8000-000000000001',   -- flat A 101
+  'owner',
+  1,                                        -- one use only
+  null,
+  'A 101 owner');
+
+select test.eq((select length(code) from redeem_probe), 8,
+  'a minted code is eight characters of the no-lookalikes alphabet');
+
+-- Ismail founded societies of his own but has never been near this one.
+select test.act_as('b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9');
+
+select test.eq(
+  (select p.status from redeem_probe r,
+     lateral public.preview_invite_code(r.code) p),
+  'ok', 'an outsider can look the code up before using it');
+select test.eq(
+  (select p.community_name from redeem_probe r,
+     lateral public.preview_invite_code(r.code) p),
+  'My Home Residency', 'and is told which society it lets them into');
+select test.eq(
+  (select p.unit_label from redeem_probe r,
+     lateral public.preview_invite_code(r.code) p),
+  'A 101', 'and which flat, so nobody joins by guessing');
+
+select test.eq(
+  (select d.status from redeem_probe r,
+     lateral public.redeem_invite_code(r.code, 'web') d),
+  'ok', 'redeeming it puts them in');
+select test.eq(
+  (select m.role::text from public.memberships m
+    where m.community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and m.user_id = 'b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9'),
+  'resident', 'with the role the code carried, already active');
+select test.eq(
+  (select count(*) from public.unit_occupants o
+     join public.memberships m on m.id = o.membership_id
+    where o.unit_id = 'bbbbbbbb-0000-4000-8000-000000000001'
+      and m.user_id = 'b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9'),
+  1::bigint, 'and seated in the flat the code named');
+
+reset role;
+select test.eq(
+  (select ic.used_count from public.invite_codes ic
+     join redeem_probe r on r.code = ic.code),
+  1, 'the use is counted');
+select test.eq(
+  (select count(*) from public.invite_code_redemptions red
+     join public.invite_codes ic on ic.id = red.invite_code_id
+     join redeem_probe r on r.code = ic.code),
+  1::bigint, 'and written down, which nothing had ever done before');
+
+-- Idempotent: the same person entering the same code again gets their seat
+-- back rather than a second membership.
+select test.act_as('b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9');
+select test.eq(
+  (select d.status from redeem_probe r,
+     lateral public.redeem_invite_code(r.code, 'web') d),
+  'already_member', 'using it twice is not an error, just nothing new');
+reset role;
+select test.eq(
+  (select count(*) from public.memberships m
+    where m.community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and m.user_id = 'b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9'),
+  1::bigint, 'and certainly not a second seat');
+
+-- max_uses was one, and it is spent.
+select test.act_as('66666666-6666-4666-8666-666666666666');
+select test.eq(
+  (select d.status from redeem_probe r,
+     lateral public.redeem_invite_code(r.code, 'web') d),
+  'exhausted', 'a one-use code does not let a second stranger in');
+reset role;
+select test.eq(
+  (select count(*) from public.memberships m
+    where m.community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and m.user_id = '66666666-6666-4666-8666-666666666666'),
+  0::bigint, 'and leaves them outside');
+
+drop table redeem_probe;
 
 -- And the people who should be able to call them still can.
 select test.ok(

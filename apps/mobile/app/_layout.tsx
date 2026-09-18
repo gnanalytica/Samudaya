@@ -51,6 +51,8 @@ function RootStack() {
         <Stack.Screen name="admin/queue" options={{ title: COPY.todo }} />
         <Stack.Screen name="welcome" options={{ headerShown: false }} />
         <Stack.Screen name="join/[code]" options={{ headerShown: false }} />
+        <Stack.Screen name="invite" options={{ title: 'Invite code' }} />
+        <Stack.Screen name="invite/[code]" options={{ headerShown: false }} />
         <Stack.Screen name="found" options={{ title: 'Start a society' }} />
         <Stack.Screen name="admin/setup" options={{ title: 'Setup' }} />
         <Stack.Screen name="admin/society-settings" options={{ title: COPY.societySettings }} />

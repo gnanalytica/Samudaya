@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Building2, Clock, KeyRound, RefreshCw, XCircle } from 'lucide-react';
+import { Building2, Clock, KeyRound, RefreshCw, Ticket, XCircle } from 'lucide-react';
 import { relativeTime } from '@samudaya/core';
 import { getMemberships, getProfile, requireUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { CreateFlow } from './create-flow';
+import { InviteFlow } from './invite-flow';
 import { JoinFlow } from './join-flow';
 import { withdrawJoinRequest } from './actions';
 
@@ -41,12 +42,14 @@ async function latestRequest(userId: string) {
  */
 export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
   const user = await requireUser();
-  const { mode, code } = await props.searchParams;
+  const { mode, code, invite } = await props.searchParams;
   const profile = await getProfile();
   // From a shared join link: /join/CODE fills the society code in.
   const initialCode = typeof code === 'string' ? code.toUpperCase().slice(0, 16) : '';
+  // From a shared invite link: /invite/CODE fills the invite code in.
+  const initialInvite = typeof invite === 'string' ? invite.toUpperCase().slice(0, 16) : '';
   // A deliberate choice, as opposed to "I just landed here".
-  const intent = mode === 'join' || mode === 'create' ? mode : null;
+  const intent = mode === 'join' || mode === 'create' || mode === 'invite' ? mode : null;
 
   const memberships = await getMemberships();
   const firstSlug = memberships[0]?.communities?.slug;
@@ -143,6 +146,21 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
                 </Link>
               </p>
             </>
+          ) : intent === 'invite' || initialInvite ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight">Use your invite code</h1>
+              <p className="text-ink-muted mt-1.5 mb-6 text-sm">
+                A code your committee sent you personally. It admits you straight away, with your
+                flat already set.
+              </p>
+              <InviteFlow initialCode={initialInvite} />
+              <p className="text-ink-muted mt-5 text-center text-sm">
+                Only have the society code everyone shares?{' '}
+                <Link href="/onboarding?mode=join" className="text-accent hover:underline">
+                  Join with that instead
+                </Link>
+              </p>
+            </>
           ) : intent === 'join' || initialCode ? (
             <>
               <h1 className="text-2xl font-semibold tracking-tight">Join your society</h1>
@@ -170,6 +188,12 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
                   icon={<KeyRound className="size-5" aria-hidden="true" />}
                   title="I have a society code"
                   detail="Your committee shares one code with every resident. Pick your flat and staff let you in."
+                />
+                <ChoiceCard
+                  href="/onboarding?mode=invite"
+                  icon={<Ticket className="size-5" aria-hidden="true" />}
+                  title="I was sent an invite code"
+                  detail="A code addressed to you and your flat. No waiting — it admits you as soon as you use it."
                 />
                 <ChoiceCard
                   href="/onboarding?mode=create"
