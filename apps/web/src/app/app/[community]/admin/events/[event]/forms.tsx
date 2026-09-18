@@ -615,16 +615,37 @@ export function ReviewPaymentForm({
   slug,
   eventSlug,
   contributionId,
+  showReferenceField,
 }: {
   slug: string;
   eventSlug: string;
   contributionId: string;
+  /** True when the row has no reference yet, or the caller cannot tell. */
+  showReferenceField: boolean;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(reviewPayment, EMPTY_STATE);
   return (
     <form action={action} className="space-y-2">
       <Hidden slug={slug} eventSlug={eventSlug} />
       <input type="hidden" name="contribution_id" value={contributionId} />
+      {/* Only when it is missing. Whoever is confirming has the statement open
+          and the screenshot in front of them, so this is the cheapest moment
+          in the whole flow to capture the one thing reconciliation needs — and
+          asking for it again on rows that already have it would be noise. */}
+      {showReferenceField ? (
+        <>
+          <label htmlFor={`pay-ref-${contributionId}`} className="sr-only">
+            UPI transaction ID from the screenshot
+          </label>
+          <Input
+            id={`pay-ref-${contributionId}`}
+            name="reference"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="UPI transaction ID from the screenshot (optional)"
+          />
+        </>
+      ) : null}
       <label htmlFor={`pay-note-${contributionId}`} className="sr-only">
         Reason, if turning it down
       </label>

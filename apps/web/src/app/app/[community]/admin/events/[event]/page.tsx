@@ -588,6 +588,7 @@ export default async function ManageEventPage(
                         slug={slug}
                         eventSlug={event.slug}
                         contributionId={payment.id}
+                        showReferenceField={!payment.reference}
                       />
                     </li>
                   ))}

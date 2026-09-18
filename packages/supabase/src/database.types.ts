@@ -2850,6 +2850,7 @@ export type Database = {
         p_contribution_id: string
         p_confirm: boolean
         p_note?: string
+        p_reference?: string
       }
         Returns: Database["public"]["Tables"]["contributions"]["Row"]
       }

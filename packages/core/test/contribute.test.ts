@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { contributionPresets, isSuggestedAmount } from '../src/payments';
+import {
+  contributionPresets,
+  isSuggestedAmount,
+  paymentEvidenceProblem,
+  reportPaymentSchema,
+} from '../src/payments';
 import { fundBarSegments, fundedPercent, normalizeStats } from '../src/events';
 
 /**
@@ -86,5 +91,62 @@ describe('isSuggestedAmount', () => {
     for (const preset of [500, 1001, 2001, 5001]) {
       expect(isSuggestedAmount(preset, null)).toBe(false);
     }
+  });
+});
+
+describe('optionalUpiReference', () => {
+  const parse = (input: unknown) => reportPaymentSchema.shape.reference.safeParse(input);
+
+  it('accepts a real twelve-digit reference', () => {
+    expect(parse('612345678901').data).toBe('612345678901');
+  });
+
+  it('strips the spaces UPI apps put in one', () => {
+    expect(parse(' 6123 4567 8901 ').data).toBe('612345678901');
+  });
+
+  it('treats empty, null and missing alike, as no reference at all', () => {
+    for (const nothing of ['', '   ', null, undefined]) {
+      const result = parse(nothing);
+      expect(result.success, String(nothing)).toBe(true);
+      expect(result.data, String(nothing)).toBeNull();
+    }
+  });
+
+  it('still refuses a half-typed one, which would match nothing and look like it should', () => {
+    for (const wrong of ['61234', '6123-4567-8901!', 'way-too-long-to-be-a-reference-x']) {
+      expect(parse(wrong).success, wrong).toBe(false);
+    }
+  });
+
+  it('is as loose about the shape as it always was, deliberately', () => {
+    // 10 to 22 alphanumerics, because apps differ about what they print and a
+    // stricter rule would reject real references. It is a hint for the bank
+    // matcher, not an identity check — the bank statement is the check.
+    expect(parse('AXI123456789').data).toBe('AXI123456789');
+  });
+});
+
+describe('paymentEvidenceProblem', () => {
+  it('is happy with a reference alone', () => {
+    expect(paymentEvidenceProblem('612345678901', false)).toBeNull();
+  });
+
+  it('is happy with a screenshot alone — the reference can be read off it later', () => {
+    expect(paymentEvidenceProblem(null, true)).toBeNull();
+  });
+
+  it('is happy with both', () => {
+    expect(paymentEvidenceProblem('612345678901', true)).toBeNull();
+  });
+
+  it('refuses neither, because that is a claim with nothing behind it', () => {
+    const problem = paymentEvidenceProblem(null, false);
+    expect(problem).toBeTruthy();
+    expect(problem).toContain('screenshot');
+  });
+
+  it('treats an empty reference as no reference', () => {
+    expect(paymentEvidenceProblem('', false)).toBeTruthy();
   });
 });
