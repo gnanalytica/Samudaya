@@ -15,6 +15,7 @@ import {
   festivalFor,
   formatDate,
   formatMoney,
+  fundBarSegments,
   fundedPercent,
   todayIn,
 } from '@samudaya/core';
@@ -56,7 +57,8 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     (await getCatalogue(community.id)).event_type.map((item) => [item.id, item.label]),
   );
   const s = next ? stats.get(next.id) : undefined;
-  const funded = fundedPercent(s?.fundRaised ?? 0, s?.fundTarget ?? 0);
+  const bar = fundBarSegments(s?.fundRaised ?? 0, s?.fundPending ?? 0, s?.fundTarget ?? 0);
+  const funded = bar.confirmed;
   const firstName = profile?.full_name?.split(' ')[0];
 
   const staff = can(role, 'events:manage');

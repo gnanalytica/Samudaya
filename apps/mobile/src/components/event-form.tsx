@@ -32,6 +32,8 @@ export type EventDetails = {
   description: string;
   organizer: string;
   attendance: string;
+  /** What each flat is asked for. Empty means "whatever people give". */
+  suggestedAmount: string;
   fundRule: FundRule;
   fundRuleNote: string;
 };
@@ -54,6 +56,7 @@ export const emptyDetails = (organizer = ''): EventDetails => ({
   description: '',
   organizer,
   attendance: '',
+  suggestedAmount: '',
   fundRule: DEFAULT_FUND_RULE,
   fundRuleNote: '',
 });
@@ -79,6 +82,7 @@ export function validateDetails(
     description: details.description.trim() || undefined,
     expected_attendance: details.attendance.trim() || undefined,
     fund_target: fundTarget,
+    suggested_amount: details.suggestedAmount.trim() || null,
     fund_rule: details.fundRule,
     fund_rule_note: details.fundRuleNote.trim() || undefined,
   });
@@ -92,6 +96,7 @@ export function validateDetails(
           ? issue.message
           : 'Pick an end date on or after the start date, or clear it.',
       expected_attendance: 'Expected attendance should be a whole number.',
+      suggested_amount: 'A suggested amount has to be more than nothing, or left empty.',
     };
     return { error: friendly[field] ?? issue?.message ?? 'Check the event details.' };
   }
@@ -200,6 +205,19 @@ export function DetailsFields({
           keyboardType="number-pad"
           placeholder="250"
         />
+        <View style={{ gap: spacing.xs }}>
+          <Input
+            label="Suggested per flat"
+            value={details.suggestedAmount}
+            onChangeText={(value) => set('suggestedAmount', value.replace(/[^0-9]/g, ''))}
+            keyboardType="number-pad"
+            placeholder="2100"
+          />
+          <Caption>
+            Offered first on the contribute screen, and chosen for the resident. Leave it empty to
+            take whatever people give.
+          </Caption>
+        </View>
         <FundRuleFields details={details} onChange={onChange} />
       </Disclosure>
     </View>

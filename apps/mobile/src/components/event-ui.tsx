@@ -3,18 +3,30 @@ import { Body, Caption, Card } from './ui';
 import { radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
-/** A thin progress bar, announced to screen readers as a progress indicator. */
+/**
+ * A thin progress bar, announced to screen readers as a progress indicator.
+ *
+ * `pendingPercent` draws a second, fainter segment behind the first: on a fund
+ * bar that is money reported and not yet confirmed. Same hue at lower opacity
+ * rather than a colour of its own — it is the same money one step earlier, and
+ * the value announced stays the confirmed figure.
+ */
 export function Meter({
   percent,
+  pendingPercent = 0,
   tone = 'accent',
   label,
 }: {
   percent: number;
+  /** Clamped to whatever the bar has left after the confirmed segment. */
+  pendingPercent?: number;
   tone?: 'accent' | 'success';
   label: string;
 }) {
   const { colors } = useTheme();
   const clamped = Math.min(100, Math.max(0, percent));
+  const pending = Math.min(100 - clamped, Math.max(0, pendingPercent));
+  const fill = tone === 'success' ? colors.success : colors.accent;
   return (
     <View
       accessibilityRole="progressbar"
@@ -22,19 +34,18 @@ export function Meter({
       accessibilityValue={{ min: 0, max: 100, now: clamped }}
       style={{
         height: 8,
+        flexDirection: 'row',
         borderRadius: radius.pill,
         backgroundColor: colors.surfaceSunken,
         overflow: 'hidden',
       }}
     >
-      <View
-        style={{
-          width: `${clamped}%`,
-          height: '100%',
-          borderRadius: radius.pill,
-          backgroundColor: tone === 'success' ? colors.success : colors.accent,
-        }}
-      />
+      <View style={{ width: `${clamped}%`, height: '100%', backgroundColor: fill }} />
+      {pending > 0 ? (
+        <View
+          style={{ width: `${pending}%`, height: '100%', backgroundColor: fill, opacity: 0.4 }}
+        />
+      ) : null}
     </View>
   );
 }

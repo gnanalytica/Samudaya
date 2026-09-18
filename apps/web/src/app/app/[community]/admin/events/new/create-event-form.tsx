@@ -130,10 +130,13 @@ export function CreateEventForm({
   slug,
   pickers,
   societyName,
+  flatCount,
 }: {
   slug: string;
   pickers: Pickers;
   societyName: string;
+  /** How many flats the society has, for the per-flat hint. Zero if none yet. */
+  flatCount: number;
 }) {
   const [state, action] = useActionState<EventFormState, FormData>(createEvent, EMPTY_STATE);
   const [emoji, setEmoji] = useState('🎉');
@@ -201,6 +204,7 @@ export function CreateEventForm({
         event_type: labelOf(pickers.event_type, read('event_type_id')),
         description: read('description'),
         organizer: read('organizer') || societyName,
+        suggested_amount: read('suggested_amount'),
         fund_rule: read('fund_rule') || DEFAULT_FUND_RULE,
       });
     }
@@ -407,6 +411,31 @@ export function CreateEventForm({
               <Plus className="size-4" aria-hidden="true" />
               Add a line
             </Button>
+
+            <div className="border-border-base mt-4 border-t pt-4">
+              <Field
+                label="Suggested per flat"
+                htmlFor="suggested_amount"
+                error={state.fieldErrors?.suggested_amount}
+                hint={
+                  flatCount > 0 && total > 0
+                    ? `The contribute screen offers this figure first. ${formatMoney(total)} across ${flatCount} flats is about ${formatMoney(Math.ceil(total / flatCount))} each. Leave it empty to take whatever people give.`
+                    : 'The contribute screen offers this figure first. Leave it empty to take whatever people give.'
+                }
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    name="suggested_amount"
+                    type="number"
+                    min={1}
+                    step="1"
+                    placeholder="₹"
+                    className="w-40"
+                  />
+                )}
+              </Field>
+            </div>
           </CardBody>
         </Card>
       </div>
@@ -514,6 +543,11 @@ export function CreateEventForm({
               {lines.filter((line) => Number(line.amount) > 0).length
                 ? `${formatMoney(total)} across ${lines.filter((line) => Number(line.amount) > 0).length} lines`
                 : 'Nothing budgeted yet'}
+            </Row>
+            <Row label="Suggested per flat">
+              {Number(summary.suggested_amount) > 0
+                ? formatMoney(Number(summary.suggested_amount))
+                : 'Whatever people give'}
             </Row>
             <Row label="Activities">
               {activities.filter((row) => row.name.trim()).length

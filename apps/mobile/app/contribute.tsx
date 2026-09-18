@@ -7,7 +7,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   COPY,
   can,
+  contributionPresets,
   formatMoney,
+  isSuggestedAmount,
   newTransactionRef,
   parseUpiResponse,
   paymentProofPath,
@@ -37,8 +39,6 @@ import { ErrorText } from '../src/components/admin-ui';
 import { FilePickerField } from '../src/components/file-ui';
 import { radius, spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
-
-const PRESETS = [1001, 2001, 5001];
 
 /**
  * Pay the society's UPI ID from any UPI app, then report the UPI reference.
@@ -134,7 +134,7 @@ function PayWithUpi({
   vpa,
   payeeName,
 }: {
-  event: { id: string; slug: string; name: string };
+  event: { id: string; slug: string; name: string; suggested_amount?: number | null };
   unit: { id: string; block: string | null; number: string } | null;
   vpa: string;
   payeeName: string;
@@ -145,8 +145,14 @@ function PayWithUpi({
   const { activeCommunity, membershipId } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
+  // The figure the committee asked for, if they named one — chosen for the
+  // resident rather than offered among four guesses. Landing on the screen
+  // with the right number already selected is the whole point of asking.
+  const asked = event.suggested_amount ? Number(event.suggested_amount) : null;
+  const presets = contributionPresets(asked);
+
   const [stage, setStage] = useState<Stage>('amount');
-  const [amount, setAmount] = useState<number | null>(null);
+  const [amount, setAmount] = useState<number | null>(asked);
   const [custom, setCustom] = useState('');
   const [reference, setReference] = useState('');
   const [proof, setProof] = useState<PickedFile | null>(null);
@@ -346,10 +352,15 @@ function PayWithUpi({
             <View style={{ gap: spacing.sm }}>
               <Body>Amount</Body>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-                {PRESETS.map((preset) => (
+                {presets.map((preset) => (
                   <Text
                     key={preset}
                     accessibilityRole="button"
+                    accessibilityLabel={
+                      isSuggestedAmount(preset, asked)
+                        ? `${formatMoney(preset, currency)}, the suggested amount`
+                        : formatMoney(preset, currency)
+                    }
                     accessibilityState={{ selected: amount === preset && custom === '' }}
                     onPress={() => {
                       if (stage !== 'amount') return;
@@ -362,6 +373,12 @@ function PayWithUpi({
                   </Text>
                 ))}
               </View>
+              {asked ? (
+                <Caption>
+                  {formatMoney(asked, currency)} is what the committee asks each flat for. Pay
+                  whatever you can.
+                </Caption>
+              ) : null}
             </View>
             <Input
               label="Or another amount"

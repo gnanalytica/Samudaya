@@ -9,7 +9,7 @@ import {
   Settings2,
   Users,
 } from 'lucide-react';
-import { COPY, can, formatDate, formatMoney, fundedPercent } from '@samudaya/core';
+import { COPY, can, formatDate, formatMoney, fundBarSegments } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { listEvents, getStatsFor } from '@/lib/events';
@@ -102,7 +102,12 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
           <div className="space-y-3">
             {events.map((event) => {
               const s = stats.get(event.id);
-              const funded = fundedPercent(s?.fundRaised ?? 0, s?.fundTarget ?? 0);
+              const bar = fundBarSegments(
+                s?.fundRaised ?? 0,
+                s?.fundPending ?? 0,
+                s?.fundTarget ?? 0,
+              );
+              const funded = bar.confirmed;
               return (
                 <Link
                   key={event.id}
@@ -136,7 +141,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                       </span>
                       <span>{funded}%</span>
                     </div>
-                    <FundBar percent={funded} />
+                    <FundBar percent={funded} pendingPercent={bar.pending} />
                   </div>
                 </Link>
               );

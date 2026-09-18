@@ -5,7 +5,7 @@ import {
   can,
   formatDate,
   formatMoney,
-  fundedPercent,
+  fundBarSegments,
   receiptRef,
   todayIn,
   unitLabel,
@@ -101,7 +101,8 @@ export default async function ManageEventPage(
     manageHref: `${base}/admin/catalogue`,
   };
 
-  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const funded = bar.confirmed;
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
   const open = expenses.filter((e) => e.status === 'pending' || e.status === 'changes_requested');
@@ -180,7 +181,7 @@ export default async function ManageEventPage(
                   <span>{funded}%</span>
                 </div>
                 <div className="mt-2">
-                  <FundBar percent={funded} />
+                  <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
               </CardBody>
             </Card>

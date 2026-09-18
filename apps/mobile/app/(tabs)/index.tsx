@@ -7,7 +7,7 @@ import {
   countdown,
   formatDate,
   formatMoney,
-  fundedPercent,
+  fundBarSegments,
   normalizeRole,
   normalizeStats,
   setupProgress,
@@ -79,7 +79,8 @@ export default function Home() {
   const currency = activeCommunity?.currency ?? 'INR';
   const next = data?.next;
   const stats = data?.stats ?? normalizeStats(null);
-  const funded = fundedPercent(stats.fundRaised, stats.fundTarget);
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const funded = fundBar.confirmed;
   const normalized = normalizeRole(role);
 
   return (
@@ -143,7 +144,12 @@ export default function Home() {
                   </Caption>
                   <Caption>{funded}%</Caption>
                 </View>
-                <Meter percent={funded} tone="success" label="Fund progress" />
+                <Meter
+                  percent={funded}
+                  pendingPercent={fundBar.pending}
+                  tone="success"
+                  label="Fund progress"
+                />
               </View>
 
               <View style={{ flexDirection: 'row', gap: spacing.md }}>

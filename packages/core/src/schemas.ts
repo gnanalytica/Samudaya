@@ -200,6 +200,15 @@ export const createEventSchema = z
     description: z.string().trim().max(5000).optional(),
     expected_attendance: z.coerce.number().int().min(0).max(100000).optional(),
     fund_target: z.coerce.number().min(0).max(100_000_000).default(0),
+    // What each flat is asked for. Empty is a real answer — plenty of events
+    // take whatever people give — so a blank field is null, not zero, and the
+    // database refuses a zero outright.
+    suggested_amount: z.coerce
+      .number()
+      .positive('A suggested amount has to be more than nothing')
+      .max(10_000_000)
+      .nullable()
+      .optional(),
     fund_rule: fundRuleSchema.default('general_fund'),
     fund_rule_note: z.string().trim().max(300).optional(),
     // A group for this event specifically — "Deepavali volunteers" — as

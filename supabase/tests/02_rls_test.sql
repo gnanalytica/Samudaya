@@ -2197,3 +2197,114 @@ select test.eq(
 select test.eq(
   (select count(*) from public.communities where slug = 'green-valley'),
   1::bigint, 'a society that still has members is left alone');
+
+-- ---------------------------------------------------------------------------
+-- Money on its way, and what the committee asks each flat for
+-- ---------------------------------------------------------------------------
+-- The fund bar's promise: the headline total is confirmed money, and what has
+-- been reported but not yet matched against the bank is a second number that
+-- is never folded into the first.
+--
+-- Checked as the committee, who may read every contribution in their society,
+-- so the aggregate can be held against the rows it claims to summarise. A
+-- literal expected figure would only be restating this file's own fixtures.
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+
+select test.eq(
+  (select fund_pending from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  (select coalesce(sum(c.amount), 0) from public.contributions c
+    where c.event_id = 'cccccccc-0000-4000-8000-0000000000aa' and c.status = 'pending'),
+  'money on its way is exactly what has been reported and not confirmed');
+select test.eq(
+  (select fund_raised from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  (select coalesce(sum(c.amount), 0) from public.contributions c
+    where c.event_id = 'cccccccc-0000-4000-8000-0000000000aa' and c.status = 'succeeded'),
+  'and the raised total is confirmed money only, with none of it folded in');
+
+create temporary table fund_before as
+select fund_raised, fund_pending, pending_contributors
+  from public.event_stats where event_id = 'cccccccc-0000-4000-8000-0000000000aa';
+
+-- Tom reports ₹3,000 he has not been confirmed for.
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.contributions (event_id, community_id, membership_id, amount, method, status)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id, 3000, 'upi', 'pending'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select s.fund_pending - b.fund_pending
+     from public.event_stats s, fund_before b
+    where s.event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  3000::numeric, 'reporting it moves the money-on-its-way total by exactly that');
+select test.eq(
+  (select s.fund_raised - b.fund_raised
+     from public.event_stats s, fund_before b
+    where s.event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  0::numeric, 'and moves the raised total by nothing at all');
+-- Tom had already reported once. A household that reports twice is one
+-- household waiting, the same rule contributors has always counted by, which
+-- is why the amount above moved and this does not.
+select test.eq(
+  (select s.pending_contributors - b.pending_contributors
+     from public.event_stats s, fund_before b
+    where s.event_id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  0::integer, 'a household reporting twice is still one household waiting');
+select test.ok(
+  (select pending_contributors from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000aa')
+  < (select count(*) from public.contributions c
+      where c.event_id = 'cccccccc-0000-4000-8000-0000000000aa' and c.status = 'pending'),
+  'so there are fewer households waiting than there are reports');
+
+drop table fund_before;
+
+-- A resident sees the society's total, including what is on its way. They do
+-- not see whose it is: the aggregate is public, the row behind it is not.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.ok(
+  (select fund_pending from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000aa') >= 3000,
+  'a resident sees the society total including money on its way');
+select test.eq(
+  test.visible($q$select c.id from public.contributions c
+                  join public.memberships m on m.id = c.membership_id
+                 where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd'$q$),
+  0::bigint, 'but never the neighbour''s payment behind it');
+
+-- What the committee asks each flat for.
+reset role;
+select test.act_as('88888888-8888-4888-8888-888888888888');
+update public.events set suggested_amount = 2100
+ where id = 'cccccccc-0000-4000-8000-0000000000aa';
+reset role;
+select test.eq(
+  (select suggested_amount from public.events
+    where id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  2100::numeric, 'the committee names a figure on the event');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.raises(
+  $q$update public.events set suggested_amount = 0
+      where id = 'cccccccc-0000-4000-8000-0000000000aa'$q$,
+  'a figure of zero is not an ask, and is refused');
+select test.raises(
+  $q$update public.events set suggested_amount = -500
+      where id = 'cccccccc-0000-4000-8000-0000000000aa'$q$,
+  'nor is a negative one');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+update public.events set suggested_amount = 1
+ where id = 'cccccccc-0000-4000-8000-0000000000aa';
+reset role;
+select test.eq(
+  (select suggested_amount from public.events
+    where id = 'cccccccc-0000-4000-8000-0000000000aa'),
+  2100::numeric, 'a resident cannot decide what the society asks for');
