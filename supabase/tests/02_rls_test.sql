@@ -1959,17 +1959,24 @@ select test.ok(
   has_function_privilege('authenticated', 'public.society_people(uuid)', 'EXECUTE'),
   'and a signed-in member can still read the directory');
 
--- Invite codes were switched off in 0913.0300 by a revoke that did not take,
--- because it removed authenticated's grant and left PUBLIC's. Now they are off.
-select test.ok(
-  not has_function_privilege('authenticated',
-    'public.redeem_invite_code(text,public.origin_channel)', 'EXECUTE'),
-  'a retired function is retired from everybody, not just from its own grant');
+-- Per-flat invite codes are a live feature, whatever 0913.0300's comment said
+-- while revoking all three from authenticated — a revoke that did nothing,
+-- because PUBLIC's grant stayed. 0920.0900 corrected the record: the codes stay.
+--
+-- So these two assertions are not two halves of one decision. The first is the
+-- feature, and must not be swept away again by a security pass reading that
+-- stale comment. The second is only that the redemption flow does not exist
+-- yet: nothing anywhere calls redeem_invite_code, so it is granted to
+-- service_role alone until the screen that needs it is written.
 select test.ok(
   has_function_privilege('authenticated',
     'public.create_invite_code(uuid,public.member_role,uuid,public.occupant_relation,integer,timestamptz,text)',
     'EXECUTE'),
-  'while the invites page the committee still uses keeps working');
+  'the committee can still mint a per-flat invite code');
+select test.ok(
+  not has_function_privilege('authenticated',
+    'public.redeem_invite_code(text,public.origin_channel)', 'EXECUTE'),
+  'and the half of it nothing calls yet is not open to everybody meanwhile');
 
 -- And the people who should be able to call them still can.
 select test.ok(
