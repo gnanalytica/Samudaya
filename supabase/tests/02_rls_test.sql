@@ -1856,6 +1856,44 @@ select test.ok(
   'the totals add up to what is left');
 
 -- ---------------------------------------------------------------------------
+-- Nothing here is callable before you sign in
+-- ---------------------------------------------------------------------------
+-- `grant execute ... to authenticated` adds a grant; it does not remove the one
+-- PostgreSQL already gave PUBLIC, which every role inherits. So a function that
+-- looked staff-only was reachable by anon, and only its internal guard stopped
+-- it — a guard nobody had decided should be load-bearing. 0920.0600 revokes
+-- PUBLIC; this says so out loud, because the next function added here should
+-- have a failing test to answer to rather than a comment to believe.
+reset role;
+select test.ok(
+  not has_function_privilege('anon',
+    'app.record_bank_lines(uuid,jsonb,public.bank_line_source)', 'EXECUTE'),
+  'anon cannot post lines into a society''s bank feed');
+select test.ok(
+  not has_function_privilege('anon', 'public.import_bank_lines(uuid,jsonb)', 'EXECUTE'),
+  'nor reach the same door through its public wrapper');
+select test.ok(
+  not has_function_privilege('anon', 'public.reconcile_bank_line(uuid,uuid,boolean)', 'EXECUTE'),
+  'nor confirm money against a statement line');
+select test.ok(
+  not has_function_privilege('anon', 'public.member_history(uuid)', 'EXECUTE'),
+  'nor ask what a member has paid');
+
+-- The ones that must stay open: joining happens before you have an account.
+select test.ok(
+  has_function_privilege('anon', 'public.request_to_join(text,uuid,text,text,public.occupant_relation)', 'EXECUTE'),
+  'while the join flow still works for somebody who has no account yet');
+
+-- And the people who should be able to call them still can.
+select test.ok(
+  has_function_privilege('authenticated', 'public.import_bank_lines(uuid,jsonb)', 'EXECUTE'),
+  'a signed-in member is not locked out by the revoke');
+select test.ok(
+  has_function_privilege('service_role',
+    'app.record_bank_lines(uuid,jsonb,public.bank_line_source)', 'EXECUTE'),
+  'and a feed job under the service role keeps its door');
+
+-- ---------------------------------------------------------------------------
 -- A member's history: theirs, and the committee's to ask about
 -- ---------------------------------------------------------------------------
 reset role;

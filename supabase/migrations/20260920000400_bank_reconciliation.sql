@@ -194,10 +194,11 @@ begin
   -- A feed job runs as the service role, which has no membership and no
   -- business being refused. A person must be staff.
   --
-  -- "No auth.uid()" standing in for "service role" is safe because of the
-  -- grants below: only `authenticated` and `service_role` may execute this, and
-  -- PostgREST always sets a JWT for `authenticated`. `anon` has no grant and
-  -- cannot reach the check at all.
+  -- "No auth.uid()" standing in for "service role" holds only because anon
+  -- cannot execute this. The grant below does not achieve that on its own —
+  -- PostgreSQL gives EXECUTE to PUBLIC by default and a grant adds to that
+  -- rather than replacing it — so 0920.0600 revokes PUBLIC, and a test asserts
+  -- it. Without that revoke, an unauthenticated caller reaches this branch.
   if v_actor is null and (select auth.uid()) is not null then
     raise exception 'Only staff can import a statement' using errcode = 'insufficient_privilege';
   end if;
