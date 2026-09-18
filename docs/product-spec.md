@@ -74,14 +74,83 @@ resident skips the waiting step.
 
 ### Contributing
 
-Pick a preset or custom amount → choose UPI / card / net banking → confirm →
-receipt with an ID. The event fund and contributor count update.
+Pick a preset or custom amount → pay it from a UPI app → report it back with the
+UPI transaction ID **and the amount that actually left the account**. The amount
+is pre-filled from the preset and stays editable, because a UPI app lets you
+change the figure on the way through and people do; what the payer types is what
+gets stored.
+
+Nothing counts until somebody confirms it. A reported payment sits at `pending`
+and is invisible to the fund total; staff confirm it against the statement (by
+hand, or by pairing it with a bank line on the Reconcile screen) and the row
+records who confirmed it and when.
+
+### Reconciliation
+
+The society's account, as rows. A statement is imported — pasted or as a CSV,
+from any of the shapes Indian banks export — and each line is matched against a
+reported payment by UTR, then by amount within a fortnight. Confirming the match
+confirms the money. Where the bank and the payer disagree on the amount, a person
+chooses which figure the books keep, and the gap is written into the record.
+
+Lines that will never match (bank charges, interest, transfers between the
+society's own accounts) are set aside with a reason rather than deleted. What is
+left is the honest residue: money that arrived and nobody can explain, and money
+somebody claims to have sent that never landed.
+
+An automatic bank feed needs an RBI-licensed account aggregator in the middle.
+The import and a feed post through the same function, so connecting one changes
+nothing on the screen.
 
 ### Expenses
 
 A committee member submits an expense with a bill. An admin approves, rejects,
 or requests changes. **Only approved expenses appear in the resident ledger**,
 and every one shows its vendor, amount, requester, approver and bill.
+
+### The society ledger
+
+`society_ledger` is every confirmed contribution and every approved bill, across
+every event, on one page any member can read.
+
+- **Money out** names the vendor, the amount, the approver and the bill.
+- **Money in** names the payer and their flat, and nothing else about them — no
+  phone, no email. Who gave how much is what a contribution list has always
+  said; a way to reach them is not, and that stays behind `society_people()`.
+- **Unconfirmed payments are not in it**, because a ledger of claims is what it
+  replaces.
+
+It is a definer view, so the column list is the whole of the protection: it
+selects `full_name` and the flat and stops, and a test pins that list so
+widening it has to be deliberate.
+
+`member_history()` gives a member their own record — payments, activities,
+suggestions — and the committee anyone's, because "has A-204 paid?" is asked at
+every meeting. Staff cannot: they run the events, not the households.
+
+### The audit trail
+
+Every money and decision row carries `updated_by` beside its `updated_at`, and
+every insert, update and delete on contributions, expenses, suggestions, events,
+memberships and bank lines is appended to `audit_log` with the fields that moved,
+their before and after, and who moved them. Nothing but the trigger can write to
+it and nobody can edit or delete a row: an audit log a committee member can
+quietly correct is not an audit log.
+
+It is readable by staff, because it holds every field of every change including
+a neighbour's contribution. What a resident is owed is on the record itself —
+who approved this bill, when, and whether anybody has touched it since — and that
+is shown next to the record.
+
+### Voting
+
+A resident suggests, the committee opens it for voting, everybody has their say,
+the committee closes it and the count decides. **A vote in favour is public to
+the society** — fourteen named supporters is a petition, and people who sign one
+generally want their name on it. **A vote against is visible to the committee
+only.** Who has not voted is visible to nobody, because an abstention leaves no
+row. Totals always come from `suggestion_stats`, which counts every ballot
+without handing over any of them.
 
 ### Fund reallocation
 
@@ -101,15 +170,16 @@ participation figures.
 ## Screens
 
 **Resident** — splash · join society · select flat · request sent · home ·
-events list · event detail · contribute (amount → payment → receipt) ·
-activities list · activity detail · activity joined · suggest activity ·
-volunteer list · volunteer confirm · accounts · view bill · fund reallocation
-vote · community feed · polls · notifications · my activity
+events list · event detail · contribute (amount → payment → report) ·
+**money (every transaction the society has ever made)** · activities list ·
+activity detail · activity joined · suggest activity · volunteer list ·
+volunteer confirm · accounts · view bill · fund reallocation vote · community
+feed · polls · notifications · my activity
 
 **Admin** — welcome · add flats · import preview · community created · invite
 residents · dashboard · create-event wizard · event management (overview,
 tasks, expenses, approvals, reports) · add expense · expense approval ·
-event closure · final report
+**reconcile (import a statement, pair each line)** · event closure · final report
 
 ---
 
@@ -118,10 +188,11 @@ event closure · final report
 | Value             | Definition                    |
 | ----------------- | ----------------------------- |
 | Readiness %       | completed tasks ÷ total tasks |
-| Fund raised       | Σ successful contributions    |
+| Fund raised       | Σ **confirmed** contributions |
 | Spent             | Σ **approved** expenses       |
 | Available         | raised − spent                |
 | Volunteers needed | role target − signed up       |
+| Unexplained lines | bank lines matched to nothing |
 
 These are computed from the underlying rows, never stored and hand-updated.
 

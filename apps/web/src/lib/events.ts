@@ -140,7 +140,7 @@ export const getExpenses = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('expenses')
     .select(
-      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
+      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, approved_at, updated_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
@@ -241,42 +241,53 @@ const SUGGESTION_COLUMNS =
   'id, kind, name, description, status, review_note, resolved_at, created_at, suggested_by, memberships!activity_suggestions_suggested_by_fkey(profiles(full_name))';
 
 /**
- * Attaches each suggestion's tally and the caller's own vote.
+ * Attaches each suggestion's tally, the caller's own vote, and the ballots the
+ * caller is allowed to see by name.
  *
  * Two queries, because they answer to different rules. The totals come from
- * suggestion_stats, a view that counts without handing over the rows it counts.
- * The second reads suggestion_votes, where the policy now returns your own
- * ballot and nobody else's — so the `mine` below is already only yours, and
- * `membershipId` is a belt to its braces.
+ * suggestion_stats, a view that counts without handing over the rows it counts;
+ * it is the only honest source for "14 against" when the reader may see none of
+ * the fourteen. The second reads suggestion_votes, whose policy decides who is
+ * named: your own ballot always, every vote in favour to any member, and votes
+ * against to the committee. So `ballots` below is already filtered by the
+ * database — this function sorts it, it does not censor it.
  */
 async function withVotes<T extends { id: string }>(suggestions: T[], membershipId: string | null) {
   const ids = suggestions.map((row) => row.id);
   if (!ids.length) return [];
 
   const supabase = await getSupabase();
-  const [{ data: tallies }, { data: mine }] = await Promise.all([
+  const [{ data: tallies }, votes] = await Promise.all([
     supabase
       .from('suggestion_stats')
       .select('suggestion_id, votes_for, votes_against')
       .in('suggestion_id', ids),
     supabase
       .from('suggestion_votes')
-      .select('suggestion_id, membership_id, support')
-      .in('suggestion_id', ids),
+      .select(
+        'suggestion_id, membership_id, support, voted_at, memberships!suggestion_votes_membership_id_fkey(profiles(full_name))',
+      )
+      .in('suggestion_id', ids)
+      .order('voted_at'),
   ]);
 
   const tallyFor = new Map((tallies ?? []).map((row) => [row.suggestion_id, row]));
+  const ballots = rowsOf(votes, 'who voted on a suggestion');
 
   return suggestions.map((suggestion) => {
     const tally = tallyFor.get(suggestion.id);
-    const ballot = (mine ?? []).find(
-      (vote) => vote.suggestion_id === suggestion.id && vote.membership_id === membershipId,
-    );
+    const cast = ballots.filter((vote) => vote.suggestion_id === suggestion.id);
+    const ballot = cast.find((vote) => vote.membership_id === membershipId);
     return {
       ...suggestion,
       votesFor: tally?.votes_for ?? 0,
       votesAgainst: tally?.votes_against ?? 0,
       myVote: membershipId === null ? null : (ballot?.support ?? null),
+      voters: cast.map((vote) => ({
+        membershipId: vote.membership_id,
+        name: vote.memberships?.profiles?.full_name ?? 'A resident',
+        support: vote.support,
+      })),
     };
   });
 }
@@ -325,7 +336,7 @@ export const getPayments = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('contributions')
     .select(
-      'id, amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, gateway_payload, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name))',
+      'id, amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, updated_at, gateway_payload, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('paid_at', { ascending: false });

@@ -79,6 +79,7 @@ export type Database = {
           updated_at: string
           kind: string
           resolved_at: string | null
+          updated_by: string | null
         }
         Insert: {
           id?: string
@@ -95,6 +96,7 @@ export type Database = {
           updated_at?: string
           kind?: string
           resolved_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           id?: string
@@ -111,6 +113,7 @@ export type Database = {
           updated_at?: string
           kind?: string
           resolved_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -130,6 +133,13 @@ export type Database = {
           {
             foreignKeyName: "activity_suggestions_suggested_by_fkey"
             columns: ["suggested_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_suggestions_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
@@ -326,6 +336,50 @@ export type Database = {
           }
         ]
       }
+      audit_log: {
+        Row: {
+          id: number
+          community_id: string
+          table_name: string
+          row_id: string
+          action: string
+          actor_id: string | null
+          actor_user_id: string | null
+          changed: Json
+          at: string
+        }
+        Insert: {
+          id?: number
+          community_id: string
+          table_name: string
+          row_id: string
+          action: string
+          actor_id?: string | null
+          actor_user_id?: string | null
+          changed?: Json
+          at?: string
+        }
+        Update: {
+          id?: number
+          community_id?: string
+          table_name?: string
+          row_id?: string
+          action?: string
+          actor_id?: string | null
+          actor_user_id?: string | null
+          changed?: Json
+          at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       audit_logs: {
         Row: {
           id: string
@@ -383,6 +437,166 @@ export type Database = {
             columns: ["community_id"]
             isOneToOne: false
             referencedRelation: "communities"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      bank_accounts: {
+        Row: {
+          id: string
+          community_id: string
+          label: string
+          bank_name: string | null
+          last4: string | null
+          currency: string
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          label: string
+          bank_name?: string | null
+          last4?: string | null
+          currency?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          label?: string
+          bank_name?: string | null
+          last4?: string | null
+          currency?: string
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_accounts_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_accounts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      bank_transactions: {
+        Row: {
+          id: string
+          community_id: string
+          account_id: string
+          posted_on: string
+          amount: number
+          narration: string | null
+          reference: string | null
+          counterparty: string | null
+          balance_after: number | null
+          source: Database["public"]["Enums"]["bank_line_source"]
+          external_id: string
+          contribution_id: string | null
+          expense_id: string | null
+          matched_by: string | null
+          matched_at: string | null
+          ignored_reason: string | null
+          imported_at: string
+          imported_by: string | null
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          account_id: string
+          posted_on: string
+          amount: number
+          narration?: string | null
+          reference?: string | null
+          counterparty?: string | null
+          balance_after?: number | null
+          source?: Database["public"]["Enums"]["bank_line_source"]
+          external_id: string
+          contribution_id?: string | null
+          expense_id?: string | null
+          matched_by?: string | null
+          matched_at?: string | null
+          ignored_reason?: string | null
+          imported_at?: string
+          imported_by?: string | null
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          account_id?: string
+          posted_on?: string
+          amount?: number
+          narration?: string | null
+          reference?: string | null
+          counterparty?: string | null
+          balance_after?: number | null
+          source?: Database["public"]["Enums"]["bank_line_source"]
+          external_id?: string
+          contribution_id?: string | null
+          expense_id?: string | null
+          matched_by?: string | null
+          matched_at?: string | null
+          ignored_reason?: string | null
+          imported_at?: string
+          imported_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bank_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_contribution_id_fkey"
+            columns: ["contribution_id"]
+            isOneToOne: false
+            referencedRelation: "contributions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bank_transactions_matched_by_fkey"
+            columns: ["matched_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           }
         ]
@@ -677,6 +891,8 @@ export type Database = {
           verified_by: string | null
           verified_at: string | null
           review_note: string | null
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
           id?: string
@@ -698,6 +914,8 @@ export type Database = {
           verified_by?: string | null
           verified_at?: string | null
           review_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           id?: string
@@ -719,6 +937,8 @@ export type Database = {
           verified_by?: string | null
           verified_at?: string | null
           review_note?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -747,6 +967,13 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contributions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
@@ -1012,6 +1239,7 @@ export type Database = {
           event_type_id: string | null
           venue_id: string | null
           whatsapp_group_url: string | null
+          updated_by: string | null
         }
         Insert: {
           id?: string
@@ -1039,6 +1267,7 @@ export type Database = {
           event_type_id?: string | null
           venue_id?: string | null
           whatsapp_group_url?: string | null
+          updated_by?: string | null
         }
         Update: {
           id?: string
@@ -1066,6 +1295,7 @@ export type Database = {
           event_type_id?: string | null
           venue_id?: string | null
           whatsapp_group_url?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1087,6 +1317,13 @@ export type Database = {
             columns: ["event_type_id"]
             isOneToOne: false
             referencedRelation: "catalogue_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
@@ -1121,6 +1358,7 @@ export type Database = {
           updated_at: string
           vendor_id: string | null
           category_id: string | null
+          updated_by: string | null
         }
         Insert: {
           id?: string
@@ -1144,6 +1382,7 @@ export type Database = {
           updated_at?: string
           vendor_id?: string | null
           category_id?: string | null
+          updated_by?: string | null
         }
         Update: {
           id?: string
@@ -1167,6 +1406,7 @@ export type Database = {
           updated_at?: string
           vendor_id?: string | null
           category_id?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1200,6 +1440,13 @@ export type Database = {
           {
             foreignKeyName: "expenses_requested_by_fkey"
             columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
@@ -1551,6 +1798,7 @@ export type Database = {
           title: string | null
           approves_spending: boolean
           welcomed_at: string | null
+          updated_by: string | null
         }
         Insert: {
           id?: string
@@ -1565,6 +1813,7 @@ export type Database = {
           title?: string | null
           approves_spending?: boolean
           welcomed_at?: string | null
+          updated_by?: string | null
         }
         Update: {
           id?: string
@@ -1579,6 +1828,7 @@ export type Database = {
           title?: string | null
           approves_spending?: boolean
           welcomed_at?: string | null
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -1593,6 +1843,13 @@ export type Database = {
             columns: ["invited_via"]
             isOneToOne: false
             referencedRelation: "invite_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memberships_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
           {
@@ -2334,6 +2591,54 @@ export type Database = {
 
         ]
       }
+      reconciliation_summary: {
+        Row: {
+          community_id: string | null
+          unexplained_lines: number | null
+          unexplained_in: number | null
+          unexplained_out: number | null
+          last_line_on: string | null
+        }
+        Relationships: [
+
+        ]
+      }
+      society_ledger: {
+        Row: {
+          id: string | null
+          community_id: string | null
+          event_id: string | null
+          event_slug: string | null
+          event_name: string | null
+          direction: string | null
+          happened_at: string | null
+          amount: number | null
+          counterpart: string | null
+          detail: string | null
+          receipt_no: number | null
+          document_url: string | null
+          confirmed_by: string | null
+          confirmed_at: string | null
+          membership_id: string | null
+        }
+        Relationships: [
+
+        ]
+      }
+      society_money: {
+        Row: {
+          community_id: string | null
+          total_in: number | null
+          total_out: number | null
+          balance: number | null
+          payments_in: number | null
+          payments_out: number | null
+          last_movement_at: string | null
+        }
+        Relationships: [
+
+        ]
+      }
       suggestion_stats: {
         Row: {
           suggestion_id: string | null
@@ -2361,6 +2666,19 @@ export type Database = {
       }
     }
     Functions: {
+      bank_line_candidates: {
+        Args: {
+        p_transaction_id: string
+      }
+        Returns: {
+        contribution_id: string | null
+        payer: string | null
+        amount: number | null
+        reported_on: string | null
+        reference: string | null
+        confidence: string | null
+      }[]
+      }
       close_suggestion_vote: {
         Args: {
         p_suggestion_id: string
@@ -2401,6 +2719,20 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["whatsapp_link_codes"]["Row"]
       }
+      ignore_bank_line: {
+        Args: {
+        p_transaction_id: string
+        p_reason: string
+      }
+        Returns: undefined
+      }
+      import_bank_lines: {
+        Args: {
+        p_account_id: string
+        p_lines: Json
+      }
+        Returns: number
+      }
       join_request_contacts: {
         Args: {
         p_community_id: string
@@ -2421,6 +2753,21 @@ export type Database = {
         p_community_id: string
       }
         Returns: undefined
+      }
+      member_history: {
+        Args: {
+        p_membership_id: string
+      }
+        Returns: {
+        kind: string | null
+        happened_at: string | null
+        title: string | null
+        detail: string | null
+        amount: number | null
+        status: string | null
+        event_slug: string | null
+        event_name: string | null
+      }[]
       }
       my_contact: {
         Args: { [_ in never]: never }
@@ -2447,6 +2794,14 @@ export type Database = {
         unit_label: string | null
         expires_at: string | null
       }[]
+      }
+      reconcile_bank_line: {
+        Args: {
+        p_transaction_id: string
+        p_contribution_id: string
+        p_take_bank_amount?: boolean
+      }
+        Returns: Database["public"]["Tables"]["contributions"]["Row"]
       }
       redeem_invite_code: {
         Args: {
@@ -2550,6 +2905,12 @@ export type Database = {
         created_at: string | null
       }[]
       }
+      unreconcile_bank_line: {
+        Args: {
+        p_transaction_id: string
+      }
+        Returns: undefined
+      }
       verify_api_key: {
         Args: {
         p_prefix: string
@@ -2580,6 +2941,7 @@ export type Database = {
     }
     Enums: {
       announcement_audience: "all" | "residents" | "committee"
+      bank_line_source: "import" | "feed" | "manual"
       contribution_status: "pending" | "succeeded" | "failed" | "refunded"
       event_status: "proposed" | "draft" | "published" | "completed" | "cancelled"
       expense_status: "pending" | "approved" | "rejected" | "changes_requested"

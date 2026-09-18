@@ -44,6 +44,19 @@ export async function fetchEventBySlug(communityId: string, slug: string) {
 
 export type Tally = { support: number; against: number; mine: boolean | null };
 
+/**
+ * suggestion_stats: every ballot counted, none of them named. Nullable because
+ * that is how the type generator sees a view's columns, not because a real row
+ * is ever missing them.
+ */
+type VoteTotals = {
+  suggestion_id: string | null;
+  votes_for: number | null;
+  votes_against: number | null;
+};
+/** suggestion_votes: only the ballots this reader is allowed to see by name. */
+type SeenVote = { suggestion_id: string; membership_id: string; support: boolean };
+
 export async function fetchEventDetail(communityId: string, slug: string, membershipId: string) {
   const event = await fetchEventBySlug(communityId, slug);
   if (!event) return null;
@@ -105,23 +118,40 @@ export async function fetchEventDetail(communityId: string, slug: string, member
       : Promise.resolve({ data: null }),
   ]);
 
+  // Counting the rows suggestion_votes hands back would under-count, because it
+  // hands back only what this reader may see by name: their own ballot, every
+  // vote in favour, and — for the committee — the votes against. The totals come
+  // from suggestion_stats, which counts every ballot without naming any of them.
   const suggestionRows = suggestions.data ?? [];
-  const votes = suggestionRows.length
-    ? await supabase
-        .from('suggestion_votes')
-        .select('suggestion_id, membership_id, support')
-        .in(
-          'suggestion_id',
-          suggestionRows.map((row) => row.id),
-        )
-    : { data: [] as { suggestion_id: string; membership_id: string; support: boolean }[] };
+  const suggestionIds = suggestionRows.map((row) => row.id);
+  const [voteTotals, votes] = suggestionIds.length
+    ? await Promise.all([
+        supabase
+          .from('suggestion_stats')
+          .select('suggestion_id, votes_for, votes_against')
+          .in('suggestion_id', suggestionIds),
+        supabase
+          .from('suggestion_votes')
+          .select('suggestion_id, membership_id, support')
+          .in('suggestion_id', suggestionIds),
+      ])
+    : [{ data: [] as VoteTotals[] }, { data: [] as SeenVote[] }];
 
   const tallies = new Map<string, Tally>();
+  for (const row of voteTotals.data ?? []) {
+    // A view's columns are all nullable to the type generator; a row without a
+    // suggestion cannot be matched to one either way.
+    if (!row.suggestion_id) continue;
+    tallies.set(row.suggestion_id, {
+      support: row.votes_for ?? 0,
+      against: row.votes_against ?? 0,
+      mine: null,
+    });
+  }
   for (const vote of votes.data ?? []) {
+    if (vote.membership_id !== membershipId) continue;
     const tally = tallies.get(vote.suggestion_id) ?? { support: 0, against: 0, mine: null };
-    if (vote.support) tally.support += 1;
-    else tally.against += 1;
-    if (vote.membership_id === membershipId) tally.mine = vote.support;
+    tally.mine = vote.support;
     tallies.set(vote.suggestion_id, tally);
   }
 

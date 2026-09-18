@@ -59,6 +59,24 @@ export function ContributeForm({
   const [uploading, setUploading] = useState(false);
   const [qr, setQr] = useState<{ uri: string; src: string } | null>(null);
 
+  /**
+   * What gets recorded, which is not always what step 1 asked for. The QR code
+   * carries an amount, but a UPI app lets you change it, and people do: they
+   * round up, they add a neighbour's share, they pay half now. The society's
+   * books should say what left the bank, so this field is the one that counts
+   * and the resident can overwrite it.
+   *
+   * It follows step 1 while they are still choosing — picking ₹1,001 and then
+   * typing it again would be silly — and stops following the moment they edit
+   * it, unless they go back and pick a different amount.
+   */
+  const [reported, setReported] = useState(suggested ? String(suggested) : '');
+  const [followed, setFollowed] = useState(amount);
+  if (followed !== amount) {
+    setFollowed(amount);
+    setReported(amount === null ? '' : String(amount));
+  }
+
   const note = upiNote(flatLabel, eventName);
   const uri = useMemo(
     () => (amount ? upiPayUri({ vpa: upi.vpa, payeeName: upi.payeeName, amount, note }) : null),
@@ -224,7 +242,32 @@ export function ContributeForm({
             </h2>
             <input type="hidden" name="slug" value={slug} />
             <input type="hidden" name="event" value={eventSlug} />
-            <input type="hidden" name="amount" value={amount ?? ''} />
+
+            <Field
+              label="Amount you actually paid"
+              htmlFor="paid-amount"
+              error={state.fieldErrors?.amount}
+              hint={
+                amount && reported !== String(amount)
+                  ? `The QR code above was for ${formatMoney(amount, currency)}. This is what will be recorded.`
+                  : 'Change it if your UPI app sent a different amount.'
+              }
+              required
+            >
+              {(control) => (
+                <Input
+                  {...control}
+                  name="amount"
+                  type="number"
+                  min={1}
+                  step="1"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={reported}
+                  onChange={(event) => setReported(event.target.value)}
+                />
+              )}
+            </Field>
 
             <Field
               label={COPY.upiReference}
@@ -254,11 +297,6 @@ export function ContributeForm({
               onUploadingChange={setUploading}
             />
 
-            {state.fieldErrors?.amount ? (
-              <p role="alert" className="text-danger text-sm">
-                {state.fieldErrors.amount}
-              </p>
-            ) : null}
             {state.error ? (
               <p role="alert" className="text-danger text-sm">
                 {state.error}

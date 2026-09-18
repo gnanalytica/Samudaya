@@ -20,6 +20,26 @@ describe('bottomNavItems', () => {
   });
 });
 
+describe('who can reach the money', () => {
+  const labels = (role: 'resident' | 'staff' | 'committee') =>
+    visibleNav('arkala', role).flatMap((group) => group.items.map((item) => item.label));
+
+  it('shows every member the society ledger', () => {
+    // The point of the product. A resident who cannot see where the money went
+    // has a noticeboard, not a transparent society.
+    for (const role of ['resident', 'staff', 'committee'] as const) {
+      expect(labels(role), role).toContain('Money');
+    }
+  });
+
+  it('keeps the bank feed to the people who handle it', () => {
+    // A statement line carries the name and bank of whoever sent the money.
+    expect(labels('resident')).not.toContain('Reconcile');
+    expect(labels('staff')).toContain('Reconcile');
+    expect(labels('committee')).toContain('Reconcile');
+  });
+});
+
 describe('eventTabsFor', () => {
   const published = { kind: 'event', status: 'published' } as const;
 

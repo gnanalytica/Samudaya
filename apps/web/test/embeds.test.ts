@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -17,8 +17,17 @@ import { describe, expect, it } from 'vitest';
  * removes the ambiguity, and is immune to a later migration adding a fourth
  * junction. A table that is unambiguous today may not be tomorrow, so this
  * applies to all of them rather than only the ones that are currently broken.
+ *
+ * It scans the mobile app as well, because that is where the same bug survived
+ * the first fix: the web app was corrected, mobile's society tab was not, and
+ * it went on asking for an embed PostgREST would never serve. A test that only
+ * guards the half you happened to be looking at is how a bug gets fixed twice.
  */
-const SRC = join(import.meta.dirname, '..', 'src');
+const ROOTS = [
+  join(import.meta.dirname, '..', 'src'),
+  join(import.meta.dirname, '..', '..', 'mobile', 'src'),
+  join(import.meta.dirname, '..', '..', 'mobile', 'app'),
+];
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
@@ -28,8 +37,10 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+const allFiles = () => ROOTS.flatMap(sourceFiles);
+
 describe('PostgREST embeds', () => {
-  const offenders = sourceFiles(SRC).flatMap((file) =>
+  const offenders = allFiles().flatMap((file) =>
     readFileSync(file, 'utf8')
       .split('\n')
       .flatMap((line, index) => {
@@ -38,7 +49,7 @@ describe('PostgREST embeds', () => {
         // `memberships!fk(` does not contain `memberships(`, so a plain search
         // finds exactly the ones that never named their key.
         if (!line.includes('memberships(')) return [];
-        return [`${file.replace(SRC, 'src')}:${index + 1}`];
+        return [`${file}:${index + 1}`];
       }),
   );
 
@@ -46,10 +57,11 @@ describe('PostgREST embeds', () => {
     expect(offenders).toEqual([]);
   });
 
-  it('finds the files it is meant to be scanning', () => {
-    const files = sourceFiles(SRC);
+  it('finds the files it is meant to be scanning, in both apps', () => {
+    const files = allFiles();
     expect(files.length).toBeGreaterThan(50);
     expect(files.some((f) => f.endsWith('events.ts'))).toBe(true);
+    expect(files.some((f) => f.includes(`mobile${sep}`))).toBe(true);
   });
 
   it('would catch a bare embed if one were reintroduced', () => {

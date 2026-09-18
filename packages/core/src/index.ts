@@ -13,3 +13,4 @@ export * from './setup';
 export * from './notifications';
 export * from './copy';
 export * from './festivals';
+export * from './statement';
