@@ -10,22 +10,25 @@
 -- society_ledger is that history: every confirmed contribution and every
 -- approved bill, across every event, as one list a resident can read.
 --
--- The line it draws, and the reasoning, because this is the one judgement in
--- this migration that a committee might want to overrule:
+-- The line it draws, which the society chose deliberately:
 --
 --   · money out names the vendor, the amount, the approver and the bill. It is
 --     the society's money being spent by people the society elected, and there
 --     is no version of this where that is private.
---   · money in names the flat, not the person. A flat number is on the door and
---     on the noticeboard list every RWA has always pinned up; a name attached
---     to an amount is a different thing, and the People page already refuses to
---     hand residents that much. A household paid; the ledger says which one.
+--   · money in names the payer and their flat. Who gave how much is the thing a
+--     contribution list has always said, on the noticeboard and in the minutes;
+--     withholding it makes the fund harder to trust rather than safer. So the
+--     name and the flat are here, and nothing else about the person is — no
+--     phone, no email, no address. That is the same line society_people() draws
+--     for the directory, which makes it one rule rather than two.
 --   · a payment nobody has confirmed yet is not in here at all. It is a claim,
 --     and a ledger of claims is what this whole feature is trying to replace.
 --
 -- Contributions stay unreadable row-by-row under RLS, so this is a definer view
--- with app.is_member() as its gate, the same shape as event_stats — it shows
--- exactly the columns above and no others.
+-- with app.is_member() as its gate, the same shape as event_stats. A definer
+-- view can read anything, which is exactly why the column list matters: it
+-- selects full_name and the flat and stops there, so widening it later has to
+-- be a deliberate edit to this file rather than a policy nobody reread.
 -- ============================================================================
 
 create view public.society_ledger
@@ -39,13 +42,30 @@ select
   'in'::text                           as direction,
   c.paid_at                            as happened_at,
   c.amount                             as amount,
-  -- "A-204", or the method when the payer has no flat on file (a guest, a
-  -- sponsor, a founder who has not added units yet).
+  -- Who paid. Their name where there is an account behind the payment, the flat
+  -- where staff recorded cash against a door rather than a person, and the
+  -- method for a sponsor or a guest who is neither.
   coalesce(
+    payer.full_name,
     nullif(btrim(coalesce(u.block || ' ', '') || u.number), ''),
     initcap(c.method::text)
   )                                    as counterpart,
-  initcap(c.method::text)              as detail,
+  -- What sits under the name: the flat and how it was paid. Whichever of those
+  -- the line above already used as its headline is left out here rather than
+  -- printed twice, and a line with nothing left to add returns null so a screen
+  -- can skip it.
+  case
+    when payer.full_name is not null then
+      nullif(
+        concat_ws(
+          ' · ',
+          nullif(btrim(coalesce(u.block || ' ', '') || u.number), ''),
+          initcap(c.method::text)
+        ),
+        ''
+      )
+    when u.id is not null then initcap(c.method::text)
+  end                                  as detail,
   c.receipt_no                         as receipt_no,
   null::text                           as document_url,
   v.full_name                          as confirmed_by,
@@ -54,6 +74,8 @@ select
   from public.contributions c
   join public.events e on e.id = c.event_id
   left join public.units u on u.id = c.unit_id
+  left join public.memberships pm on pm.id = c.membership_id
+  left join public.profiles payer on payer.id = pm.user_id
   left join public.memberships vm on vm.id = c.verified_by
   left join public.profiles v on v.id = vm.user_id
  where c.status = 'succeeded'
@@ -88,8 +110,8 @@ grant select on public.society_ledger to authenticated, service_role;
 
 comment on view public.society_ledger is
   'Every confirmed contribution and approved bill in a society, as one list any '
-  'member may read. Money in is identified by flat, money out by vendor. '
-  'Unconfirmed payments are not in it.';
+  'member may read. Money in names the payer and their flat and nothing else '
+  'about them; money out names the vendor. Unconfirmed payments are not in it.';
 
 -- ---------------------------------------------------------------------------
 -- What it adds up to

@@ -108,11 +108,25 @@ A committee member submits an expense with a bill. An admin approves, rejects,
 or requests changes. **Only approved expenses appear in the resident ledger**,
 and every one shows its vendor, amount, requester, approver and bill.
 
-### Expenses
+### The society ledger
 
-A committee member submits an expense with a bill. An admin approves, rejects,
-or requests changes. **Only approved expenses appear in the resident ledger**,
-and every one shows its vendor, amount, requester, approver and bill.
+`society_ledger` is every confirmed contribution and every approved bill, across
+every event, on one page any member can read.
+
+- **Money out** names the vendor, the amount, the approver and the bill.
+- **Money in** names the payer and their flat, and nothing else about them — no
+  phone, no email. Who gave how much is what a contribution list has always
+  said; a way to reach them is not, and that stays behind `society_people()`.
+- **Unconfirmed payments are not in it**, because a ledger of claims is what it
+  replaces.
+
+It is a definer view, so the column list is the whole of the protection: it
+selects `full_name` and the flat and stops, and a test pins that list so
+widening it has to be deliberate.
+
+`member_history()` gives a member their own record — payments, activities,
+suggestions — and the committee anyone's, because "has A-204 paid?" is asked at
+every meeting. Staff cannot: they run the events, not the households.
 
 ### The audit trail
 

@@ -1804,22 +1804,51 @@ select test.eq(
     where id = 'out:dddddddd-0000-4000-8000-0000000000bb'),
   'Hana Iyer', 'and the committee member who approved it');
 
--- Money in is identified by the flat, which is on the door, rather than by the
--- neighbour's name, which the People page already refuses to hand over.
+-- Who gave how much is what a contribution list has always said, so money in
+-- names the payer and their flat — and stops there. A neighbour's phone and
+-- email stay where society_people() keeps them.
 --
--- The id is looked up as the platform on purpose: a resident cannot select the
--- cash row from contributions at all, so looking it up as Ria would compare
+-- The ids are looked up as the platform on purpose: a resident cannot select
+-- either contribution row directly, so looking them up as Ria would compare
 -- against null and pass without testing anything.
 reset role;
 create temporary table t_cash as
 select 'in:' || id::text as ledger_id from public.contributions
  where method = 'cash' and amount = 450;
-grant select on t_cash to authenticated;
+create temporary table t_named as
+select 'in:' || id::text as ledger_id from public.contributions
+ where reference = '612345678901';
+grant select on t_cash, t_named to authenticated;
+
 select test.act_as('abababab-abab-4bab-8bab-abababababab');
 select test.eq(
   (select counterpart from public.society_ledger
+    where id = (select ledger_id from t_named)),
+  'Tom Menon', 'a neighbour can see who paid');
+select test.eq(
+  (select amount from public.society_ledger
+    where id = (select ledger_id from t_named)),
+  1001::numeric, 'and how much they paid');
+
+-- Cash staff collected against a door, with no account behind it, still has a
+-- flat to name even though it has no payer.
+select test.eq(
+  (select counterpart from public.society_ledger
     where id = (select ledger_id from t_cash)),
-  'A 1104', 'money in is identified by flat, not by name');
+  'A 1104', 'money with no account behind it is named by flat');
+
+-- The ledger is a definer view, so what it does not select is the only thing
+-- stopping it. Pin the column list: a later edit that adds a contact column
+-- has to break this test first.
+reset role;
+select test.eq(
+  (select string_agg(column_name, ',' order by column_name)
+     from information_schema.columns
+    where table_schema = 'public' and table_name = 'society_ledger'),
+  'amount,community_id,confirmed_at,confirmed_by,counterpart,detail,direction,'
+  'document_url,event_id,event_name,event_slug,happened_at,id,membership_id,'
+  'receipt_no',
+  'and the ledger carries a name and a flat, never a way to contact anyone');
 
 select test.ok(
   (select balance = total_in - total_out from public.society_money

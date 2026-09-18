@@ -23,9 +23,9 @@ export const metadata = { title: 'Money' };
  * looked like. The history existed and was unreachable, which for a
  * transparency ledger is close to not existing.
  *
- * Money in is identified by flat, money out by vendor — the line society_ledger
- * draws and explains. Payments nobody has confirmed are not here: a ledger of
- * claims is what this replaces.
+ * Money in names the payer and their flat, money out the vendor — the line
+ * society_ledger draws and explains. Payments nobody has confirmed are not
+ * here: a ledger of claims is what this replaces.
  */
 export default async function MoneyPage(props: PageProps<'/app/[community]/money'>) {
   const { community: slug } = await props.params;
@@ -222,8 +222,10 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         <p className="text-ink-subtle mt-4 flex items-start gap-2 text-xs">
           <Scale className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           <span>
-            Money in is listed by flat rather than by name, the way a noticeboard list always was.
-            Money out names the vendor, the amount and whoever on the committee approved it.{' '}
+            Money in names who paid and their flat, the way a contribution list always has. Money
+            out names the vendor, the amount and whoever on the committee approved it. Nothing here
+            is a way to contact anybody — phone numbers and email addresses stay on the People page,
+            for the people entitled to them.{' '}
             {totals.data?.last_movement_at ? (
               <>Last movement {relativeTime(totals.data.last_movement_at)}.</>
             ) : null}
