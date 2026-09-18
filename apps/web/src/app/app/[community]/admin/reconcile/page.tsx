@@ -7,7 +7,7 @@ import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatTile } from '@/components/badges';
+import { StatTile, StatTiles } from '@/components/badges';
 import {
   AddAccountForm,
   ImportStatementForm,
@@ -110,7 +110,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
         description="Import the society's statement and pair each line with the payment it turned out to be."
       />
       <PageBody>
-        <div className="grid grid-cols-3 gap-3">
+        <StatTiles>
           <StatTile
             label="Unexplained lines"
             value={String(summary.data?.unexplained_lines ?? 0)}
@@ -123,7 +123,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
             label="Left, unexplained"
             value={formatMoney(Number(summary.data?.unexplained_out ?? 0), community.currency)}
           />
-        </div>
+        </StatTiles>
 
         {accounts.length ? (
           <Card className="mt-5">

@@ -145,6 +145,9 @@ export function ImportStatementForm({
         </div>
       </div>
 
+      {/* The statement box is monospace so pasted columns line up, but 16px on
+          a phone: below that, Safari zooms the page in the moment it is
+          tapped. */}
       {mode === 'paste' ? (
         <Field
           label="Statement"
@@ -158,7 +161,7 @@ export function ImportStatementForm({
               name="csv"
               rows={8}
               spellCheck={false}
-              className="border-border-base bg-surface-raised text-ink placeholder:text-ink-subtle aria-[invalid=true]:border-danger w-full resize-y rounded-lg border px-3 py-2 font-mono text-xs"
+              className="border-border-base bg-surface-raised text-ink placeholder:text-ink-subtle aria-[invalid=true]:border-danger w-full resize-y rounded-lg border px-3 py-2 font-mono text-base sm:text-xs"
               placeholder={
                 'Date,Narration,Withdrawal Amt.,Deposit Amt.,Closing Balance\n16/09/26,UPI/612345678901/RIA MENON,,2001.00,124551.00'
               }

@@ -48,6 +48,7 @@ import {
   FundBar,
   PaymentStatusBadge,
   StatTile,
+  StatTiles,
 } from '@/components/badges';
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
@@ -333,7 +334,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <div className="mt-3">
                   <FundBar percent={funded} />
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-2">
+                <StatTiles className="mt-4 gap-2">
                   <StatTile
                     label="Raised"
                     value={formatMoney(stats.fundRaised, community.currency)}
@@ -344,7 +345,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                     value={formatMoney(stats.available, community.currency)}
                     tone={stats.available < 0 ? 'danger' : 'success'}
                   />
-                </div>
+                </StatTiles>
               </CardBody>
             </Card>
 

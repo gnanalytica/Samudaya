@@ -16,7 +16,7 @@ import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PaymentStatusBadge, StatTile } from '@/components/badges';
+import { PaymentStatusBadge, StatTile, StatTiles } from '@/components/badges';
 
 export const metadata = { title: 'Me' };
 
@@ -89,11 +89,11 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
           </Card>
         ) : null}
 
-        <div className="grid grid-cols-3 gap-3">
+        <StatTiles>
           <StatTile label="Contributed" value={formatMoney(totalGiven, community.currency)} />
           <StatTile label="Registrations" value={String(registrations.data?.length ?? 0)} />
           <StatTile label="Suggestions" value={String(suggestions.data?.length ?? 0)} />
-        </div>
+        </StatTiles>
 
         <Card className="mt-5">
           <CardHeader title="Your payments" />

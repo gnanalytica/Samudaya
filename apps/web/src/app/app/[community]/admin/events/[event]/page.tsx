@@ -37,6 +37,7 @@ import {
   FundBar,
   PaymentStatusBadge,
   StatTile,
+  StatTiles,
 } from '@/components/badges';
 import { BillLink, StoredFileLink } from '@/components/bill-link';
 import { AuditTrail } from '@/components/audit-trail';
@@ -534,14 +535,14 @@ export default async function ManageEventPage(
 
         {active === 'payments' ? (
           <div className="space-y-5">
-            <div className="grid grid-cols-3 gap-3">
+            <StatTiles>
               <StatTile
                 label="Collected"
                 value={formatMoney(stats.fundRaised, community.currency)}
               />
               <StatTile label="Confirmed payments" value={String(confirmedPayments.length)} />
               <StatTile label="Flats paid" value={String(flatsPaid)} />
-            </div>
+            </StatTiles>
             {waitingPayments.length ? (
               <Card>
                 <CardHeader

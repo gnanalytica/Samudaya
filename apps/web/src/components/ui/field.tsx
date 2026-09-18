@@ -2,8 +2,13 @@ import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes 
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+// 16px on a phone, 14px from `sm`. Mobile Safari zooms the page in on any
+// field it focuses whose text is under 16px, and then leaves it zoomed — so
+// tapping a form on an iPhone jumped the layout and the rest of the page had
+// to be scrolled sideways to read. The size only looks different on a phone,
+// where the field is full-width anyway; `sm` and up is unchanged at 14px.
 const control =
-  'w-full rounded-lg border border-border-base bg-surface-raised px-3 py-2 text-sm text-ink ' +
+  'w-full rounded-lg border border-border-base bg-surface-raised px-3 py-2 text-base sm:text-sm text-ink ' +
   'placeholder:text-ink-subtle disabled:opacity-60 disabled:cursor-not-allowed ' +
   'aria-[invalid=true]:border-danger';
 
