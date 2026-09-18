@@ -89,10 +89,27 @@ than a ladder, and the ladder only stands in when nobody has named one. Twice
 the figure is the other chip, for a household paying for two flats. Anything
 else is typed.
 
-Pick an amount → pay it from a UPI app → report it back with the UPI transaction
-ID **and the amount that actually left the account**. The amount is pre-filled
-and stays editable, because a UPI app lets you change the figure on the way
-through and people do; what the payer types is what gets stored.
+Pick an amount → pay it from a UPI app → report it back with **the amount that
+actually left the account**. The amount is pre-filled and stays editable,
+because a UPI app lets you change the figure on the way through and people do;
+what the payer types is what gets stored.
+
+The 12-digit UPI reference is no longer the price of reporting. On Android it
+never was — the UPI app is opened for a result and hands it back, so the report
+files itself. Everywhere else, finding it means leaving the app, opening GPay
+or PhonePe, and digging three taps down; residents who give up at that step have
+still paid, and the money arrives with nothing pointing at who sent it.
+
+So a screenshot is enough, and the society's UPI ID can be copied with one tap
+for anyone whose phone does not open a UPI app from a link. One of the two is
+still required, never neither: a report with no reference and no picture is a
+claim with nothing behind it.
+
+The reference is not abandoned, because reconciliation runs on it — matching on
+the UTR is near-certain, and the fallback of amount-within-a-fortnight is no
+help when sixty flats each pay ₹2,100 in the same week. It is simply captured
+later: the screenshot contains it, and whoever confirms the payment has the bank
+statement open anyway, so they record it then.
 
 Nothing counts until somebody confirms it. A reported payment sits at `pending`
 and is **not** in the fund total; staff confirm it against the statement (by

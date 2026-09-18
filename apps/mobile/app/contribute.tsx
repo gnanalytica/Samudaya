@@ -11,12 +11,13 @@ import {
   formatMoney,
   isSuggestedAmount,
   newTransactionRef,
+  optionalUpiReference,
   parseUpiResponse,
+  paymentEvidenceProblem,
   paymentProofPath,
   unitLabel,
   upiNote,
   upiPayUri,
-  upiReferenceSchema,
 } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
@@ -160,6 +161,7 @@ function PayWithUpi({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captured, setCaptured] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const note = upiNote(unit ? unitLabel(unit) : null, event.name);
 
@@ -226,15 +228,23 @@ function PayWithUpi({
   };
 
   const submit = async () => {
-    const parsed = upiReferenceSchema.safeParse(reference);
+    const parsed = optionalUpiReference.safeParse(reference);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Enter the UPI transaction ID.');
+      setError(parsed.error.issues[0]?.message ?? 'Check the UPI transaction ID.');
+      return;
+    }
+    // One of the two, never neither: the reference is what the bank matcher
+    // runs on, and the screenshot is what staff read it off when the resident
+    // did not have it to hand.
+    const missing = paymentEvidenceProblem(parsed.data, Boolean(proof));
+    if (missing) {
+      setError(missing);
       return;
     }
     await submitReport(parsed.data, null);
   };
 
-  const submitReport = async (upiReference: string, appResponse: AppResponse | null) => {
+  const submitReport = async (upiReference: string | null, appResponse: AppResponse | null) => {
     if (!amount || !activeCommunity || !membershipId) return;
     setBusy(true);
     setError(null);
@@ -282,7 +292,9 @@ function PayWithUpi({
             : 'That did not go through. Please try again.',
       );
       if (appResponse) {
-        setReference(upiReference);
+        // Only reached when the UPI app handed one back, so it is never null
+        // here; the fallback is for the type, not for a case that happens.
+        setReference(upiReference ?? '');
         setStage('report');
       }
       return;
@@ -392,10 +404,24 @@ function PayWithUpi({
               keyboardType="number-pad"
               placeholder="Enter an amount"
             />
-            <Caption>
-              Paying {payeeName} · {vpa}
-              {'\n'}Note: {note}
-            </Caption>
+            <View style={{ gap: spacing.xs }}>
+              <Caption>
+                Paying {payeeName} · {vpa}
+                {'\n'}Note: {note}
+              </Caption>
+              {/* The society's UPI ID was on screen and there was no way to
+                  take it anywhere — on an iPhone with no UPI app registered,
+                  the deep link does nothing and this is the whole path. */}
+              <Button
+                label={copied ? 'UPI ID copied' : 'Copy UPI ID'}
+                variant="secondary"
+                onPress={() => {
+                  void Clipboard.setStringAsync(vpa);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+              />
+            </View>
           </Card>
 
           {stage === 'amount' ? (
@@ -421,16 +447,18 @@ function PayWithUpi({
               <Heading>Tell us you’ve paid</Heading>
               {notice ? <Body muted>{notice}</Body> : null}
               <Input
-                label={COPY.upiReference}
+                label={`${COPY.upiReference} — optional`}
                 value={reference}
                 onChangeText={setReference}
                 keyboardType="number-pad"
                 placeholder="12-digit number from your UPI app"
                 autoCapitalize="none"
               />
-              <Caption>{COPY.upiReferenceHint}</Caption>
+              <Caption>
+                If you have it to hand it saves staff a step. If not, a screenshot is enough.
+              </Caption>
               <FilePickerField
-                label="Payment screenshot (optional)"
+                label="Payment screenshot"
                 file={proof}
                 onChange={setProof}
                 allowPdf={false}

@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import QRCode from 'qrcode';
-import { Clock, ExternalLink, Smartphone } from 'lucide-react';
+import { Check, Clock, Copy, ExternalLink, Smartphone } from 'lucide-react';
 import {
   COPY,
   contributionPresets,
@@ -20,6 +20,46 @@ import { FocusFirstError } from '@/components/focus-first-error';
 import { contribute, type ContributeState } from '../../actions';
 
 const initial: ContributeState = {};
+
+/**
+ * Copies a short string, and says so for a moment.
+ *
+ * Added because the line beside it told people to "copy the UPI ID above" and
+ * there was nothing to copy with — they had to select twenty characters of
+ * monospace by hand, on a phone. Clipboard access can be refused or absent
+ * (an insecure origin, an old browser); the button then says so rather than
+ * silently doing nothing, because a copy that quietly failed is how somebody
+ * pastes the wrong thing into a payment.
+ */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(value);
+          setState('copied');
+        } catch {
+          setState('failed');
+        }
+        setTimeout(() => setState('idle'), 2000);
+      }}
+      className="text-accent hover:bg-surface-sunken -my-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium pointer-coarse:min-h-11"
+    >
+      {state === 'copied' ? (
+        <Check className="size-3.5" aria-hidden="true" />
+      ) : (
+        <Copy className="size-3.5" aria-hidden="true" />
+      )}
+      <span>
+        {state === 'copied' ? 'Copied' : state === 'failed' ? 'Press and hold to copy' : 'Copy'}
+      </span>
+      <span className="sr-only">{` the ${label}`}</span>
+    </button>
+  );
+}
 
 function Submit({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
@@ -120,10 +160,17 @@ export function ContributeForm({
             Sent for confirmation
           </h2>
           <p className="text-ink-muted mx-auto mt-1 max-w-sm text-sm">
-            Staff will match UPI transaction ID{' '}
-            <span className="text-ink font-mono">{state.reported.reference}</span> with the bank
-            statement. Your {formatMoney(state.reported.amount, currency)} counts towards{' '}
-            {eventName} once it is confirmed.
+            {state.reported.reference ? (
+              <>
+                Staff will match UPI transaction ID{' '}
+                <span className="text-ink font-mono">{state.reported.reference}</span> with the bank
+                statement.
+              </>
+            ) : (
+              <>Staff will match your screenshot against the bank statement.</>
+            )}{' '}
+            Your {formatMoney(state.reported.amount, currency)} counts towards {eventName} once it
+            is confirmed.
           </p>
           <div className="mt-7 flex justify-center gap-3">
             <ButtonLink href={`/app/${slug}/me`} variant="secondary" size="sm">
@@ -235,13 +282,15 @@ export function ContributeForm({
               </p>
             )}
             <dl className="text-ink-muted space-y-1 text-sm">
-              <div className="flex flex-wrap gap-x-2">
+              <div className="flex flex-wrap items-center gap-x-2">
                 <dt>UPI ID</dt>
                 <dd className="text-ink font-mono break-all">{upi.vpa}</dd>
+                <CopyButton value={upi.vpa} label="UPI ID" />
               </div>
-              <div className="flex flex-wrap gap-x-2">
+              <div className="flex flex-wrap items-center gap-x-2">
                 <dt>Note</dt>
                 <dd className="text-ink font-mono break-all">{note}</dd>
+                <CopyButton value={note} label="note" />
               </div>
             </dl>
             {/* Most residents pay from the phone they are reading this on, where
@@ -250,7 +299,7 @@ export function ContributeForm({
                 the same markup. */}
             <p className="text-ink-subtle text-xs">
               <span className="sm:hidden">
-                On this phone, tap Open UPI app or copy the UPI ID above.
+                On this phone, tap Open UPI app — or copy the UPI ID above and paste it into yours.
               </span>
               <span className="hidden sm:inline">
                 On a computer, scan the QR code with your phone.
@@ -294,11 +343,10 @@ export function ContributeForm({
             </Field>
 
             <Field
-              label={COPY.upiReference}
+              label={`${COPY.upiReference} — optional`}
               htmlFor="upi-reference"
               error={state.fieldErrors?.reference}
-              hint={COPY.upiReferenceHint}
-              required
+              hint="If you have it to hand it saves staff a step. If not, a screenshot below is enough."
             >
               {(control) => (
                 <Input
@@ -315,8 +363,8 @@ export function ContributeForm({
               bucket="payment-proofs"
               folder={proofFolder}
               name="proof_path"
-              label="Payment screenshot (optional)"
-              hint="Helps staff confirm faster. Only you and staff can see it."
+              label="Payment screenshot"
+              hint="The success screen from your UPI app. Only you and staff can see it."
               maxBytes={5 * 1_048_576}
               onUploadingChange={setUploading}
             />

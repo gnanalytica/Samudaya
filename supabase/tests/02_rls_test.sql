@@ -1953,7 +1953,7 @@ reset role;
 -- WhatsApp bot and the v1 API call these with it, and a revoke that took PUBLIC
 -- and its grant together would break both silently.
 select test.ok(
-  has_function_privilege('service_role', 'public.review_contribution(uuid,boolean,text)', 'EXECUTE'),
+  has_function_privilege('service_role', 'public.review_contribution(uuid,boolean,text,text)', 'EXECUTE'),
   'the WhatsApp bot and the API keep their door');
 select test.ok(
   has_function_privilege('authenticated', 'public.society_people(uuid)', 'EXECUTE'),
@@ -2308,3 +2308,79 @@ select test.eq(
   (select suggested_amount from public.events
     where id = 'cccccccc-0000-4000-8000-0000000000aa'),
   2100::numeric, 'a resident cannot decide what the society asks for');
+
+-- ---------------------------------------------------------------------------
+-- The reference can arrive later
+-- ---------------------------------------------------------------------------
+-- A resident on an iPhone uploads the screenshot and types no twelve-digit
+-- reference. Whoever confirms the payment has the bank statement open and the
+-- screenshot in front of them, so the reference is recorded then.
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference, proof_path)
+select 'dddddddd-0000-4000-8000-00000000000a',
+       'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id,
+       4100, 'upi', 'pending', null, 'proof/one.jpg'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+reset role;
+select test.eq(
+  (select reference from public.contributions where id = 'dddddddd-0000-4000-8000-00000000000a'),
+  null::text, 'a payment can be reported with a screenshot and no reference');
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select public.review_contribution(
+  'dddddddd-0000-4000-8000-00000000000a', true, null, '612345678999');
+reset role;
+select test.eq(
+  (select reference from public.contributions where id = 'dddddddd-0000-4000-8000-00000000000a'),
+  '612345678999', 'and staff record the reference they read off it when confirming');
+select test.eq(
+  (select status::text from public.contributions
+    where id = 'dddddddd-0000-4000-8000-00000000000a'),
+  'succeeded', 'which confirms the payment in the same act');
+
+-- A mistyped digit is correctable, because the person confirming is the one
+-- holding the evidence.
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference)
+select 'dddddddd-0000-4000-8000-00000000000b',
+       'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id,
+       4200, 'upi', 'pending', '600000000001'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select public.review_contribution(
+  'dddddddd-0000-4000-8000-00000000000b', true, null, '600000000002');
+reset role;
+select test.eq(
+  (select reference from public.contributions where id = 'dddddddd-0000-4000-8000-00000000000b'),
+  '600000000002', 'staff correct a reference the resident mistyped');
+
+-- Confirming without one changes nothing, so the one-tap confirm still works.
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference)
+select 'dddddddd-0000-4000-8000-00000000000c',
+       'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id,
+       4300, 'upi', 'pending', '600000000003'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select public.review_contribution('dddddddd-0000-4000-8000-00000000000c', true);
+reset role;
+select test.eq(
+  (select reference from public.contributions where id = 'dddddddd-0000-4000-8000-00000000000c'),
+  '600000000003', 'and confirming without one leaves what was there alone');
+
+-- The revoke that dropping and recreating a function would have undone.
+select test.ok(
+  not has_function_privilege('anon', 'public.review_contribution(uuid,boolean,text,text)', 'EXECUTE'),
+  'a stranger cannot confirm a payment');
+select test.ok(
+  has_function_privilege('authenticated', 'public.review_contribution(uuid,boolean,text,text)', 'EXECUTE'),
+  'and staff still can');

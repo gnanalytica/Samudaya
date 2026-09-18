@@ -164,7 +164,14 @@ function TodoActions({
   switch (item.kind) {
     case 'payment_to_confirm':
       return can(role, 'payments:record') ? (
-        <ReviewPaymentForm slug={slug} eventSlug={item.eventSlug ?? ''} contributionId={item.id} />
+        // The queue does not carry the reference, so the field is always
+        // offered here rather than hidden from the screen staff work on most.
+        <ReviewPaymentForm
+          slug={slug}
+          eventSlug={item.eventSlug ?? ''}
+          contributionId={item.id}
+          showReferenceField
+        />
       ) : null;
 
     case 'join_request':

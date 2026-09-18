@@ -269,6 +269,7 @@ function PendingPayment({
 }) {
   const [declining, setDeclining] = useState(false);
   const [note, setNote] = useState('');
+  const [reference, setReference] = useState('');
   const [busy, setBusy] = useState<'confirm' | 'decline' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -283,6 +284,7 @@ function PendingPayment({
       p_contribution_id: row.id,
       p_confirm: confirm,
       p_note: note.trim() || undefined,
+      p_reference: reference.trim() || undefined,
     });
     setBusy(null);
     if (rpcError) {
@@ -312,6 +314,20 @@ function PendingPayment({
         <Caption>{upiCaptureNote(row.gateway_payload)}</Caption>
       ) : null}
       <ViewFileChip bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
+      {/* Only when it is missing, which means the resident sent a screenshot
+          instead of typing it. Whoever is confirming has the statement open
+          and the picture one tap away, so this is the cheapest moment in the
+          whole flow to capture the one thing reconciliation runs on. */}
+      {mayReview && !row.reference ? (
+        <Input
+          label="UPI transaction ID from the screenshot (optional)"
+          value={reference}
+          onChangeText={setReference}
+          keyboardType="number-pad"
+          autoCapitalize="none"
+          placeholder="612345678901"
+        />
+      ) : null}
       {/* Who confirmed the money arrived, and any edit made after they did. */}
       <AuditTrail
         confirmedBy={row.verifier?.profiles?.full_name}

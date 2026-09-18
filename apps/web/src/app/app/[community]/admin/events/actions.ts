@@ -10,6 +10,7 @@ import {
   createEventSchema,
   createExpenseSchema,
   eventSlug as makeEventSlug,
+  optionalUpiReference,
   optionalWhatsappGroup,
   paymentMethodSchema,
   reviewExpenseSchema,
@@ -695,6 +696,8 @@ const reviewPaymentSchema = z
     contribution_id: uuid,
     decision: z.enum(['confirm', 'reject']),
     note: z.string().trim().max(300).optional(),
+    // Read off the resident's screenshot by whoever is confirming.
+    reference: optionalUpiReference,
   })
   .refine((value) => value.decision === 'confirm' || Boolean(value.note), {
     message: 'Say why it could not be confirmed',
@@ -714,6 +717,7 @@ export async function reviewPayment(_prev: ActionState, formData: FormData): Pro
     contribution_id: formData.get('contribution_id'),
     decision: formData.get('decision'),
     note: formData.get('note') || undefined,
+    reference: formData.get('reference'),
   });
   if (!parsed.success) {
     return { error: fieldErrors(parsed.error).note ?? 'That decision could not be recorded.' };
@@ -724,6 +728,7 @@ export async function reviewPayment(_prev: ActionState, formData: FormData): Pro
     p_contribution_id: parsed.data.contribution_id,
     p_confirm: parsed.data.decision === 'confirm',
     p_note: parsed.data.note ?? undefined,
+    p_reference: parsed.data.reference ?? undefined,
   });
   if (error) return { error: friendlyDbError(error) };
 

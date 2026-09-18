@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   joinActivitySchema,
+  paymentEvidenceProblem,
   reportPaymentSchema,
   suggestActivitySchema,
   suggestionKindSchema,
@@ -23,7 +24,10 @@ import { EMPTY_STATE, fieldErrors, friendlyDbError, type ActionState } from '@/l
  * the database checks it again — these are convenience, not the boundary.
  */
 
-export type ContributeState = ActionState & { reported?: { amount: number; reference: string } };
+export type ContributeState = ActionState & {
+  /** `reference` is null when the resident sent a screenshot instead. */
+  reported?: { amount: number; reference: string | null };
+};
 
 /**
  * A resident reports a UPI payment they made to the society's UPI ID. It is
@@ -68,6 +72,12 @@ export async function contribute(
   if (proof && !proof.startsWith(proofFolder)) {
     return { error: 'That screenshot could not be attached. Please upload it again.' };
   }
+
+  // One of the two, never neither: the reference is what the bank matcher runs
+  // on, and the screenshot is what somebody reads it off when the resident did
+  // not have it to hand.
+  const missing = paymentEvidenceProblem(parsed.data.reference, Boolean(proof));
+  if (missing) return { fieldErrors: { reference: missing } };
 
   const { error } = await supabase.from('contributions').insert({
     event_id: event.id,

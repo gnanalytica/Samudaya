@@ -26,11 +26,53 @@ export const upiReferenceSchema = z
       .regex(/^[A-Za-z0-9]{10,22}$/, 'Enter the 12-digit UPI reference from your payment app'),
   );
 
+/**
+ * The same reference, when the resident may not have one to give.
+ *
+ * Empty is a real answer now: on an iPhone or the website, digging a
+ * twelve-digit UTR out of GPay is the step people abandon, and a payment
+ * abandoned at that step has still left their account. A screenshot stands in.
+ * Anything that is not empty still has to look like a reference, because a
+ * half-typed one is worse than none — it would match nothing and read as
+ * though it should.
+ */
+export const optionalUpiReference = z.preprocess(
+  (value) => {
+    if (value == null) return null;
+    // Whitespace-only is empty too: a field somebody tabbed through is not an
+    // attempt at a reference.
+    const cleaned = String(value).replace(/\s+/g, '');
+    return cleaned === '' ? null : cleaned;
+  },
+  z.union([z.null(), upiReferenceSchema]),
+);
+
 export const reportPaymentSchema = z.object({
   event_id: z.string().uuid(),
   amount: z.coerce.number().positive('Enter the amount you paid').max(10_000_000),
-  reference: upiReferenceSchema,
+  reference: optionalUpiReference,
 });
+
+/**
+ * Whether a report carries enough for anybody to ever check it, and what to
+ * say when it does not.
+ *
+ * One of the two, never neither. The reference is what reconciliation runs on;
+ * the screenshot is what somebody reads the reference off when the resident
+ * did not type it. A report with neither is a claim with nothing behind it,
+ * and confirming it would mean taking a stranger's word for money.
+ *
+ * This is a rule about the contribute form, not about the ledger, so it lives
+ * here rather than in a constraint: staff recording a cash payment for a flat
+ * have never had either, and never needed one.
+ */
+export function paymentEvidenceProblem(
+  reference: string | null | undefined,
+  hasProof: boolean,
+): string | null {
+  if (reference || hasProof) return null;
+  return 'Add the UPI transaction ID or a screenshot of the payment, so it can be checked.';
+}
 
 export type UpiPaymentLink = {
   vpa: string;
