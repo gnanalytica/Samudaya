@@ -8,6 +8,11 @@ import { AuthProvider, useAuth } from '../src/lib/auth';
 import { usePushRegistration } from '../src/lib/use-push-registration';
 import { usePushTapHandler } from '../src/lib/notifications';
 import { useTheme } from '../src/lib/use-theme';
+import { initErrorReporting } from '../src/lib/observability';
+
+// Before the first render, so a crash while the tree is mounting is still
+// reported. Inert without a DSN — see lib/observability.
+initErrorReporting();
 
 function RootStack() {
   const { colors, isDark } = useTheme();
@@ -64,6 +69,7 @@ function RootStack() {
           options={{ title: `Share ${COPY.societyCode.toLowerCase()}` }}
         />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
+        <Stack.Screen name="delete-account" options={{ title: 'Delete account' }} />
         <Stack.Screen name="admin/event/new" options={{ title: 'New event' }} />
         <Stack.Screen name="admin/event/[slug]" options={{ title: 'Manage event' }} />
       </Stack>

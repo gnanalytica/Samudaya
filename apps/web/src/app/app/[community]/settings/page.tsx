@@ -5,6 +5,7 @@ import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ProfileCard } from './profile-card';
+import { DeleteAccountCard } from './delete-account-card';
 
 export const metadata = { title: 'Settings' };
 
@@ -62,6 +63,8 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
               </form>
             </CardBody>
           </Card>
+
+          <DeleteAccountCard />
         </div>
       </PageBody>
     </>

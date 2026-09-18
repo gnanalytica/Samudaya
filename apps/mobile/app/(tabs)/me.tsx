@@ -27,7 +27,7 @@ import { StatTile } from '../../src/components/event-ui';
 import { LinkRow } from '../../src/components/admin-ui';
 import { ViewSwitchCard } from '../../src/components/view-switch';
 import { useUnreadCount } from '../../src/lib/notifications';
-import { spacing } from '../../src/lib/theme';
+import { minTapTarget, spacing } from '../../src/lib/theme';
 
 /** Profile, your payments and registrations, notifications, societies, sign out. */
 export default function Me() {
@@ -223,6 +223,24 @@ export default function Me() {
           style={{ paddingVertical: spacing.md, alignItems: 'center' }}
         >
           <Body muted>Sign out</Body>
+        </Pressable>
+
+        {/* Both stores require an app with accounts to offer this, and to
+            offer it in the app rather than only by email. It sits below Sign
+            out because that is where somebody looks for it, and it is a plain
+            row rather than a button so it does not compete with the things
+            people actually came here to do. */}
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/delete-account')}
+          style={{
+            paddingVertical: spacing.md,
+            alignItems: 'center',
+            minHeight: minTapTarget,
+            justifyContent: 'center',
+          }}
+        >
+          <Caption>Delete account</Caption>
         </Pressable>
         {/* Clears the tab bar so the last row is never half-hidden behind it. */}
         <View style={{ height: spacing.xl }} />

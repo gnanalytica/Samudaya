@@ -2117,3 +2117,83 @@ select test.ok(
   (select count(*) from public.member_history((select id from t_ria))) > 0,
   'the committee can, because "has A-204 paid?" is asked at every meeting');
 reset role;
+
+-- ---------------------------------------------------------------------------
+-- Deleting your account: what goes, and what a ledger has to keep
+-- ---------------------------------------------------------------------------
+-- Both stores require this before they will take the app at all, and the
+-- Privacy Policy has described exactly what it does since it was written.
+-- These are that description, as assertions.
+reset role;
+select test.ok(
+  not has_function_privilege('anon', 'public.delete_my_account()', 'EXECUTE'),
+  'a stranger cannot delete somebody''s account');
+select test.ok(
+  has_function_privilege('authenticated', 'public.delete_my_account()', 'EXECUTE'),
+  'a signed-in member can delete their own');
+
+-- Hana is the only committee member Hill Crest has, and Ria, Tom and the staff
+-- member are still in it. Leaving would hand them a society nobody can run.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select status from public.delete_my_account()), 'last_committee',
+  'the last committee member of a society with residents in it is refused');
+select test.eq(
+  (select detail from public.delete_my_account()), 'Hill Crest',
+  'and told which society is holding them, rather than just "no"');
+reset role;
+select test.eq(
+  (select count(*) from auth.users where id = '88888888-8888-4888-8888-888888888888'),
+  1::bigint, 'a refused deletion deletes nothing');
+
+-- Dev is a resident of My Home Residency who gave ₹2000 to the Ganesh fund,
+-- and owns flat A-102.
+select test.act_as('44444444-4444-4444-8444-444444444444');
+select test.eq(
+  (select status from public.delete_my_account()), 'deleted',
+  'a resident can delete their account');
+
+reset role;
+select test.eq(
+  (select count(*) from auth.users where id = '44444444-4444-4444-8444-444444444444'),
+  0::bigint, 'the account itself is gone, not just its profile');
+select test.eq(
+  (select count(*) from public.profiles where id = '44444444-4444-4444-8444-444444444444'),
+  0::bigint, 'the profile goes with it');
+select test.eq(
+  (select count(*) from public.memberships where user_id = '44444444-4444-4444-8444-444444444444'),
+  0::bigint, 'and every membership');
+select test.eq(
+  (select count(*) from public.unit_occupants o
+     where o.unit_id = 'bbbbbbbb-0000-4000-8000-000000000002'),
+  0::bigint, 'the flat no longer records them as living there');
+
+-- The half the Privacy Policy is careful about: the money stays, unattached.
+select test.eq(
+  (select count(*) from public.contributions
+    where event_id = 'cccccccc-0000-4000-8000-000000000001'
+      and amount = 2000 and membership_id is null),
+  1::bigint, 'the ₹2000 they gave is kept, and is no longer theirs');
+select test.eq(
+  (select sum(amount) from public.contributions
+    where event_id = 'cccccccc-0000-4000-8000-000000000001'),
+  7000::numeric, 'so the fund still adds up to what was actually collected');
+
+-- Nobody is stranded by the only member of a society leaving it.
+reset role;
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('d0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0', 'nadia@example.com', '{"full_name":"Nadia Sheikh"}');
+select test.act_as('d0d0d0d0-d0d0-4d0d-8d0d-d0d0d0d0d0d0');
+select test.eq(
+  (select status from public.create_society('Palm Court', 'Pune')), 'ok',
+  'a founder opens a society and is its only member');
+select test.eq(
+  (select status from public.delete_my_account()), 'deleted',
+  'and leaving strands nobody, so it is allowed');
+reset role;
+select test.eq(
+  (select count(*) from public.communities where slug = 'palm-court'),
+  0::bigint, 'the society goes with its last member, rather than sitting unreachable');
+select test.eq(
+  (select count(*) from public.communities where slug = 'green-valley'),
+  1::bigint, 'a society that still has members is left alone');

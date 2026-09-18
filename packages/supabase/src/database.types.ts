@@ -2719,6 +2719,13 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["whatsapp_link_codes"]["Row"]
       }
+      delete_my_account: {
+        Args: { [_ in never]: never }
+        Returns: {
+        status: string | null
+        detail: string | null
+      }[]
+      }
       ignore_bank_line: {
         Args: {
         p_transaction_id: string

@@ -45,10 +45,15 @@ const FEATURES = [
 const withIntent = (mode: 'join' | 'create') =>
   `/login?next=${encodeURIComponent(`/onboarding?mode=${mode}`)}`;
 
-export default async function LandingPage() {
+export default async function LandingPage(props: PageProps<'/'>) {
   // Signed-in visitors have no use for the pitch.
   const user = await getCurrentUser();
   if (user) redirect('/app');
+
+  // Somebody who has just deleted their account arrives here, signed out, with
+  // no other way of knowing it worked. The pitch is the wrong thing to greet
+  // them with on its own.
+  const { deleted } = await props.searchParams;
 
   return (
     <div className="min-h-dvh">
@@ -65,6 +70,22 @@ export default async function LandingPage() {
       </header>
 
       <main id="main">
+        {deleted ? (
+          <div className="mx-auto max-w-5xl px-6">
+            <p
+              role="status"
+              className="border-border-base bg-surface-sunken text-ink rounded-xl border px-5 py-4 text-sm"
+            >
+              Your account has been deleted. Contributions and bills stay in your society&rsquo;s
+              ledger with your name removed, as our{' '}
+              <Link href="/privacy" className="text-accent underline underline-offset-4">
+                Privacy Policy
+              </Link>{' '}
+              describes.
+            </p>
+          </div>
+        ) : null}
+
         <section className="mx-auto max-w-5xl px-6 pt-12 pb-16 sm:pt-20">
           <p className="text-accent text-sm font-medium">समुदाय · community</p>
           <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">

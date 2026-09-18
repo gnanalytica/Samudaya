@@ -117,6 +117,15 @@ export default function PrivacyPage() {
           mobile, WhatsApp or the API. Our hosting and database providers also keep routine
           technical logs, such as IP addresses and request times, to operate and secure the service.
         </p>
+        <p>
+          <Strong>Crash reports.</Strong> When the app or the website hits an error, we send a
+          report so we can fix it: what went wrong, where in our code, the app version and the kind
+          of device. These reports are deliberately built to carry <Strong>no personal data</Strong>{' '}
+          — we switch off the parts of our error-reporting tool that would attach your identity,
+          your IP address or what you had typed, and we remove anything sensitive from the address
+          of the page you were on. We do not record your screen and we do not trace what you do in
+          the app.
+        </p>
       </LegalSection>
 
       <LegalSection id="how-we-use-data" title="How we use it">
@@ -188,6 +197,10 @@ export default function PrivacyPage() {
           <li>
             <Strong>Google</Strong> — if you choose to sign in with Google.
           </li>
+          <li>
+            <Strong>Sentry</Strong> — receiving the crash reports described above, which carry no
+            personal data.
+          </li>
         </LegalList>
         <p>
           Some of these providers may process data outside India. Where they do, we rely on their
@@ -214,8 +227,13 @@ export default function PrivacyPage() {
 
       <LegalSection id="retention" title="How long we keep data">
         <p>
-          We keep your account data for as long as you have an account. You can ask us to delete
-          your account by writing to <ContactLink />. When we delete it:
+          We keep your account data for as long as you have an account. You can delete it yourself,
+          at any time, from <Strong>Settings</Strong> on the web or <Strong>Me</Strong> in the
+          mobile app — see{' '}
+          <Link href="/delete-account" className="text-accent underline underline-offset-4">
+            Delete your account
+          </Link>{' '}
+          — or ask us to do it by writing to <ContactLink />. When it is deleted:
         </p>
         <LegalList>
           <li>
@@ -264,7 +282,8 @@ export default function PrivacyPage() {
             <Strong>correct or update</Strong> it — much of it you can edit yourself in the app;
           </li>
           <li>
-            <Strong>erase</Strong> it, subject to the ledger records described above;
+            <Strong>erase</Strong> it — from inside the app, at any time — subject to the ledger
+            records described above;
           </li>
           <li>
             <Strong>withdraw consent</Strong> at any time, for example by turning off notifications,
