@@ -16,6 +16,7 @@ import {
   COPY,
   FUND_RULE_LABEL,
   can,
+  correctionNote,
   countdown,
   formatDate,
   festivalFor,
@@ -84,7 +85,9 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
       getMyParticipation(event.id, membership.id),
       supabase
         .from('contributions')
-        .select('id, amount, status, method, reference, receipt_no, review_note, paid_at')
+        .select(
+          'id, amount, reported_amount, status, method, reference, receipt_no, review_note, paid_at',
+        )
         .eq('event_id', event.id)
         .eq('membership_id', membership.id)
         .order('paid_at', { ascending: false }),
@@ -383,6 +386,20 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                         </p>
                         {payment.status === 'failed' && payment.review_note ? (
                           <p className="text-danger mt-1 text-xs">{payment.review_note}</p>
+                        ) : null}
+                        {correctionNote(
+                          payment.amount,
+                          payment.reported_amount,
+                          community.currency,
+                        ) ? (
+                          <p className="text-warning mt-1 text-xs">
+                            {correctionNote(
+                              payment.amount,
+                              payment.reported_amount,
+                              community.currency,
+                            )}
+                            {payment.review_note ? ` · ${payment.review_note}` : ''}
+                          </p>
                         ) : null}
                       </div>
                       <PaymentStatusBadge status={payment.status} />

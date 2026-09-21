@@ -105,7 +105,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     // The viewer's own payments for this event, confirmed or not.
     supabase
       .from('contributions')
-      .select('id, amount, status, reference, review_note, paid_at')
+      .select('id, amount, reported_amount, status, reference, review_note, paid_at')
       .eq('event_id', event.id)
       .eq('membership_id', membershipId)
       .order('paid_at', { ascending: false }),

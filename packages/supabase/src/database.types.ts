@@ -893,6 +893,7 @@ export type Database = {
           review_note: string | null
           updated_at: string
           updated_by: string | null
+          reported_amount: number | null
         }
         Insert: {
           id?: string
@@ -916,6 +917,7 @@ export type Database = {
           review_note?: string | null
           updated_at?: string
           updated_by?: string | null
+          reported_amount?: number | null
         }
         Update: {
           id?: string
@@ -939,6 +941,7 @@ export type Database = {
           review_note?: string | null
           updated_at?: string
           updated_by?: string | null
+          reported_amount?: number | null
         }
         Relationships: [
           {
@@ -1362,6 +1365,8 @@ export type Database = {
           vendor_id: string | null
           category_id: string | null
           updated_by: string | null
+          revised_by: string | null
+          revised_at: string | null
         }
         Insert: {
           id?: string
@@ -1386,6 +1391,8 @@ export type Database = {
           vendor_id?: string | null
           category_id?: string | null
           updated_by?: string | null
+          revised_by?: string | null
+          revised_at?: string | null
         }
         Update: {
           id?: string
@@ -1410,6 +1417,8 @@ export type Database = {
           vendor_id?: string | null
           category_id?: string | null
           updated_by?: string | null
+          revised_by?: string | null
+          revised_at?: string | null
         }
         Relationships: [
           {
@@ -1443,6 +1452,13 @@ export type Database = {
           {
             foreignKeyName: "expenses_requested_by_fkey"
             columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_revised_by_fkey"
+            columns: ["revised_by"]
             isOneToOne: false
             referencedRelation: "memberships"
             referencedColumns: ["id"]
@@ -2851,6 +2867,7 @@ export type Database = {
         p_confirm: boolean
         p_note?: string
         p_reference?: string
+        p_amount?: number
       }
         Returns: Database["public"]["Tables"]["contributions"]["Row"]
       }

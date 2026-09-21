@@ -176,6 +176,43 @@ A committee member submits an expense with a bill. An admin approves, rejects,
 or requests changes. **Only approved expenses appear in the resident ledger**,
 and every one shows its vendor, amount, requester, approver and bill.
 
+**A revised bill is a new bill.** Changing the amount, the attached copy or any
+of the details a committee member reads before approving withdraws the approval
+and sends it back — enforced by a trigger rather than asked of the client,
+because a committee member outranks the update policy on every bill in their
+society and PostgREST takes an update straight from the app. The row records who
+revised it, and that person is the one who may not approve it. The copy
+residents already saw is kept rather than deleted: a revision should be
+answerable to the version it replaces.
+
+### Nobody signs off their own money
+
+The person who puts money into the ledger is not the person who says it is true.
+It holds for a bill (you cannot approve one you uploaded or revised) and, since
+0921.0200, for a payment: reporting your own contribution and confirming it in
+the next tap moved the fund bar on nobody's word but yours.
+
+There is one escape hatch, and only one: **a society with exactly one active
+committee member.** A rule nobody can satisfy is not a control, it is a dead end
+with a moral — the founder of a small society would have bills that can never be
+approved and money that can never be counted. The audit log records who did it
+either way, which is the part that survives.
+
+### Correcting what a payment was for
+
+A resident reports ₹1,000 and ₹10 arrives — a typo, or a screenshot from the
+wrong payment. The only answer used to be turning the whole payment down and
+asking them to report it again, which is a bad trade for one digit.
+
+So the committee can write down what the bank actually shows, at the moment they
+confirm it. `amount` becomes the corrected figure and `reported_amount` keeps
+what the resident typed, which means every total — the fund bar, the ledger, the
+resident's own history — follows the correction without knowing one happened.
+That is right for the arithmetic and wrong for the person, so the row says
+"corrected from ₹1,000" wherever it is shown, and the resident is notified in
+both figures. Staff confirm payments but cannot rewrite them: a correction is a
+ledger change, and those are the committee's.
+
 ### The society ledger
 
 `society_ledger` is every confirmed contribution and every approved bill, across

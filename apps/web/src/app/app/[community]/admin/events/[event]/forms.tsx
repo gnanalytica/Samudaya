@@ -1,6 +1,6 @@
 'use client';
 
-import { COPY, todayIn } from '@samudaya/core';
+import { COPY, formatMoney, todayIn } from '@samudaya/core';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -570,10 +570,13 @@ export function ReviewExpenseForm({
   slug,
   eventSlug,
   expenseId,
+  mayApprove,
 }: {
   slug: string;
   eventSlug: string;
   expenseId: string;
+  /** False when the viewer wrote the version waiting to be approved. */
+  mayApprove: boolean;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(reviewExpense, EMPTY_STATE);
   return (
@@ -589,9 +592,15 @@ export function ReviewExpenseForm({
         placeholder="Note for staff, if sending back or rejecting"
       />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" name="decision" value="approved" size="sm">
-          Approve
-        </Button>
+        {mayApprove ? (
+          <Button type="submit" name="decision" value="approved" size="sm">
+            Approve
+          </Button>
+        ) : (
+          <p className="text-ink-muted self-center text-xs">
+            You wrote this version, so another committee member approves it.
+          </p>
+        )}
         <Button
           type="submit"
           name="decision"
@@ -616,12 +625,20 @@ export function ReviewPaymentForm({
   eventSlug,
   contributionId,
   showReferenceField,
+  reportedAmount,
+  currency,
+  mayCorrect,
 }: {
   slug: string;
   eventSlug: string;
   contributionId: string;
   /** True when the row has no reference yet, or the caller cannot tell. */
   showReferenceField: boolean;
+  /** What the resident says they paid, to correct against the statement. */
+  reportedAmount: number | null;
+  currency: string;
+  /** Rewriting a recorded amount is a ledger correction: committee only. */
+  mayCorrect: boolean;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(reviewPayment, EMPTY_STATE);
   return (
@@ -644,6 +661,32 @@ export function ReviewPaymentForm({
             autoComplete="off"
             placeholder="UPI transaction ID from the screenshot (optional)"
           />
+        </>
+      ) : null}
+      {/* Pre-filled with what the resident reported, so confirming an
+          accurate report is still one tap. A resident who typed ₹1,000 and
+          sent ₹10 is a digit, not a fraud, and rejecting the whole payment
+          over it makes them report it all over again. */}
+      {mayCorrect && reportedAmount ? (
+        <>
+          <label htmlFor={`pay-amount-${contributionId}`} className="sr-only">
+            Amount the bank shows
+          </label>
+          <Input
+            id={`pay-amount-${contributionId}`}
+            name="amount"
+            type="number"
+            min={1}
+            step="1"
+            inputMode="numeric"
+            autoComplete="off"
+            defaultValue={reportedAmount}
+            aria-describedby={`pay-amount-hint-${contributionId}`}
+          />
+          <p id={`pay-amount-hint-${contributionId}`} className="text-ink-subtle text-xs">
+            Reported as {formatMoney(reportedAmount, currency)}. Change it only to what the
+            statement shows; the resident is told either way.
+          </p>
         </>
       ) : null}
       <label htmlFor={`pay-note-${contributionId}`} className="sr-only">

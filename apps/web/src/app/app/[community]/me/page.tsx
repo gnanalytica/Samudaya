@@ -4,6 +4,7 @@ import {
   EVENT_STATUS_LABEL,
   ROLE_LABEL,
   canParticipate,
+  correctionNote,
   formatDate,
   formatMoney,
   normalizeRole,
@@ -39,7 +40,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
     supabase
       .from('contributions')
       .select(
-        'id, amount, method, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
+        'id, amount, reported_amount, method, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
       )
       .eq('membership_id', membership.id)
       .order('paid_at', { ascending: false })
@@ -119,6 +120,22 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                     </p>
                     {contribution.status === 'failed' && contribution.review_note ? (
                       <p className="text-danger mt-1 text-xs">{contribution.review_note}</p>
+                    ) : null}
+                    {/* A figure that moved with no explanation on the row is
+                        the app looking like it lost somebody's money. */}
+                    {correctionNote(
+                      contribution.amount,
+                      contribution.reported_amount,
+                      community.currency,
+                    ) ? (
+                      <p className="text-warning mt-1 text-xs">
+                        {correctionNote(
+                          contribution.amount,
+                          contribution.reported_amount,
+                          community.currency,
+                        )}
+                        {contribution.review_note ? ` · ${contribution.review_note}` : ''}
+                      </p>
                     ) : null}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">

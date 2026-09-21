@@ -140,11 +140,29 @@ export const getExpenses = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('expenses')
     .select(
-      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, approved_at, updated_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name))',
+      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, approved_at, updated_at, requested_by, revised_by, revised_at, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name)), reviser:memberships!expenses_revised_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
   return data ?? [];
+});
+
+/**
+ * How many people can approve a bill or confirm somebody else's payment.
+ *
+ * One is the case every separation-of-duties rule has to answer for: the
+ * database lets the sole committee member sign off their own, so the screens
+ * must not tell them somebody else will.
+ */
+export const getCommitteeCount = cache(async (communityId: string) => {
+  const supabase = await getSupabase();
+  const { count } = await supabase
+    .from('memberships')
+    .select('id', { count: 'exact', head: true })
+    .eq('community_id', communityId)
+    .eq('role', 'committee')
+    .eq('status', 'active');
+  return count ?? 0;
 });
 
 /** What the signed-in member has personally done for this event. */
@@ -336,7 +354,7 @@ export const getPayments = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('contributions')
     .select(
-      'id, amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, updated_at, gateway_payload, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
+      'id, amount, reported_amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, updated_at, gateway_payload, membership_id, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('paid_at', { ascending: false });

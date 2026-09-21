@@ -60,6 +60,11 @@ const KNOWN_DB_MESSAGES = [
   'Only staff or the committee can confirm payments',
   'This payment has already been reviewed',
   'Say why the payment could not be confirmed',
+  'You cannot confirm your own payment; another committee member must',
+  'You cannot approve a bill you uploaded or revised yourself',
+  'Only the committee can correct the amount of a payment',
+  'A corrected amount must be more than zero',
+  'This event is closed; its ledger cannot be changed',
 ];
 
 /** Constraint names worth their own explanation. */

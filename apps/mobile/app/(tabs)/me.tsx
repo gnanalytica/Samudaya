@@ -4,6 +4,7 @@ import {
   ROLE_DESCRIPTION,
   ROLE_LABEL,
   can,
+  correctionNote,
   formatDate,
   formatMoney,
   normalizeRole,
@@ -46,7 +47,7 @@ export default function Me() {
         supabase
           .from('contributions')
           .select(
-            'id, amount, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
+            'id, amount, reported_amount, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
           )
           .eq('membership_id', membershipId ?? '')
           .order('paid_at', { ascending: false })
@@ -145,6 +146,22 @@ export default function Me() {
                       </View>
                       {contribution.status === 'failed' && contribution.review_note ? (
                         <Caption>{contribution.review_note}</Caption>
+                      ) : null}
+                      {/* A figure that moved with no explanation on the row is
+                          the app looking like it lost somebody's money. */}
+                      {correctionNote(
+                        contribution.amount,
+                        contribution.reported_amount,
+                        currency,
+                      ) ? (
+                        <Caption>
+                          {correctionNote(
+                            contribution.amount,
+                            contribution.reported_amount,
+                            currency,
+                          )}
+                          {contribution.review_note ? ` · ${contribution.review_note}` : ''}
+                        </Caption>
                       ) : null}
                     </View>
                     <Body>{formatMoney(contribution.amount, currency)}</Body>

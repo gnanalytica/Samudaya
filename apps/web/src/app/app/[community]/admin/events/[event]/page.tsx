@@ -16,6 +16,7 @@ import {
   budgetVsSpent,
   getActivities,
   getBudgetLines,
+  getCommitteeCount,
   getEventStats,
   getExpenses,
   getPayments,
@@ -60,7 +61,7 @@ export default async function ManageEventPage(
 ) {
   const { community: slug, event: eventSlug } = await props.params;
   const { tab } = await props.searchParams;
-  const { community, role } = await requireCapability(slug, 'events:manage');
+  const { community, role, membership } = await requireCapability(slug, 'events:manage');
   const event = await requireEvent(community.id, eventSlug);
   const supabase = await getSupabase();
 
@@ -72,23 +73,37 @@ export default async function ManageEventPage(
   const active = tabs.find((t) => t.id === tab)?.id ?? 'overview';
   const base = `/app/${community.slug}`;
 
-  const [stats, budget, expenses, activities, registrations, payments, units, catalogue] =
-    await Promise.all([
-      getEventStats(event.id),
-      getBudgetLines(event.id),
-      getExpenses(event.id),
-      getActivities(event.id),
-      getRegistrations(event.id),
-      getPayments(event.id),
-      supabase
-        .from('units')
-        .select('id, block, number')
-        .eq('community_id', community.id)
-        .order('block', { nullsFirst: true })
-        .order('number')
-        .limit(2000),
-      getCatalogue(community.id),
-    ]);
+  const [
+    stats,
+    budget,
+    expenses,
+    activities,
+    registrations,
+    payments,
+    units,
+    catalogue,
+    committeeCount,
+  ] = await Promise.all([
+    getEventStats(event.id),
+    getBudgetLines(event.id),
+    getExpenses(event.id),
+    getActivities(event.id),
+    getRegistrations(event.id),
+    getPayments(event.id),
+    supabase
+      .from('units')
+      .select('id, block, number')
+      .eq('community_id', community.id)
+      .order('block', { nullsFirst: true })
+      .order('number')
+      .limit(2000),
+    getCatalogue(community.id),
+    getCommitteeCount(community.id),
+  ]);
+
+  // The database steps the separation-of-duties rule aside when there is
+  // nobody else on the committee. The screens have to say the same thing.
+  const alone = isCommittee && committeeCount <= 1;
 
   const pick = (kind: keyof typeof catalogue) =>
     activeItems(catalogue, kind).map(({ id, label, emoji }) => ({ id, label, emoji }));
@@ -406,9 +421,11 @@ export default async function ManageEventPage(
                 <CardHeader
                   title="Waiting for the committee"
                   description={
-                    isCommittee
-                      ? 'Approve to publish a bill to residents. Nobody approves a bill they uploaded.'
-                      : 'Correct or re-upload a bill while it is pending or sent back.'
+                    !isCommittee
+                      ? 'Correct or re-upload a bill while it is pending or sent back.'
+                      : alone
+                        ? 'Approve to publish a bill to residents. You are the whole committee, so your own bills are yours to approve.'
+                        : 'Approve to publish a bill to residents. Nobody approves a bill they uploaded or revised.'
                   }
                 />
                 <ul className="divide-border-base divide-y">
@@ -427,6 +444,18 @@ export default async function ManageEventPage(
                               ? ` · uploaded by ${expense.requester.profiles.full_name}`
                               : ''}
                           </p>
+                          {/* Who wrote the version on the table, which is who
+                              may not be the one to approve it. */}
+                          {expense.revised_at ? (
+                            <p className="text-warning mt-1 text-xs">
+                              Revised
+                              {expense.reviser?.profiles?.full_name
+                                ? ` by ${expense.reviser.profiles.full_name}`
+                                : ''}{' '}
+                              on {formatDate(expense.revised_at.slice(0, 10))} — needs approving
+                              again
+                            </p>
+                          ) : null}
                           {expense.review_note ? (
                             <p className="text-info mt-1 text-xs">
                               Committee: {expense.review_note}
@@ -441,6 +470,13 @@ export default async function ManageEventPage(
                           slug={slug}
                           eventSlug={event.slug}
                           expenseId={expense.id}
+                          // Whoever wrote the version on the table. Once a bill
+                          // has been revised that is the reviser, not the
+                          // original uploader — otherwise a committee of two
+                          // could not approve anything either of them touched.
+                          mayApprove={
+                            alone || (expense.revised_by ?? expense.requested_by) !== membership.id
+                          }
                         />
                       ) : null}
                       {!closed ? (
@@ -484,26 +520,61 @@ export default async function ManageEventPage(
               {decided.length ? (
                 <ul className="divide-border-base divide-y">
                   {decided.map((expense) => (
-                    <li
-                      key={expense.id}
-                      className="flex items-center justify-between gap-3 px-5 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-ink text-sm font-medium">{expense.name}</p>
-                        <p className="text-ink-subtle text-xs">
-                          {[expense.category, expense.vendor].filter(Boolean).join(' · ')}
-                          {expense.approver?.profiles?.full_name
-                            ? ` · approved by ${expense.approver.profiles.full_name}`
-                            : ''}
-                        </p>
-                        <BillLink url={expense.bill_url} />
+                    <li key={expense.id} className="space-y-3 px-5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-ink text-sm font-medium">{expense.name}</p>
+                          <p className="text-ink-subtle text-xs">
+                            {[expense.category, expense.vendor].filter(Boolean).join(' · ')}
+                            {expense.approver?.profiles?.full_name
+                              ? ` · approved by ${expense.approver.profiles.full_name}`
+                              : ''}
+                          </p>
+                          <BillLink url={expense.bill_url} />
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <span className="text-ink text-sm font-semibold">
+                            {formatMoney(expense.amount, community.currency)}
+                          </span>
+                          <ExpenseStatusBadge status={expense.status} />
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-3">
-                        <span className="text-ink text-sm font-semibold">
-                          {formatMoney(expense.amount, community.currency)}
-                        </span>
-                        <ExpenseStatusBadge status={expense.status} />
-                      </div>
+                      {/* A wrong figure on an approved bill used to have no
+                          way out but a second bill cancelling the first. The
+                          revision goes back for approval on its own — the
+                          database resets it whatever this form sends — and the
+                          copy residents already saw is kept, because a
+                          revision should be answerable to it. */}
+                      {isCommittee && !closed ? (
+                        <details className="group">
+                          <summary className="text-accent cursor-pointer text-sm">
+                            Upload a revised bill
+                          </summary>
+                          <div className="mt-3">
+                            <ExpenseForm
+                              slug={slug}
+                              eventSlug={event.slug}
+                              communityId={community.id}
+                              eventId={event.id}
+                              expense={{
+                                id: expense.id,
+                                name: expense.name,
+                                category: expense.category,
+                                category_id: expense.category_id,
+                                amount: Number(expense.amount),
+                                vendor: expense.vendor,
+                                vendor_id: expense.vendor_id,
+                                paid_by: expense.paid_by,
+                                method: expense.method,
+                                bill_url: expense.bill_url,
+                                spent_on: expense.spent_on,
+                              }}
+                              pickers={pickers}
+                              today={today}
+                            />
+                          </div>
+                        </details>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -548,7 +619,11 @@ export default async function ManageEventPage(
               <Card>
                 <CardHeader
                   title={`Waiting for confirmation (${waitingPayments.length})`}
-                  description="Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count."
+                  description={
+                    isCommittee
+                      ? 'Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count, and the amount can be corrected to what the bank shows.'
+                      : 'Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count.'
+                  }
                 />
                 <ul className="divide-border-base divide-y">
                   {waitingPayments.map((payment) => (
@@ -584,12 +659,25 @@ export default async function ManageEventPage(
                         </div>
                         <Badge tone="warning">Waiting</Badge>
                       </div>
-                      <ReviewPaymentForm
-                        slug={slug}
-                        eventSlug={event.slug}
-                        contributionId={payment.id}
-                        showReferenceField={!payment.reference}
-                      />
+                      {/* Reporting a payment and confirming it in the next tap
+                          is the fund bar moving on nobody's word but yours.
+                          The database refuses it; saying so here saves the
+                          round trip. */}
+                      {payment.membership_id === membership.id && !alone ? (
+                        <p className="border-border-base text-ink-muted rounded-lg border border-dashed px-4 py-3 text-sm">
+                          This is your own payment. Another committee member confirms it.
+                        </p>
+                      ) : (
+                        <ReviewPaymentForm
+                          slug={slug}
+                          eventSlug={event.slug}
+                          contributionId={payment.id}
+                          showReferenceField={!payment.reference}
+                          reportedAmount={Number(payment.amount)}
+                          currency={community.currency}
+                          mayCorrect={isCommittee}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -674,6 +762,15 @@ export default async function ManageEventPage(
                           </td>
                           <td className="text-ink px-5 py-3 text-right font-medium">
                             {formatMoney(payment.amount, community.currency)}
+                            {/* The figure the flat reported, when it is not the
+                                figure the books kept. A number that moved with
+                                no trace of the move is the thing this app
+                                exists to replace. */}
+                            {payment.reported_amount != null ? (
+                              <span className="text-ink-subtle block text-xs font-normal">
+                                was {formatMoney(payment.reported_amount, community.currency)}
+                              </span>
+                            ) : null}
                           </td>
                           <td className="text-ink-muted px-5 py-3 uppercase">{payment.method}</td>
                           <td className="text-ink-subtle px-5 py-3 font-mono text-xs">

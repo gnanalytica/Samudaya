@@ -7,6 +7,7 @@ import {
   EVENT_STATUS_LABEL,
   EVENT_TABS,
   can,
+  correctionNote,
   countdown,
   formatDate,
   formatMoney,
@@ -280,6 +281,12 @@ function YourPayments({ data, currency }: { data: Detail; currency: string }) {
           </View>
           {payment.status === 'failed' && payment.review_note ? (
             <Caption>{payment.review_note}</Caption>
+          ) : null}
+          {correctionNote(payment.amount, payment.reported_amount, currency) ? (
+            <Caption>
+              {correctionNote(payment.amount, payment.reported_amount, currency)}
+              {payment.review_note ? ` · ${payment.review_note}` : ''}
+            </Caption>
           ) : null}
         </View>
       ))}

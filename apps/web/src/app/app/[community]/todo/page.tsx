@@ -114,6 +114,7 @@ export default async function TodoPage(props: PageProps<'/app/[community]/todo'>
                           slug={community.slug}
                           item={item}
                           committee={committee}
+                          currency={community.currency}
                           role={role}
                           fixHref={href}
                         />
@@ -152,12 +153,14 @@ function TodoActions({
   slug,
   item,
   committee,
+  currency,
   role,
   fixHref,
 }: {
   slug: string;
   item: TodoItem;
   committee: boolean;
+  currency: string;
   role: Parameters<typeof can>[0];
   fixHref: string | null;
 }) {
@@ -166,11 +169,17 @@ function TodoActions({
       return can(role, 'payments:record') ? (
         // The queue does not carry the reference, so the field is always
         // offered here rather than hidden from the screen staff work on most.
+        // Nor does it carry who reported the payment, so a committee member
+        // confirming their own is refused by the database rather than by this
+        // screen; the message they get back says so.
         <ReviewPaymentForm
           slug={slug}
           eventSlug={item.eventSlug ?? ''}
           contributionId={item.id}
           showReferenceField
+          reportedAmount={item.amount}
+          currency={currency}
+          mayCorrect={committee}
         />
       ) : null;
 
@@ -214,7 +223,15 @@ function TodoActions({
 
     case 'bill_to_approve':
       return can(role, 'expenses:approve') ? (
-        <ReviewExpenseForm slug={slug} eventSlug={item.eventSlug ?? ''} expenseId={item.id} />
+        // The queue only lists bills this member may approve — it leaves out
+        // the ones they wrote — so the button is never the one the database
+        // would refuse.
+        <ReviewExpenseForm
+          slug={slug}
+          eventSlug={item.eventSlug ?? ''}
+          expenseId={item.id}
+          mayApprove
+        />
       ) : null;
 
     case 'bill_sent_back':

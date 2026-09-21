@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   DEFAULT_FUND_RULE,
+  can,
   closeEventSchema,
   createActivitySchema,
   createEventSchema,
@@ -539,8 +540,9 @@ export async function submitExpense(_prev: ActionState, formData: FormData): Pro
 }
 
 /**
- * Corrects a bill that is still pending or was sent back, including attaching
- * a new copy. A corrected bill goes back to the committee as pending.
+ * Corrects a bill, including attaching a new copy. A corrected bill goes back
+ * to the committee as pending — including one that had already been approved,
+ * where the database resets the approval whatever this function asks for.
  */
 export async function correctExpense(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const communitySlug = String(formData.get('slug') ?? '');
@@ -560,13 +562,18 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
-  // Remember the file this bill pointed at, to tidy it up if it is replaced.
+  // Remember the file this bill pointed at, and whether it had been approved.
   const { data: previous } = await supabase
     .from('expenses')
-    .select('bill_url')
+    .select('bill_url, status')
     .eq('id', expenseId.data)
     .eq('event_id', event.id)
     .maybeSingle();
+  if (!previous) return { error: 'That bill no longer exists.' };
+  const wasDecided = previous.status !== 'pending' && previous.status !== 'changes_requested';
+  if (wasDecided && !can(context.role, 'expenses:approve')) {
+    return { error: 'Only the committee can revise a bill that has already been decided.' };
+  }
 
   const { data, error } = await supabase
     .from('expenses')
@@ -586,22 +593,27 @@ export async function correctExpense(_prev: ActionState, formData: FormData): Pr
     })
     .eq('id', expenseId.data)
     .eq('event_id', event.id)
-    .in('status', ['pending', 'changes_requested'])
     .select('id');
   if (error) return { error: friendlyDbError(error) };
-  if (!data?.length) {
-    return { error: 'Only bills that are pending or sent back for changes can be corrected.' };
-  }
+  if (!data?.length) return { error: 'That bill could not be corrected.' };
 
-  // The corrected bill now points at a new copy; the old one is orphaned.
-  const oldBill = previous?.bill_url ?? null;
-  if (oldBill && oldBill !== (parsed.data.bill_url ?? null)) {
+  // The corrected bill now points at a new copy, so the old one is orphaned —
+  // unless it had been approved, in which case residents have already seen it
+  // and it is the record of what was signed off. A revision supersedes that
+  // record; deleting it would destroy the thing the revision is answerable to.
+  const oldBill = previous.bill_url ?? null;
+  if (!wasDecided && oldBill && oldBill !== (parsed.data.bill_url ?? null)) {
     await removeStoredFile('bills', oldBill);
   }
 
   refreshEvent(communitySlug, eventSlug);
   revalidatePath(`/app/${communitySlug}/todo`);
-  return { ...EMPTY_STATE, success: 'Corrected and sent back to the committee.' };
+  return {
+    ...EMPTY_STATE,
+    success: wasDecided
+      ? 'Revised. It needs approving again before the new figure counts.'
+      : 'Corrected and sent back to the committee.',
+  };
 }
 
 /** The committee approves, rejects or sends back a bill. */
@@ -698,6 +710,16 @@ const reviewPaymentSchema = z
     note: z.string().trim().max(300).optional(),
     // Read off the resident's screenshot by whoever is confirming.
     reference: optionalUpiReference,
+    // What the bank actually shows, when that is not what was reported. Blank
+    // is the normal case and means "leave it alone".
+    amount: z.preprocess(
+      (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+      z.coerce
+        .number()
+        .positive('Enter an amount greater than zero')
+        .max(10_000_000, 'That is larger than this app will accept')
+        .optional(),
+    ),
   })
   .refine((value) => value.decision === 'confirm' || Boolean(value.note), {
     message: 'Say why it could not be confirmed',
@@ -718,25 +740,37 @@ export async function reviewPayment(_prev: ActionState, formData: FormData): Pro
     decision: formData.get('decision'),
     note: formData.get('note') || undefined,
     reference: formData.get('reference'),
+    amount: formData.get('amount'),
   });
   if (!parsed.success) {
-    return { error: fieldErrors(parsed.error).note ?? 'That decision could not be recorded.' };
+    const problems = fieldErrors(parsed.error);
+    return { error: problems.note ?? problems.amount ?? 'That decision could not be recorded.' };
   }
 
   const supabase = await getSupabase();
-  const { error } = await supabase.rpc('review_contribution', {
+  const { data, error } = await supabase.rpc('review_contribution', {
     p_contribution_id: parsed.data.contribution_id,
     p_confirm: parsed.data.decision === 'confirm',
     p_note: parsed.data.note ?? undefined,
     p_reference: parsed.data.reference ?? undefined,
+    p_amount: parsed.data.amount ?? undefined,
   });
   if (error) return { error: friendlyDbError(error) };
 
   refreshEvent(communitySlug, eventSlug);
   revalidatePath(`/app/${communitySlug}`);
+  // The database decides whether the figure moved: it ignores an amount equal
+  // to the one already recorded, so this reads the row it returns rather than
+  // comparing what was typed.
+  const corrected = data?.reported_amount != null;
   return {
     ...EMPTY_STATE,
-    success: parsed.data.decision === 'confirm' ? 'Confirmed. It now counts.' : 'Turned down.',
+    success:
+      parsed.data.decision !== 'confirm'
+        ? 'Turned down.'
+        : corrected
+          ? 'Confirmed at the corrected amount. The resident has been told.'
+          : 'Confirmed. It now counts.',
   };
 }
 
