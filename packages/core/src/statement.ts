@@ -187,6 +187,21 @@ export function parseMoney(raw: string): number | null {
 }
 
 /**
+ * Why bank_line_candidates offered a pairing, in the words a person confirming
+ * it would use. Shared so the web and the phone cannot describe the same
+ * candidate differently — and so a tier added to the function has one place to
+ * be named rather than two to be forgotten in.
+ */
+export const MATCH_CONFIDENCE: Record<string, string> = {
+  reference: 'same UTR',
+  // The narration carries the note Samudaya put on the payment, so the bank
+  // line says which flat sent it. Offered whatever the amounts say.
+  flat: 'names this flat',
+  amount: 'same amount',
+  close: 'close',
+};
+
+/**
  * The UTR hiding in a narration.
  *
  * A UPI reference is twelve digits, and every bank buries it in free text

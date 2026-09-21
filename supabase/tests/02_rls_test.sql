@@ -2384,3 +2384,92 @@ select test.ok(
 select test.ok(
   has_function_privilege('authenticated', 'public.review_contribution(uuid,boolean,text,text)', 'EXECUTE'),
   'and staff still can');
+
+-- ---------------------------------------------------------------------------
+-- The note says whose money it is
+-- ---------------------------------------------------------------------------
+reset role;
+select test.eq(app.flat_tag_in('UPI/CR/612345678901/RIA MENON/HDFC/SMDA1104 GANESH'),
+  'A1104', 'the flat is found in a narration the bank has wrapped in its own punctuation');
+select test.eq(app.flat_tag_in('upi-smda1104-612345678901'), 'A1104',
+  'however the bank cased it');
+select test.eq(app.flat_tag_in('UPI/CR/612345678901/RIA MENON/HDFC'), null::text,
+  'and is null when the payer did not keep the note');
+select test.eq(app.normalize_flat('A-1104'), app.normalize_flat('a 1104'),
+  'a flat is the same flat however it is punctuated');
+
+-- Ria reports ₹2,100 for her flat and actually sends ₹2,000. Before the note
+-- was read back, the candidate list for that line was empty: the amounts are
+-- ₹100 apart, and the reported figure is the payer's own.
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, unit_id, amount, method, status)
+select 'dddddddd-0000-4000-8000-00000000000d',
+       'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id,
+       'b2b2b2b2-0000-4000-8000-000000000001', 2100, 'upi', 'pending'
+  from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab';
+
+-- And a neighbour reports exactly ₹2,000, so amount alone would pick the wrong one.
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status)
+select 'dddddddd-0000-4000-8000-00000000000e',
+       'cccccccc-0000-4000-8000-0000000000aa', m.community_id, m.id,
+       2000, 'upi', 'pending'
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+reset role;
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  app.record_bank_lines('eeeeeeee-0000-4000-8000-0000000000aa', $j$[
+    {"posted_on": "2026-09-17", "amount": 2000,
+     "narration": "UPI/CR/799900022233/RIA MENON/HDFC/SMDA1104 GANESH"}
+  ]$j$),
+  1, 'a credit arrives naming the flat that sent it');
+
+reset role;
+create temporary table t_tagged as
+select id from public.bank_transactions
+ where narration = 'UPI/CR/799900022233/RIA MENON/HDFC/SMDA1104 GANESH';
+grant select on t_tagged to authenticated;
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  (select confidence from public.bank_line_candidates((select id from t_tagged)) limit 1),
+  'flat', 'the flat the line names outranks a neighbour whose amount happens to match');
+-- Which of that flat's payments comes first is decided by how close in time
+-- it is, and the flat has more than one waiting. What matters is that the top
+-- candidate belongs to the flat the line named, rather than to the neighbour
+-- whose amount happens to be exact.
+select test.eq(
+  (select app.normalize_flat(app.flat_label(c.unit_id))
+     from public.bank_line_candidates((select id from t_tagged)) cand
+     join public.contributions c on c.id = cand.contribution_id
+    limit 1),
+  'A1104', 'and the payment offered belongs to the flat the line named');
+select test.ok(
+  (select count(*) from public.bank_line_candidates((select id from t_tagged))
+    where contribution_id = 'dddddddd-0000-4000-8000-00000000000d') = 1,
+  'her ₹2,100 report is on the list at all, though she sent ₹100 less');
+select test.ok(
+  (select count(*) from public.bank_line_candidates((select id from t_tagged))
+    where contribution_id = 'dddddddd-0000-4000-8000-00000000000e') = 1,
+  'and the exact-amount neighbour is still offered, just not first');
+
+-- Pairing them is what the spec has always described: a person decides which
+-- figure the books keep.
+select test.eq(
+  (select status::text from public.reconcile_bank_line(
+     (select id from t_tagged), 'dddddddd-0000-4000-8000-00000000000d')),
+  'succeeded', 'and the pairing the list could not reach before now goes through');
+
+reset role;
+drop table t_tagged;
+
+select test.ok(
+  not has_function_privilege('anon', 'public.bank_line_candidates(uuid)', 'EXECUTE'),
+  'recreating the matcher did not hand it back to anon');
+select test.ok(
+  has_function_privilege('authenticated', 'public.bank_line_candidates(uuid)', 'EXECUTE'),
+  'and staff can still call it');

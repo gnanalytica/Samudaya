@@ -2,7 +2,15 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { can, formatDate, formatMoney, parseStatement, relativeTime } from '@samudaya/core';
+import {
+  can,
+  flatTagIn,
+  formatDate,
+  MATCH_CONFIDENCE,
+  formatMoney,
+  parseStatement,
+  relativeTime,
+} from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -47,12 +55,6 @@ type Line = {
 };
 
 type Account = { id: string; label: string; bank_name: string | null; last4: string | null };
-
-const CONFIDENCE: Record<string, string> = {
-  reference: 'same UTR',
-  amount: 'same amount',
-  close: 'close',
-};
 
 /**
  * The bank's version of events, next to ours — the web Reconcile page, on a
@@ -475,6 +477,9 @@ function OpenLine({
           </Body>
           <Caption>{line.narration ?? 'No narration'}</Caption>
           {line.reference ? <Caption>UTR {line.reference}</Caption> : null}
+          {/* The payer kept the note Samudaya put on the payment, so the line
+              says which flat sent it — the question this screen is for. */}
+          {flatTagIn(line.narration) ? <Body>Names flat {flatTagIn(line.narration)}</Body> : null}
         </View>
         <Badge
           label={incoming ? 'Money in' : 'Money out'}
@@ -498,7 +503,7 @@ function OpenLine({
                 <Chip
                   key={row.contribution_id}
                   label={`${row.payer} · ${formatMoney(row.amount, currency)}${
-                    CONFIDENCE[row.confidence] ? ` · ${CONFIDENCE[row.confidence]}` : ''
+                    MATCH_CONFIDENCE[row.confidence] ? ` · ${MATCH_CONFIDENCE[row.confidence]}` : ''
                   }`}
                   selected={chosen === row.contribution_id}
                   onPress={() => setChosen(row.contribution_id)}

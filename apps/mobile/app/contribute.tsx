@@ -126,6 +126,31 @@ export default function Contribute() {
 
 type Stage = 'amount' | 'report' | 'done';
 
+/** One thing to carry to a UPI app, shown plainly and copied in one tap. */
+function CopyRow({
+  label,
+  value,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+      <View style={{ flex: 1, gap: 1 }}>
+        <Caption>{label}</Caption>
+        <Body>{value}</Body>
+      </View>
+      <View style={{ width: 104 }}>
+        <Button label={copied ? 'Copied' : 'Copy'} variant="secondary" onPress={onCopy} />
+      </View>
+    </View>
+  );
+}
+
 /** What the UPI app said about a payment, stored for staff with the report. */
 type AppResponse = Record<string, string | null>;
 
@@ -161,7 +186,13 @@ function PayWithUpi({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captured, setCaptured] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<'vpa' | 'note' | null>(null);
+
+  const copy = (what: 'vpa' | 'note', value: string) => {
+    void Clipboard.setStringAsync(value);
+    setCopied(what);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
   const note = upiNote(unit ? unitLabel(unit) : null, event.name);
 
@@ -404,23 +435,32 @@ function PayWithUpi({
               keyboardType="number-pad"
               placeholder="Enter an amount"
             />
-            <View style={{ gap: spacing.xs }}>
-              <Caption>
-                Paying {payeeName} · {vpa}
-                {'\n'}Note: {note}
-              </Caption>
-              {/* The society's UPI ID was on screen and there was no way to
-                  take it anywhere — on an iPhone with no UPI app registered,
-                  the deep link does nothing and this is the whole path. */}
-              <Button
-                label={copied ? 'UPI ID copied' : 'Copy UPI ID'}
-                variant="secondary"
-                onPress={() => {
-                  void Clipboard.setStringAsync(vpa);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
+            {/* Two things to carry across to a UPI app, and on an iPhone with
+                no UPI app registered the deep link does nothing, so this is the
+                whole path. Two buttons rather than one combined string: they
+                go into two different fields over there. */}
+            <View style={{ gap: spacing.sm }}>
+              <Caption>Paying {payeeName}</Caption>
+              <CopyRow
+                label="UPI ID"
+                value={vpa}
+                copied={copied === 'vpa'}
+                onCopy={() => copy('vpa', vpa)}
               />
+              {note ? (
+                <>
+                  <CopyRow
+                    label="Note"
+                    value={note}
+                    copied={copied === 'note'}
+                    onCopy={() => copy('note', note)}
+                  />
+                  <Caption>
+                    Keep the note on the payment. It is how the committee tells your ₹ apart from
+                    everyone else&rsquo;s on the bank statement.
+                  </Caption>
+                </>
+              ) : null}
             </View>
           </Card>
 

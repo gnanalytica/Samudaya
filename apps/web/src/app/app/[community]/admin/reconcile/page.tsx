@@ -1,5 +1,5 @@
 import { Landmark, Scale } from 'lucide-react';
-import { can, formatDate, formatMoney, relativeTime } from '@samudaya/core';
+import { can, flatTagIn, formatDate, formatMoney, relativeTime } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { rowsOf } from '@/lib/rows';
@@ -183,6 +183,17 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
                         </p>
                         {line.reference ? (
                           <p className="text-ink mt-0.5 font-mono text-xs">UTR {line.reference}</p>
+                        ) : null}
+                        {/* The payer kept the note Samudaya put on the payment,
+                            so the line says which flat sent it — which is the
+                            question this screen exists to answer. */}
+                        {flatTagIn(line.narration) ? (
+                          <p className="text-ink mt-0.5 text-xs">
+                            Names flat{' '}
+                            <span className="font-mono font-semibold">
+                              {flatTagIn(line.narration)}
+                            </span>
+                          </p>
                         ) : null}
                       </div>
                       <Badge tone={incoming ? 'success' : 'warning'}>
