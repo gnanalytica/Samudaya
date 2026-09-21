@@ -1547,86 +1547,6 @@ export type Database = {
           }
         ]
       }
-      fund_reallocations: {
-        Row: {
-          id: string
-          community_id: string
-          from_event_id: string
-          to_event_id: string | null
-          to_label: string | null
-          amount: number
-          reason: string
-          threshold_pct: number
-          status: Database["public"]["Enums"]["proposal_status"]
-          closes_at: string | null
-          resolved_at: string | null
-          created_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          community_id: string
-          from_event_id: string
-          to_event_id?: string | null
-          to_label?: string | null
-          amount: number
-          reason: string
-          threshold_pct?: number
-          status?: Database["public"]["Enums"]["proposal_status"]
-          closes_at?: string | null
-          resolved_at?: string | null
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          community_id?: string
-          from_event_id?: string
-          to_event_id?: string | null
-          to_label?: string | null
-          amount?: number
-          reason?: string
-          threshold_pct?: number
-          status?: Database["public"]["Enums"]["proposal_status"]
-          closes_at?: string | null
-          resolved_at?: string | null
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fund_reallocations_community_id_fkey"
-            columns: ["community_id"]
-            isOneToOne: false
-            referencedRelation: "communities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fund_reallocations_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fund_reallocations_from_event_id_fkey"
-            columns: ["from_event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "fund_reallocations_to_event_id_fkey"
-            columns: ["to_event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       invite_code_attempts: {
         Row: {
           id: string
@@ -2191,48 +2111,6 @@ export type Database = {
           }
         ]
       }
-      reallocation_votes: {
-        Row: {
-          id: string
-          reallocation_id: string
-          membership_id: string
-          approve: boolean
-          channel: Database["public"]["Enums"]["origin_channel"]
-          voted_at: string
-        }
-        Insert: {
-          id?: string
-          reallocation_id: string
-          membership_id: string
-          approve: boolean
-          channel?: Database["public"]["Enums"]["origin_channel"]
-          voted_at?: string
-        }
-        Update: {
-          id?: string
-          reallocation_id?: string
-          membership_id?: string
-          approve?: boolean
-          channel?: Database["public"]["Enums"]["origin_channel"]
-          voted_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reallocation_votes_membership_id_fkey"
-            columns: ["membership_id"]
-            isOneToOne: false
-            referencedRelation: "memberships"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "reallocation_votes_reallocation_id_fkey"
-            columns: ["reallocation_id"]
-            isOneToOne: false
-            referencedRelation: "fund_reallocations"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       suggestion_interests: {
         Row: {
           suggestion_id: string
@@ -2667,20 +2545,6 @@ export type Database = {
 
         ]
       }
-      reallocation_results: {
-        Row: {
-          reallocation_id: string | null
-          community_id: string | null
-          approve_votes: number | null
-          reject_votes: number | null
-          total_votes: number | null
-          eligible: number | null
-          threshold_pct: number | null
-        }
-        Relationships: [
-
-        ]
-      }
       reconciliation_summary: {
         Row: {
           community_id: string | null
@@ -3048,21 +2912,6 @@ export type Database = {
         community_id: string | null
         scopes: string[] | null
         acts_as: string | null
-      }[]
-      }
-      vote_on_reallocation: {
-        Args: {
-        p_reallocation_id: string
-        p_approve: boolean
-        p_channel?: Database["public"]["Enums"]["origin_channel"]
-      }
-        Returns: {
-        status: string | null
-        approve_votes: number | null
-        reject_votes: number | null
-        eligible: number | null
-        resolved: boolean | null
-        approved: boolean | null
       }[]
       }
     }

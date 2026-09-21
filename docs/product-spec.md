@@ -34,12 +34,12 @@ That transparency is the product.
 
 ## Roles
 
-| Role          | Can                                                                                                                    |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Resident**  | Contribute, join activities, volunteer, suggest activities, vote in polls and fund reallocations, read the full ledger |
-| **Committee** | Coordinate activities and volunteer roles, work the checklist                                                          |
-| **Admin**     | Create and publish events, approve expenses, approve join requests, close events                                       |
-| **Owner**     | Everything, plus transferring ownership                                                                                |
+| Role          | Can                                                                                             |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| **Resident**  | Contribute, join activities, volunteer, suggest activities, vote in polls, read the full ledger |
+| **Committee** | Coordinate activities and volunteer roles, work the checklist                                   |
+| **Admin**     | Create and publish events, approve expenses, approve join requests, close events                |
+| **Owner**     | Everything, plus transferring ownership                                                         |
 
 ---
 
@@ -283,21 +283,23 @@ only.** Who has not voted is visible to nobody, because an abstention leaves no
 row. Totals always come from `suggestion_stats`, which counts every ballot
 without handing over any of them.
 
-### Fund reallocation
-
-Moving money between two _live_ funds cannot be done on an admin's say-so. The
-committee proposes a transfer with a reason; residents vote; it passes only at
-the configured threshold (60% by default). The result is written to an audit
-trail.
-
 ### Where the leftover goes
 
-A **closed** event's surplus is the committee's to decide, without a vote. That
-is a deliberate exception to the paragraph above and worth naming: the money is
-residents' and the vote machinery exists a few lines up. What keeps it honest is
-that the decision is a row — who decided, when, how much, and where it went —
-readable by every member on the same screen as the balance itself, and
-unchangeable afterwards by anybody including the person who made it.
+A **closed** event's surplus is the committee's to decide, without a vote.
+
+That deserves naming rather than glossing, because the money is residents' and
+an earlier design said the opposite. `fund_reallocations` — propose, vote,
+clear a 60% threshold, write an audit row — was built in 0870 and never
+reachable: nothing in either app ever created a proposal, and the card that
+would have collected the votes was written, exported and never rendered.
+0921.0400 removed it rather than leave the schema making a promise the product
+could not keep.
+
+What keeps the committee's decision honest instead is that it is a row — who
+decided, when, how much, and where it went — readable by every member on the
+same screen as the balance it produced, and unchangeable afterwards by anybody
+including the person who made it. There is no update or delete policy on
+`fund_movements`; the two RPCs are the only way in.
 
 An event budgets ₹50,000, collects ₹30,000 and spends ₹20,000. Three answers:
 
@@ -338,8 +340,8 @@ clicks past on the way to the confirmation box.
 events list · event detail · contribute (amount → payment → report) ·
 **money (every transaction the society has ever made)** · activities list ·
 activity detail · activity joined · suggest activity · volunteer list ·
-volunteer confirm · accounts · view bill · fund reallocation vote · community
-feed · polls · notifications · my activity
+volunteer confirm · accounts · view bill · community feed · polls ·
+notifications · my activity
 
 **Admin** — welcome · add flats · import preview · community created · invite
 residents · dashboard · create-event wizard · event management (overview,

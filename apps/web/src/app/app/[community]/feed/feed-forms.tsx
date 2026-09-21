@@ -8,13 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
-import {
-  suggestActivity,
-  toggleSuggestionInterest,
-  voteReallocation,
-  votePoll,
-  type ReallocationState,
-} from '../events/actions';
+import { suggestActivity, toggleSuggestionInterest, votePoll } from '../events/actions';
 
 function Submit({ label, busy }: { label: string; busy: string }) {
   const { pending } = useFormStatus();
@@ -202,129 +196,6 @@ export function PollCard({
         <p className="text-ink-subtle mt-2 text-xs">
           {poll.totalVotes} {poll.totalVotes === 1 ? 'vote' : 'votes'} · your ballot is private
         </p>
-      </CardBody>
-    </Card>
-  );
-}
-
-const initialReallocation: ReallocationState = {};
-
-export function ReallocationCard({
-  slug,
-  proposal,
-  currency,
-  myVote,
-}: {
-  slug: string;
-  proposal: {
-    id: string;
-    amount: number;
-    reason: string;
-    fromName: string;
-    toName: string;
-    thresholdPct: number;
-    approveVotes: number;
-    rejectVotes: number;
-    eligible: number;
-    status: string;
-  };
-  currency: string;
-  myVote: boolean | null;
-}) {
-  const [state, action] = useActionState(voteReallocation, initialReallocation);
-
-  const approvalShare =
-    proposal.eligible > 0 ? Math.round((proposal.approveVotes / proposal.eligible) * 100) : 0;
-  const decided = proposal.status !== 'voting';
-
-  return (
-    <Card className="border-warning/40">
-      <CardBody>
-        <p className="text-warning text-xs font-semibold tracking-wide uppercase">
-          Committee proposal · your vote decides
-        </p>
-        <p className="text-ink mt-2 text-base font-semibold">
-          Move {formatMoney(proposal.amount, currency)}
-        </p>
-        <p className="text-ink-muted mt-1 text-sm">
-          from <span className="text-ink font-medium">{proposal.fromName}</span> to{' '}
-          <span className="text-ink font-medium">{proposal.toName}</span>
-        </p>
-        <p className="border-border-strong text-ink-muted mt-3 border-l-2 pl-3 text-sm italic">
-          “{proposal.reason}”
-        </p>
-
-        <div className="mt-4">
-          <div className="text-ink-muted flex justify-between text-xs font-medium">
-            <span>
-              {proposal.approveVotes} of {proposal.eligible} members in favour
-            </span>
-            <span>needs {proposal.thresholdPct}%</span>
-          </div>
-          <div
-            className="bg-surface-sunken relative mt-1.5 h-2 overflow-hidden rounded-full"
-            role="progressbar"
-            aria-valuenow={approvalShare}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Approval"
-          >
-            <div className="bg-accent h-full rounded-full" style={{ width: `${approvalShare}%` }} />
-            {/* The bar alone does not say where the line is. */}
-            <div
-              className="bg-ink/40 absolute inset-y-0 w-0.5"
-              style={{ left: `${proposal.thresholdPct}%` }}
-              aria-hidden="true"
-            />
-          </div>
-        </div>
-
-        {decided ? (
-          <p
-            className={
-              proposal.status === 'approved'
-                ? 'text-success mt-4 text-sm font-medium'
-                : 'text-danger mt-4 text-sm font-medium'
-            }
-          >
-            {proposal.status === 'approved'
-              ? 'Approved — the transfer is recorded in the audit log.'
-              : 'This proposal did not pass.'}
-          </p>
-        ) : (
-          <form action={action} className="mt-4 flex items-center gap-2">
-            <input type="hidden" name="slug" value={slug} />
-            <input type="hidden" name="reallocation_id" value={proposal.id} />
-            <Button
-              type="submit"
-              name="approve"
-              value="1"
-              size="sm"
-              variant={myVote === true ? 'primary' : 'secondary'}
-            >
-              {myVote === true ? '✓ In favour' : 'Approve'}
-            </Button>
-            <Button
-              type="submit"
-              name="approve"
-              value="0"
-              size="sm"
-              variant={myVote === false ? 'danger' : 'secondary'}
-            >
-              {myVote === false ? '✓ Against' : 'Reject'}
-            </Button>
-            {state.success ? (
-              <span role="status" className="text-ink-muted text-xs">
-                {state.success}
-              </span>
-            ) : null}
-            {state.error ? (
-              <span role="alert" className="text-danger text-xs">
-                {state.error}
-              </span>
-            ) : null}
-          </form>
-        )}
       </CardBody>
     </Card>
   );

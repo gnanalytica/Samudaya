@@ -553,75 +553,6 @@ select test.eq(
   2, 'and so is the turnout');
 
 -- ---------------------------------------------------------------------------
--- Fund reallocation needs a vote that clears the threshold
--- ---------------------------------------------------------------------------
-reset role;
-select test.act_as('11111111-1111-4111-8111-111111111111');
-insert into public.events (id, community_id, slug, name, starts_on, status, fund_target, created_by)
-values ('cccccccc-0000-4000-8000-000000000002', 'aaaaaaaa-0000-4000-8000-000000000001',
-        'sports-day-2026', 'Society Sports Day', '2026-10-05', 'published', 60000,
-        '11111111-1111-4111-8111-111111111111');
-
-insert into public.fund_reallocations
-  (id, community_id, from_event_id, to_event_id, amount, reason, threshold_pct)
-values ('b1b1b1b1-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001',
-        'cccccccc-0000-4000-8000-000000000001', 'cccccccc-0000-4000-8000-000000000002',
-        15000, 'Use surplus funds to support children''s sports activities.', 60);
-
-reset role;
-select test.act_as('55555555-5555-4555-8555-555555555555');
-select test.raises(
-  $q$insert into public.fund_reallocations
-       (community_id, from_event_id, to_label, amount, reason)
-     values ('aaaaaaaa-0000-4000-8000-000000000001',
-             'cccccccc-0000-4000-8000-000000000001', 'General fund', 1000, 'because')$q$,
-  'staff may not propose moving money between funds');
-
--- Five active members, so 60% needs three approvals.
-reset role;
-select test.act_as('33333333-3333-4333-8333-333333333333');
-select test.eq(
-  (select resolved from public.vote_on_reallocation('b1b1b1b1-0000-4000-8000-000000000001', true)),
-  false, 'one vote does not carry a proposal');
-
-reset role;
-select test.act_as('44444444-4444-4444-8444-444444444444');
-select test.eq(
-  (select resolved from public.vote_on_reallocation('b1b1b1b1-0000-4000-8000-000000000001', true)),
-  false, 'nor does two');
-
-reset role;
-select test.act_as('33333333-3333-4333-8333-333333333333');
-select test.eq(
-  (select approve_votes from public.vote_on_reallocation('b1b1b1b1-0000-4000-8000-000000000001', true)),
-  2, 'voting again changes your vote rather than adding one');
-
-reset role;
-select test.act_as('55555555-5555-4555-8555-555555555555');
-create temporary table t_vote as
-select * from public.vote_on_reallocation('b1b1b1b1-0000-4000-8000-000000000001', true);
-grant select on t_vote to authenticated;
-
-select test.eq((select resolved from t_vote), true,
-  'the third of five approvals clears the 60% threshold');
-select test.eq((select approved from t_vote), true, 'and the proposal passes');
-
-reset role;
-select test.eq(
-  (select status::text from public.fund_reallocations where id = 'b1b1b1b1-0000-4000-8000-000000000001'),
-  'approved', 'the proposal is recorded as approved');
-select test.eq(
-  (select count(*)::int from public.audit_logs
-    where action = 'fund_reallocation.approved'
-      and entity_id = 'b1b1b1b1-0000-4000-8000-000000000001'),
-  1, 'and an audit row is written in the same transaction as the deciding vote');
-
-select test.act_as('11111111-1111-4111-8111-111111111111');
-select test.eq(
-  (select status from public.vote_on_reallocation('b1b1b1b1-0000-4000-8000-000000000001', false)),
-  'already_resolved', 'votes cast after it resolves change nothing');
-
--- ---------------------------------------------------------------------------
 -- Closing an event freezes its ledger
 -- ---------------------------------------------------------------------------
 reset role;
@@ -2885,3 +2816,71 @@ select test.ok(
   has_function_privilege('authenticated',
     'public.allocate_surplus(uuid,public.fund_movement_kind,uuid,text)', 'EXECUTE'),
   'while the committee can, signed in');
+
+-- ---------------------------------------------------------------------------
+-- The vote that was never built
+-- ---------------------------------------------------------------------------
+-- 0870 built fund reallocation voting and nothing ever reached it: no app
+-- inserted a proposal, and the card that would have collected the votes was
+-- exported and never rendered. 0921.0300 then settled the same question — where
+-- a closed event's surplus goes — a different way. 0921.0400 removed it.
+--
+-- Asserted by absence, so re-introducing the schema without re-introducing a
+-- way to reach it fails here rather than in a year's reading of the spec.
+reset role;
+select test.eq(
+  (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname in ('fund_reallocations', 'reallocation_votes', 'reallocation_results')),
+  0::bigint, 'the reallocation tables and view are gone');
+select test.eq(
+  (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'vote_on_reallocation'),
+  0::bigint, 'and so is the function that counted the votes');
+select test.ok(
+  exists (select 1 from pg_type t join pg_namespace n on n.oid = t.typnamespace
+           where n.nspname = 'public' and t.typname = 'proposal_status'),
+  'while proposal_status stays, because polls use it and polls are reachable');
+select test.ok(
+  (select count(*) from public.polls) >= 0,
+  'and the polls half of 0870 still answers');
+
+-- ---------------------------------------------------------------------------
+-- A policy name that lies is worse than no name
+-- ---------------------------------------------------------------------------
+-- 0913.0300 renamed the role helpers in place — the old app.is_committee
+-- became app.is_staff, the old app.is_admin became app.is_committee — and a
+-- policy binds to a function by OID, so twenty-four of them kept working and
+-- started meaning something other than what they were called. Nobody was let
+-- in or shut out; the names simply stopped being evidence.
+--
+-- Written as a sweep rather than a list of twenty-four, so a policy added next
+-- year is covered the day it lands instead of the day somebody remembers.
+--
+-- `admin` is in the failing set on its own terms: memberships_role_not_retired
+-- forbids the role outright, so a policy named for it is named for nobody.
+select test.eq(
+  (select coalesce(string_agg(policyname, ', ' order by policyname), '')
+     from pg_policies
+    where schemaname in ('public', 'storage')
+      and (
+        policyname ~ 'admin'
+        or (policyname ~ 'committee'
+            and (coalesce(qual, '') || coalesce(with_check, '')) !~ 'app\.is_committee')
+        or (policyname ~ 'staff'
+            and (coalesce(qual, '') || coalesce(with_check, '')) !~ 'app\.is_staff')
+      )),
+  '', 'no policy names a role it does not enforce, nor one nobody may hold');
+
+-- The rename changed names and nothing else, so the two that decide who
+-- touches a bill still decide exactly what they decided before.
+select test.eq(
+  (select with_check from pg_policies
+    where schemaname = 'public' and policyname = 'expenses_insert_staff'),
+  '(app.is_staff(community_id) AND (requested_by = app.my_membership_id(community_id)) AND (status = ''pending''::expense_status))'::text,
+  'staff file their own bill as pending, exactly as before the rename');
+select test.eq(
+  (select qual from pg_policies
+    where schemaname = 'public' and policyname = 'expenses_update_own_pending_or_committee'),
+  '(app.is_committee(community_id) OR ((requested_by = app.my_membership_id(community_id)) AND (status = ANY (ARRAY[''pending''::expense_status, ''changes_requested''::expense_status]))))'::text,
+  'and the committee, or the filer while it is still open, may still edit one');
