@@ -106,6 +106,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                 s?.fundRaised ?? 0,
                 s?.fundPending ?? 0,
                 s?.fundTarget ?? 0,
+                s?.fundCarried ?? 0,
               );
               const funded = bar.confirmed;
               return (
@@ -141,7 +142,11 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                       </span>
                       <span>{funded}%</span>
                     </div>
-                    <FundBar percent={funded} pendingPercent={bar.pending} />
+                    <FundBar
+                      percent={funded}
+                      pendingPercent={bar.pending}
+                      carriedPercent={bar.carried}
+                    />
                   </div>
                 </Link>
               );

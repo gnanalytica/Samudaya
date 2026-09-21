@@ -2,7 +2,14 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, RefreshControl, ScrollView, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { can, formatDate, formatMoney, unitLabel, upiCaptureNote } from '@samudaya/core';
+import {
+  can,
+  correctionNoteForStaff,
+  formatDate,
+  formatMoney,
+  unitLabel,
+  upiCaptureNote,
+} from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -19,7 +26,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { KeyValue } from '../../src/components/event-ui';
-import { ViewFileChip } from '../../src/components/file-ui';
+import { ViewFileButton } from '../../src/components/file-ui';
 import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
@@ -50,7 +57,7 @@ const METHOD_LABEL: Record<string, string> = {
 export default function Payments() {
   const { event: initialSlug } = useLocalSearchParams<{ event?: string }>();
   const queryClient = useQueryClient();
-  const { activeCommunity, role } = useAuth();
+  const { activeCommunity, role, membershipId } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
   const [slug, setSlug] = useState<string | null>(initialSlug ?? null);
   const [recording, setRecording] = useState(false);
@@ -58,7 +65,7 @@ export default function Payments() {
   const { data, loading, refreshing, refresh } = useCommunityData(
     'admin:payments',
     async (communityId) => {
-      const [events, contributions, units] = await Promise.all([
+      const [events, contributions, units, committee] = await Promise.all([
         supabase
           .from('events')
           .select('id, slug, name, emoji, status, starts_on')
@@ -68,7 +75,7 @@ export default function Payments() {
         supabase
           .from('contributions')
           .select(
-            'id, event_id, amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, gateway_payload, verified_at, updated_at, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
+            'id, event_id, amount, reported_amount, method, reference, status, channel, paid_at, receipt_no, proof_path, review_note, gateway_payload, verified_at, updated_at, membership_id, units(block, number), payer:memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
           )
           .eq('community_id', communityId)
           .order('paid_at', { ascending: false })
@@ -80,11 +87,20 @@ export default function Payments() {
           .order('block', { nullsFirst: true })
           .order('number')
           .limit(2000),
+        // One committee member means there is nobody else to confirm their
+        // own payment, so the rule below steps aside for them.
+        supabase
+          .from('memberships')
+          .select('id', { count: 'exact', head: true })
+          .eq('community_id', communityId)
+          .eq('role', 'committee')
+          .eq('status', 'active'),
       ]);
       return {
         events: events.data ?? [],
         contributions: contributions.data ?? [],
         units: units.data ?? [],
+        committeeCount: committee.count ?? 0,
       };
     },
   );
@@ -120,6 +136,8 @@ export default function Payments() {
     rows.map((row) => (row.units ? unitLabel(row.units) : null)).filter(Boolean),
   );
   const unitCount = data?.units.length ?? 0;
+  const mayCorrect = can(role, 'expenses:approve');
+  const alone = mayCorrect && (data?.committeeCount ?? 0) <= 1;
 
   return (
     <Screen>
@@ -194,6 +212,8 @@ export default function Payments() {
                       row={row}
                       currency={currency}
                       mayReview={can(role, 'payments:record')}
+                      mayCorrect={mayCorrect}
+                      mine={!alone && row.membership_id === membershipId}
                       onDone={refreshAll}
                     />
                   ))}
@@ -202,30 +222,51 @@ export default function Payments() {
 
               <Card style={{ gap: spacing.md }}>
                 <Heading>Confirmed payments</Heading>
+                <Caption>
+                  The amount, the transaction ID and the screenshot stay together after
+                  confirmation, so the statement can be checked against this page at any time.
+                </Caption>
                 {rows.length ? (
                   rows.map((row) => (
-                    <View
-                      key={row.id}
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        gap: spacing.md,
-                      }}
-                    >
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <Body>
-                          {row.units ? `Flat ${unitLabel(row.units)}` : 'No flat'}
-                          {row.payer?.profiles?.full_name
-                            ? ` · ${row.payer.profiles.full_name}`
-                            : ' · recorded by staff'}
-                        </Body>
-                        <Caption>
-                          {METHOD_LABEL[row.method] ?? row.method}
-                          {row.reference ? ` · ${row.reference}` : ''} ·{' '}
-                          {formatDate(row.paid_at.slice(0, 10))} · #{row.receipt_no}
-                        </Caption>
+                    <View key={row.id} style={{ gap: spacing.xs }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          gap: spacing.md,
+                        }}
+                      >
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Body>
+                            {row.units ? `Flat ${unitLabel(row.units)}` : 'No flat'}
+                            {row.payer?.profiles?.full_name
+                              ? ` · ${row.payer.profiles.full_name}`
+                              : ' · recorded by staff'}
+                          </Body>
+                          <Caption>
+                            {METHOD_LABEL[row.method] ?? row.method}
+                            {row.reference ? ` · ${row.reference}` : ''} ·{' '}
+                            {formatDate(row.paid_at.slice(0, 10))} · #{row.receipt_no}
+                          </Caption>
+                          {/* A number that moved with no trace of the move is
+                              the thing this app exists to replace. */}
+                          {correctionNoteForStaff(row.amount, row.reported_amount, currency) ? (
+                            <Caption>
+                              {correctionNoteForStaff(row.amount, row.reported_amount, currency)}
+                            </Caption>
+                          ) : null}
+                        </View>
+                        <Body>{formatMoney(row.amount, currency)}</Body>
                       </View>
-                      <Body>{formatMoney(row.amount, currency)}</Body>
+                      {/* Confirming a payment used to be the last moment anybody
+                          could see the screenshot. Reconciliation happens later,
+                          when the bank statement arrives, so the evidence has to
+                          outlive the decision. */}
+                      <ViewFileButton
+                        bucket="payment-proofs"
+                        value={row.proof_path}
+                        label="View screenshot"
+                      />
                     </View>
                   ))
                 ) : (
@@ -243,6 +284,8 @@ export default function Payments() {
 type PendingRow = {
   id: string;
   amount: number;
+  reported_amount: number | null;
+  membership_id: string | null;
   method: string;
   reference: string | null;
   paid_at: string;
@@ -260,22 +303,34 @@ function PendingPayment({
   row,
   currency,
   mayReview,
+  mayCorrect,
+  mine,
   onDone,
 }: {
   row: PendingRow;
   currency: string;
   mayReview: boolean;
+  /** Rewriting a recorded amount is a ledger correction: committee only. */
+  mayCorrect: boolean;
+  /** The viewer reported this payment, and somebody else must confirm it. */
+  mine: boolean;
   onDone: () => void;
 }) {
   const [declining, setDeclining] = useState(false);
   const [note, setNote] = useState('');
   const [reference, setReference] = useState('');
+  const [amount, setAmount] = useState(String(row.amount));
   const [busy, setBusy] = useState<'confirm' | 'decline' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const review = async (confirm: boolean) => {
     if (!confirm && !note.trim()) {
       setError('Say why it could not be confirmed, e.g. no matching credit in the bank statement.');
+      return;
+    }
+    const corrected = Number(amount);
+    if (confirm && mayCorrect && (!Number.isFinite(corrected) || corrected <= 0)) {
+      setError('Enter the amount the bank shows, or put the reported figure back.');
       return;
     }
     setBusy(confirm ? 'confirm' : 'decline');
@@ -285,6 +340,7 @@ function PendingPayment({
       p_confirm: confirm,
       p_note: note.trim() || undefined,
       p_reference: reference.trim() || undefined,
+      p_amount: confirm && mayCorrect ? corrected : undefined,
     });
     setBusy(null);
     if (rpcError) {
@@ -313,7 +369,7 @@ function PendingPayment({
       {upiCaptureNote(row.gateway_payload) ? (
         <Caption>{upiCaptureNote(row.gateway_payload)}</Caption>
       ) : null}
-      <ViewFileChip bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
+      <ViewFileButton bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
       {/* Only when it is missing, which means the resident sent a screenshot
           instead of typing it. Whoever is confirming has the statement open
           and the picture one tap away, so this is the cheapest moment in the
@@ -328,6 +384,19 @@ function PendingPayment({
           placeholder="612345678901"
         />
       ) : null}
+      {/* Pre-filled with what the resident reported, so confirming an accurate
+          report is still one tap. Somebody who typed ₹1,000 and sent ₹10 is a
+          digit, not a fraud, and turning the whole payment down over it makes
+          them report it all over again. */}
+      {mayReview && mayCorrect && !mine ? (
+        <Input
+          label={`Amount the bank shows (reported ${formatMoney(row.amount, currency)})`}
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="number-pad"
+          placeholder={String(row.amount)}
+        />
+      ) : null}
       {/* Who confirmed the money arrived, and any edit made after they did. */}
       <AuditTrail
         confirmedBy={row.verifier?.profiles?.full_name}
@@ -335,7 +404,9 @@ function PendingPayment({
         editedBy={row.editor?.profiles?.full_name}
         editedAt={row.updated_at}
       />
-      {mayReview ? (
+      {mine ? (
+        <Caption>You reported this payment, so another committee member has to confirm it.</Caption>
+      ) : mayReview ? (
         declining ? (
           <View style={{ gap: spacing.sm }}>
             <Input

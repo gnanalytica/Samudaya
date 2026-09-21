@@ -893,6 +893,7 @@ export type Database = {
           review_note: string | null
           updated_at: string
           updated_by: string | null
+          reported_amount: number | null
         }
         Insert: {
           id?: string
@@ -916,6 +917,7 @@ export type Database = {
           review_note?: string | null
           updated_at?: string
           updated_by?: string | null
+          reported_amount?: number | null
         }
         Update: {
           id?: string
@@ -939,6 +941,7 @@ export type Database = {
           review_note?: string | null
           updated_at?: string
           updated_by?: string | null
+          reported_amount?: number | null
         }
         Relationships: [
           {
@@ -1362,6 +1365,8 @@ export type Database = {
           vendor_id: string | null
           category_id: string | null
           updated_by: string | null
+          revised_by: string | null
+          revised_at: string | null
         }
         Insert: {
           id?: string
@@ -1386,6 +1391,8 @@ export type Database = {
           vendor_id?: string | null
           category_id?: string | null
           updated_by?: string | null
+          revised_by?: string | null
+          revised_at?: string | null
         }
         Update: {
           id?: string
@@ -1410,6 +1417,8 @@ export type Database = {
           vendor_id?: string | null
           category_id?: string | null
           updated_by?: string | null
+          revised_by?: string | null
+          revised_at?: string | null
         }
         Relationships: [
           {
@@ -1448,6 +1457,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "expenses_revised_by_fkey"
+            columns: ["revised_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "expenses_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -1459,6 +1475,74 @@ export type Database = {
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "catalogue_items"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      fund_movements: {
+        Row: {
+          id: string
+          community_id: string
+          kind: Database["public"]["Enums"]["fund_movement_kind"]
+          from_event_id: string | null
+          to_event_id: string | null
+          amount: number
+          note: string | null
+          decided_by: string | null
+          decided_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          kind: Database["public"]["Enums"]["fund_movement_kind"]
+          from_event_id?: string | null
+          to_event_id?: string | null
+          amount: number
+          note?: string | null
+          decided_by?: string | null
+          decided_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          kind?: Database["public"]["Enums"]["fund_movement_kind"]
+          from_event_id?: string | null
+          to_event_id?: string | null
+          amount?: number
+          note?: string | null
+          decided_by?: string | null
+          decided_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fund_movements_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_movements_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_movements_from_event_id_fkey"
+            columns: ["from_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fund_movements_to_event_id_fkey"
+            columns: ["to_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           }
         ]
@@ -2563,6 +2647,7 @@ export type Database = {
           volunteers: number | null
           fund_pending: number | null
           pending_contributors: number | null
+          fund_carried: number | null
         }
         Relationships: [
 
@@ -2603,6 +2688,17 @@ export type Database = {
           unexplained_in: number | null
           unexplained_out: number | null
           last_line_on: string | null
+        }
+        Relationships: [
+
+        ]
+      }
+      society_balance: {
+        Row: {
+          community_id: string | null
+          balance: number | null
+          movements_in: number | null
+          last_decided_at: string | null
         }
         Relationships: [
 
@@ -2671,6 +2767,15 @@ export type Database = {
       }
     }
     Functions: {
+      allocate_surplus: {
+        Args: {
+        p_event_id: string
+        p_kind: Database["public"]["Enums"]["fund_movement_kind"]
+        p_to_event_id?: string
+        p_note?: string
+      }
+        Returns: Database["public"]["Tables"]["fund_movements"]["Row"]
+      }
       bank_line_candidates: {
         Args: {
         p_transaction_id: string
@@ -2851,6 +2956,7 @@ export type Database = {
         p_confirm: boolean
         p_note?: string
         p_reference?: string
+        p_amount?: number
       }
         Returns: Database["public"]["Tables"]["contributions"]["Row"]
       }
@@ -2896,6 +3002,14 @@ export type Database = {
         block: string | null
         number: string | null
       }[]
+      }
+      spend_society_balance: {
+        Args: {
+        p_to_event_id: string
+        p_amount: number
+        p_note?: string
+      }
+        Returns: Database["public"]["Tables"]["fund_movements"]["Row"]
       }
       todo_count: {
         Args: {
@@ -2958,6 +3072,7 @@ export type Database = {
       contribution_status: "pending" | "succeeded" | "failed" | "refunded"
       event_status: "proposed" | "draft" | "published" | "completed" | "cancelled"
       expense_status: "pending" | "approved" | "rejected" | "changes_requested"
+      fund_movement_kind: "next_event" | "next_edition" | "society_balance" | "from_balance"
       fund_rule: "carry_next_edition" | "carry_related" | "general_fund" | "refund" | "donate"
       join_request_status: "pending" | "approved" | "rejected"
       member_role: "resident" | "staff" | "admin" | "committee"

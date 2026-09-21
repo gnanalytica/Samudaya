@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   billPath,
+  correctionNote,
+  correctionNoteForStaff,
   newTransactionRef,
   parseUpiResponse,
   paymentProofPath,
@@ -105,5 +107,38 @@ describe('capture note for staff', () => {
     expect(
       upiCaptureNote({ source: 'upi_app', txn_ref: null, expected_txn_ref: 'SMDY1' }),
     ).toContain('check it carefully');
+  });
+});
+
+describe('a corrected amount', () => {
+  it('says nothing about a payment nobody corrected', () => {
+    expect(correctionNote(2100, null)).toBeNull();
+    expect(correctionNote(2100, undefined)).toBeNull();
+    // A row where the two agree is a correction that was undone, or a figure
+    // that was re-entered unchanged. Either way there is nothing to explain.
+    expect(correctionNote(2100, 2100)).toBeNull();
+  });
+
+  it('names the figure the resident actually typed', () => {
+    expect(correctionNote(10, 1000)).toBe('Corrected from ₹1,000, which is what you reported');
+    expect(correctionNoteForStaff(10, 1000)).toBe(
+      'Corrected from ₹1,000, which is what the flat reported',
+    );
+  });
+
+  it('reads the numeric strings PostgREST returns as well as numbers', () => {
+    expect(correctionNote('10.00', '1000.00')).toBe(
+      'Corrected from ₹1,000, which is what you reported',
+    );
+    expect(correctionNote('2100.00', '2100.00')).toBeNull();
+  });
+
+  it('says nothing rather than something wrong when a figure is unreadable', () => {
+    expect(correctionNote(10, 'not a number')).toBeNull();
+    expect(correctionNote(10, '')).toBeNull();
+  });
+
+  it('works upwards too, because a correction is not always downwards', () => {
+    expect(correctionNote(5000, 500)).toBe('Corrected from ₹500, which is what you reported');
   });
 });

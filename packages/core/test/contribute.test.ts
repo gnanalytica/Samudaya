@@ -9,7 +9,7 @@ import {
   reportPaymentSchema,
   upiNote,
 } from '../src/payments';
-import { fundBarSegments, fundedPercent, normalizeStats } from '../src/events';
+import { fundBarSegments, fundedPercent, normalizeStats, stillNeeded } from '../src/events';
 
 /**
  * Two things a resident sees on the way to paying: what the bar says has been
@@ -20,7 +20,7 @@ import { fundBarSegments, fundedPercent, normalizeStats } from '../src/events';
 describe('fundBarSegments', () => {
   it('draws confirmed money and money on its way as two stacked widths', () => {
     const bar = fundBarSegments(60_000, 20_000, 100_000);
-    expect(bar).toEqual({ confirmed: 60, pending: 20 });
+    expect(bar).toEqual({ carried: 0, confirmed: 60, pending: 20 });
   });
 
   it('never lets the two together overflow the bar', () => {
@@ -34,11 +34,35 @@ describe('fundBarSegments', () => {
 
   it('gives confirmed money the whole bar when it has already filled it', () => {
     const bar = fundBarSegments(150_000, 20_000, 100_000);
-    expect(bar).toEqual({ confirmed: 100, pending: 0 });
+    expect(bar).toEqual({ carried: 0, confirmed: 100, pending: 0 });
   });
 
   it('draws nothing for an event with no target', () => {
-    expect(fundBarSegments(5_000, 1_000, 0)).toEqual({ confirmed: 0, pending: 0 });
+    expect(fundBarSegments(5_000, 1_000, 0)).toEqual({
+      carried: 0,
+      confirmed: 0,
+      pending: 0,
+    });
+  });
+
+  it('draws money carried across first, and never counts it as a contribution', () => {
+    const bar = fundBarSegments(30_000, 0, 100_000, 10_000);
+    expect(bar).toEqual({ carried: 10, confirmed: 30, pending: 0 });
+  });
+
+  it('keeps all three inside the bar when the fund is over-subscribed', () => {
+    const bar = fundBarSegments(90_000, 30_000, 100_000, 40_000);
+    expect(bar.carried).toBe(40);
+    expect(bar.confirmed).toBe(60);
+    expect(bar.pending).toBe(0);
+    expect(bar.carried + bar.confirmed + bar.pending).toBe(100);
+  });
+
+  it('draws nothing for an event that gave its surplus away', () => {
+    // fund_carried is net, so an event that carried money out reads negative.
+    // What it did belongs on its own record, not as a negative width here.
+    const bar = fundBarSegments(30_000, 0, 100_000, -10_000);
+    expect(bar).toEqual({ carried: 0, confirmed: 30, pending: 0 });
   });
 
   it('keeps pending out of the raised figure entirely', () => {
@@ -232,5 +256,19 @@ describe('MATCH_CONFIDENCE', () => {
 
   it('says what a flat match means, since it is the one that ignores the amount', () => {
     expect(MATCH_CONFIDENCE.flat).toContain('flat');
+  });
+});
+
+describe('what is still needed', () => {
+  it('counts money carried across, so nobody is asked for it twice', () => {
+    expect(stillNeeded(50_000, 30_000, 10_000)).toBe(10_000);
+  });
+
+  it('is zero rather than negative once the target is passed', () => {
+    expect(stillNeeded(50_000, 45_000, 10_000)).toBe(0);
+  });
+
+  it('ignores a negative carried figure rather than inflating the ask', () => {
+    expect(stillNeeded(50_000, 30_000, -10_000)).toBe(20_000);
   });
 });

@@ -1,8 +1,7 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useActionState, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import QRCode from 'qrcode';
 import { Check, Clock, Copy, ExternalLink, Smartphone } from 'lucide-react';
 import {
   COPY,
@@ -12,7 +11,7 @@ import {
   upiNote,
   upiPayUri,
 } from '@samudaya/core';
-import { Button, ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink, buttonClass } from '@/components/ui/button';
 import { Field, Input } from '@/components/ui/field';
 import { Card, CardBody } from '@/components/ui/card';
 import { FileUpload } from '@/components/file-upload';
@@ -24,12 +23,10 @@ const initial: ContributeState = {};
 /**
  * Copies a short string, and says so for a moment.
  *
- * Added because the line beside it told people to "copy the UPI ID above" and
- * there was nothing to copy with — they had to select twenty characters of
- * monospace by hand, on a phone. Clipboard access can be refused or absent
- * (an insecure origin, an old browser); the button then says so rather than
- * silently doing nothing, because a copy that quietly failed is how somebody
- * pastes the wrong thing into a payment.
+ * Not the shared CopyButton: that one swallows a failure, and this is the one
+ * place where a copy that quietly failed is how somebody pastes the wrong
+ * thing into a payment. Clipboard access can be refused or absent (an insecure
+ * origin, an old browser), so the button says so instead.
  */
 function CopyButton({ value, label }: { value: string; label: string }) {
   const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -46,12 +43,12 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         }
         setTimeout(() => setState('idle'), 2000);
       }}
-      className="text-accent hover:bg-surface-sunken -my-1 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium pointer-coarse:min-h-11"
+      className={buttonClass('secondary', 'sm', 'shrink-0')}
     >
       {state === 'copied' ? (
-        <Check className="size-3.5" aria-hidden="true" />
+        <Check className="text-success size-4" aria-hidden="true" />
       ) : (
-        <Copy className="size-3.5" aria-hidden="true" />
+        <Copy className="size-4" aria-hidden="true" />
       )}
       <span>
         {state === 'copied' ? 'Copied' : state === 'failed' ? 'Press and hold to copy' : 'Copy'}
@@ -71,9 +68,9 @@ function Submit({ disabled }: { disabled: boolean }) {
 }
 
 /**
- * Contributing on one screen: pick an amount, pay it from a UPI app (QR code on
- * a computer, a button on a phone), then paste the UPI transaction ID. The
- * payment and the report sit side by side on wide screens and stack on phones.
+ * Contributing on one screen: pick an amount, pay it from a UPI app, then
+ * paste the UPI transaction ID or attach a screenshot. The payment and the
+ * report sit side by side on wide screens and stack on phones.
  */
 export function ContributeForm({
   slug,
@@ -110,14 +107,13 @@ export function ContributeForm({
     opening && !presets.includes(opening) ? String(opening) : '',
   );
   const [uploading, setUploading] = useState(false);
-  const [qr, setQr] = useState<{ uri: string; src: string } | null>(null);
 
   /**
-   * What gets recorded, which is not always what step 1 asked for. The QR code
-   * carries an amount, but a UPI app lets you change it, and people do: they
-   * round up, they add a neighbour's share, they pay half now. The society's
-   * books should say what left the bank, so this field is the one that counts
-   * and the resident can overwrite it.
+   * What gets recorded, which is not always what step 1 asked for. The payment
+   * link carries an amount, but a UPI app lets you change it, and people do:
+   * they round up, they add a neighbour's share, they pay half now. The
+   * society's books should say what left the bank, so this field is the one
+   * that counts and the resident can overwrite it.
    *
    * It follows step 1 while they are still choosing — picking ₹1,001 and then
    * typing it again would be silly — and stops following the moment they edit
@@ -135,21 +131,6 @@ export function ContributeForm({
     () => (amount ? upiPayUri({ vpa: upi.vpa, payeeName: upi.payeeName, amount, note }) : null),
     [amount, note, upi.vpa, upi.payeeName],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!uri) return;
-    QRCode.toDataURL(uri, { margin: 1, width: 220, errorCorrectionLevel: 'M' })
-      .then((src) => {
-        if (!cancelled) setQr({ uri, src });
-      })
-      .catch(() => {
-        if (!cancelled) setQr(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [uri]);
 
   if (state.reported) {
     return (
@@ -184,8 +165,6 @@ export function ContributeForm({
       </Card>
     );
   }
-
-  const qrSrc = qr && qr.uri === uri ? qr.src : null;
 
   return (
     <Card>
@@ -250,61 +229,49 @@ export function ContributeForm({
             <h2 id="pay-heading" className="text-ink text-sm font-semibold">
               2. Pay {amount ? formatMoney(amount, currency) : ''} to {upi.payeeName}
             </h2>
-            {uri ? (
-              <>
-                <div className="flex justify-center md:justify-start">
-                  {qrSrc ? (
-                    // A data URL generated in the browser; next/image adds nothing here.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={qrSrc}
-                      alt={`UPI QR code to pay ${formatMoney(amount ?? 0, currency)} to ${upi.payeeName}`}
-                      width={180}
-                      height={180}
-                      className="border-border-base rounded-lg border bg-white p-1"
-                    />
-                  ) : (
-                    <div className="border-border-base bg-surface-sunken size-[180px] rounded-lg border" />
-                  )}
-                </div>
-                <a
-                  href={uri}
-                  className="bg-accent text-accent-ink inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
-                >
-                  <Smartphone className="size-4" aria-hidden="true" />
-                  Open UPI app
-                  <ExternalLink className="size-3.5" aria-hidden="true" />
-                </a>
-              </>
-            ) : (
-              <p className="border-border-base bg-surface-sunken text-ink-muted rounded-lg border px-4 py-6 text-center text-sm">
-                Choose an amount to see the QR code.
-              </p>
-            )}
-            <dl className="text-ink-muted space-y-1 text-sm">
-              <div className="flex flex-wrap items-center gap-x-2">
-                <dt>UPI ID</dt>
-                <dd className="text-ink font-mono break-all">{upi.vpa}</dd>
+            {/* There used to be a QR code here. It confused people: on the
+                phone most residents read this on there is nothing to scan it
+                with, and it left the two things they actually need to carry
+                into their UPI app — the ID to pay and the note to type — as
+                small print underneath. Copying is the whole of step 2 now. */}
+            <dl className="border-border-base bg-surface-sunken divide-border-base divide-y rounded-lg border">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                <dt className="text-ink-muted w-full text-xs font-medium sm:w-auto">UPI ID</dt>
+                <dd className="text-ink min-w-0 flex-1 font-mono text-sm break-all">{upi.vpa}</dd>
                 <CopyButton value={upi.vpa} label="UPI ID" />
               </div>
-              <div className="flex flex-wrap items-center gap-x-2">
-                <dt>Note</dt>
-                <dd className="text-ink font-mono break-all">{note}</dd>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                <dt className="text-ink-muted w-full text-xs font-medium sm:w-auto">Note</dt>
+                <dd className="text-ink min-w-0 flex-1 font-mono text-sm break-all">{note}</dd>
                 <CopyButton value={note} label="note" />
               </div>
             </dl>
-            {/* Most residents pay from the phone they are reading this on, where
-                "scan the QR code with your phone" is nonsense. Branched with CSS
-                rather than a viewport check, so the server and the client render
-                the same markup. */}
+            {uri ? (
+              <a
+                href={uri}
+                className="bg-accent text-accent-ink inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold"
+              >
+                <Smartphone className="size-4" aria-hidden="true" />
+                Open UPI app
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+              </a>
+            ) : (
+              <p className="border-border-base text-ink-muted rounded-lg border border-dashed px-4 py-3 text-center text-sm">
+                Choose an amount above to open your UPI app with it filled in.
+              </p>
+            )}
+            {/* Most residents pay from the phone they are reading this on.
+                Branched with CSS rather than a viewport check, so the server and
+                the client render the same markup. */}
             <p className="text-ink-subtle text-xs">
               <span className="sm:hidden">
-                On this phone, tap Open UPI app — or copy the UPI ID above and paste it into yours.
+                Tap Open UPI app, or paste the UPI ID into the app you already use.
               </span>
               <span className="hidden sm:inline">
-                On a computer, scan the QR code with your phone.
+                Copy the UPI ID and the note, and pay from your phone.
               </span>{' '}
-              You pay {upi.payeeName} directly; Samudaya never handles the money.
+              Put the note in the payment&rsquo;s remark so the committee can tell your payment
+              apart. You pay {upi.payeeName} directly; Samudaya never handles the money.
             </p>
           </section>
 
@@ -322,7 +289,7 @@ export function ContributeForm({
               error={state.fieldErrors?.amount}
               hint={
                 amount && reported !== String(amount)
-                  ? `The QR code above was for ${formatMoney(amount, currency)}. This is what will be recorded.`
+                  ? `Step 1 asked for ${formatMoney(amount, currency)}. This is what will be recorded.`
                   : 'Change it if your UPI app sent a different amount.'
               }
               required

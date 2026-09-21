@@ -3,6 +3,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   View,
@@ -12,10 +13,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   COPY,
   EVENT_STATUS_LABEL,
+  SURPLUS_CHOICES,
+  SURPLUS_CHOICE_DETAIL,
+  SURPLUS_CHOICE_LABEL,
   can,
   createActivitySchema,
+  eventSlug as makeEventSlug,
   formatMoney,
+  nextEditionDate,
+  nextEditionName,
   type FundRule,
+  type SurplusChoice,
 } from '@samudaya/core';
 import { useAuth } from '../../../src/lib/auth';
 import { supabase } from '../../../src/lib/supabase';
@@ -33,7 +41,7 @@ import {
   Screen,
   Title,
 } from '../../../src/components/ui';
-import { ErrorText } from '../../../src/components/admin-ui';
+import { Chip, ChipRow, ErrorText } from '../../../src/components/admin-ui';
 import { CataloguePicker } from '../../../src/components/catalogue-ui';
 import {
   ActivityTypeChips,
@@ -48,13 +56,13 @@ async function loadEvent(communityId: string, slug: string) {
   const { data: event } = await supabase
     .from('events')
     .select(
-      'id, slug, emoji, name, kind, status, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, expected_attendance, fund_target, suggested_amount, fund_rule, fund_rule_note, created_by',
+      'id, community_id, slug, emoji, name, kind, status, starts_on, ends_on, venue, venue_id, event_type_id, organizer, description, expected_attendance, fund_target, suggested_amount, fund_rule, fund_rule_note, created_by',
     )
     .eq('community_id', communityId)
     .eq('slug', slug)
     .maybeSingle();
   if (!event) return null;
-  const [budget, activities, openBills, stats, eventType] = await Promise.all([
+  const [budget, activities, openBills, stats, eventType, openEvents, society] = await Promise.all([
     supabase
       .from('budget_lines')
       .select('id, category, category_id, amount, position')
@@ -74,6 +82,20 @@ async function loadEvent(communityId: string, slug: string) {
     event.event_type_id
       ? supabase.from('catalogue_items').select('label').eq('id', event.event_type_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Events a surplus can be carried into: still open, and not this one.
+    supabase
+      .from('events')
+      .select('id, name, emoji, starts_on')
+      .eq('community_id', event.community_id)
+      .in('status', ['draft', 'published'])
+      .neq('id', event.id)
+      .order('starts_on', { ascending: true })
+      .limit(100),
+    supabase
+      .from('society_balance')
+      .select('balance')
+      .eq('community_id', event.community_id)
+      .maybeSingle(),
   ]);
   return {
     event,
@@ -86,6 +108,8 @@ async function loadEvent(communityId: string, slug: string) {
     })),
     openBills: openBills.count ?? 0,
     stats: stats.data,
+    openEvents: openEvents.data ?? [],
+    societyBalance: Number(society.data?.balance ?? 0),
   };
 }
 
@@ -134,6 +158,8 @@ export default function ManageEvent() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         >
           <StatusCard data={data} onChange={refresh} />
+          <SurplusCard data={data} onChange={refresh} />
+          <BringInBalanceCard data={data} onChange={refresh} />
           <DetailsCard key={`details:${data.event.id}`} data={data} onChange={refresh} />
           <BudgetCard data={data} onChange={refresh} />
           <ActivitiesCard data={data} onChange={refresh} />
@@ -648,6 +674,226 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
         )
       ) : null}
       <ErrorText message={error} />
+    </Card>
+  );
+}
+
+/**
+ * What happens to the money left in a closed event.
+ *
+ * Offered after closing rather than as part of it: closing is a speed bump
+ * with a typed confirmation, and burying a second decision inside it is how
+ * somebody taps the first option to get past the form. It stays on the screen
+ * until it is answered, so a committee that wants to talk about it first can
+ * come back.
+ *
+ * No amount field: the figure is what the ledger says, and letting the
+ * committee type it would invite a typo into the one number nobody is
+ * checking.
+ */
+function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void }) {
+  const { activeCommunity, role } = useAuth();
+  const invalidate = useInvalidate(onChange);
+  const currency = activeCommunity?.currency ?? 'INR';
+  const { event } = data;
+  const surplus = Number(data.stats?.available ?? 0);
+  const [kind, setKind] = useState<SurplusChoice>(
+    data.openEvents.length ? 'next_event' : 'society_balance',
+  );
+  const [target, setTarget] = useState<string>(data.openEvents[0]?.id ?? '');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const closed = event.status === 'completed';
+  if (!closed || surplus <= 0 || !can(role, 'events:close')) return null;
+
+  const nextEdition = nextEditionName(event.name, event.starts_on);
+
+  const decide = async () => {
+    if (kind === 'next_event' && !target) {
+      setError('Pick the event to carry it to.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    let carryTo: string | undefined = kind === 'society_balance' ? undefined : target || undefined;
+
+    // "Keep it for next year" is useless if next year's event has to exist
+    // before you can say it, so the draft is made here.
+    if (kind === 'next_edition' && !carryTo) {
+      const { data: created, error: createError } = await supabase
+        .from('events')
+        .insert({
+          community_id: event.community_id,
+          slug: makeEventSlug(nextEdition),
+          name: nextEdition,
+          emoji: event.emoji,
+          event_type_id: event.event_type_id,
+          venue: event.venue,
+          venue_id: event.venue_id,
+          organizer: event.organizer,
+          starts_on: nextEditionDate(event.starts_on),
+          fund_target: 0,
+          status: 'draft',
+        })
+        .select('id')
+        .single();
+      if (createError) {
+        setBusy(false);
+        setError(createError.message);
+        return;
+      }
+      carryTo = created.id;
+    }
+
+    const { error: rpcError } = await supabase.rpc('allocate_surplus', {
+      p_event_id: event.id,
+      p_kind: kind,
+      p_to_event_id: carryTo,
+      p_note: note.trim() || undefined,
+    });
+    setBusy(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    await invalidate();
+  };
+
+  return (
+    <Card style={{ gap: spacing.md }}>
+      <View style={{ gap: 2 }}>
+        <Title>{formatMoney(surplus, currency)} left over</Title>
+        <Caption>
+          Residents’ money this event did not spend. The committee decides where it goes, and
+          everybody sees the decision.
+        </Caption>
+      </View>
+
+      <View style={{ gap: spacing.sm }}>
+        {SURPLUS_CHOICES.map((choice) => (
+          <Pressable
+            key={choice}
+            onPress={() => setKind(choice)}
+            disabled={choice === 'next_event' && data.openEvents.length === 0}
+            style={{ opacity: choice === 'next_event' && data.openEvents.length === 0 ? 0.5 : 1 }}
+          >
+            <View style={{ gap: 2 }}>
+              <Body>
+                {kind === choice ? '◉' : '○'} {SURPLUS_CHOICE_LABEL[choice]}
+              </Body>
+              <Caption>
+                {choice === 'next_edition'
+                  ? `The same, for ${nextEdition}. We’ll create it if it isn’t on the calendar yet.`
+                  : choice === 'next_event' && data.openEvents.length === 0
+                    ? 'No event is open to carry it to yet.'
+                    : SURPLUS_CHOICE_DETAIL[choice]}
+              </Caption>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+
+      {kind === 'next_event' || kind === 'next_edition' ? (
+        <View style={{ gap: spacing.xs }}>
+          <Body>{kind === 'next_edition' ? 'Carry it to (optional)' : 'Carry it to'}</Body>
+          <ChipRow>
+            {kind === 'next_edition' ? (
+              <Chip
+                label={`Create ${nextEdition}`}
+                selected={target === ''}
+                onPress={() => setTarget('')}
+              />
+            ) : null}
+            {data.openEvents.map((option) => (
+              <Chip
+                key={option.id}
+                label={`${option.emoji} ${option.name}`}
+                selected={target === option.id}
+                onPress={() => setTarget(option.id)}
+              />
+            ))}
+          </ChipRow>
+        </View>
+      ) : null}
+
+      <Input
+        label="Note (optional)"
+        value={note}
+        onChangeText={setNote}
+        placeholder="Agreed at the October meeting"
+      />
+      <ErrorText message={error} />
+      <Button label="Record the decision" onPress={() => void decide()} loading={busy} />
+    </Card>
+  );
+}
+
+/**
+ * The way back out of the society balance, so keeping a surplus is not a
+ * one-way door.
+ */
+function BringInBalanceCard({ data, onChange }: { data: Loaded; onChange: () => void }) {
+  const { activeCommunity, role } = useAuth();
+  const invalidate = useInvalidate(onChange);
+  const currency = activeCommunity?.currency ?? 'INR';
+  const { event } = data;
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const open = event.status === 'draft' || event.status === 'published';
+  if (!open || data.societyBalance <= 0 || !can(role, 'events:close')) return null;
+
+  const bringIn = async () => {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setError('Enter an amount greater than zero.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc('spend_society_balance', {
+      p_to_event_id: event.id,
+      p_amount: value,
+      p_note: note.trim() || undefined,
+    });
+    setBusy(false);
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    setAmount('');
+    setNote('');
+    await invalidate();
+  };
+
+  return (
+    <Card style={{ gap: spacing.md }}>
+      <View style={{ gap: 2 }}>
+        <Heading>Bring in society funds</Heading>
+        <Caption>
+          The society is holding {formatMoney(data.societyBalance, currency)} that is not behind any
+          event.
+        </Caption>
+      </View>
+      <Input
+        label="Amount (₹)"
+        value={amount}
+        onChangeText={setAmount}
+        keyboardType="number-pad"
+        placeholder="5000"
+      />
+      <Input
+        label="Note (optional)"
+        value={note}
+        onChangeText={setNote}
+        placeholder="Towards the pandal"
+      />
+      <ErrorText message={error} />
+      <Button label="Put it behind this event" onPress={() => void bringIn()} loading={busy} />
     </Card>
   );
 }

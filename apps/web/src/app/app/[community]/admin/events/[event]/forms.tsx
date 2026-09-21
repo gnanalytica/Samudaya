@@ -1,6 +1,15 @@
 'use client';
 
-import { COPY, todayIn } from '@samudaya/core';
+import {
+  COPY,
+  SURPLUS_CHOICES,
+  SURPLUS_CHOICE_DETAIL,
+  SURPLUS_CHOICE_LABEL,
+  formatDate,
+  formatMoney,
+  todayIn,
+  type SurplusChoice,
+} from '@samudaya/core';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -12,11 +21,13 @@ import { CatalogueSelect, type PickerItem } from '@/components/catalogue-select'
 import {
   addActivity,
   addBudgetLine,
+  allocateSurplus,
   closeEvent,
   correctExpense,
   recordPayment,
   reviewExpense,
   reviewPayment,
+  spendSocietyBalance,
   submitExpense,
   updateEventDetails,
   type CloseState,
@@ -570,10 +581,13 @@ export function ReviewExpenseForm({
   slug,
   eventSlug,
   expenseId,
+  mayApprove,
 }: {
   slug: string;
   eventSlug: string;
   expenseId: string;
+  /** False when the viewer wrote the version waiting to be approved. */
+  mayApprove: boolean;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(reviewExpense, EMPTY_STATE);
   return (
@@ -589,9 +603,15 @@ export function ReviewExpenseForm({
         placeholder="Note for staff, if sending back or rejecting"
       />
       <div className="flex flex-wrap gap-2">
-        <Button type="submit" name="decision" value="approved" size="sm">
-          Approve
-        </Button>
+        {mayApprove ? (
+          <Button type="submit" name="decision" value="approved" size="sm">
+            Approve
+          </Button>
+        ) : (
+          <p className="text-ink-muted self-center text-xs">
+            You wrote this version, so another committee member approves it.
+          </p>
+        )}
         <Button
           type="submit"
           name="decision"
@@ -616,12 +636,20 @@ export function ReviewPaymentForm({
   eventSlug,
   contributionId,
   showReferenceField,
+  reportedAmount,
+  currency,
+  mayCorrect,
 }: {
   slug: string;
   eventSlug: string;
   contributionId: string;
   /** True when the row has no reference yet, or the caller cannot tell. */
   showReferenceField: boolean;
+  /** What the resident says they paid, to correct against the statement. */
+  reportedAmount: number | null;
+  currency: string;
+  /** Rewriting a recorded amount is a ledger correction: committee only. */
+  mayCorrect: boolean;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(reviewPayment, EMPTY_STATE);
   return (
@@ -644,6 +672,32 @@ export function ReviewPaymentForm({
             autoComplete="off"
             placeholder="UPI transaction ID from the screenshot (optional)"
           />
+        </>
+      ) : null}
+      {/* Pre-filled with what the resident reported, so confirming an
+          accurate report is still one tap. A resident who typed ₹1,000 and
+          sent ₹10 is a digit, not a fraud, and rejecting the whole payment
+          over it makes them report it all over again. */}
+      {mayCorrect && reportedAmount ? (
+        <>
+          <label htmlFor={`pay-amount-${contributionId}`} className="sr-only">
+            Amount the bank shows
+          </label>
+          <Input
+            id={`pay-amount-${contributionId}`}
+            name="amount"
+            type="number"
+            min={1}
+            step="1"
+            inputMode="numeric"
+            autoComplete="off"
+            defaultValue={reportedAmount}
+            aria-describedby={`pay-amount-hint-${contributionId}`}
+          />
+          <p id={`pay-amount-hint-${contributionId}`} className="text-ink-subtle text-xs">
+            Reported as {formatMoney(reportedAmount, currency)}. Change it only to what the
+            statement shows; the resident is told either way.
+          </p>
         </>
       ) : null}
       <label htmlFor={`pay-note-${contributionId}`} className="sr-only">
@@ -772,5 +826,168 @@ export function CloseEventForm({
         </form>
       </CardBody>
     </Card>
+  );
+}
+
+/**
+ * What happens to the money left in a closed event.
+ *
+ * Offered after closing rather than as part of it: closing is a speed bump
+ * with a typed confirmation, and burying a second decision inside it is how
+ * somebody picks the first radio button to get past the form. It stays on the
+ * tab until it is answered, so a committee that wants to talk about it first
+ * can come back.
+ *
+ * No amount field. The figure is what the ledger says, and letting the
+ * committee type it would invite a typo into the one number nobody is
+ * checking.
+ */
+export function AllocateSurplusForm({
+  slug,
+  eventSlug,
+  surplus,
+  currency,
+  openEvents,
+  nextEdition,
+}: {
+  slug: string;
+  eventSlug: string;
+  surplus: number;
+  currency: string;
+  openEvents: { id: string; name: string; emoji: string | null; starts_on: string }[];
+  /** What next year's edition would be called, if it has to be created. */
+  nextEdition: string;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(allocateSurplus, EMPTY_STATE);
+  const [kind, setKind] = useState<SurplusChoice>(
+    openEvents.length ? 'next_event' : 'society_balance',
+  );
+
+  return (
+    <Card className="border-accent/40">
+      <CardHeader
+        title={`${formatMoney(surplus, currency)} left over`}
+        description="Residents' money the event did not spend. The committee decides where it goes, and everybody sees the decision."
+      />
+      <CardBody>
+        <form action={action} className="space-y-4">
+          <Hidden slug={slug} eventSlug={eventSlug} />
+          <fieldset className="space-y-2">
+            <legend className="sr-only">Where the leftover goes</legend>
+            {SURPLUS_CHOICES.map((choice) => (
+              <label
+                key={choice}
+                className={
+                  kind === choice
+                    ? 'border-accent bg-surface-raised flex cursor-pointer gap-3 rounded-lg border-2 p-3'
+                    : 'border-border-base bg-surface-raised hover:bg-surface-sunken flex cursor-pointer gap-3 rounded-lg border p-3'
+                }
+              >
+                <input
+                  type="radio"
+                  name="kind"
+                  value={choice}
+                  checked={kind === choice}
+                  onChange={() => setKind(choice)}
+                  className="mt-1"
+                  disabled={choice === 'next_event' && openEvents.length === 0}
+                />
+                <span className="min-w-0">
+                  <span className="text-ink block text-sm font-medium">
+                    {SURPLUS_CHOICE_LABEL[choice]}
+                  </span>
+                  <span className="text-ink-subtle block text-xs">
+                    {choice === 'next_edition'
+                      ? `The same, for ${nextEdition}. We’ll create it if it isn’t on the calendar yet.`
+                      : choice === 'next_event' && openEvents.length === 0
+                        ? 'No event is open to carry it to yet.'
+                        : SURPLUS_CHOICE_DETAIL[choice]}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+
+          {kind === 'next_event' || kind === 'next_edition' ? (
+            <Field
+              label={kind === 'next_edition' ? 'Carry it to (optional)' : 'Carry it to'}
+              htmlFor="surplus-target"
+              error={state.fieldErrors?.to_event_id}
+              hint={
+                kind === 'next_edition'
+                  ? `Leave it blank and we’ll create ${nextEdition} as a draft.`
+                  : undefined
+              }
+            >
+              {(control) => (
+                <Select {...control} name="to_event_id" defaultValue="">
+                  <option value="">
+                    {kind === 'next_edition' ? `Create ${nextEdition}` : 'Pick an event'}
+                  </option>
+                  {openEvents.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.emoji} {option.name} · {formatDate(option.starts_on)}
+                    </option>
+                  ))}
+                </Select>
+              )}
+            </Field>
+          ) : null}
+
+          <Field label="Note (optional)" htmlFor="surplus-note">
+            {(control) => (
+              <Input {...control} name="note" placeholder="Agreed at the October meeting" />
+            )}
+          </Field>
+
+          <Feedback state={state} />
+          <Submit label="Record the decision" busy="Recording…" />
+        </form>
+      </CardBody>
+    </Card>
+  );
+}
+
+/** Society funds put behind an event that is still collecting. */
+export function SpendBalanceForm({
+  slug,
+  eventSlug,
+  balance,
+  currency,
+}: {
+  slug: string;
+  eventSlug: string;
+  balance: number;
+  currency: string;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(spendSocietyBalance, EMPTY_STATE);
+  return (
+    <form action={action} className="space-y-3">
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <Field
+        label="Amount from the society balance (₹)"
+        htmlFor="balance-amount"
+        error={state.fieldErrors?.amount}
+        hint={`${formatMoney(balance, currency)} available`}
+        required
+      >
+        {(control) => (
+          <Input
+            {...control}
+            name="amount"
+            type="number"
+            min={1}
+            step="1"
+            inputMode="numeric"
+            autoComplete="off"
+          />
+        )}
+      </Field>
+      <Field label="Note (optional)" htmlFor="balance-note">
+        {(control) => <Input {...control} name="note" placeholder="Towards the pandal" />}
+      </Field>
+      <Feedback state={state} />
+      <Submit label="Put it behind this event" busy="Saving…" />
+    </form>
   );
 }

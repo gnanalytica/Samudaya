@@ -16,12 +16,14 @@ import {
   COPY,
   FUND_RULE_LABEL,
   can,
+  correctionNote,
   countdown,
   formatDate,
   festivalFor,
   formatMoney,
   fundBarSegments,
   receiptRef,
+  stillNeeded,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import {
@@ -84,7 +86,9 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
       getMyParticipation(event.id, membership.id),
       supabase
         .from('contributions')
-        .select('id, amount, status, method, reference, receipt_no, review_note, paid_at')
+        .select(
+          'id, amount, reported_amount, status, method, reference, receipt_no, review_note, paid_at',
+        )
         .eq('event_id', event.id)
         .eq('membership_id', membership.id)
         .order('paid_at', { ascending: false }),
@@ -92,7 +96,12 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
 
   const base = `/app/${community.slug}`;
   const here = `${base}/events/${event.slug}`;
-  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const bar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const funded = bar.confirmed;
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
@@ -260,7 +269,11 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <span>{funded}%</span>
               </div>
               <div className="mt-2">
-                <FundBar percent={funded} pendingPercent={bar.pending} />
+                <FundBar
+                  percent={funded}
+                  pendingPercent={bar.pending}
+                  carriedPercent={bar.carried}
+                />
               </div>
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
@@ -333,13 +346,32 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                   ) : null}
                 </div>
                 <div className="mt-3">
-                  <FundBar percent={funded} pendingPercent={bar.pending} />
+                  <FundBar
+                    percent={funded}
+                    pendingPercent={bar.pending}
+                    carriedPercent={bar.carried}
+                  />
                 </div>
                 {stats.fundPending > 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
                     {formatMoney(stats.fundPending, community.currency)} more has been reported and
                     is waiting to be matched against the bank. It counts towards the total once it
                     is confirmed.
+                  </p>
+                ) : null}
+                {/* Money the society already had, moved here by the committee.
+                    Said out loud rather than folded into the raised figure:
+                    "sixty flats gave ₹30,000" and "the committee moved ₹10,000
+                    across from last year" are different sentences. */}
+                {stats.fundCarried > 0 ? (
+                  <p className="text-ink-subtle mt-2 text-xs">
+                    {formatMoney(stats.fundCarried, community.currency)} was carried across by the
+                    committee from a closed event, so only{' '}
+                    {formatMoney(
+                      stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
+                      community.currency,
+                    )}{' '}
+                    is still to raise.
                   </p>
                 ) : null}
                 <StatTiles className="mt-4 gap-2">
@@ -383,6 +415,20 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                         </p>
                         {payment.status === 'failed' && payment.review_note ? (
                           <p className="text-danger mt-1 text-xs">{payment.review_note}</p>
+                        ) : null}
+                        {correctionNote(
+                          payment.amount,
+                          payment.reported_amount,
+                          community.currency,
+                        ) ? (
+                          <p className="text-warning mt-1 text-xs">
+                            {correctionNote(
+                              payment.amount,
+                              payment.reported_amount,
+                              community.currency,
+                            )}
+                            {payment.review_note ? ` · ${payment.review_note}` : ''}
+                          </p>
                         ) : null}
                       </div>
                       <PaymentStatusBadge status={payment.status} />

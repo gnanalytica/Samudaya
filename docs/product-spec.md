@@ -105,6 +105,13 @@ for anyone whose phone does not open a UPI app from a link. One of the two is
 still required, never neither: a report with no reference and no picture is a
 claim with nothing behind it.
 
+There is no QR code on that screen any more. Most residents read it on the phone
+they are about to pay from, where there is nothing to scan it with, and it sat
+above the two things they do carry into their UPI app — the ID and the note —
+leaving those as small print underneath. The ID and the note are the pay step
+now, each with its own copy button; the link that opens a UPI app with the
+amount already filled in stays.
+
 The reference is not abandoned, because reconciliation runs on it — matching on
 the UTR is near-certain, and the fallback of amount-within-a-fortnight is no
 help when sixty flats each pay ₹2,100 in the same week. It is simply captured
@@ -115,6 +122,11 @@ Nothing counts until somebody confirms it. A reported payment sits at `pending`
 and is **not** in the fund total; staff confirm it against the statement (by
 hand, or by pairing it with a bank line on the Reconcile screen) and the row
 records who confirmed it and when.
+
+The evidence outlives the decision. The screenshot is on the payments page for
+every flat, confirmed or not, beside the amount and the transaction ID — the
+statement arrives long after the confirming tap, and the page that exists to be
+checked against it should still have the picture on it.
 
 It is not invisible, though, and that is a deliberate correction. A resident who
 has just paid was looking at the fund bar when they decided to, and a bar that
@@ -163,6 +175,43 @@ claims there is none.
 A committee member submits an expense with a bill. An admin approves, rejects,
 or requests changes. **Only approved expenses appear in the resident ledger**,
 and every one shows its vendor, amount, requester, approver and bill.
+
+**A revised bill is a new bill.** Changing the amount, the attached copy or any
+of the details a committee member reads before approving withdraws the approval
+and sends it back — enforced by a trigger rather than asked of the client,
+because a committee member outranks the update policy on every bill in their
+society and PostgREST takes an update straight from the app. The row records who
+revised it, and that person is the one who may not approve it. The copy
+residents already saw is kept rather than deleted: a revision should be
+answerable to the version it replaces.
+
+### Nobody signs off their own money
+
+The person who puts money into the ledger is not the person who says it is true.
+It holds for a bill (you cannot approve one you uploaded or revised) and, since
+0921.0200, for a payment: reporting your own contribution and confirming it in
+the next tap moved the fund bar on nobody's word but yours.
+
+There is one escape hatch, and only one: **a society with exactly one active
+committee member.** A rule nobody can satisfy is not a control, it is a dead end
+with a moral — the founder of a small society would have bills that can never be
+approved and money that can never be counted. The audit log records who did it
+either way, which is the part that survives.
+
+### Correcting what a payment was for
+
+A resident reports ₹1,000 and ₹10 arrives — a typo, or a screenshot from the
+wrong payment. The only answer used to be turning the whole payment down and
+asking them to report it again, which is a bad trade for one digit.
+
+So the committee can write down what the bank actually shows, at the moment they
+confirm it. `amount` becomes the corrected figure and `reported_amount` keeps
+what the resident typed, which means every total — the fund bar, the ledger, the
+resident's own history — follows the correction without knowing one happened.
+That is right for the arithmetic and wrong for the person, so the row says
+"corrected from ₹1,000" wherever it is shown, and the resident is notified in
+both figures. Staff confirm payments but cannot rewrite them: a correction is a
+ledger change, and those are the committee's.
 
 ### The society ledger
 
@@ -236,16 +285,50 @@ without handing over any of them.
 
 ### Fund reallocation
 
-Surplus cannot be moved on an admin's say-so. The committee proposes a transfer
-with a reason; residents vote; it passes only at the configured threshold
-(60% by default). The result is written to an audit trail.
+Moving money between two _live_ funds cannot be done on an admin's say-so. The
+committee proposes a transfer with a reason; residents vote; it passes only at
+the configured threshold (60% by default). The result is written to an audit
+trail.
+
+### Where the leftover goes
+
+A **closed** event's surplus is the committee's to decide, without a vote. That
+is a deliberate exception to the paragraph above and worth naming: the money is
+residents' and the vote machinery exists a few lines up. What keeps it honest is
+that the decision is a row — who decided, when, how much, and where it went —
+readable by every member on the same screen as the balance itself, and
+unchangeable afterwards by anybody including the person who made it.
+
+An event budgets ₹50,000, collects ₹30,000 and spends ₹20,000. Three answers:
+
+| Answer              | What happens                                                               |
+| ------------------- | -------------------------------------------------------------------------- |
+| **Next event**      | It shows on that event's bar as money already received                     |
+| **Next edition**    | The same, for next year's run; the draft event is created if it is missing |
+| **Society balance** | It sits with the society, on everybody's home screen, until it is used     |
+
+The amount is never typed. `allocate_surplus()` takes the whole of what is left,
+because the figure is what the ledger says and a box to type it in is an
+invitation to a typo in the one number nobody is checking.
+
+Money moved across is its own number on an event — `fund_carried` — and is
+**never** folded into `fund_raised`: "sixty flats contributed ₹30,000" and "the
+committee moved ₹10,000 across from last year" are different sentences and only
+one of them is a contribution. The fund bar draws it as its own segment, first,
+and what the event still asks residents for comes down by the same amount.
+
+The society balance has a way back out (`spend_society_balance()`), because the
+third answer would otherwise be a one-way door: a society that always kept its
+surplus would accumulate a number it could look at and never use.
 
 ### Closing an event
 
 Shows collected / spent / remaining, task completion, bills uploaded, and the
 surplus destination fixed at creation. Publishing closes the event and issues
 the **transparency report**: full breakdown, every bill, audit history and
-participation figures.
+participation figures. If money is left, the committee is asked where it goes —
+after closing rather than inside it, so the decision is not something somebody
+clicks past on the way to the confirmation box.
 
 ---
 

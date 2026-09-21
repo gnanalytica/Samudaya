@@ -46,7 +46,12 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
 
   const card = (event: (typeof events)[number]) => {
     const s = stats.get(event.id);
-    const bar = fundBarSegments(s?.fundRaised ?? 0, s?.fundPending ?? 0, s?.fundTarget ?? 0);
+    const bar = fundBarSegments(
+      s?.fundRaised ?? 0,
+      s?.fundPending ?? 0,
+      s?.fundTarget ?? 0,
+      s?.fundCarried ?? 0,
+    );
     const funded = bar.confirmed;
     // A list of events should look like a year, not like a spreadsheet: each
     // card carries its own festival's colour down its edge.
@@ -84,7 +89,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
               </span>
               <span>{funded}%</span>
             </div>
-            <FundBar percent={funded} pendingPercent={bar.pending} />
+            <FundBar percent={funded} pendingPercent={bar.pending} carriedPercent={bar.carried} />
             <p className="text-ink-subtle mt-2 text-xs">
               {s?.contributors ?? 0} households contributed · {s?.participants ?? 0} registered for
               activities

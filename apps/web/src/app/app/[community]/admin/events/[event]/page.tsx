@@ -6,7 +6,9 @@ import {
   formatDate,
   formatMoney,
   fundBarSegments,
+  nextEditionName,
   receiptRef,
+  stillNeeded,
   todayIn,
   unitLabel,
   upiCaptureNote,
@@ -16,9 +18,12 @@ import {
   budgetVsSpent,
   getActivities,
   getBudgetLines,
+  getCommitteeCount,
   getEventStats,
   getExpenses,
+  getOpenEvents,
   getPayments,
+  getSocietyBalance,
   getRegistrations,
   requireEvent,
 } from '@/lib/events';
@@ -44,12 +49,14 @@ import { AuditTrail } from '@/components/audit-trail';
 import {
   AddActivityForm,
   AddBudgetLineForm,
+  AllocateSurplusForm,
   CloseEventForm,
   EventDetailsForm,
   ExpenseForm,
   RecordPaymentForm,
   ReviewExpenseForm,
   ReviewPaymentForm,
+  SpendBalanceForm,
   type Pickers,
 } from './forms';
 import { removeBudgetLine, setEventStatus, updateActivity, updateBudgetLine } from '../actions';
@@ -60,7 +67,7 @@ export default async function ManageEventPage(
 ) {
   const { community: slug, event: eventSlug } = await props.params;
   const { tab } = await props.searchParams;
-  const { community, role } = await requireCapability(slug, 'events:manage');
+  const { community, role, membership } = await requireCapability(slug, 'events:manage');
   const event = await requireEvent(community.id, eventSlug);
   const supabase = await getSupabase();
 
@@ -72,23 +79,41 @@ export default async function ManageEventPage(
   const active = tabs.find((t) => t.id === tab)?.id ?? 'overview';
   const base = `/app/${community.slug}`;
 
-  const [stats, budget, expenses, activities, registrations, payments, units, catalogue] =
-    await Promise.all([
-      getEventStats(event.id),
-      getBudgetLines(event.id),
-      getExpenses(event.id),
-      getActivities(event.id),
-      getRegistrations(event.id),
-      getPayments(event.id),
-      supabase
-        .from('units')
-        .select('id, block, number')
-        .eq('community_id', community.id)
-        .order('block', { nullsFirst: true })
-        .order('number')
-        .limit(2000),
-      getCatalogue(community.id),
-    ]);
+  const [
+    stats,
+    budget,
+    expenses,
+    activities,
+    registrations,
+    payments,
+    units,
+    catalogue,
+    committeeCount,
+    society,
+    openEvents,
+  ] = await Promise.all([
+    getEventStats(event.id),
+    getBudgetLines(event.id),
+    getExpenses(event.id),
+    getActivities(event.id),
+    getRegistrations(event.id),
+    getPayments(event.id),
+    supabase
+      .from('units')
+      .select('id, block, number')
+      .eq('community_id', community.id)
+      .order('block', { nullsFirst: true })
+      .order('number')
+      .limit(2000),
+    getCatalogue(community.id),
+    getCommitteeCount(community.id),
+    getSocietyBalance(community.id),
+    getOpenEvents(community.id, event.id),
+  ]);
+
+  // The database steps the separation-of-duties rule aside when there is
+  // nobody else on the committee. The screens have to say the same thing.
+  const alone = isCommittee && committeeCount <= 1;
 
   const pick = (kind: keyof typeof catalogue) =>
     activeItems(catalogue, kind).map(({ id, label, emoji }) => ({ id, label, emoji }));
@@ -101,7 +126,12 @@ export default async function ManageEventPage(
     manageHref: `${base}/admin/catalogue`,
   };
 
-  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const bar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const funded = bar.confirmed;
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
@@ -181,10 +211,51 @@ export default async function ManageEventPage(
                   <span>{funded}%</span>
                 </div>
                 <div className="mt-2">
-                  <FundBar percent={funded} pendingPercent={bar.pending} />
+                  <FundBar
+                    percent={funded}
+                    pendingPercent={bar.pending}
+                    carriedPercent={bar.carried}
+                  />
                 </div>
+                {/* Not a contribution, and never added to the raised figure —
+                    the society moved its own money across. Said out loud so
+                    nobody reads the bar as sixty flats having paid. */}
+                {stats.fundCarried !== 0 ? (
+                  <p className="text-ink-subtle mt-2 text-xs">
+                    {stats.fundCarried > 0
+                      ? `Includes ${formatMoney(stats.fundCarried, community.currency)} carried across by the committee.`
+                      : `${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
+                  </p>
+                ) : null}
+                {!closed ? (
+                  <p className="text-ink-subtle mt-1 text-xs">
+                    {formatMoney(
+                      stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
+                      community.currency,
+                    )}{' '}
+                    still to raise.
+                  </p>
+                ) : null}
               </CardBody>
             </Card>
+            {/* The way back out of the society balance, so keeping a surplus
+                is not a one-way door. */}
+            {isCommittee && !closed && society.balance > 0 ? (
+              <Card>
+                <CardHeader
+                  title="Bring in society funds"
+                  description={`The society is holding ${formatMoney(society.balance, community.currency)} that is not behind any event.`}
+                />
+                <CardBody>
+                  <SpendBalanceForm
+                    slug={slug}
+                    eventSlug={event.slug}
+                    balance={society.balance}
+                    currency={community.currency}
+                  />
+                </CardBody>
+              </Card>
+            ) : null}
             <Card>
               <CardHeader title="Details" />
               <CardBody>
@@ -406,9 +477,11 @@ export default async function ManageEventPage(
                 <CardHeader
                   title="Waiting for the committee"
                   description={
-                    isCommittee
-                      ? 'Approve to publish a bill to residents. Nobody approves a bill they uploaded.'
-                      : 'Correct or re-upload a bill while it is pending or sent back.'
+                    !isCommittee
+                      ? 'Correct or re-upload a bill while it is pending or sent back.'
+                      : alone
+                        ? 'Approve to publish a bill to residents. You are the whole committee, so your own bills are yours to approve.'
+                        : 'Approve to publish a bill to residents. Nobody approves a bill they uploaded or revised.'
                   }
                 />
                 <ul className="divide-border-base divide-y">
@@ -427,6 +500,18 @@ export default async function ManageEventPage(
                               ? ` · uploaded by ${expense.requester.profiles.full_name}`
                               : ''}
                           </p>
+                          {/* Who wrote the version on the table, which is who
+                              may not be the one to approve it. */}
+                          {expense.revised_at ? (
+                            <p className="text-warning mt-1 text-xs">
+                              Revised
+                              {expense.reviser?.profiles?.full_name
+                                ? ` by ${expense.reviser.profiles.full_name}`
+                                : ''}{' '}
+                              on {formatDate(expense.revised_at.slice(0, 10))} — needs approving
+                              again
+                            </p>
+                          ) : null}
                           {expense.review_note ? (
                             <p className="text-info mt-1 text-xs">
                               Committee: {expense.review_note}
@@ -441,6 +526,13 @@ export default async function ManageEventPage(
                           slug={slug}
                           eventSlug={event.slug}
                           expenseId={expense.id}
+                          // Whoever wrote the version on the table. Once a bill
+                          // has been revised that is the reviser, not the
+                          // original uploader — otherwise a committee of two
+                          // could not approve anything either of them touched.
+                          mayApprove={
+                            alone || (expense.revised_by ?? expense.requested_by) !== membership.id
+                          }
                         />
                       ) : null}
                       {!closed ? (
@@ -484,26 +576,61 @@ export default async function ManageEventPage(
               {decided.length ? (
                 <ul className="divide-border-base divide-y">
                   {decided.map((expense) => (
-                    <li
-                      key={expense.id}
-                      className="flex items-center justify-between gap-3 px-5 py-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-ink text-sm font-medium">{expense.name}</p>
-                        <p className="text-ink-subtle text-xs">
-                          {[expense.category, expense.vendor].filter(Boolean).join(' · ')}
-                          {expense.approver?.profiles?.full_name
-                            ? ` · approved by ${expense.approver.profiles.full_name}`
-                            : ''}
-                        </p>
-                        <BillLink url={expense.bill_url} />
+                    <li key={expense.id} className="space-y-3 px-5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-ink text-sm font-medium">{expense.name}</p>
+                          <p className="text-ink-subtle text-xs">
+                            {[expense.category, expense.vendor].filter(Boolean).join(' · ')}
+                            {expense.approver?.profiles?.full_name
+                              ? ` · approved by ${expense.approver.profiles.full_name}`
+                              : ''}
+                          </p>
+                          <BillLink url={expense.bill_url} />
+                        </div>
+                        <div className="flex shrink-0 items-center gap-3">
+                          <span className="text-ink text-sm font-semibold">
+                            {formatMoney(expense.amount, community.currency)}
+                          </span>
+                          <ExpenseStatusBadge status={expense.status} />
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-3">
-                        <span className="text-ink text-sm font-semibold">
-                          {formatMoney(expense.amount, community.currency)}
-                        </span>
-                        <ExpenseStatusBadge status={expense.status} />
-                      </div>
+                      {/* A wrong figure on an approved bill used to have no
+                          way out but a second bill cancelling the first. The
+                          revision goes back for approval on its own — the
+                          database resets it whatever this form sends — and the
+                          copy residents already saw is kept, because a
+                          revision should be answerable to it. */}
+                      {isCommittee && !closed ? (
+                        <details className="group">
+                          <summary className="text-accent cursor-pointer text-sm">
+                            Upload a revised bill
+                          </summary>
+                          <div className="mt-3">
+                            <ExpenseForm
+                              slug={slug}
+                              eventSlug={event.slug}
+                              communityId={community.id}
+                              eventId={event.id}
+                              expense={{
+                                id: expense.id,
+                                name: expense.name,
+                                category: expense.category,
+                                category_id: expense.category_id,
+                                amount: Number(expense.amount),
+                                vendor: expense.vendor,
+                                vendor_id: expense.vendor_id,
+                                paid_by: expense.paid_by,
+                                method: expense.method,
+                                bill_url: expense.bill_url,
+                                spent_on: expense.spent_on,
+                              }}
+                              pickers={pickers}
+                              today={today}
+                            />
+                          </div>
+                        </details>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -548,7 +675,11 @@ export default async function ManageEventPage(
               <Card>
                 <CardHeader
                   title={`Waiting for confirmation (${waitingPayments.length})`}
-                  description="Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count."
+                  description={
+                    isCommittee
+                      ? 'Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count, and the amount can be corrected to what the bank shows.'
+                      : 'Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count.'
+                  }
                 />
                 <ul className="divide-border-base divide-y">
                   {waitingPayments.map((payment) => (
@@ -584,12 +715,25 @@ export default async function ManageEventPage(
                         </div>
                         <Badge tone="warning">Waiting</Badge>
                       </div>
-                      <ReviewPaymentForm
-                        slug={slug}
-                        eventSlug={event.slug}
-                        contributionId={payment.id}
-                        showReferenceField={!payment.reference}
-                      />
+                      {/* Reporting a payment and confirming it in the next tap
+                          is the fund bar moving on nobody's word but yours.
+                          The database refuses it; saying so here saves the
+                          round trip. */}
+                      {payment.membership_id === membership.id && !alone ? (
+                        <p className="border-border-base text-ink-muted rounded-lg border border-dashed px-4 py-3 text-sm">
+                          This is your own payment. Another committee member confirms it.
+                        </p>
+                      ) : (
+                        <ReviewPaymentForm
+                          slug={slug}
+                          eventSlug={event.slug}
+                          contributionId={payment.id}
+                          showReferenceField={!payment.reference}
+                          reportedAmount={Number(payment.amount)}
+                          currency={community.currency}
+                          mayCorrect={isCommittee}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -638,6 +782,15 @@ export default async function ManageEventPage(
                         <th scope="col" className="px-5 py-2.5 font-medium">
                           Reference
                         </th>
+                        {/* Reconciliation happens later, when the bank
+                            statement arrives — long after the confirming tap.
+                            The evidence has to outlive the decision, so the
+                            screenshot sits beside the amount and the
+                            transaction ID for every flat, not only the ones
+                            still waiting. */}
+                        <th scope="col" className="px-5 py-2.5 font-medium">
+                          Screenshot
+                        </th>
                         <th scope="col" className="px-5 py-2.5 font-medium">
                           Date
                         </th>
@@ -665,10 +818,31 @@ export default async function ManageEventPage(
                           </td>
                           <td className="text-ink px-5 py-3 text-right font-medium">
                             {formatMoney(payment.amount, community.currency)}
+                            {/* The figure the flat reported, when it is not the
+                                figure the books kept. A number that moved with
+                                no trace of the move is the thing this app
+                                exists to replace. */}
+                            {payment.reported_amount != null ? (
+                              <span className="text-ink-subtle block text-xs font-normal">
+                                was {formatMoney(payment.reported_amount, community.currency)}
+                              </span>
+                            ) : null}
                           </td>
                           <td className="text-ink-muted px-5 py-3 uppercase">{payment.method}</td>
                           <td className="text-ink-subtle px-5 py-3 font-mono text-xs">
                             {payment.reference ?? receiptRef(event.slug, payment.receipt_no)}
+                          </td>
+                          <td className="text-ink-subtle px-5 py-3 text-xs">
+                            {payment.proof_path ? (
+                              <StoredFileLink
+                                bucket="payment-proofs"
+                                path={payment.proof_path}
+                                label="View"
+                                compact
+                              />
+                            ) : (
+                              '—'
+                            )}
                           </td>
                           <td className="text-ink-subtle px-5 py-3 text-xs">
                             {formatDate(payment.paid_at.slice(0, 10))}
@@ -705,13 +879,31 @@ export default async function ManageEventPage(
 
         {active === 'close' ? (
           closed ? (
-            <Card>
-              <EmptyState
-                icon={<FileText className="size-6" />}
-                title="This event is closed"
-                description="Its accounts are published and the ledger is frozen."
+            // Residents' money the event did not spend. Asked after closing
+            // rather than inside it, so the decision is not something somebody
+            // clicks past on the way to the confirmation box.
+            stats.available > 0 && isCommittee ? (
+              <AllocateSurplusForm
+                slug={slug}
+                eventSlug={event.slug}
+                surplus={stats.available}
+                currency={community.currency}
+                openEvents={openEvents}
+                nextEdition={nextEditionName(event.name, event.starts_on)}
               />
-            </Card>
+            ) : (
+              <Card>
+                <EmptyState
+                  icon={<FileText className="size-6" />}
+                  title="This event is closed"
+                  description={
+                    stats.available > 0
+                      ? `${formatMoney(stats.available, community.currency)} is left over. The committee decides where it goes.`
+                      : 'Its accounts are published and the ledger is frozen.'
+                  }
+                />
+              </Card>
+            )
           ) : (
             <CloseEventForm
               slug={slug}

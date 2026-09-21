@@ -20,7 +20,7 @@ import {
   Screen,
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
-import { ViewFileChip } from '../../src/components/file-ui';
+import { ViewFileButton } from '../../src/components/file-ui';
 import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
@@ -49,15 +49,25 @@ export default function Bills() {
   const { data, loading, refreshing, refresh } = useCommunityData(
     'admin:bills',
     async (communityId) => {
-      const { data: rows } = await supabase
-        .from('expenses')
-        .select(
-          'id, name, category, amount, vendor, method, bill_url, spent_on, status, review_note, requested_by, created_at, approved_at, updated_at, events(name, emoji), requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name))',
-        )
-        .eq('community_id', communityId)
-        .order('created_at', { ascending: false })
-        .limit(300);
-      return rows ?? [];
+      const [bills, committee] = await Promise.all([
+        supabase
+          .from('expenses')
+          .select(
+            'id, name, category, amount, vendor, method, bill_url, spent_on, status, review_note, requested_by, revised_by, revised_at, created_at, approved_at, updated_at, events(name, emoji), requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name)), reviser:memberships!expenses_revised_by_fkey(profiles(full_name))',
+          )
+          .eq('community_id', communityId)
+          .order('created_at', { ascending: false })
+          .limit(300),
+        // How many people could possibly approve this. One means the rule
+        // below steps aside, because there is nobody else to step aside for.
+        supabase
+          .from('memberships')
+          .select('id', { count: 'exact', head: true })
+          .eq('community_id', communityId)
+          .eq('role', 'committee')
+          .eq('status', 'active'),
+      ]);
+      return { bills: bills.data ?? [], committeeCount: committee.count ?? 0 };
     },
   );
 
@@ -83,9 +93,11 @@ export default function Bills() {
     void queryClient.invalidateQueries({ queryKey: [TODO_KEY] });
   };
 
-  const rows = (data ?? []).filter((row) => row.status === filter);
+  const bills = data?.bills ?? [];
+  const alone = can(role, 'expenses:approve') && (data?.committeeCount ?? 0) <= 1;
+  const rows = bills.filter((row) => row.status === filter);
   const counts = new Map<Filter, number>();
-  for (const row of data ?? []) {
+  for (const row of bills) {
     if (row.status in EXPENSE_STATUS_LABEL) {
       counts.set(row.status as Filter, (counts.get(row.status as Filter) ?? 0) + 1);
     }
@@ -117,10 +129,14 @@ export default function Bills() {
               currency={currency}
               mayDecide={can(role, 'expenses:approve') && row.status === 'pending'}
               mayEdit={
-                (row.status === 'pending' || row.status === 'changes_requested') &&
-                (row.requested_by === membershipId || can(role, 'expenses:approve'))
+                row.status === 'pending' || row.status === 'changes_requested'
+                  ? row.requested_by === membershipId || can(role, 'expenses:approve')
+                  : // A decided bill with the wrong figure on it used to have
+                    // no way out but a second bill cancelling the first. The
+                    // revision goes back for approval on its own.
+                    can(role, 'expenses:approve')
               }
-              ownBill={row.requested_by === membershipId}
+              ownBill={!alone && (row.revised_by ?? row.requested_by) === membershipId}
               onEdit={() => router.push(`/admin/bill?id=${row.id}`)}
               onDone={afterChange}
             />
@@ -148,9 +164,12 @@ type BillRow = {
   approved_at: string | null;
   updated_at: string | null;
   events: { name: string; emoji: string } | null;
+  revised_by: string | null;
+  revised_at: string | null;
   requester: { profiles: { full_name: string | null } | null } | null;
   approver: { profiles: { full_name: string | null } | null } | null;
   editor: { profiles: { full_name: string | null } | null } | null;
+  reviser: { profiles: { full_name: string | null } | null } | null;
 };
 
 function BillCard({
@@ -209,6 +228,13 @@ function BillCard({
           .join(' · ')}
       </Caption>
       <Caption>Raised by {bill.requester?.profiles?.full_name ?? 'someone'}</Caption>
+      {/* Who wrote the version on the table, which is who may not approve it. */}
+      {bill.revised_at ? (
+        <Caption>
+          Revised by {bill.reviser?.profiles?.full_name ?? 'someone'} on{' '}
+          {formatDate(bill.revised_at.slice(0, 10))} — needs approving again
+        </Caption>
+      ) : null}
       <View style={{ flexDirection: 'row', gap: spacing.xs }}>
         <Badge
           label={bill.bill_url ? '📎 Bill attached' : 'No bill attached'}
@@ -218,7 +244,7 @@ function BillCard({
           <Badge label={EXPENSE_STATUS_LABEL[bill.status as keyof typeof EXPENSE_STATUS_LABEL]} />
         ) : null}
       </View>
-      <ViewFileChip bucket="bills" value={bill.bill_url} label="View bill" />
+      <ViewFileButton bucket="bills" value={bill.bill_url} label="View bill" />
       {/* Who signed this off, and whether anybody has touched it since. */}
       <AuditTrail
         confirmedBy={bill.approver?.profiles?.full_name}
@@ -231,7 +257,13 @@ function BillCard({
 
       {mayEdit ? (
         <Button
-          label={bill.status === 'changes_requested' ? 'Correct and resubmit' : 'Edit bill'}
+          label={
+            bill.status === 'changes_requested'
+              ? 'Correct and resubmit'
+              : bill.status === 'pending'
+                ? 'Edit bill'
+                : 'Upload a revised bill'
+          }
           variant="secondary"
           onPress={onEdit}
         />
@@ -263,7 +295,9 @@ function BillCard({
         ) : (
           <View style={{ gap: spacing.sm }}>
             {ownBill ? (
-              <Caption>You raised this bill, so another committee member must approve it.</Caption>
+              <Caption>
+                You wrote the version on the table, so another committee member must approve it.
+              </Caption>
             ) : (
               <Button
                 label="Approve"

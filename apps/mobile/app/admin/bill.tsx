@@ -20,7 +20,7 @@ import {
 } from '../../src/components/ui';
 import { DateField, today } from '../../src/components/date-field';
 import { Chip, ChipRow, Disclosure, ErrorText } from '../../src/components/admin-ui';
-import { FilePickerField, ViewFileChip } from '../../src/components/file-ui';
+import { FilePickerField, ViewFileButton } from '../../src/components/file-ui';
 import { CataloguePicker } from '../../src/components/catalogue-ui';
 import { uploadFile, type PickedFile } from '../../src/lib/storage';
 import { spacing } from '../../src/lib/theme';
@@ -150,6 +150,10 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
   );
   // Local calendar day: toISOString would give yesterday's date before 5:30 am IST.
   const [spentOn, setSpentOn] = useState(existing?.spent_on ?? today());
+  // Approved or rejected: a decision exists, and a change to the substance
+  // withdraws it. The database does the withdrawing; this only says so.
+  const wasDecided =
+    existing != null && existing.status !== 'pending' && existing.status !== 'changes_requested';
   const [billFile, setBillFile] = useState<PickedFile | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,8 +248,10 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
       return;
     }
     // A correction with a new file replaces the old one; remove the old file
-    // only now that the bill points at the new path.
-    if (billFile && existing?.bill_url && existing.bill_url !== billUrl) {
+    // only now that the bill points at the new path. A bill that had already
+    // been decided is the exception: residents have seen that copy, and it is
+    // the record the revision is answerable to, so it stays.
+    if (billFile && existing?.bill_url && existing.bill_url !== billUrl && !wasDecided) {
       void removeStoredBill(existing.bill_url);
     }
     await queryClient.invalidateQueries({ queryKey: ['admin:bills'] });
@@ -286,11 +292,15 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
           keyboardShouldPersistTaps="handled"
         >
           <View style={{ gap: 2 }}>
-            <Title>{existing ? 'Correct a bill' : 'Add a bill'}</Title>
+            <Title>
+              {!existing ? 'Add a bill' : wasDecided ? 'Revise a bill' : 'Correct a bill'}
+            </Title>
             <Caption>
-              {existing?.status === 'changes_requested'
-                ? 'Saving sends it back to the committee for approval.'
-                : 'The committee approves every bill before it appears in the accounts.'}
+              {wasDecided
+                ? 'This bill has already been decided. Saving a revision withdraws that decision and sends it back for approval.'
+                : existing?.status === 'changes_requested'
+                  ? 'Saving sends it back to the committee for approval.'
+                  : 'The committee approves every bill before it appears in the accounts.'}
             </Caption>
           </View>
 
@@ -350,7 +360,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               }
             />
             {existing?.bill_url && !billFile ? (
-              <ViewFileChip bucket="bills" value={existing.bill_url} label="View current bill" />
+              <ViewFileButton bucket="bills" value={existing.bill_url} label="View current bill" />
             ) : null}
 
             <Disclosure
@@ -395,7 +405,9 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
 
           <ErrorText message={error} />
           <Button
-            label={existing ? 'Save and resubmit' : 'Submit for approval'}
+            label={
+              !existing ? 'Submit for approval' : wasDecided ? 'Save revision' : 'Save and resubmit'
+            }
             onPress={() => void save()}
             loading={busy}
           />

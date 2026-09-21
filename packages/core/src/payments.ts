@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { formatMoney } from './format';
 
 /**
  * Payments go straight from a resident's UPI app to the society's own UPI ID:
@@ -317,4 +318,40 @@ export function contributionPresets(suggested: number | null | undefined): numbe
 export function isSuggestedAmount(preset: number, suggested: number | null | undefined): boolean {
   const asked = Number(suggested ?? 0);
   return Number.isFinite(asked) && asked > 0 && preset === asked;
+}
+
+/**
+ * What a resident said they paid, when the committee wrote down something else.
+ *
+ * `amount` is the one number every total reads, so a correction moves the fund
+ * bar, the ledger and the resident's own history without any of them knowing a
+ * correction happened. That is right for the arithmetic and wrong for the
+ * person: somebody who reported ₹1,000 and sees ₹10 needs to be told, on the
+ * row, that the change was deliberate and who made it — otherwise the app
+ * looks like it lost their money.
+ *
+ * Null when nothing was corrected, which is almost every row.
+ */
+export function correctionNote(
+  amount: number | string | null | undefined,
+  reportedAmount: number | string | null | undefined,
+  currency = 'INR',
+): string | null {
+  if (reportedAmount === null || reportedAmount === undefined || reportedAmount === '') return null;
+  const reported = Number(reportedAmount);
+  const recorded = Number(amount ?? 0);
+  if (!Number.isFinite(reported) || !Number.isFinite(recorded)) return null;
+  if (reported === recorded) return null;
+  return `Corrected from ${formatMoney(reported, currency)}, which is what you reported`;
+}
+
+/** The same fact, for whoever is reading somebody else's row. */
+export function correctionNoteForStaff(
+  amount: number | string | null | undefined,
+  reportedAmount: number | string | null | undefined,
+  currency = 'INR',
+): string | null {
+  const note = correctionNote(amount, reportedAmount, currency);
+  if (!note) return null;
+  return `Corrected from ${formatMoney(Number(reportedAmount), currency)}, which is what the flat reported`;
 }

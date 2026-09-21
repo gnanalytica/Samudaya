@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   Lightbulb,
   Megaphone,
+  PiggyBank,
   Sparkles,
 } from 'lucide-react';
 import {
@@ -21,7 +22,7 @@ import {
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getTodoItems } from '@/lib/todo';
-import { getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
+import { getSocietyBalance, getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
 import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
@@ -57,7 +58,12 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     (await getCatalogue(community.id)).event_type.map((item) => [item.id, item.label]),
   );
   const s = next ? stats.get(next.id) : undefined;
-  const bar = fundBarSegments(s?.fundRaised ?? 0, s?.fundPending ?? 0, s?.fundTarget ?? 0);
+  const bar = fundBarSegments(
+    s?.fundRaised ?? 0,
+    s?.fundPending ?? 0,
+    s?.fundTarget ?? 0,
+    s?.fundCarried ?? 0,
+  );
   const funded = bar.confirmed;
   const firstName = profile?.full_name?.split(' ')[0];
 
@@ -67,6 +73,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     next?.event_type_id ? typeLabel.get(next.event_type_id) : null,
     next?.name,
   );
+  const balance = await getSocietyBalance(community.id);
   const societySuggestions = await getSocietySuggestions(community.id, membership.id);
   const societyIdeas = societySuggestions.filter((row) => row.status === 'accepted').length;
   // Voting is the best thing in the app and it was four taps down. This is what
@@ -100,6 +107,31 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
             <Sparkles className="text-accent mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink text-sm font-medium">You’ve joined {community.name}.</p>
           </div>
+        ) : null}
+
+        {/* Money the society is holding that is not behind any event: what a
+            closed event had left, once the committee decided to keep it. On
+            everybody's home screen, resident and committee alike, because it
+            is the one figure a society is most often asked about and least
+            often able to answer. Tapping it shows where every rupee came
+            from. */}
+        {balance.balance > 0 ? (
+          <Link
+            href={`${base}/money#society-balance`}
+            className="border-border-base bg-surface-raised hover:bg-surface-sunken mb-5 flex items-center justify-between gap-3 rounded-xl border p-4"
+          >
+            <span className="min-w-0">
+              <span className="text-ink flex items-center gap-2 text-sm font-medium">
+                <PiggyBank className="text-accent size-5 shrink-0" aria-hidden="true" />
+                Society balance: {formatMoney(balance.balance, community.currency)}
+              </span>
+              <span className="text-ink-subtle mt-0.5 block text-xs">
+                Left over from {balance.movements} closed{' '}
+                {balance.movements === 1 ? 'event' : 'events'}, not yet behind a new one
+              </span>
+            </span>
+            <ArrowRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
+          </Link>
         ) : null}
 
         {todo.length ? (

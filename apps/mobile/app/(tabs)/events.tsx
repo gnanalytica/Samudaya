@@ -121,6 +121,7 @@ export default function Events() {
             item.stats?.fundRaised ?? 0,
             item.stats?.fundPending ?? 0,
             item.stats?.fundTarget ?? 0,
+            item.stats?.fundCarried ?? 0,
           );
           const funded = fundBar.confirmed;
           return (
@@ -174,6 +175,7 @@ export default function Events() {
                     <Meter
                       percent={funded}
                       pendingPercent={fundBar.pending}
+                      carriedPercent={fundBar.carried}
                       tone="success"
                       label="Fund progress"
                     />

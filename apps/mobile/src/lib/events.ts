@@ -105,7 +105,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     // The viewer's own payments for this event, confirmed or not.
     supabase
       .from('contributions')
-      .select('id, amount, status, reference, review_note, paid_at')
+      .select('id, amount, reported_amount, status, reference, review_note, paid_at')
       .eq('event_id', event.id)
       .eq('membership_id', membershipId)
       .order('paid_at', { ascending: false }),
@@ -230,4 +230,20 @@ export function makeSlug(name: string) {
     .slice(0, 48);
   const suffix = Math.random().toString(36).slice(2, 6);
   return `${base || 'campaign'}-${suffix}`;
+}
+
+/**
+ * What the society is holding that is not behind any event, and how many
+ * decisions put it there.
+ *
+ * A society that has never closed an event with money left has no row in the
+ * view, which reads as zero rather than as an error.
+ */
+export async function fetchSocietyBalance(communityId: string) {
+  const { data } = await supabase
+    .from('society_balance')
+    .select('balance, movements_in')
+    .eq('community_id', communityId)
+    .maybeSingle();
+  return { balance: Number(data?.balance ?? 0), movements: data?.movements_in ?? 0 };
 }

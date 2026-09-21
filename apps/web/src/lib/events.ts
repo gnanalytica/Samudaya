@@ -140,10 +140,77 @@ export const getExpenses = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('expenses')
     .select(
-      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, approved_at, updated_at, requested_by, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name))',
+      'id, name, category, category_id, amount, vendor, vendor_id, paid_by, method, status, bill_url, spent_on, review_note, created_at, approved_at, updated_at, requested_by, revised_by, revised_at, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name)), editor:memberships!expenses_updated_by_fkey(profiles(full_name)), reviser:memberships!expenses_revised_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: false });
+  return data ?? [];
+});
+
+/**
+ * How many people can approve a bill or confirm somebody else's payment.
+ *
+ * One is the case every separation-of-duties rule has to answer for: the
+ * database lets the sole committee member sign off their own, so the screens
+ * must not tell them somebody else will.
+ */
+export const getCommitteeCount = cache(async (communityId: string) => {
+  const supabase = await getSupabase();
+  const { count } = await supabase
+    .from('memberships')
+    .select('id', { count: 'exact', head: true })
+    .eq('community_id', communityId)
+    .eq('role', 'committee')
+    .eq('status', 'active');
+  return count ?? 0;
+});
+
+/**
+ * What the society is holding that is not assigned to any event, and how it
+ * got there.
+ *
+ * A society that has never closed an event with money left has no row in the
+ * view, which reads as zero rather than as an error.
+ */
+export const getSocietyBalance = cache(async (communityId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('society_balance')
+    .select('balance, movements_in, last_decided_at')
+    .eq('community_id', communityId)
+    .maybeSingle();
+  return {
+    balance: Number(data?.balance ?? 0),
+    movements: data?.movements_in ?? 0,
+    lastDecidedAt: data?.last_decided_at ?? null,
+  };
+});
+
+/** Every decision the committee made about a surplus, newest first. */
+export const getFundMovements = cache(async (communityId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('fund_movements')
+    .select(
+      'id, kind, amount, note, decided_at, from_event:events!fund_movements_from_event_id_fkey(name, slug), to_event:events!fund_movements_to_event_id_fkey(name, slug), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+    )
+    .eq('community_id', communityId)
+    .order('decided_at', { ascending: false })
+    .limit(100);
+  return data ?? [];
+});
+
+/** Events a surplus can be carried into: still open, and not the one it came from. */
+export const getOpenEvents = cache(async (communityId: string, exceptId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('events')
+    .select('id, name, emoji, starts_on, status')
+    .eq('community_id', communityId)
+    .in('status', ['draft', 'published'])
+    .neq('id', exceptId)
+    .order('starts_on', { ascending: true })
+    .limit(100);
   return data ?? [];
 });
 
@@ -336,7 +403,7 @@ export const getPayments = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('contributions')
     .select(
-      'id, amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, updated_at, gateway_payload, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
+      'id, amount, reported_amount, method, status, reference, receipt_no, channel, paid_at, proof_path, review_note, verified_at, updated_at, gateway_payload, membership_id, units(block, number), memberships!contributions_membership_id_fkey(profiles(full_name)), verifier:memberships!contributions_verified_by_fkey(profiles(full_name)), editor:memberships!contributions_updated_by_fkey(profiles(full_name))',
     )
     .eq('event_id', eventId)
     .order('paid_at', { ascending: false });
