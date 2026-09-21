@@ -16,7 +16,7 @@ import { reportHandled } from '../src/lib/observability';
 import { Body, Button, Caption, Card, EmptyState, Loading, Screen } from '../src/components/ui';
 import { Chip, ChipRow } from '../src/components/admin-ui';
 import { StatTile } from '../src/components/event-ui';
-import { ViewFileChip } from '../src/components/file-ui';
+import { ViewFileButton } from '../src/components/file-ui';
 import { minTapTarget, spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
 
@@ -235,7 +235,7 @@ export default function Money() {
                 </Pressable>
               ) : null}
 
-              <ViewFileChip bucket="bills" value={item.document_url} label="View bill" />
+              <ViewFileButton bucket="bills" value={item.document_url} label="View bill" />
             </Card>
           );
         }}

@@ -34,7 +34,7 @@ import {
 import { Chip, ChipRow, ErrorText, Segmented } from '../../src/components/admin-ui';
 import { FUND_RULE_PLAIN } from '../../src/components/event-form';
 import { KeyValue, Meter, StatTile } from '../../src/components/event-ui';
-import { ViewFileChip } from '../../src/components/file-ui';
+import { ViewFileButton } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
 
 type Detail = NonNullable<Awaited<ReturnType<typeof fetchEventDetail>>>;
@@ -370,7 +370,7 @@ function BudgetAndSpending({ data, currency }: { data: Detail; currency: string 
                     .join(' · ')}
                   {expense.spent_on ? ` · ${formatDate(expense.spent_on)}` : ''}
                 </Caption>
-                <ViewFileChip bucket="bills" value={expense.bill_url} label="View bill" />
+                <ViewFileButton bucket="bills" value={expense.bill_url} label="View bill" />
               </View>
               <Body>{formatMoney(expense.amount, currency)}</Body>
             </View>

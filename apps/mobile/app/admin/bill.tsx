@@ -20,7 +20,7 @@ import {
 } from '../../src/components/ui';
 import { DateField, today } from '../../src/components/date-field';
 import { Chip, ChipRow, Disclosure, ErrorText } from '../../src/components/admin-ui';
-import { FilePickerField, ViewFileChip } from '../../src/components/file-ui';
+import { FilePickerField, ViewFileButton } from '../../src/components/file-ui';
 import { CataloguePicker } from '../../src/components/catalogue-ui';
 import { uploadFile, type PickedFile } from '../../src/lib/storage';
 import { spacing } from '../../src/lib/theme';
@@ -350,7 +350,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               }
             />
             {existing?.bill_url && !billFile ? (
-              <ViewFileChip bucket="bills" value={existing.bill_url} label="View current bill" />
+              <ViewFileButton bucket="bills" value={existing.bill_url} label="View current bill" />
             ) : null}
 
             <Disclosure

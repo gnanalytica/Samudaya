@@ -638,6 +638,15 @@ export default async function ManageEventPage(
                         <th scope="col" className="px-5 py-2.5 font-medium">
                           Reference
                         </th>
+                        {/* Reconciliation happens later, when the bank
+                            statement arrives — long after the confirming tap.
+                            The evidence has to outlive the decision, so the
+                            screenshot sits beside the amount and the
+                            transaction ID for every flat, not only the ones
+                            still waiting. */}
+                        <th scope="col" className="px-5 py-2.5 font-medium">
+                          Screenshot
+                        </th>
                         <th scope="col" className="px-5 py-2.5 font-medium">
                           Date
                         </th>
@@ -669,6 +678,18 @@ export default async function ManageEventPage(
                           <td className="text-ink-muted px-5 py-3 uppercase">{payment.method}</td>
                           <td className="text-ink-subtle px-5 py-3 font-mono text-xs">
                             {payment.reference ?? receiptRef(event.slug, payment.receipt_no)}
+                          </td>
+                          <td className="text-ink-subtle px-5 py-3 text-xs">
+                            {payment.proof_path ? (
+                              <StoredFileLink
+                                bucket="payment-proofs"
+                                path={payment.proof_path}
+                                label="View"
+                                compact
+                              />
+                            ) : (
+                              '—'
+                            )}
                           </td>
                           <td className="text-ink-subtle px-5 py-3 text-xs">
                             {formatDate(payment.paid_at.slice(0, 10))}

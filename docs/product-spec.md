@@ -105,6 +105,13 @@ for anyone whose phone does not open a UPI app from a link. One of the two is
 still required, never neither: a report with no reference and no picture is a
 claim with nothing behind it.
 
+There is no QR code on that screen any more. Most residents read it on the phone
+they are about to pay from, where there is nothing to scan it with, and it sat
+above the two things they do carry into their UPI app — the ID and the note —
+leaving those as small print underneath. The ID and the note are the pay step
+now, each with its own copy button; the link that opens a UPI app with the
+amount already filled in stays.
+
 The reference is not abandoned, because reconciliation runs on it — matching on
 the UTR is near-certain, and the fallback of amount-within-a-fortnight is no
 help when sixty flats each pay ₹2,100 in the same week. It is simply captured
@@ -115,6 +122,11 @@ Nothing counts until somebody confirms it. A reported payment sits at `pending`
 and is **not** in the fund total; staff confirm it against the statement (by
 hand, or by pairing it with a bank line on the Reconcile screen) and the row
 records who confirmed it and when.
+
+The evidence outlives the decision. The screenshot is on the payments page for
+every flat, confirmed or not, beside the amount and the transaction ID — the
+statement arrives long after the confirming tap, and the page that exists to be
+checked against it should still have the picture on it.
 
 It is not invisible, though, and that is a deliberate correction. A resident who
 has just paid was looking at the fund bar when they decided to, and a bar that

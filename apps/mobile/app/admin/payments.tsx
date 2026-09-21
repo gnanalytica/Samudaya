@@ -19,7 +19,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { KeyValue } from '../../src/components/event-ui';
-import { ViewFileChip } from '../../src/components/file-ui';
+import { ViewFileButton } from '../../src/components/file-ui';
 import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
@@ -202,30 +202,44 @@ export default function Payments() {
 
               <Card style={{ gap: spacing.md }}>
                 <Heading>Confirmed payments</Heading>
+                <Caption>
+                  The amount, the transaction ID and the screenshot stay together after
+                  confirmation, so the statement can be checked against this page at any time.
+                </Caption>
                 {rows.length ? (
                   rows.map((row) => (
-                    <View
-                      key={row.id}
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        gap: spacing.md,
-                      }}
-                    >
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <Body>
-                          {row.units ? `Flat ${unitLabel(row.units)}` : 'No flat'}
-                          {row.payer?.profiles?.full_name
-                            ? ` · ${row.payer.profiles.full_name}`
-                            : ' · recorded by staff'}
-                        </Body>
-                        <Caption>
-                          {METHOD_LABEL[row.method] ?? row.method}
-                          {row.reference ? ` · ${row.reference}` : ''} ·{' '}
-                          {formatDate(row.paid_at.slice(0, 10))} · #{row.receipt_no}
-                        </Caption>
+                    <View key={row.id} style={{ gap: spacing.xs }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          gap: spacing.md,
+                        }}
+                      >
+                        <View style={{ flex: 1, gap: 2 }}>
+                          <Body>
+                            {row.units ? `Flat ${unitLabel(row.units)}` : 'No flat'}
+                            {row.payer?.profiles?.full_name
+                              ? ` · ${row.payer.profiles.full_name}`
+                              : ' · recorded by staff'}
+                          </Body>
+                          <Caption>
+                            {METHOD_LABEL[row.method] ?? row.method}
+                            {row.reference ? ` · ${row.reference}` : ''} ·{' '}
+                            {formatDate(row.paid_at.slice(0, 10))} · #{row.receipt_no}
+                          </Caption>
+                        </View>
+                        <Body>{formatMoney(row.amount, currency)}</Body>
                       </View>
-                      <Body>{formatMoney(row.amount, currency)}</Body>
+                      {/* Confirming a payment used to be the last moment anybody
+                          could see the screenshot. Reconciliation happens later,
+                          when the bank statement arrives, so the evidence has to
+                          outlive the decision. */}
+                      <ViewFileButton
+                        bucket="payment-proofs"
+                        value={row.proof_path}
+                        label="View screenshot"
+                      />
                     </View>
                   ))
                 ) : (
@@ -313,7 +327,7 @@ function PendingPayment({
       {upiCaptureNote(row.gateway_payload) ? (
         <Caption>{upiCaptureNote(row.gateway_payload)}</Caption>
       ) : null}
-      <ViewFileChip bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
+      <ViewFileButton bucket="payment-proofs" value={row.proof_path} label="View screenshot" />
       {/* Only when it is missing, which means the resident sent a screenshot
           instead of typing it. Whoever is confirming has the statement open
           and the picture one tap away, so this is the cheapest moment in the

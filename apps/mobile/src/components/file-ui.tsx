@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
-import { Body, Caption } from './ui';
+import { Body, Button, Caption } from './ui';
 import { Chip, ChipRow, ErrorText } from './admin-ui';
 import {
   openStoredFile,
@@ -66,8 +66,16 @@ export function FilePickerField({
   );
 }
 
-/** Opens a stored bill or screenshot through a short-lived signed link. */
-export function ViewFileChip({
+/**
+ * Opens a stored bill or screenshot through a short-lived signed link.
+ *
+ * A full-width button rather than the chip this used to be. The picture is the
+ * evidence — it is what a committee member checks a payment against, and what
+ * a resident opens to see the bill behind a line in the ledger. A chip the size
+ * of a filter, sitting in a row of filters, is not what the most important
+ * control on the card should look like.
+ */
+export function ViewFileButton({
   bucket,
   value,
   label,
@@ -81,21 +89,20 @@ export function ViewFileChip({
   if (!value) return null;
 
   return (
-    <View style={{ gap: 2 }}>
-      <ChipRow>
-        <Chip
-          label={busy ? 'Opening…' : label}
-          disabled={busy}
-          onPress={() => {
-            setBusy(true);
-            setError(null);
-            void openStoredFile(bucket, value)
-              .then((message) => setError(message))
-              .catch(() => setError('Could not open that file.'))
-              .finally(() => setBusy(false));
-          }}
-        />
-      </ChipRow>
+    <View style={{ gap: spacing.xs }}>
+      <Button
+        label={busy ? 'Opening…' : label}
+        variant="secondary"
+        loading={busy}
+        onPress={() => {
+          setBusy(true);
+          setError(null);
+          void openStoredFile(bucket, value)
+            .then((message) => setError(message))
+            .catch(() => setError('Could not open that file.'))
+            .finally(() => setBusy(false));
+        }}
+      />
       {error ? <Caption>{error}</Caption> : null}
     </View>
   );

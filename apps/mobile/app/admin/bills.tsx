@@ -20,7 +20,7 @@ import {
   Screen,
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
-import { ViewFileChip } from '../../src/components/file-ui';
+import { ViewFileButton } from '../../src/components/file-ui';
 import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
@@ -218,7 +218,7 @@ function BillCard({
           <Badge label={EXPENSE_STATUS_LABEL[bill.status as keyof typeof EXPENSE_STATUS_LABEL]} />
         ) : null}
       </View>
-      <ViewFileChip bucket="bills" value={bill.bill_url} label="View bill" />
+      <ViewFileButton bucket="bills" value={bill.bill_url} label="View bill" />
       {/* Who signed this off, and whether anybody has touched it since. */}
       <AuditTrail
         confirmedBy={bill.approver?.profiles?.full_name}
