@@ -231,3 +231,19 @@ export function makeSlug(name: string) {
   const suffix = Math.random().toString(36).slice(2, 6);
   return `${base || 'campaign'}-${suffix}`;
 }
+
+/**
+ * What the society is holding that is not behind any event, and how many
+ * decisions put it there.
+ *
+ * A society that has never closed an event with money left has no row in the
+ * view, which reads as zero rather than as an error.
+ */
+export async function fetchSocietyBalance(communityId: string) {
+  const { data } = await supabase
+    .from('society_balance')
+    .select('balance, movements_in')
+    .eq('community_id', communityId)
+    .maybeSingle();
+  return { balance: Number(data?.balance ?? 0), movements: data?.movements_in ?? 0 };
+}

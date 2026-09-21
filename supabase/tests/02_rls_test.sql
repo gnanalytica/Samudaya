@@ -2703,3 +2703,185 @@ select test.ok(
   has_function_privilege('authenticated',
     'public.review_expense(uuid,public.expense_status,text)', 'EXECUTE'),
   'and the committee still can');
+
+-- ---------------------------------------------------------------------------
+-- Where the leftover goes
+-- ---------------------------------------------------------------------------
+-- Two events that close with money still in them, and the three answers the
+-- committee can give.
+
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+insert into public.events (id, community_id, slug, name, starts_on, fund_target, created_by)
+values
+  ('cccccccc-0000-4000-8000-0000000000f2', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'gv-onam-2027', 'Green Valley Onam 2027', '2027-09-05', 20000,
+   '11111111-1111-4111-8111-111111111111'),
+  ('cccccccc-0000-4000-8000-0000000000f3', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'gv-pongal-2027', 'Green Valley Pongal 2027', '2027-01-14', 20000,
+   '11111111-1111-4111-8111-111111111111'),
+  ('cccccccc-0000-4000-8000-0000000000f4', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'gv-holi-2027', 'Green Valley Holi 2027', '2027-03-08', 20000,
+   '11111111-1111-4111-8111-111111111111');
+update public.events set status = 'published'
+ where id in ('cccccccc-0000-4000-8000-0000000000f2',
+              'cccccccc-0000-4000-8000-0000000000f3',
+              'cccccccc-0000-4000-8000-0000000000f4');
+
+-- ₹3,000 into Onam 2027 and ₹2,000 into Holi 2027, neither of them spent.
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference)
+select 'dddddddd-0000-4000-8000-0000000000f6', 'cccccccc-0000-4000-8000-0000000000f2',
+       m.community_id, m.id, 3000, 'upi', 'pending', '700000000003'
+  from public.memberships m where m.user_id = '33333333-3333-4333-8333-333333333333';
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference)
+select 'dddddddd-0000-4000-8000-0000000000f7', 'cccccccc-0000-4000-8000-0000000000f4',
+       m.community_id, m.id, 2000, 'upi', 'pending', '700000000004'
+  from public.memberships m where m.user_id = '33333333-3333-4333-8333-333333333333';
+
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select public.review_contribution('dddddddd-0000-4000-8000-0000000000f6', true);
+select public.review_contribution('dddddddd-0000-4000-8000-0000000000f7', true);
+
+-- Deciding before the event closes is deciding the fate of a surplus nobody
+-- has finished counting.
+select test.raises(
+  $q$select public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f2', 'society_balance')$q$,
+  'a surplus cannot be allocated while the event is still running');
+
+update public.events set status = 'completed'
+ where id in ('cccccccc-0000-4000-8000-0000000000f2', 'cccccccc-0000-4000-8000-0000000000f4');
+
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.raises(
+  $q$select public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f2',
+       'next_event', 'cccccccc-0000-4000-8000-0000000000f3')$q$,
+  'and a resident cannot decide it at all');
+
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select test.raises(
+  $q$select public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f2',
+       'next_event', 'cccccccc-0000-4000-8000-0000000000f4')$q$,
+  'nor can it be carried into an event that has already closed');
+select test.raises(
+  $q$select public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f2',
+       'next_event', 'cccccccc-0000-4000-8000-0000000000f2')$q$,
+  'nor back into the event it came from');
+
+-- Answer one: the next thing on the calendar.
+select test.eq(
+  (select amount from public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f2',
+     'next_event', 'cccccccc-0000-4000-8000-0000000000f3', 'Carried to Pongal')),
+  3000::numeric(12,2),
+  'the committee carries the whole of what is left, not a figure they typed');
+select test.eq(
+  (select fund_carried from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  3000::numeric(12,2), 'which lands on the next event as money already received');
+select test.eq(
+  (select fund_raised from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  0::numeric(12,2), 'without being counted as a contribution, because nobody contributed it');
+select test.eq(
+  (select available from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  3000::numeric(12,2), 'and is money that event can spend');
+select test.eq(
+  (select available from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f2'),
+  0::numeric(12,2), 'while the event it came from stops reporting a surplus it gave away');
+select test.raises(
+  $q$select public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f2',
+       'next_event', 'cccccccc-0000-4000-8000-0000000000f3')$q$,
+  'so allocating it a second time finds nothing left');
+
+-- Answer three: the society keeps it.
+select test.eq(
+  (select amount from public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f4',
+     'society_balance', null, 'Keep it for now')),
+  2000::numeric(12,2), 'Holi''s leftover stays with the society instead');
+select test.eq(
+  (select balance from public.society_balance
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  2000::numeric(12,2), 'which is what the balance on everybody''s home screen reads');
+select test.raises(
+  $q$select public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f4',
+       'society_balance', 'cccccccc-0000-4000-8000-0000000000f3')$q$,
+  'and keeping a surplus does not name another event');
+
+-- The way back out, so the third answer is not a one-way door.
+select test.raises(
+  $q$select public.spend_society_balance('cccccccc-0000-4000-8000-0000000000f3', 5000)$q$,
+  'the committee cannot spend a balance the society does not have');
+select test.eq(
+  (select amount from public.spend_society_balance(
+     'cccccccc-0000-4000-8000-0000000000f3', 500, 'Towards the pandal')),
+  500::numeric(12,2), 'but can put part of it behind an event that is still collecting');
+select test.eq(
+  (select balance from public.society_balance
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  1500::numeric(12,2), 'which comes off the balance');
+select test.eq(
+  (select fund_carried from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  3500::numeric(12,2), 'and onto the event');
+
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+select test.raises(
+  $q$select public.spend_society_balance('cccccccc-0000-4000-8000-0000000000f3', 100)$q$,
+  'staff cannot spend it either; this is the committee''s to decide');
+
+-- Every member reads the decisions. A committee decision about residents'
+-- money that residents cannot see is not an improvement on a WhatsApp message
+-- saying the same thing.
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.eq(test.visible('select id from public.fund_movements'), 3::bigint,
+  'a resident sees every movement their society made');
+-- No delete policy at all, which RLS renders as a delete that matches nothing
+-- rather than one that errors — so the assertion is about the rows, not the
+-- error. The committee member who made the decision is held to it too.
+delete from public.fund_movements;
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+delete from public.fund_movements;
+update public.fund_movements set amount = 1;
+reset role;
+select test.eq((select count(*) from public.fund_movements), 3::bigint,
+  'and nobody can delete or rewrite one, the committee member who decided included');
+select test.eq(
+  (select balance from public.society_balance
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  1500::numeric(12,2), 'so the balance is what the decisions add up to, still');
+
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(test.visible('select id from public.fund_movements'), 0::bigint,
+  'another society sees none of them');
+select test.eq(test.visible('select * from public.society_balance'), 0::bigint,
+  'nor what this one is holding');
+
+reset role;
+select test.act_anon();
+select test.eq(test.visible('select * from public.society_balance'), 0::bigint,
+  'and a stranger sees nothing at all');
+
+reset role;
+select test.ok(
+  not has_function_privilege('anon',
+    'public.allocate_surplus(uuid,public.fund_movement_kind,uuid,text)', 'EXECUTE'),
+  'a stranger cannot decide where a surplus goes');
+select test.ok(
+  not has_function_privilege('anon', 'public.spend_society_balance(uuid,numeric,text)', 'EXECUTE'),
+  'nor spend the society balance');
+select test.ok(
+  has_function_privilege('authenticated',
+    'public.allocate_surplus(uuid,public.fund_movement_kind,uuid,text)', 'EXECUTE'),
+  'while the committee can, signed in');

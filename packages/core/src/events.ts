@@ -165,6 +165,8 @@ export type EventStats = {
   /** Reported and not yet confirmed. Never part of fund_raised. */
   fund_pending: number | null;
   pending_contributors: number | null;
+  /** Moved across by the committee, net. Never part of fund_raised either. */
+  fund_carried: number | null;
 };
 
 /** Fills in zeroes so callers never have to null-check a total. */
@@ -183,6 +185,7 @@ export function normalizeStats(stats: Partial<EventStats> | null | undefined) {
     pendingExpenses: stats?.pending_expenses ?? 0,
     fundPending: Number(stats?.fund_pending ?? 0),
     pendingContributors: stats?.pending_contributors ?? 0,
+    fundCarried: Number(stats?.fund_carried ?? 0),
   };
 }
 
@@ -193,26 +196,47 @@ export function fundedPercent(raised: number, target: number): number {
 }
 
 /**
- * The two widths a fund bar draws: money confirmed, and money on its way.
+ * The three widths a fund bar draws: money the society moved across, money
+ * confirmed, and money on its way.
  *
- * They stack, so the pending segment is what is left of the bar after the
- * confirmed one — never its own share of the target. Without that clamp an
- * event at 90% confirmed with another 30% reported would draw 120% of a bar
- * that is 100% wide, and the overflow would land on whichever segment the
- * layout happened to put last.
+ * They stack, so each segment is what is left of the bar after the ones before
+ * it — never its own share of the target. Without that clamp an event at 90%
+ * confirmed with another 30% reported would draw 120% of a bar that is 100%
+ * wide, and the overflow would land on whichever segment the layout happened
+ * to put last.
  *
- * Confirmed always wins the space. Pending is the guest.
+ * Carried money goes first because it is the most settled thing on the bar:
+ * it is already in the society's account and already decided. Confirmed comes
+ * next. Pending is the guest.
+ *
+ * A negative carried figure — an event that gave its surplus away — draws
+ * nothing rather than a negative width; what it did is on the event's own
+ * record, not on a bar about reaching a target.
  */
 export function fundBarSegments(
   raised: number,
   pending: number,
   target: number,
-): { confirmed: number; pending: number } {
-  const confirmed = fundedPercent(raised, target);
+  carriedIn = 0,
+): { carried: number; confirmed: number; pending: number } {
+  const carried = fundedPercent(Math.max(0, carriedIn), target);
+  const confirmed = Math.min(100 - carried, fundedPercent(raised, target));
   return {
+    carried,
     confirmed,
-    pending: Math.min(100 - confirmed, fundedPercent(pending, target)),
+    pending: Math.min(100 - carried - confirmed, fundedPercent(pending, target)),
   };
+}
+
+/**
+ * What the event still has to ask residents for.
+ *
+ * Money carried across counts, which is the whole point of carrying it: a
+ * society holding ₹10,000 from last year should not send sixty flats a request
+ * for the full ₹50,000 and then sit on the difference.
+ */
+export function stillNeeded(target: number, raised: number, carriedIn = 0): number {
+  return Math.max(0, target - raised - Math.max(0, carriedIn));
 }
 
 /**

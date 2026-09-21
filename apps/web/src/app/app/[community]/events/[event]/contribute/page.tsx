@@ -36,7 +36,12 @@ export default async function ContributePage(
       .eq('membership_id', membership.id)
       .order('paid_at', { ascending: false }),
   ]);
-  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const bar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const funded = bar.confirmed;
 
   const suggested = Number.parseInt(typeof amount === 'string' ? amount : '', 10);
@@ -66,7 +71,7 @@ export default async function ContributePage(
               <span>{funded}%</span>
             </div>
             <div className="mt-2">
-              <FundBar percent={funded} pendingPercent={bar.pending} />
+              <FundBar percent={funded} pendingPercent={bar.pending} carriedPercent={bar.carried} />
             </div>
             <p className="text-ink-subtle mt-2 text-xs">
               Confirmed payments only. {stats.contributors}{' '}

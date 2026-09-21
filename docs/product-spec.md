@@ -285,16 +285,50 @@ without handing over any of them.
 
 ### Fund reallocation
 
-Surplus cannot be moved on an admin's say-so. The committee proposes a transfer
-with a reason; residents vote; it passes only at the configured threshold
-(60% by default). The result is written to an audit trail.
+Moving money between two _live_ funds cannot be done on an admin's say-so. The
+committee proposes a transfer with a reason; residents vote; it passes only at
+the configured threshold (60% by default). The result is written to an audit
+trail.
+
+### Where the leftover goes
+
+A **closed** event's surplus is the committee's to decide, without a vote. That
+is a deliberate exception to the paragraph above and worth naming: the money is
+residents' and the vote machinery exists a few lines up. What keeps it honest is
+that the decision is a row — who decided, when, how much, and where it went —
+readable by every member on the same screen as the balance itself, and
+unchangeable afterwards by anybody including the person who made it.
+
+An event budgets ₹50,000, collects ₹30,000 and spends ₹20,000. Three answers:
+
+| Answer              | What happens                                                               |
+| ------------------- | -------------------------------------------------------------------------- |
+| **Next event**      | It shows on that event's bar as money already received                     |
+| **Next edition**    | The same, for next year's run; the draft event is created if it is missing |
+| **Society balance** | It sits with the society, on everybody's home screen, until it is used     |
+
+The amount is never typed. `allocate_surplus()` takes the whole of what is left,
+because the figure is what the ledger says and a box to type it in is an
+invitation to a typo in the one number nobody is checking.
+
+Money moved across is its own number on an event — `fund_carried` — and is
+**never** folded into `fund_raised`: "sixty flats contributed ₹30,000" and "the
+committee moved ₹10,000 across from last year" are different sentences and only
+one of them is a contribution. The fund bar draws it as its own segment, first,
+and what the event still asks residents for comes down by the same amount.
+
+The society balance has a way back out (`spend_society_balance()`), because the
+third answer would otherwise be a one-way door: a society that always kept its
+surplus would accumulate a number it could look at and never use.
 
 ### Closing an event
 
 Shows collected / spent / remaining, task completion, bills uploaded, and the
 surplus destination fixed at creation. Publishing closes the event and issues
 the **transparency report**: full breakdown, every bill, audit history and
-participation figures.
+participation figures. If money is left, the committee is asked where it goes —
+after closing rather than inside it, so the decision is not something somebody
+clicks past on the way to the confirmation box.
 
 ---
 

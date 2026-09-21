@@ -89,3 +89,78 @@ describe('contributing', () => {
     expect(read(...CONTRIBUTE)).toContain('Open UPI app');
   });
 });
+
+/**
+ * The society balance, on both home screens and on both money screens.
+ *
+ * An event that closed with money left used to report a surplus forever while
+ * the next event opened at zero and asked sixty flats for money the society
+ * was already holding. The number now has somewhere to live, and the rule is
+ * that it lives in the same places on both apps: a figure a resident can see
+ * on the phone and not on the web is a figure two neighbours will disagree
+ * about.
+ */
+describe('the society balance', () => {
+  it('is on the home screen of both apps, not just the one', () => {
+    expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain(
+      'Society balance',
+    );
+    expect(read('mobile', 'app', '(tabs)', 'index.tsx')).toContain('Society balance');
+  });
+
+  it('opens the log of where every rupee of it came from', () => {
+    const web = read('web', 'src', 'app', 'app', '[community]', 'money', 'page.tsx');
+    expect(web).toContain('fundMovementLine');
+    expect(web).toContain('id="society-balance"');
+    // The home card links straight to that anchor.
+    expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain(
+      'money#society-balance',
+    );
+    expect(read('mobile', 'app', 'money.tsx')).toContain('fundMovementLine');
+  });
+
+  it('is decided at closure by the committee, on both apps', () => {
+    expect(
+      read('web', 'src', 'app', 'app', '[community]', 'admin', 'events', '[event]', 'page.tsx'),
+    ).toContain('AllocateSurplusForm');
+    expect(read('mobile', 'app', 'admin', 'event', '[slug].tsx')).toContain('allocate_surplus');
+  });
+
+  it('can be spent again, so keeping a surplus is not a one-way door', () => {
+    expect(
+      read('web', 'src', 'app', 'app', '[community]', 'admin', 'events', '[event]', 'page.tsx'),
+    ).toContain('SpendBalanceForm');
+    expect(read('mobile', 'app', 'admin', 'event', '[slug].tsx')).toContain(
+      'spend_society_balance',
+    );
+  });
+});
+
+describe('the fund bar', () => {
+  /**
+   * Nine screens draw this bar between them. A carried segment on eight of
+   * them is a bar that means one thing on the events list and another on the
+   * event itself, which is how two residents come away with different numbers.
+   */
+  const CALLERS = [
+    ['web', 'src', 'app', 'app', '[community]', 'page.tsx'],
+    ['web', 'src', 'app', 'app', '[community]', 'events', 'page.tsx'],
+    ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'page.tsx'],
+    ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'contribute', 'page.tsx'],
+    ['web', 'src', 'app', 'app', '[community]', 'admin', 'page.tsx'],
+    ['web', 'src', 'app', 'app', '[community]', 'admin', 'events', '[event]', 'page.tsx'],
+    ['mobile', 'app', '(tabs)', 'index.tsx'],
+    ['mobile', 'app', '(tabs)', 'events.tsx'],
+    ['mobile', 'app', 'event', '[slug].tsx'],
+  ];
+
+  it('is told about money carried across everywhere it is drawn', () => {
+    const missing = CALLERS.filter((parts) => !read(...parts).includes('fundCarried'));
+    expect(missing.map((parts) => parts.join('/'))).toEqual([]);
+  });
+
+  it('draws it as its own segment rather than folding it into the raised figure', () => {
+    expect(read('web', 'src', 'components', 'badges.tsx')).toContain('carriedPercent');
+    expect(read('mobile', 'src', 'components', 'event-ui.tsx')).toContain('carriedPercent');
+  });
+});

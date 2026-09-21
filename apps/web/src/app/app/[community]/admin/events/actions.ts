@@ -5,16 +5,20 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   DEFAULT_FUND_RULE,
+  allocateSurplusSchema,
   can,
   closeEventSchema,
   createActivitySchema,
   createEventSchema,
   createExpenseSchema,
   eventSlug as makeEventSlug,
+  nextEditionDate,
+  nextEditionName,
   optionalUpiReference,
   optionalWhatsappGroup,
   paymentMethodSchema,
   reviewExpenseSchema,
+  spendBalanceSchema,
   uuid,
 } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
@@ -902,4 +906,123 @@ export async function closeEvent(_prev: CloseState, formData: FormData): Promise
 
   refreshEvent(communitySlug, eventSlug);
   return { ...EMPTY_STATE, closed: true, success: 'Event closed and its accounts published.' };
+}
+
+// ---------------------------------------------------------------------------
+// Where the leftover goes
+// ---------------------------------------------------------------------------
+
+/**
+ * The committee decides where a closed event's surplus goes.
+ *
+ * The amount is not sent: the database takes the whole of what is left, which
+ * is what the ledger says rather than what somebody typed into a box.
+ *
+ * `next_edition` without a target creates the event first — "keep it for next
+ * year" is useless if next year's event has to exist before you can say it.
+ */
+export async function allocateSurplus(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'events:close');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+
+  const parsed = allocateSurplusSchema.safeParse({
+    event_id: event.id,
+    kind: formData.get('kind'),
+    to_event_id: formData.get('to_event_id') || undefined,
+    note: formData.get('note') || undefined,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  let target = parsed.data.to_event_id ?? null;
+
+  if (parsed.data.kind === 'next_edition' && !target) {
+    // "Keep it for next year" is useless if next year's event has to exist
+    // before you can say it, so the draft is made here and the committee fills
+    // it in whenever they get to planning.
+    const { data: previous } = await supabase
+      .from('events')
+      .select('emoji, event_type_id, venue, venue_id, organizer, starts_on')
+      .eq('id', event.id)
+      .single();
+    const name = nextEditionName(event.name, previous?.starts_on);
+    const { data: created, error: createError } = await supabase
+      .from('events')
+      .insert({
+        community_id: context.community.id,
+        slug: makeEventSlug(name),
+        name,
+        emoji: previous?.emoji ?? '🎉',
+        event_type_id: previous?.event_type_id ?? null,
+        venue: previous?.venue ?? null,
+        venue_id: previous?.venue_id ?? null,
+        organizer: previous?.organizer ?? null,
+        starts_on: nextEditionDate(previous?.starts_on),
+        fund_target: 0,
+        status: 'draft',
+        created_by: context.user.id,
+      })
+      .select('id, slug')
+      .single();
+    if (createError) return { error: friendlyDbError(createError) };
+    target = created.id;
+  }
+
+  const { error } = await supabase.rpc('allocate_surplus', {
+    p_event_id: event.id,
+    p_kind: parsed.data.kind,
+    p_to_event_id: target ?? undefined,
+    p_note: parsed.data.note ?? undefined,
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  refreshEvent(communitySlug, eventSlug);
+  revalidatePath(`/app/${communitySlug}`);
+  revalidatePath(`/app/${communitySlug}/money`);
+  revalidatePath(`/app/${communitySlug}/events`);
+  return {
+    ...EMPTY_STATE,
+    success:
+      parsed.data.kind === 'society_balance'
+        ? 'Kept as society balance. Everybody can see it on their home screen.'
+        : 'Carried forward. It counts towards that event from now on.',
+  };
+}
+
+/** The way back out: society funds put behind an event that is still collecting. */
+export async function spendSocietyBalance(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'events:close');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+
+  const parsed = spendBalanceSchema.safeParse({
+    to_event_id: event.id,
+    amount: formData.get('amount'),
+    note: formData.get('note') || undefined,
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+
+  const supabase = await getSupabase();
+  const { error } = await supabase.rpc('spend_society_balance', {
+    p_to_event_id: event.id,
+    p_amount: parsed.data.amount,
+    p_note: parsed.data.note ?? undefined,
+  });
+  if (error) return { error: friendlyDbError(error) };
+
+  refreshEvent(communitySlug, eventSlug);
+  revalidatePath(`/app/${communitySlug}`);
+  revalidatePath(`/app/${communitySlug}/money`);
+  return { ...EMPTY_STATE, success: 'Society funds are now behind this event.' };
 }

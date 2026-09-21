@@ -15,5 +15,6 @@ export * from './copy';
 export * from './festivals';
 export * from './statement';
 export * from './ledger';
+export * from './funds';
 export * from './audit';
 export * from './account';

@@ -12,6 +12,7 @@ import {
   formatDate,
   formatMoney,
   fundBarSegments,
+  stillNeeded,
   type EventTab,
   type FundRule,
 } from '@samudaya/core';
@@ -72,7 +73,12 @@ export default function EventDetail() {
   }
 
   const { event, stats } = data;
-  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const fundBar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const funded = fundBar.confirmed;
   const open = event.status === 'published';
 
@@ -130,7 +136,13 @@ export default function EventDetail() {
               <Caption>
                 of {formatMoney(stats.fundTarget || event.fund_target, currency)} target
               </Caption>
-              <Meter percent={funded} tone="success" label="Fund progress" />
+              <Meter
+                percent={funded}
+                pendingPercent={fundBar.pending}
+                carriedPercent={fundBar.carried}
+                tone="success"
+                label="Fund progress"
+              />
               <View style={{ gap: spacing.xs }}>
                 <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
                 <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
@@ -182,7 +194,12 @@ function About({
   onMoney: () => void;
 }) {
   const { event, stats } = data;
-  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const fundBar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const dates =
     event.ends_on && event.ends_on !== event.starts_on
       ? `${formatDate(event.starts_on)} – ${formatDate(event.ends_on)}`
@@ -230,6 +247,7 @@ function About({
           <Meter
             percent={fundBar.confirmed}
             pendingPercent={fundBar.pending}
+            carriedPercent={fundBar.carried}
             tone="success"
             label="Fund progress"
           />
@@ -237,6 +255,21 @@ function About({
             <Caption>
               {formatMoney(stats.fundPending, currency)} reported and waiting to be confirmed
               against the bank. It counts once staff match it.
+            </Caption>
+          ) : null}
+          {/* Money the society already had, moved here by the committee. Said
+              out loud rather than folded into the raised figure: "sixty flats
+              gave ₹30,000" and "the committee moved ₹10,000 across from last
+              year" are different sentences. */}
+          {stats.fundCarried > 0 ? (
+            <Caption>
+              {formatMoney(stats.fundCarried, currency)} was carried across by the committee from a
+              closed event, so only{' '}
+              {formatMoney(
+                stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
+                currency,
+              )}{' '}
+              is still to raise.
             </Caption>
           ) : null}
         </Card>

@@ -165,6 +165,55 @@ export const getCommitteeCount = cache(async (communityId: string) => {
   return count ?? 0;
 });
 
+/**
+ * What the society is holding that is not assigned to any event, and how it
+ * got there.
+ *
+ * A society that has never closed an event with money left has no row in the
+ * view, which reads as zero rather than as an error.
+ */
+export const getSocietyBalance = cache(async (communityId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('society_balance')
+    .select('balance, movements_in, last_decided_at')
+    .eq('community_id', communityId)
+    .maybeSingle();
+  return {
+    balance: Number(data?.balance ?? 0),
+    movements: data?.movements_in ?? 0,
+    lastDecidedAt: data?.last_decided_at ?? null,
+  };
+});
+
+/** Every decision the committee made about a surplus, newest first. */
+export const getFundMovements = cache(async (communityId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('fund_movements')
+    .select(
+      'id, kind, amount, note, decided_at, from_event:events!fund_movements_from_event_id_fkey(name, slug), to_event:events!fund_movements_to_event_id_fkey(name, slug), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+    )
+    .eq('community_id', communityId)
+    .order('decided_at', { ascending: false })
+    .limit(100);
+  return data ?? [];
+});
+
+/** Events a surplus can be carried into: still open, and not the one it came from. */
+export const getOpenEvents = cache(async (communityId: string, exceptId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('events')
+    .select('id, name, emoji, starts_on, status')
+    .eq('community_id', communityId)
+    .in('status', ['draft', 'published'])
+    .neq('id', exceptId)
+    .order('starts_on', { ascending: true })
+    .limit(100);
+  return data ?? [];
+});
+
 /** What the signed-in member has personally done for this event. */
 export const getMyParticipation = cache(async (eventId: string, membershipId: string | null) => {
   if (!membershipId) return { activities: [], roles: [], contributed: 0 };

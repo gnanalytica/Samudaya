@@ -6,6 +6,7 @@ import {
   filterLedger,
   formatDate,
   formatMoney,
+  fundMovementLine,
   ledgerFilterFrom,
   relativeTime,
 } from '@samudaya/core';
@@ -48,7 +49,7 @@ export default function Money() {
   const { data, loading, refreshing, refresh, error } = useCommunityData(
     'money',
     async (communityId) => {
-      const [ledger, totals] = await Promise.all([
+      const [ledger, totals, society, movements] = await Promise.all([
         // One string literal, not a concatenation: supabase-js reads the row type
         // off the literal itself, and `'a, b' + 'c'` widens it to string, which
         // hands every row back as GenericStringError.
@@ -61,6 +62,19 @@ export default function Money() {
           .order('happened_at', { ascending: false })
           .limit(500),
         supabase.from('society_money').select('*').eq('community_id', communityId).maybeSingle(),
+        supabase
+          .from('society_balance')
+          .select('balance, movements_in')
+          .eq('community_id', communityId)
+          .maybeSingle(),
+        supabase
+          .from('fund_movements')
+          .select(
+            'id, kind, amount, note, decided_at, from_event:events!fund_movements_from_event_id_fkey(name), to_event:events!fund_movements_to_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+          )
+          .eq('community_id', communityId)
+          .order('decided_at', { ascending: false })
+          .limit(100),
       ]);
       // A read that fails must not arrive here as an empty ledger. The web app
       // learned this the expensive way — an ambiguous embed answered 300 for two
@@ -78,7 +92,12 @@ export default function Money() {
         reportHandled(failure, 'the society ledger');
         throw new Error(failure.message);
       }
-      return { rows: ledger.data ?? [], totals: totals.data ?? null };
+      return {
+        rows: ledger.data ?? [],
+        totals: totals.data ?? null,
+        society: society.data ?? null,
+        movements: movements.data ?? [],
+      };
     },
   );
 
@@ -105,6 +124,8 @@ export default function Money() {
   const totals = data?.totals ?? null;
   const visible = filterLedger(rows, ledgerFilterFrom(direction), eventSlug);
   const balance = Number(totals?.balance ?? 0);
+  const heldBySociety = Number(data?.society?.balance ?? 0);
+  const movements = data?.movements ?? [];
 
   // Built from the ledger rather than from events, so the filter only offers an
   // event that has something in it.
@@ -131,6 +152,29 @@ export default function Money() {
               value={formatMoney(balance, currency)}
               tone={balance < 0 ? 'danger' : 'success'}
             />
+
+            {/* What was left when an event closed, and what the committee
+                decided to do with it. "The society is holding ₹12,000" is only
+                worth saying if the next question — from what, and decided by
+                whom — has an answer on the same screen. */}
+            {movements.length ? (
+              <Card style={{ gap: spacing.sm }}>
+                <Body>Society balance · {formatMoney(heldBySociety, currency)}</Body>
+                <Caption>Held by the society and not behind any event.</Caption>
+                {movements.map((movement) => (
+                  <View key={movement.id} style={{ gap: 2 }}>
+                    <Body>{fundMovementLine(movement, currency)}</Body>
+                    <Caption>
+                      {movement.decided_at ? formatDate(movement.decided_at.slice(0, 10)) : ''}
+                      {movement.decider?.profiles?.full_name
+                        ? ` · decided by ${movement.decider.profiles.full_name}`
+                        : ''}
+                      {movement.note ? ` · ${movement.note}` : ''}
+                    </Caption>
+                  </View>
+                ))}
+              </Card>
+            ) : null}
 
             <ChipRow>
               {LEDGER_FILTERS.map((option) => (

@@ -1,14 +1,16 @@
 import Link from 'next/link';
-import { ArrowDownLeft, ArrowUpRight, Scale, Wallet } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, PiggyBank, Scale, Wallet } from 'lucide-react';
 import {
   LEDGER_FILTERS,
   filterLedger,
   formatDate,
   formatMoney,
+  fundMovementLine,
   ledgerFilterFrom,
   relativeTime,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
+import { getFundMovements, getSocietyBalance } from '@/lib/events';
 import { getSupabase } from '@/lib/supabase/server';
 import { rowsOf } from '@/lib/rows';
 import { PageBody, PageHeader } from '@/components/page-header';
@@ -39,7 +41,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
   const { community } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
-  const [ledger, totals] = await Promise.all([
+  const [ledger, totals, society, movements] = await Promise.all([
     supabase
       .from('society_ledger')
       .select(
@@ -49,6 +51,8 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
       .order('happened_at', { ascending: false })
       .limit(500),
     supabase.from('society_money').select('*').eq('community_id', community.id).maybeSingle(),
+    getSocietyBalance(community.id),
+    getFundMovements(community.id),
   ]);
 
   const rows = rowsOf(ledger, 'the society ledger');
@@ -86,6 +90,46 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
             tone={balance < 0 ? 'danger' : 'success'}
           />
         </StatTiles>
+
+        {/* Where the money left in a closed event went. The home screen links
+            straight here, because "the society is holding ₹12,000" is only
+            worth saying if the next question — from what, and decided by
+            whom — has an answer on the same screen. */}
+        {movements.length ? (
+          <Card className="mt-5 scroll-mt-20" id="society-balance">
+            <CardHeader
+              title="Society balance"
+              description="What was left over when an event closed, and what the committee decided to do with it."
+            />
+            <CardBody className="border-border-base flex items-center gap-3 border-b">
+              <PiggyBank className="text-accent size-6 shrink-0" aria-hidden="true" />
+              <div>
+                <p className="text-ink text-lg font-semibold">
+                  {formatMoney(society.balance, community.currency)}
+                </p>
+                <p className="text-ink-subtle text-xs">
+                  Held by the society and not behind any event
+                </p>
+              </div>
+            </CardBody>
+            <ul className="divide-border-base divide-y">
+              {movements.map((movement) => (
+                <li key={movement.id} className="px-5 py-3">
+                  <p className="text-ink text-sm">
+                    {fundMovementLine(movement, community.currency)}
+                  </p>
+                  <p className="text-ink-subtle mt-0.5 text-xs">
+                    {movement.decided_at ? formatDate(movement.decided_at.slice(0, 10)) : ''}
+                    {movement.decider?.profiles?.full_name
+                      ? ` · decided by ${movement.decider.profiles.full_name}`
+                      : ''}
+                    {movement.note ? ` · ${movement.note}` : ''}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ) : null}
 
         <Card className="mt-5">
           <CardHeader

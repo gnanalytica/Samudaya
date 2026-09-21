@@ -14,7 +14,7 @@ import {
   setupSteps,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
-import { fetchEvents, fetchStats, pickNextEvent } from '../../src/lib/events';
+import { fetchEvents, fetchSocietyBalance, fetchStats, pickNextEvent } from '../../src/lib/events';
 import { fetchSetupFacts } from '../../src/lib/setup';
 import { groupTodo, useTodoItems } from '../../src/lib/todo';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -51,12 +51,14 @@ export default function Home() {
     async (communityId) => {
       const events = await fetchEvents(communityId);
       const next = pickNextEvent(events);
-      const stats = next
-        ? await fetchStats([next.id])
-        : new Map<string, ReturnType<typeof normalizeStats>>();
+      const [stats, society] = await Promise.all([
+        next ? fetchStats([next.id]) : new Map<string, ReturnType<typeof normalizeStats>>(),
+        fetchSocietyBalance(communityId),
+      ]);
       return {
         next: next ?? null,
         stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
+        society,
       };
     },
   );
@@ -79,8 +81,15 @@ export default function Home() {
   const currency = activeCommunity?.currency ?? 'INR';
   const next = data?.next;
   const stats = data?.stats ?? normalizeStats(null);
-  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const fundBar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const funded = fundBar.confirmed;
+  const heldBySociety = data?.society.balance ?? 0;
+  const balanceMovements = data?.society.movements ?? 0;
   const normalized = normalizeRole(role);
 
   return (
@@ -101,6 +110,24 @@ export default function Home() {
 
         {setupOpen && setup.data ? (
           <SetupCard steps={setupSteps(setup.data)} onOpen={() => router.push('/admin/setup')} />
+        ) : null}
+
+        {/* Money the society is holding that is not behind any event: what a
+            closed event had left, once the committee decided to keep it. On
+            everybody's home screen, resident and committee alike, because it
+            is the one figure a society is most often asked about and least
+            often able to answer. Tapping it shows where every rupee came
+            from. */}
+        {heldBySociety > 0 ? (
+          <Card style={{ gap: spacing.xs }}>
+            <LinkRow
+              label={`Society balance · ${formatMoney(heldBySociety, currency)}`}
+              detail={`Left over from ${balanceMovements} closed ${
+                balanceMovements === 1 ? 'event' : 'events'
+              }, not yet behind a new one`}
+              onPress={() => router.push('/money')}
+            />
+          </Card>
         ) : null}
 
         {staffView ? (
@@ -147,6 +174,7 @@ export default function Home() {
                 <Meter
                   percent={funded}
                   pendingPercent={fundBar.pending}
+                  carriedPercent={fundBar.carried}
                   tone="success"
                   label="Fund progress"
                 />

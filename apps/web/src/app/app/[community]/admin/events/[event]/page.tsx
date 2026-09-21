@@ -6,7 +6,9 @@ import {
   formatDate,
   formatMoney,
   fundBarSegments,
+  nextEditionName,
   receiptRef,
+  stillNeeded,
   todayIn,
   unitLabel,
   upiCaptureNote,
@@ -19,7 +21,9 @@ import {
   getCommitteeCount,
   getEventStats,
   getExpenses,
+  getOpenEvents,
   getPayments,
+  getSocietyBalance,
   getRegistrations,
   requireEvent,
 } from '@/lib/events';
@@ -45,12 +49,14 @@ import { AuditTrail } from '@/components/audit-trail';
 import {
   AddActivityForm,
   AddBudgetLineForm,
+  AllocateSurplusForm,
   CloseEventForm,
   EventDetailsForm,
   ExpenseForm,
   RecordPaymentForm,
   ReviewExpenseForm,
   ReviewPaymentForm,
+  SpendBalanceForm,
   type Pickers,
 } from './forms';
 import { removeBudgetLine, setEventStatus, updateActivity, updateBudgetLine } from '../actions';
@@ -83,6 +89,8 @@ export default async function ManageEventPage(
     units,
     catalogue,
     committeeCount,
+    society,
+    openEvents,
   ] = await Promise.all([
     getEventStats(event.id),
     getBudgetLines(event.id),
@@ -99,6 +107,8 @@ export default async function ManageEventPage(
       .limit(2000),
     getCatalogue(community.id),
     getCommitteeCount(community.id),
+    getSocietyBalance(community.id),
+    getOpenEvents(community.id, event.id),
   ]);
 
   // The database steps the separation-of-duties rule aside when there is
@@ -116,7 +126,12 @@ export default async function ManageEventPage(
     manageHref: `${base}/admin/catalogue`,
   };
 
-  const bar = fundBarSegments(stats.fundRaised, stats.fundPending, stats.fundTarget);
+  const bar = fundBarSegments(
+    stats.fundRaised,
+    stats.fundPending,
+    stats.fundTarget,
+    stats.fundCarried,
+  );
   const funded = bar.confirmed;
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
@@ -196,10 +211,51 @@ export default async function ManageEventPage(
                   <span>{funded}%</span>
                 </div>
                 <div className="mt-2">
-                  <FundBar percent={funded} pendingPercent={bar.pending} />
+                  <FundBar
+                    percent={funded}
+                    pendingPercent={bar.pending}
+                    carriedPercent={bar.carried}
+                  />
                 </div>
+                {/* Not a contribution, and never added to the raised figure —
+                    the society moved its own money across. Said out loud so
+                    nobody reads the bar as sixty flats having paid. */}
+                {stats.fundCarried !== 0 ? (
+                  <p className="text-ink-subtle mt-2 text-xs">
+                    {stats.fundCarried > 0
+                      ? `Includes ${formatMoney(stats.fundCarried, community.currency)} carried across by the committee.`
+                      : `${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
+                  </p>
+                ) : null}
+                {!closed ? (
+                  <p className="text-ink-subtle mt-1 text-xs">
+                    {formatMoney(
+                      stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
+                      community.currency,
+                    )}{' '}
+                    still to raise.
+                  </p>
+                ) : null}
               </CardBody>
             </Card>
+            {/* The way back out of the society balance, so keeping a surplus
+                is not a one-way door. */}
+            {isCommittee && !closed && society.balance > 0 ? (
+              <Card>
+                <CardHeader
+                  title="Bring in society funds"
+                  description={`The society is holding ${formatMoney(society.balance, community.currency)} that is not behind any event.`}
+                />
+                <CardBody>
+                  <SpendBalanceForm
+                    slug={slug}
+                    eventSlug={event.slug}
+                    balance={society.balance}
+                    currency={community.currency}
+                  />
+                </CardBody>
+              </Card>
+            ) : null}
             <Card>
               <CardHeader title="Details" />
               <CardBody>
@@ -823,13 +879,31 @@ export default async function ManageEventPage(
 
         {active === 'close' ? (
           closed ? (
-            <Card>
-              <EmptyState
-                icon={<FileText className="size-6" />}
-                title="This event is closed"
-                description="Its accounts are published and the ledger is frozen."
+            // Residents' money the event did not spend. Asked after closing
+            // rather than inside it, so the decision is not something somebody
+            // clicks past on the way to the confirmation box.
+            stats.available > 0 && isCommittee ? (
+              <AllocateSurplusForm
+                slug={slug}
+                eventSlug={event.slug}
+                surplus={stats.available}
+                currency={community.currency}
+                openEvents={openEvents}
+                nextEdition={nextEditionName(event.name, event.starts_on)}
               />
-            </Card>
+            ) : (
+              <Card>
+                <EmptyState
+                  icon={<FileText className="size-6" />}
+                  title="This event is closed"
+                  description={
+                    stats.available > 0
+                      ? `${formatMoney(stats.available, community.currency)} is left over. The committee decides where it goes.`
+                      : 'Its accounts are published and the ledger is frozen.'
+                  }
+                />
+              </Card>
+            )
           ) : (
             <CloseEventForm
               slug={slug}
