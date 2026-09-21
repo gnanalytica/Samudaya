@@ -128,9 +128,20 @@ is what this replaces.
 
 The society's account, as rows. A statement is imported — pasted or as a CSV,
 from any of the shapes Indian banks export — and each line is matched against a
-reported payment by UTR, then by amount within a fortnight. Confirming the match
-confirms the money. Where the bank and the payer disagree on the amount, a person
-chooses which figure the books keep, and the gap is written into the record.
+reported payment: by UTR, then by the flat the line names, then by amount within
+a fortnight. Confirming the match confirms the money.
+
+Every payment Samudaya starts carries a note — `SMDA1104 GANESH` — and that note
+rides to the statement, so a credit usually says which flat sent it. One
+contiguous token, first, because a narration preserves a run of letters and
+digits, mangles punctuation, and truncates from the right.
+
+That is what makes the next sentence reachable. Where the bank and the payer
+disagree on the amount, a person chooses which figure the books keep and the gap
+is written into the record — but a pairing that far apart was never offered
+until the line could say whose money it was. A flat match is offered whatever
+the amounts say, because the reported figure is the payer's own and is the thing
+most likely to be wrong.
 
 Lines that will never match (bank charges, interest, transfers between the
 society's own accounts) are set aside with a reason rather than deleted. What is

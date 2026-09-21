@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { formatMoney } from '@samudaya/core';
+import { formatMoney, MATCH_CONFIDENCE } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
@@ -254,9 +254,7 @@ export function MatchForm({
           <option key={row.contribution_id} value={row.contribution_id}>
             {row.payer} · {formatMoney(Number(row.amount), currency)}
             {row.reference ? ` · ${row.reference}` : ''}
-            {row.confidence === 'reference' ? ' · same UTR' : ''}
-            {row.confidence === 'amount' ? ' · same amount' : ''}
-            {row.confidence === 'close' ? ' · close' : ''}
+            {MATCH_CONFIDENCE[row.confidence] ? ` · ${MATCH_CONFIDENCE[row.confidence]}` : ''}
           </option>
         ))}
       </Select>

@@ -88,17 +88,71 @@ export type UpiPaymentLink = {
 };
 
 /**
- * A note that identifies the payment on a bank statement, e.g. "A-1104 GANESH".
- * UPI notes are short and some banks drop punctuation, so keep it plain.
+ * The marker that makes a Samudaya payment findable in a bank statement.
+ *
+ * Three letters, because the note is typed by hand by everybody whose phone
+ * does not open a UPI app from a link, and because it has to survive a bank
+ * narration — which arrives as `UPI/CR/612345678901/RIA MENON/HDFC/SMDA1104`,
+ * mangled, truncated and upper-cased in ways that vary by bank.
+ */
+export const NOTE_TAG = 'SMD';
+
+/**
+ * A note that identifies the payment on a bank statement, e.g.
+ * "SMDA1104 GANESH".
+ *
+ * Two parts doing two jobs. `SMDA1104` is one contiguous alphanumeric token —
+ * no spaces, no hyphens — because that is the only shape a narration reliably
+ * preserves, and it is what the reconcile screen searches for to say whose
+ * money a line is. "GANESH" is for the human reading their own bank statement
+ * three months later.
+ *
+ * The token goes first. Banks truncate narration from the right, so the part
+ * that has to survive is the part that arrives first.
+ *
+ * It names the flat, not the payment. A per-payment code would have to be
+ * issued before the resident leaves to pay — which means a row for every
+ * person who opens the screen and changes their mind, and those rows would
+ * land in the "waiting to be confirmed" total. The flat is what staff actually
+ * need in order to attribute money, and two payments from one flat are two
+ * payments from one flat, which is the right answer to that question.
  */
 export function upiNote(flatLabel: string | null | undefined, eventName: string): string {
-  const flat = (flatLabel ?? '').replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
+  const flat = normalizeFlat(flatLabel);
   const event = eventName
     .replace(/[^A-Za-z0-9 ]/g, ' ')
     .trim()
     .split(/\s+/)[0]
     ?.toUpperCase();
-  return [flat, event].filter(Boolean).join(' ').slice(0, 50);
+  // No flat, no token: there would be nothing for it to identify.
+  return [flat ? `${NOTE_TAG}${flat}` : '', event].filter(Boolean).join(' ').slice(0, 50);
+}
+
+/** `A-1104` and `a 1104` are the same flat; a narration keeps neither shape. */
+export function normalizeFlat(label: string | null | undefined): string {
+  return (label ?? '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+}
+
+/**
+ * The flat a bank line names, if the payer kept our note on it.
+ *
+ * Searched rather than parsed: by the time a narration reaches a statement the
+ * token is surrounded by the bank's own punctuation, and which punctuation
+ * depends on the bank.
+ */
+export function flatTagIn(narration: string | null | undefined): string | null {
+  if (!narration) return null;
+  const match = new RegExp(`${NOTE_TAG}([A-Za-z0-9]{1,12})`, 'i').exec(narration);
+  return match?.[1] ? match[1].toUpperCase() : null;
+}
+
+/** Whether a bank line's tag names this flat. Both sides are normalised. */
+export function flatMatchesTag(
+  flatLabel: string | null | undefined,
+  tag: string | null | undefined,
+): boolean {
+  const flat = normalizeFlat(flatLabel);
+  return flat.length > 0 && flat === normalizeFlat(tag);
 }
 
 /** The `upi://pay` link every UPI app understands (NPCI deep-link format). */

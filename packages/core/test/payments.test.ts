@@ -17,7 +17,9 @@ describe('UPI links', () => {
       vpa: 'whitecliff.rwa@okaxis',
       payeeName: 'Whitecliff RWA',
       amount: 2001,
-      note: 'A-1104 GANESH',
+      // Built rather than restated, so the link test cannot drift away from
+      // what upiNote actually writes.
+      note: upiNote('A-1104', 'Ganesh Chaturthi 2026'),
     });
     expect(uri.startsWith('upi://pay?')).toBe(true);
     const params = new URLSearchParams(uri.slice('upi://pay?'.length));
@@ -25,12 +27,12 @@ describe('UPI links', () => {
     expect(params.get('pn')).toBe('Whitecliff RWA');
     expect(params.get('am')).toBe('2001.00');
     expect(params.get('cu')).toBe('INR');
-    expect(params.get('tn')).toBe('A-1104 GANESH');
+    expect(params.get('tn')).toBe('SMDA1104 GANESH');
     expect(uri).not.toContain('+');
   });
 
   it('makes a short statement note from flat and event', () => {
-    expect(upiNote('A-1104', 'Ganesh Chaturthi 2026')).toBe('A-1104 GANESH');
+    expect(upiNote('A-1104', 'Ganesh Chaturthi 2026')).toBe('SMDA1104 GANESH');
     expect(upiNote(null, 'Deepavali 2026')).toBe('DEEPAVALI');
   });
 });

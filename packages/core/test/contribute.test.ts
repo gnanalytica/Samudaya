@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { MATCH_CONFIDENCE } from '../src/statement';
 import {
   contributionPresets,
+  flatMatchesTag,
+  flatTagIn,
   isSuggestedAmount,
   paymentEvidenceProblem,
   reportPaymentSchema,
+  upiNote,
 } from '../src/payments';
 import { fundBarSegments, fundedPercent, normalizeStats } from '../src/events';
 
@@ -148,5 +152,85 @@ describe('paymentEvidenceProblem', () => {
 
   it('treats an empty reference as no reference', () => {
     expect(paymentEvidenceProblem('', false)).toBeTruthy();
+  });
+});
+
+describe('the note a bank statement keeps', () => {
+  it('leads with one contiguous token, because that is what survives', () => {
+    const note = upiNote('A-1104', 'Ganesh Chaturthi 2026');
+    expect(note).toBe('SMDA1104 GANESH');
+    // No space, no hyphen, nothing a bank will punctuate differently.
+    expect(note.split(' ')[0]).toMatch(/^[A-Z0-9]+$/);
+  });
+
+  it('puts the token first, because banks truncate from the right', () => {
+    expect(upiNote('B-2', 'Diwali')).toMatch(/^SMD/);
+  });
+
+  it('writes no token for somebody with no flat, having nothing to name', () => {
+    expect(upiNote(null, 'Deepavali 2026')).toBe('DEEPAVALI');
+    expect(flatTagIn(upiNote(null, 'Deepavali'))).toBeNull();
+  });
+
+  it('stays inside the length a UPI note allows', () => {
+    const note = upiNote('PHASE-2-TOWER-C-1104', 'Ganesh Chaturthi Celebrations');
+    expect(note.length).toBeLessThanOrEqual(50);
+  });
+});
+
+describe('flatTagIn', () => {
+  it('finds the flat in a narration the bank has mangled around it', () => {
+    for (const narration of [
+      'UPI/CR/612345678901/RIA MENON/HDFC/SMDA1104 GANESH',
+      'UPI-SMDA1104-612345678901',
+      'NEFT SMDA1104 GANESH RIA MENON',
+      'smda1104 ganesh',
+    ]) {
+      expect(flatTagIn(narration), narration).toBe('A1104');
+    }
+  });
+
+  it('is null when the payer did not keep the note', () => {
+    for (const narration of [
+      'UPI/CR/612345678901/RIA MENON/HDFC',
+      'ATM WDL 612345678901',
+      null,
+      '',
+    ]) {
+      expect(flatTagIn(narration), String(narration)).toBeNull();
+    }
+  });
+
+  it('round-trips whatever upiNote wrote', () => {
+    for (const flat of ['A-1104', 'B2', 'C-12', '1104']) {
+      expect(flatMatchesTag(flat, flatTagIn(upiNote(flat, 'Ganesh')))).toBe(true);
+    }
+  });
+});
+
+describe('flatMatchesTag', () => {
+  it('ignores the punctuation a flat is written with', () => {
+    expect(flatMatchesTag('A-1104', 'A1104')).toBe(true);
+    expect(flatMatchesTag('a 1104', 'A1104')).toBe(true);
+  });
+
+  it('does not match a different flat, or nothing at all', () => {
+    expect(flatMatchesTag('A-1104', 'A1105')).toBe(false);
+    expect(flatMatchesTag('A-1104', null)).toBe(false);
+    expect(flatMatchesTag(null, 'A1104')).toBe(false);
+    // Two flats with no label must not collide on the empty string.
+    expect(flatMatchesTag('', '')).toBe(false);
+  });
+});
+
+describe('MATCH_CONFIDENCE', () => {
+  it('names every tier bank_line_candidates can return', () => {
+    // The function's case expression has exactly these four arms. A tier added
+    // there without a word here would reach staff as a blank.
+    expect(Object.keys(MATCH_CONFIDENCE).sort()).toEqual(['amount', 'close', 'flat', 'reference']);
+  });
+
+  it('says what a flat match means, since it is the one that ignores the amount', () => {
+    expect(MATCH_CONFIDENCE.flat).toContain('flat');
   });
 });
