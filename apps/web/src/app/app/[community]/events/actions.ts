@@ -12,7 +12,6 @@ import {
   uuid,
   volunteerSchema,
   votePollSchema,
-  voteReallocationSchema,
 } from '@samudaya/core';
 import { requireCapability, requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
@@ -585,53 +584,6 @@ export async function votePoll(formData: FormData): Promise<void> {
     );
 
   revalidatePath(`/app/${slug}/feed`);
-}
-
-export type ReallocationState = ActionState & { resolved?: boolean; approved?: boolean };
-
-export async function voteReallocation(
-  _prev: ReallocationState,
-  formData: FormData,
-): Promise<ReallocationState> {
-  const slug = String(formData.get('slug') ?? '');
-  await requireCommunity(slug);
-
-  const parsed = voteReallocationSchema.safeParse({
-    reallocation_id: formData.get('reallocation_id'),
-    approve: formData.get('approve') === '1',
-    channel: 'web',
-  });
-  if (!parsed.success) return { error: 'That vote could not be recorded.' };
-
-  const supabase = await getSupabase();
-  // The tally and the threshold check happen inside the database, in the same
-  // transaction as the vote — two people voting at once cannot both read a
-  // pre-threshold count and neither resolve it.
-  const { data, error } = await supabase.rpc('vote_on_reallocation', {
-    p_reallocation_id: parsed.data.reallocation_id,
-    p_approve: parsed.data.approve,
-    p_channel: 'web',
-  });
-
-  if (error) return { error: friendlyDbError(error) };
-
-  const row = data?.[0];
-  revalidatePath(`/app/${slug}/feed`);
-  revalidatePath(`/app/${slug}`);
-
-  if (row?.status === 'already_resolved') {
-    return { error: 'That vote has already closed.' };
-  }
-  return {
-    ...EMPTY_STATE,
-    success: row?.resolved
-      ? row.approved
-        ? 'Approved — the transfer is recorded in the audit log.'
-        : 'The proposal did not pass.'
-      : 'Your vote has been recorded.',
-    resolved: row?.resolved ?? false,
-    approved: row?.approved ?? false,
-  };
 }
 
 export async function goToEvent(slug: string, eventSlug: string): Promise<never> {

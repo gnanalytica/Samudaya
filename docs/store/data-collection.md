@@ -15,23 +15,23 @@ worse problem than one that was never filed.
 
 ## Collected, and linked to you
 
-| What                          | Where it lives                                                                                      | Why                                             | Optional?                                      |
-| ----------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------- |
-| Name                          | `profiles.full_name`                                                                                | Your neighbours need to know who is on the list | Required                                       |
-| Email address                 | `profiles.email`, `auth.users`                                                                      | It is how you sign in                           | Required                                       |
-| Phone number                  | `profiles.phone`, `join_requests.claimed_phone`                                                     | So staff and the committee can reach you        | Optional                                       |
-| Profile photo                 | `profiles.avatar_url` (from Google, if you sign in with it)                                         | Shown beside your name                          | Optional                                       |
-| Which society, which flat     | `memberships`, `unit_occupants`, `units`                                                            | The whole product; also who may read what       | Required                                       |
-| Join requests                 | `join_requests`                                                                                     | The admin approves or declines                  | Required to join that way                      |
-| Invite codes tried            | `invite_code_attempts.code_tried`                                                                   | Rate-limits brute force                         | Required                                       |
-| Contributions                 | `contributions` — amount, UPI reference, receipt number                                             | The society ledger                              | Optional (you need not contribute)             |
-| Expenses you filed            | `expenses` — vendor, amount, bill                                                                   | The society ledger                              | Staff and committee only                       |
-| Bills and payment screenshots | `storage.bills`, `storage.payment-proofs` (both private)                                            | Proof behind a ledger line                      | Optional                                       |
-| Votes, sign-ups, volunteering | `poll_votes`, `suggestion_votes`, `reallocation_votes`, `activity_participants`, `event_volunteers` | Taking part                                     | Optional                                       |
-| Things you wrote              | `activity_suggestions`, `comments`, `announcements`                                                 | Taking part                                     | Optional                                       |
-| Push notification token       | `device_push_tokens.token`, plus platform and app version                                           | Sending you a notification                      | Optional — declining notifications stores none |
-| WhatsApp number and messages  | `whatsapp_links`, `whatsapp_messages`                                                               | Only if you use the WhatsApp bot                | Optional                                       |
-| Audit trail                   | `audit_log` — the fields that moved, and who moved them                                             | So a ledger cannot be quietly corrected         | Required                                       |
+| What                          | Where it lives                                                                | Why                                             | Optional?                                      |
+| ----------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| Name                          | `profiles.full_name`                                                          | Your neighbours need to know who is on the list | Required                                       |
+| Email address                 | `profiles.email`, `auth.users`                                                | It is how you sign in                           | Required                                       |
+| Phone number                  | `profiles.phone`, `join_requests.claimed_phone`                               | So staff and the committee can reach you        | Optional                                       |
+| Profile photo                 | `profiles.avatar_url` (from Google, if you sign in with it)                   | Shown beside your name                          | Optional                                       |
+| Which society, which flat     | `memberships`, `unit_occupants`, `units`                                      | The whole product; also who may read what       | Required                                       |
+| Join requests                 | `join_requests`                                                               | The admin approves or declines                  | Required to join that way                      |
+| Invite codes tried            | `invite_code_attempts.code_tried`                                             | Rate-limits brute force                         | Required                                       |
+| Contributions                 | `contributions` — amount, UPI reference, receipt number                       | The society ledger                              | Optional (you need not contribute)             |
+| Expenses you filed            | `expenses` — vendor, amount, bill                                             | The society ledger                              | Staff and committee only                       |
+| Bills and payment screenshots | `storage.bills`, `storage.payment-proofs` (both private)                      | Proof behind a ledger line                      | Optional                                       |
+| Votes, sign-ups, volunteering | `poll_votes`, `suggestion_votes`, `activity_participants`, `event_volunteers` | Taking part                                     | Optional                                       |
+| Things you wrote              | `activity_suggestions`, `comments`, `announcements`                           | Taking part                                     | Optional                                       |
+| Push notification token       | `device_push_tokens.token`, plus platform and app version                     | Sending you a notification                      | Optional — declining notifications stores none |
+| WhatsApp number and messages  | `whatsapp_links`, `whatsapp_messages`                                         | Only if you use the WhatsApp bot                | Optional                                       |
+| Audit trail                   | `audit_log` — the fields that moved, and who moved them                       | So a ledger cannot be quietly corrected         | Required                                       |
 
 ## Collected, and **not** linked to you
 

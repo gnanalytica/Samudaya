@@ -130,8 +130,8 @@ export default function TermsPage() {
             admins or treasurer.
           </li>
           <li>
-            Rules a community sets in {LEGAL.product}, such as surplus rules and fund reallocation
-            votes, help it act transparently but do not replace its legal obligations.
+            Rules a community sets in {LEGAL.product}, such as what happens to money left over when
+            an event closes, help it act transparently but do not replace its legal obligations.
           </li>
         </LegalList>
       </LegalSection>

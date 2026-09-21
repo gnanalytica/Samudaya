@@ -368,33 +368,6 @@ export const votePollSchema = z.object({
   channel: originChannelSchema.default('web'),
 });
 
-export const proposeReallocationSchema = z
-  .object({
-    community_id: uuid,
-    from_event_id: uuid,
-    to_event_id: uuid.nullable().optional(),
-    to_label: z.string().trim().max(140).nullable().optional(),
-    amount: z.coerce.number().positive('Enter an amount greater than zero').max(10_000_000),
-    reason: z.string().trim().min(10, 'Explain why, in a sentence residents can judge').max(1000),
-    threshold_pct: z.coerce.number().int().min(1).max(100).default(60),
-    closes_at: z.string().datetime({ offset: true }).nullable().optional(),
-  })
-  .refine((v) => Boolean(v.to_event_id) !== Boolean(v.to_label), {
-    message: 'Pick either another event or a named destination, not both',
-    path: ['to_event_id'],
-  })
-  .refine((v) => !v.to_event_id || v.to_event_id !== v.from_event_id, {
-    message: 'A fund cannot be moved into itself',
-    path: ['to_event_id'],
-  });
-export type ProposeReallocationInput = z.infer<typeof proposeReallocationSchema>;
-
-export const voteReallocationSchema = z.object({
-  reallocation_id: uuid,
-  approve: z.boolean(),
-  channel: originChannelSchema.default('web'),
-});
-
 // ---------------------------------------------------------------------------
 // API keys
 // ---------------------------------------------------------------------------
