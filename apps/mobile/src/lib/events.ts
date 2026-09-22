@@ -118,22 +118,51 @@ export async function fetchEventDetail(communityId: string, slug: string, member
       : Promise.resolve({ data: null }),
   ]);
 
-  // Counting the rows suggestion_votes hands back would under-count, because it
-  // hands back only what this reader may see by name: their own ballot, every
-  // vote in favour, and — for the committee — the votes against. The totals come
-  // from suggestion_stats, which counts every ballot without naming any of them.
-  const suggestionRows = suggestions.data ?? [];
-  const suggestionIds = suggestionRows.map((row) => row.id);
-  const [voteTotals, votes] = suggestionIds.length
+  const counts = new Map(
+    (activityStats.data ?? []).map((row) => [row.activity_id, row.interested ?? 0]),
+  );
+
+  return {
+    event,
+    eventType: eventType.data?.label ?? null,
+    stats: normalizeStats(stats.data),
+    budget: budget.data ?? [],
+    expenses: expenses.data ?? [],
+    activities: (activities.data ?? []).map((activity) => ({
+      ...activity,
+      registered: counts.get(activity.id) ?? 0,
+    })),
+    registrations: registrations.data ?? [],
+    myPayments: payments.data ?? [],
+    // Residents see suggestions open for voting, plus their own awaiting the
+    // committee. Staff and committee see everything still in play.
+    suggestions: await withTallies(suggestions.data ?? [], membershipId),
+  };
+}
+
+/**
+ * Attaches each suggestion's vote tally, and the reader's own ballot.
+ *
+ * Counting the rows suggestion_votes hands back would under-count, because it
+ * hands back only what this reader may see by name: their own ballot, every
+ * vote in favour, and — for the committee — the votes against. The totals come
+ * from suggestion_stats, which counts every ballot without naming any of them.
+ *
+ * Shared by the event screen and the Ideas screen, because two copies of this
+ * would be two different answers to "how many voted for it".
+ */
+export async function withTallies<T extends { id: string }>(rows: T[], membershipId: string) {
+  const ids = rows.map((row) => row.id);
+  const [voteTotals, votes] = ids.length
     ? await Promise.all([
         supabase
           .from('suggestion_stats')
           .select('suggestion_id, votes_for, votes_against')
-          .in('suggestion_id', suggestionIds),
+          .in('suggestion_id', ids),
         supabase
           .from('suggestion_votes')
           .select('suggestion_id, membership_id, support')
-          .in('suggestion_id', suggestionIds),
+          .in('suggestion_id', ids),
       ])
     : [{ data: [] as VoteTotals[] }, { data: [] as SeenVote[] }];
 
@@ -155,29 +184,33 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     tallies.set(vote.suggestion_id, tally);
   }
 
-  const counts = new Map(
-    (activityStats.data ?? []).map((row) => [row.activity_id, row.interested ?? 0]),
-  );
+  return rows.map((row) => ({
+    ...row,
+    tally: tallies.get(row.id) ?? { support: 0, against: 0, mine: null },
+  }));
+}
 
-  return {
-    event,
-    eventType: eventType.data?.label ?? null,
-    stats: normalizeStats(stats.data),
-    budget: budget.data ?? [],
-    expenses: expenses.data ?? [],
-    activities: (activities.data ?? []).map((activity) => ({
-      ...activity,
-      registered: counts.get(activity.id) ?? 0,
-    })),
-    registrations: registrations.data ?? [],
-    myPayments: payments.data ?? [],
-    // Residents see suggestions open for voting, plus their own awaiting the
-    // committee. Staff and committee see everything still in play.
-    suggestions: suggestionRows.map((row) => ({
-      ...row,
-      tally: tallies.get(row.id) ?? { support: 0, against: 0, mine: null },
-    })),
-  };
+/**
+ * Every suggestion still in play across the society — the ones about an event
+ * and the ones about nothing in particular, in one list.
+ *
+ * The split exists in the database because an event's suggestions belong to
+ * that event's page, but a resident thinking "didn't someone suggest that?"
+ * does not know or care which kind theirs was. So this screen asks for both
+ * and says which event each one belongs to.
+ */
+export async function fetchIdeas(communityId: string, membershipId: string) {
+  const { data } = await supabase
+    .from('activity_suggestions')
+    .select(
+      'id, kind, name, description, status, suggested_by, created_at, event_id, events(slug, name, emoji)',
+    )
+    .eq('community_id', communityId)
+    .in('status', ['new', 'reviewing', 'accepted'])
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  return withTallies(data ?? [], membershipId);
 }
 
 /**

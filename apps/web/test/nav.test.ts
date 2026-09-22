@@ -133,6 +133,8 @@ describe('eventTabsFor', () => {
 // ---------------------------------------------------------------------------
 const SRC = join(import.meta.dirname, '..', 'src');
 const read = (...parts: string[]) => readFileSync(join(SRC, ...parts), 'utf8');
+const MOBILE = join(import.meta.dirname, '..', '..', 'mobile');
+const mobile = (...parts: string[]) => readFileSync(join(MOBILE, ...parts), 'utf8');
 const count = (haystack: string, needle: string) => haystack.split(needle).length - 1;
 
 /**
@@ -197,15 +199,42 @@ describe('a phone reaches everything a desktop does', () => {
     expect(home).toContain('md:hidden');
   });
 
-  it('gives a resident on the phone app a way into People at all', () => {
-    // /people turns nobody away — it checks membership and nothing else — but
-    // the only screens that opened it were Manage, which residents never see,
-    // and Community, which is switched off for the pilot.
-    const me = readFileSync(
-      join(import.meta.dirname, '..', '..', 'mobile', 'app', '(tabs)', 'me.tsx'),
-      'utf8',
-    );
-    expect(me).toContain("router.push('/people')");
+  it('gives a resident on the phone app a way into People and Ideas at all', () => {
+    // Neither screen turns anybody away — /people checks membership and
+    // nothing else — but the only screens that opened them were Manage, which
+    // residents never see, and Community, which is switched off for the pilot.
+    expect(mobile('app', '(tabs)', 'me.tsx')).toContain("router.push('/people')");
+    expect(mobile('app', '(tabs)', 'me.tsx')).toContain("router.push('/ideas')");
+    expect(mobile('app', '_layout.tsx')).toContain('name="ideas"');
+  });
+
+  it('sends a society-wide suggestion in the queue to the ideas, not the events list', () => {
+    // It has no event, so "See the event" used to land the committee on the
+    // events list — nowhere near the thing they were asked to decide on.
+    const queue = mobile('src', 'components', 'todo-queue.tsx');
+    const branch = queue.slice(queue.indexOf("case 'suggestion_to_review'"));
+    expect(branch.slice(0, 400)).toContain("'/ideas'");
+  });
+
+  it('renders one suggestions component into both the event page and Ideas', () => {
+    // Built once and used twice, rather than two lists that drift — the last
+    // time voting lived in only one screen, the other screen did not exist.
+    for (const screen of [
+      ['app', 'event', '[slug].tsx'],
+      ['app', 'ideas.tsx'],
+    ] as const) {
+      expect(mobile(...screen), screen.join('/')).toContain('<Suggestions');
+    }
+    expect(mobile('src', 'components', 'suggestions.tsx')).toContain('export function Suggestions');
+  });
+
+  it('shows the phone both kinds of idea, the society’s and each event’s', () => {
+    // A resident wondering "did somebody already suggest that?" does not know
+    // which kind theirs was, so the screen does not make them choose.
+    const lib = mobile('src', 'lib', 'events.ts');
+    const query = lib.slice(lib.indexOf('export async function fetchIdeas'));
+    expect(query.slice(0, 900)).not.toContain("is('event_id', null)");
+    expect(query.slice(0, 900)).toContain('events(slug, name, emoji)');
   });
 
   it('offers joining and founding a society from Me, not only from the switcher', () => {

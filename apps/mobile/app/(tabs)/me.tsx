@@ -119,6 +119,11 @@ export default function Me() {
             detail="Everyone in the society, by flat"
             onPress={() => router.push('/people')}
           />
+          <LinkRow
+            label="Ideas"
+            detail="Suggest something, and vote on what others suggested"
+            onPress={() => router.push('/ideas')}
+          />
         </Card>
 
         {participant ? (
