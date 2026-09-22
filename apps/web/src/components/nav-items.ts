@@ -46,9 +46,11 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
       items: [
         { href: base, label: 'Home', icon: LayoutDashboard, primary: true },
         { href: `${base}/events`, label: 'Events', icon: CalendarDays, primary: true },
-        { href: `${base}/people`, label: 'People', icon: Users, primary: true },
-        // Not primary: the bottom bar is full, and Home already points here.
-        { href: `${base}/money`, label: 'Money', icon: Wallet },
+        // Not primary: the bar has four slots and Money wants one of them more.
+        // People is a directory you consult now and then; the ledger is the
+        // thing the society publishes.
+        { href: `${base}/people`, label: 'People', icon: Users },
+        { href: `${base}/money`, label: 'Money', icon: Wallet, primary: true },
         { href: `${base}/suggest`, label: 'Ideas', icon: Lightbulb },
         { href: `${base}/me`, label: 'Me', icon: UserRound, primary: true },
       ],
@@ -120,17 +122,21 @@ function manageTab(slug: string): NavItem {
 /**
  * Four tabs — and which four depends on whether you run the society.
  *
- * Residents keep Home, Events, People, Me. Staff and the committee trade
- * People for Manage: the To do count rides on the tab, and the hub behind it
- * leads to the event console, Reconcile, Society settings and People itself.
+ * Residents get Home, Events, Money, Me. Staff and the committee get Home,
+ * Events, Manage, Me, with the To do count riding on the tab.
  *
- * This is the shape the phone app has always had, and it was the better answer
- * all along. The sheet behind the society name came first and did fix the real
- * problem — on a phone there was no route to Manage at all — and it still
- * carries Money and Ideas. But a sheet is a drawer you have to know about, and
- * a committee member approving a bill from their phone should not have to find
- * one. So the work that is waiting gets a tab, and People gives up its place
- * to it: Home links to People, and so does the first row of the hub.
+ * Both of those middle slots were won the same way. Manage took one because
+ * the work waiting on the committee is why they open the app at all, and it
+ * used to live in the sheet behind the society name — a drawer you have to
+ * know about. Money took the other because the ledger is the thing this app
+ * exists to publish, and asking a resident to open Home first to read it is
+ * the same mistake one step smaller.
+ *
+ * What gives way both times is People. It is a directory you consult now and
+ * then rather than daily, and it keeps its place in the sidebar, in the sheet,
+ * as the second row of the Manage hub, and under "More in this society" on
+ * Home — which is built by subtracting this bar from the list, so the two
+ * cannot drift.
  */
 export function bottomNavItems(slug: string, role: MemberRole): NavItem[] {
   const primary = visibleNav(slug, role)
@@ -138,8 +144,9 @@ export function bottomNavItems(slug: string, role: MemberRole): NavItem[] {
     .filter((item) => item.primary);
   if (!can(role, 'events:manage')) return primary;
 
-  // In People's place rather than a fifth tab: five labels across a 360px
-  // phone is where they start wrapping, and four is what the phone app fits.
-  const rest = primary.filter((item) => item.href !== `/app/${slug}/people`);
+  // Money gives up the slot rather than Manage taking a fifth: five labels
+  // across a 360px phone is where they wrap. Staff read the ledger from Home,
+  // which lists whatever their bar left out.
+  const rest = primary.filter((item) => item.href !== `/app/${slug}/money`);
   return [...rest.slice(0, 2), manageTab(slug), ...rest.slice(2)];
 }

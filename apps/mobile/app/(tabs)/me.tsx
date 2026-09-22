@@ -108,6 +108,17 @@ export default function Me() {
             detail="Every rupee in and out, for every event"
             onPress={() => router.push('/money')}
           />
+          {/* The screen has always been there and has never turned a resident
+              away — /people checks nothing beyond membership. What it lacked
+              was a way in. The only two screens that opened it were Manage,
+              which residents never see, and Community, which is switched off
+              for the pilot, so on a phone a resident could not look up a
+              neighbour at all. */}
+          <LinkRow
+            label="Residents"
+            detail="Everyone in the society, by flat"
+            onPress={() => router.push('/people')}
+          />
         </Card>
 
         {participant ? (

@@ -8,6 +8,8 @@ import {
   Megaphone,
   PiggyBank,
   Sparkles,
+  Users,
+  Wallet,
 } from 'lucide-react';
 import {
   COPY,
@@ -24,6 +26,7 @@ import { requireCommunity } from '@/lib/auth';
 import { getTodoItems } from '@/lib/todo';
 import { getSocietyBalance, getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
+import { bottomNavItems } from '@/components/nav-items';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
 import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
 import { PageBody } from '@/components/page-header';
@@ -39,6 +42,27 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
   // Committee in resident view sees exactly what residents see.
   const { community, viewRole: role, profile, membership } = await requireCommunity(slug);
   const base = `/app/${community.slug}`;
+
+  // The phone's bottom bar has four slots and the society has more than four
+  // places. Rather than hard-code what it left out — which is how two lists
+  // drift until one of them strands a page — subtract the bar from the list.
+  // A resident's bar carries Money, so they see People here; staff trade Money
+  // for Manage, so they see both.
+  const onTheBar = new Set(bottomNavItems(community.slug, role).map((item) => item.href));
+  const alsoHere = [
+    {
+      href: `${base}/people`,
+      label: 'People',
+      detail: 'Everyone in the society, by flat',
+      icon: Users,
+    },
+    {
+      href: `${base}/money`,
+      label: 'Money',
+      detail: 'Every rupee in and out, for every event',
+      icon: Wallet,
+    },
+  ].filter((item) => !onTheBar.has(item.href));
 
   const events = await listEvents(community.id);
   const published = events.filter((event) => event.status === 'published');
@@ -309,6 +333,33 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               url={community.whatsapp_group_url}
               label={`Join the ${community.name} WhatsApp group`}
             />
+          </div>
+        ) : null}
+
+        {/* Phone only: on a desktop the sidebar already lists every one of
+            these, and a card repeating the sidebar two inches to its right is
+            noise. This exists because the bar is four slots wide. */}
+        {alsoHere.length ? (
+          <div className="md:hidden">
+            <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">More in this society</h2>
+            <div className="space-y-3">
+              {alsoHere.map(({ href, label, detail, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="border-border-base bg-surface-raised hover:bg-surface-sunken flex items-center justify-between gap-3 rounded-xl border p-4"
+                >
+                  <span className="flex items-center gap-3">
+                    <Icon className="text-accent size-5 shrink-0" aria-hidden="true" />
+                    <span>
+                      <span className="text-ink block text-sm font-semibold">{label}</span>
+                      <span className="text-ink-muted block text-xs">{detail}</span>
+                    </span>
+                  </span>
+                  <ArrowRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
+                </Link>
+              ))}
+            </div>
           </div>
         ) : null}
 
