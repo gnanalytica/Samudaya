@@ -186,3 +186,39 @@ export function setMemberUnitMessage(status: string): string {
     'We could not change that flat. Please try again.'
   );
 }
+
+/** The statuses public.request_unit_change() can return. */
+export type RequestUnitChangeStatus =
+  'ok' | 'not_a_member' | 'no_unit' | 'wrong_community' | 'already_there';
+
+const REQUEST_UNIT_MESSAGES: Record<RequestUnitChangeStatus, string> = {
+  ok: 'The committee has been asked.',
+  not_a_member: 'You are not a member of this society.',
+  no_unit: 'That flat no longer exists.',
+  wrong_community: 'That flat belongs to another society.',
+  already_there: 'That is already the flat you are listed at.',
+};
+
+export function requestUnitChangeMessage(status: string): string {
+  return (
+    REQUEST_UNIT_MESSAGES[status as RequestUnitChangeStatus] ??
+    'We could not send that request. Please try again.'
+  );
+}
+
+/** The statuses public.review_unit_change() can return. */
+export type ReviewUnitChangeStatus = 'ok' | 'not_committee' | 'no_request' | 'already_decided';
+
+const REVIEW_UNIT_MESSAGES: Record<ReviewUnitChangeStatus, string> = {
+  ok: 'Done.',
+  not_committee: 'Only the committee can answer a flat change.',
+  no_request: 'That request is no longer there.',
+  already_decided: 'Somebody has already answered this one.',
+};
+
+export function reviewUnitChangeMessage(status: string): string {
+  return (
+    REVIEW_UNIT_MESSAGES[status as ReviewUnitChangeStatus] ??
+    'We could not answer that request. Please try again.'
+  );
+}

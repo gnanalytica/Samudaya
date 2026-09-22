@@ -54,6 +54,10 @@ function detailRoute(item: TodoItem): Href {
       return item.event_slug
         ? { pathname: '/event/[slug]', params: { slug: item.event_slug, tab: 'vote' } }
         : '/events';
+    // The whole list, so the committee can see who else has no flat while
+    // they are already thinking about flats.
+    case 'flat_change':
+      return '/admin/society';
   }
 }
 
@@ -90,6 +94,30 @@ function actionsFor(kind: TodoKind, id: string): Action[] {
               p_contribution_id: id,
               p_confirm: false,
               p_note: note,
+            }),
+        },
+      ];
+    case 'flat_change':
+      return [
+        {
+          id: 'move',
+          label: 'Move them',
+          primary: true,
+          run: () => supabase.rpc('review_unit_change', { p_request_id: id, p_approve: true }),
+        },
+        {
+          id: 'leave',
+          label: 'Leave as is',
+          note: {
+            label: 'Why not? They will see this.',
+            placeholder: 'That flat already has someone in it',
+            required: false,
+          },
+          run: (note) =>
+            supabase.rpc('review_unit_change', {
+              p_request_id: id,
+              p_approve: false,
+              p_reason: note || undefined,
             }),
         },
       ];

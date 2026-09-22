@@ -1026,3 +1026,27 @@ export async function spendSocietyBalance(
   revalidatePath(`/app/${communitySlug}/money`);
   return { ...EMPTY_STATE, success: 'Society funds are now behind this event.' };
 }
+
+/**
+ * The committee answers a resident who says they have moved.
+ *
+ * Seating somebody decides who the ledger names against their money, so the
+ * database gates this on being committee rather than staff — same as the
+ * control on the People page, which calls the same seating code underneath.
+ */
+export async function reviewFlatChange(formData: FormData): Promise<void> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  await requireCapability(communitySlug, 'roles:manage');
+
+  const supabase = await getSupabase();
+  await supabase.rpc('review_unit_change', {
+    p_request_id: String(formData.get('request_id') ?? ''),
+    p_approve: formData.get('approve') === '1',
+    p_reason: String(formData.get('reason') ?? '').trim() || undefined,
+  });
+
+  revalidatePath(`/app/${communitySlug}/todo`);
+  revalidatePath(`/app/${communitySlug}/people`);
+  // Their payments in the ledger are labelled from where they live.
+  revalidatePath(`/app/${communitySlug}/money`);
+}

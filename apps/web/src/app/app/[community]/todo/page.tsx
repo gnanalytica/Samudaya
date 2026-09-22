@@ -17,7 +17,12 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/field';
 import { EmptyState } from '@/components/ui/empty-state';
 import { ReviewExpenseForm, ReviewPaymentForm } from '../admin/events/[event]/forms';
-import { decideCampaign, decideSuggestion, reviewJoinRequest } from '../admin/events/actions';
+import {
+  decideCampaign,
+  decideSuggestion,
+  reviewFlatChange,
+  reviewJoinRequest,
+} from '../admin/events/actions';
 
 export const metadata = { title: COPY.todo };
 
@@ -29,6 +34,10 @@ function detailHref(base: string, item: TodoItem): string | null {
       return event ? `${base}/admin/events/${event}?tab=payments` : null;
     case 'join_request':
       return `${base}/people/requests`;
+    // The whole list, so the committee can see who else has no flat while
+    // they are already thinking about flats.
+    case 'flat_change':
+      return `${base}/people`;
     case 'bill_to_approve':
     case 'bill_sent_back':
       return event ? `${base}/admin/events/${event}?tab=bills` : null;
@@ -47,6 +56,7 @@ const DETAIL_LABEL: Record<TodoKind, string> = {
   bill_sent_back: 'Fix the bill',
   campaign_to_review: 'See the campaign',
   suggestion_to_review: 'See the event',
+  flat_change: 'See everyone and their flats',
 };
 
 function detailLabel(item: TodoItem): string {
@@ -232,6 +242,28 @@ function TodoActions({
           expenseId={item.id}
           mayApprove
         />
+      ) : null;
+
+    case 'flat_change':
+      return can(role, 'roles:manage') ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={reviewFlatChange}>
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="request_id" value={item.id} />
+            <input type="hidden" name="approve" value="1" />
+            <Button type="submit" size="sm">
+              Move them
+            </Button>
+          </form>
+          <form action={reviewFlatChange}>
+            <input type="hidden" name="slug" value={slug} />
+            <input type="hidden" name="request_id" value={item.id} />
+            <input type="hidden" name="approve" value="0" />
+            <Button type="submit" size="sm" variant="ghost">
+              Leave as is
+            </Button>
+          </form>
+        </div>
       ) : null;
 
     case 'bill_sent_back':

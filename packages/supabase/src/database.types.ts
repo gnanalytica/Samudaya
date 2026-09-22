@@ -2183,6 +2183,77 @@ export type Database = {
           }
         ]
       }
+      unit_change_requests: {
+        Row: {
+          id: string
+          community_id: string
+          membership_id: string
+          unit_id: string | null
+          note: string | null
+          status: Database["public"]["Enums"]["join_request_status"]
+          reviewed_by: string | null
+          reviewed_at: string | null
+          decline_reason: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          membership_id: string
+          unit_id?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["join_request_status"]
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          decline_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          membership_id?: string
+          unit_id?: string | null
+          note?: string | null
+          status?: Database["public"]["Enums"]["join_request_status"]
+          reviewed_by?: string | null
+          reviewed_at?: string | null
+          decline_reason?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_change_requests_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_change_requests_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_change_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_change_requests_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       unit_occupants: {
         Row: {
           id: string
@@ -2818,6 +2889,14 @@ export type Database = {
         community_name: string | null
       }[]
       }
+      request_unit_change: {
+        Args: {
+        p_community_id: string
+        p_unit_id?: string
+        p_note?: string
+      }
+        Returns: string
+      }
       review_contribution: {
         Args: {
         p_contribution_id: string
@@ -2844,6 +2923,14 @@ export type Database = {
         p_reason?: string
       }
         Returns: Database["public"]["Tables"]["join_requests"]["Row"]
+      }
+      review_unit_change: {
+        Args: {
+        p_request_id: string
+        p_approve: boolean
+        p_reason?: string
+      }
+        Returns: string
       }
       set_member_unit: {
         Args: {

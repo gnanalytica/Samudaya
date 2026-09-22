@@ -8,6 +8,7 @@ import {
   ROLE_LABEL,
   can,
   normalizeRole,
+  setMemberUnitMessage,
   unitLabel,
   type Role,
 } from '@samudaya/core';
@@ -21,6 +22,7 @@ import {
   Card,
   EmptyState,
   Heading,
+  Input,
   Loading,
   Screen,
   Title,
@@ -38,17 +40,28 @@ export default function EditMember() {
   const { role, membershipId, refresh: refreshAuth } = useAuth();
 
   const { data, loading } = useCommunityData(`admin:member:${id}`, async (communityId) => {
-    const { data: row } = await supabase
-      .from('memberships')
-      .select(
-        // Contact details are staff-only and come from society_people(); a plain
-        // select of profiles.email is no longer granted to any client.
-        'id, role, joined_at, profiles(full_name), unit_occupants(relation, units(block, number))',
-      )
-      .eq('community_id', communityId)
-      .eq('id', String(id))
-      .maybeSingle();
-    return row;
+    // The member, and the flats the committee can move them between. Two reads
+    // rather than one: the flat list is the society's, not this member's.
+    const [{ data: row }, { data: flats }] = await Promise.all([
+      supabase
+        .from('memberships')
+        .select(
+          // Contact details are staff-only and come from society_people(); a plain
+          // select of profiles.email is no longer granted to any client.
+          'id, role, joined_at, profiles(full_name), unit_occupants(unit_id, relation, moved_out_on, units(block, number))',
+        )
+        .eq('community_id', communityId)
+        .eq('id', String(id))
+        .maybeSingle(),
+      supabase
+        .from('units')
+        .select('id, block, number')
+        .eq('community_id', communityId)
+        .order('block')
+        .order('number')
+        .limit(5000),
+    ]);
+    return row ? { ...row, flats: flats ?? [] } : null;
   });
 
   if (!can(role, 'residents:remove')) {
@@ -91,7 +104,13 @@ type MemberRow = {
   role: Parameters<typeof normalizeRole>[0];
   joined_at: string;
   profiles: { full_name: string | null } | null;
-  unit_occupants: { relation: string; units: { block: string | null; number: string } | null }[];
+  unit_occupants: {
+    unit_id: string;
+    relation: string;
+    moved_out_on: string | null;
+    units: { block: string | null; number: string } | null;
+  }[];
+  flats: { id: string; block: string | null; number: string }[];
 };
 
 function MemberEditor({
@@ -109,14 +128,33 @@ function MemberEditor({
   const queryClient = useQueryClient();
   const current = normalizeRole(member.role) ?? 'resident';
   const [nextRole, setNextRole] = useState<Role>(current);
-  const [busy, setBusy] = useState<'save' | 'remove' | null>(null);
+  const [busy, setBusy] = useState<'save' | 'remove' | 'flat' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [flatQuery, setFlatQuery] = useState('');
 
   const name = member.profiles?.full_name ?? 'This resident';
-  const flats = member.unit_occupants
+  const here = member.unit_occupants.filter((row) => row.moved_out_on === null);
+  const flats = here
     .filter((row) => row.units)
     .map((row) => `Flat ${unitLabel(row.units)} · ${row.relation}`);
   const mayRemove = !isSelf && (current === 'resident' || mayManageRoles);
+  const seated = here.find((row) => row.units)
+    ? unitLabel(here.find((row) => row.units)!.units)
+    : null;
+
+  // Narrowed on the normalised label, so "a703", "A 703" and "a-703" all find
+  // the same flat — the same shapes app.split_flat() reads.
+  const needle = flatQuery.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const found = needle
+    ? member.flats.filter((flat) =>
+        `${flat.block ?? ''}${flat.number}`
+          .replace(/[^a-z0-9]/gi, '')
+          .toUpperCase()
+          .includes(needle),
+      )
+    : [];
+  const matchCount = found.length;
+  const matches = found.slice(0, 24);
 
   const afterChange = async () => {
     await queryClient.invalidateQueries({ queryKey: ['admin:members'] });
@@ -138,6 +176,22 @@ function MemberEditor({
     }
     await afterChange();
     router.back();
+  };
+
+  const saveFlat = async (unitId: string | null) => {
+    setBusy('flat');
+    setError(null);
+    const { data: result, error: rpcError } = await supabase.rpc('set_member_unit', {
+      p_membership_id: member.id,
+      p_unit_id: unitId ?? undefined,
+    });
+    setBusy(null);
+    if (rpcError || result !== 'ok') {
+      setError(rpcError?.message ?? setMemberUnitMessage(result ?? ''));
+      return;
+    }
+    setFlatQuery('');
+    await afterChange();
   };
 
   const remove = async () => {
@@ -189,6 +243,69 @@ function MemberEditor({
               loading={busy === 'save'}
               disabled={nextRole === current}
             />
+          </Card>
+        ) : null}
+
+        {/* A committee member on their phone could not seat anybody: the flats
+            screen counts occupants without being able to add one, and the two
+            paths that do seat somebody both happen at the moment of joining.
+            Filtered rather than listed, because a society is hundreds of flats
+            and a wall of chips is not a picker. */}
+        {mayManageRoles ? (
+          <Card style={{ gap: spacing.md }}>
+            <Heading>Flat</Heading>
+            <Body muted>
+              {seated
+                ? `Listed at ${seated}. Moving them keeps the old flat as history, so their past payments stay with it.`
+                : 'Not listed at any flat, so their payments show no flat beside their name.'}
+            </Body>
+            <Input
+              label="Find a flat"
+              value={flatQuery}
+              onChangeText={setFlatQuery}
+              placeholder="A 703"
+              autoCapitalize="characters"
+            />
+            {flatQuery.trim() ? (
+              matches.length ? (
+                <ChipRow>
+                  {matches.map((flat) => (
+                    <Chip
+                      key={flat.id}
+                      label={unitLabel(flat)}
+                      selected={here.some((row) => row.unit_id === flat.id)}
+                      disabled={busy !== null}
+                      onPress={() => void saveFlat(flat.id)}
+                    />
+                  ))}
+                </ChipRow>
+              ) : (
+                <Caption>No flat matches that.</Caption>
+              )
+            ) : (
+              <Caption>
+                {member.flats.length} flats in this society. Type part of one to pick it.
+              </Caption>
+            )}
+            {matchCount > matches.length ? (
+              <Caption>
+                Showing {matches.length} of {matchCount}. Type more to narrow it.
+              </Caption>
+            ) : null}
+            {seated ? (
+              <Button
+                label="Take them out of their flat"
+                variant="secondary"
+                loading={busy === 'flat'}
+                disabled={busy !== null}
+                onPress={() =>
+                  Alert.alert(`Take ${name} out of ${seated}?`, 'Their past payments keep it.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Take out', onPress: () => void saveFlat(null) },
+                  ])
+                }
+              />
+            ) : null}
           </Card>
         ) : null}
 
