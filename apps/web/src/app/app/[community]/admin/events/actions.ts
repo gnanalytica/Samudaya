@@ -6,6 +6,8 @@ import { z } from 'zod';
 import {
   DEFAULT_FUND_RULE,
   allocateSurplusSchema,
+  NEW_EDITION,
+  surplusKindFor,
   can,
   closeEventSchema,
   createActivitySchema,
@@ -915,11 +917,14 @@ export async function closeEvent(_prev: CloseState, formData: FormData): Promise
 /**
  * The committee decides where a closed event's surplus goes.
  *
+ * Two answers, not three: the society keeps it, or it goes behind another
+ * event. Which movement that becomes — a carry to an event already on the
+ * calendar, or to next year's edition — is worked out from the target rather
+ * than asked, because that is a fact about the calendar and not a decision
+ * about money.
+ *
  * The amount is not sent: the database takes the whole of what is left, which
  * is what the ledger says rather than what somebody typed into a box.
- *
- * `next_edition` without a target creates the event first — "keep it for next
- * year" is useless if next year's event has to exist before you can say it.
  */
 export async function allocateSurplus(
   _prev: ActionState,
@@ -933,16 +938,17 @@ export async function allocateSurplus(
 
   const parsed = allocateSurplusSchema.safeParse({
     event_id: event.id,
-    kind: formData.get('kind'),
-    to_event_id: formData.get('to_event_id') || undefined,
+    answer: formData.get('answer'),
+    to_event: formData.get('to_event') || undefined,
     note: formData.get('note') || undefined,
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
+  const kind = surplusKindFor(parsed.data.answer, parsed.data.to_event);
   const supabase = await getSupabase();
-  let target = parsed.data.to_event_id ?? null;
+  let target = parsed.data.to_event === NEW_EDITION ? null : (parsed.data.to_event ?? null);
 
-  if (parsed.data.kind === 'next_edition' && !target) {
+  if (kind === 'next_edition') {
     // "Keep it for next year" is useless if next year's event has to exist
     // before you can say it, so the draft is made here and the committee fills
     // it in whenever they get to planning.
@@ -976,7 +982,7 @@ export async function allocateSurplus(
 
   const { error } = await supabase.rpc('allocate_surplus', {
     p_event_id: event.id,
-    p_kind: parsed.data.kind,
+    p_kind: kind,
     p_to_event_id: target ?? undefined,
     p_note: parsed.data.note ?? undefined,
   });
@@ -989,8 +995,8 @@ export async function allocateSurplus(
   return {
     ...EMPTY_STATE,
     success:
-      parsed.data.kind === 'society_balance'
-        ? 'Kept as society balance. Everybody can see it on their home screen.'
+      kind === 'society_balance'
+        ? 'Kept for the society. Everybody can see it on their home screen.'
         : 'Carried forward. It counts towards that event from now on.',
   };
 }

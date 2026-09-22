@@ -94,15 +94,19 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
           />
         </StatTiles>
 
-        {/* Where the money left in a closed event went. The home screen links
-            straight here, because "the society is holding ₹12,000" is only
-            worth saying if the next question — from what, and decided by
-            whom — has an answer on the same screen. */}
+        {/* Where the money left in a closed event went — into the society's
+            own balance, or straight behind another event, which never touches
+            the balance at all. The card was titled for the balance alone, and
+            a carry from Ganesh to Diwali read as if it were part of a figure
+            it has nothing to do with. The home screen links here, because
+            "the society is holding ₹12,000" is only worth saying if the next
+            question — from what, and decided by whom — is answered on the
+            same screen. */}
         {movements.length ? (
           <Card className="mt-5 scroll-mt-20" id="society-balance">
             <CardHeader
-              title="Society balance"
-              description="What was left over when an event closed, and what the committee decided to do with it."
+              title="Where money has moved"
+              description="What was left over when an event closed, and what the committee decided to do with it — carry it to another event, or keep it for the society."
             />
             <CardBody className="border-border-base flex items-center gap-3 border-b">
               <PiggyBank className="text-accent size-6 shrink-0" aria-hidden="true" />
@@ -111,7 +115,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                   {formatMoney(society.balance, community.currency)}
                 </p>
                 <p className="text-ink-subtle text-xs">
-                  Held by the society and not behind any event
+                  Society balance · what is left after all of this, behind no event
                 </p>
               </div>
             </CardBody>
