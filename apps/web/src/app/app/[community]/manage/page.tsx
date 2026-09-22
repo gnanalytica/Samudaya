@@ -45,8 +45,9 @@ export default async function ManagePage(props: PageProps<'/app/[community]/mana
       detail: 'Create and run events, and see each one’s money',
       icon: CalendarCog,
     },
-    // First row on the phone app's Manage tab too, and the reason People can
-    // give up its own tab here.
+    // People has no tab of its own on a phone — Money and Manage took the two
+    // middle slots — so every hub that can lead back to it does. This is one
+    // of them, and it is the first row of the phone app's Manage tab too.
     {
       href: `${base}/people`,
       label: 'People',

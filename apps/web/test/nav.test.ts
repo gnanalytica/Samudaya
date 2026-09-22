@@ -5,18 +5,32 @@ import { bottomNavItems, visibleNav } from '@/components/nav-items';
 import { eventTabsFor } from '@/components/event-tabs';
 
 describe('bottomNavItems', () => {
-  it('gives a resident Home, Events, People and Me', () => {
+  it('gives a resident Home, Events, Money and Me', () => {
+    // The ledger is the thing this app exists to publish. Making a resident
+    // open Home first to read it is a small version of the mistake the sheet
+    // made with Manage.
     const labels = bottomNavItems('arkala', 'resident').map((item) => item.label);
-    expect(labels).toEqual(['Home', 'Events', 'People', 'Me']);
+    expect(labels).toEqual(['Home', 'Events', 'Money', 'Me']);
   });
 
-  it('trades People for Manage once you run the society', () => {
-    // The shape the phone app has always had. People does not disappear: Home
-    // links to it, and it is the first row of the Manage hub.
+  it('trades Money for Manage once you run the society', () => {
+    // The shape the phone app has always had.
     for (const role of ['staff', 'committee'] as const) {
       const labels = bottomNavItems('arkala', role).map((item) => item.label);
       expect(labels, role).toEqual(['Home', 'Events', 'Manage', 'Me']);
     }
+  });
+
+  it('never puts People on the bar, and never strands it', () => {
+    // It gives way in both shapes, so every one of them has to lead back: the
+    // sidebar, the sheet, the Manage hub, and "More in this society" on Home.
+    for (const role of ['resident', 'staff', 'committee'] as const) {
+      const hrefs = bottomNavItems('arkala', role).map((item) => item.href);
+      expect(hrefs, role).not.toContain('/app/arkala/people');
+    }
+    const sidebar = visibleNav('arkala', 'resident').flatMap((g) => g.items.map((i) => i.href));
+    expect(sidebar).toContain('/app/arkala/people');
+    expect(read('app', 'app', '[community]', 'manage', 'page.tsx')).toContain('${base}/people');
   });
 
   it('never grows past four, which is what a 360px phone fits', () => {
@@ -170,6 +184,28 @@ describe('a phone reaches everything a desktop does', () => {
     const page = read('app', 'app', '[community]', 'manage', 'page.tsx');
     expect(page).toContain("requireCapability(slug, 'events:manage')");
     expect(page).toContain("can(role, 'payments:record')");
+  });
+
+  it('lists on Home whatever the bar left out, by subtracting one from the other', () => {
+    // Two hand-kept lists drift, and the way you find out is a page nobody can
+    // reach. Home asks the bar what it is carrying instead.
+    const home = read('app', 'app', '[community]', 'page.tsx');
+    expect(home).toContain('bottomNavItems(community.slug, role)');
+    expect(home).toContain('!onTheBar.has(item.href)');
+    // And it is phone-only: the sidebar already lists these on a desktop.
+    expect(home).toContain('More in this society');
+    expect(home).toContain('md:hidden');
+  });
+
+  it('gives a resident on the phone app a way into People at all', () => {
+    // /people turns nobody away — it checks membership and nothing else — but
+    // the only screens that opened it were Manage, which residents never see,
+    // and Community, which is switched off for the pilot.
+    const me = readFileSync(
+      join(import.meta.dirname, '..', '..', 'mobile', 'app', '(tabs)', 'me.tsx'),
+      'utf8',
+    );
+    expect(me).toContain("router.push('/people')");
   });
 
   it('offers joining and founding a society from Me, not only from the switcher', () => {
