@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Lightbulb, ThumbsDown, ThumbsUp, Users } from 'lucide-react';
 import { relativeTime } from '@samudaya/core';
 import type { SuggestionRow } from '@/lib/events';
@@ -72,9 +73,11 @@ function Voters({ row, canApprove }: { row: SuggestionRow; canApprove: boolean }
  * and the committee only found it by opening the To do queue. Now everybody
  * sees what is waiting, and whoever may open it for voting can do so here.
  *
- * The same board serves an event and the society itself; `eventSlug` is the
- * only difference, and it is only used to send the reader back to the right
- * page after a vote.
+ * The same board serves an event's page and the Ideas page. The difference is
+ * `showEvent`: an event's page knows what its suggestions are about, the Ideas
+ * page mixes both kinds and has to say. Which event a row belongs to is read
+ * from the row either way, so a vote cast from Ideas refreshes the event page
+ * it also appears on.
  */
 export function SuggestionBoard({
   slug,
@@ -84,9 +87,10 @@ export function SuggestionBoard({
   canVote,
   canApprove,
   emptyDescription,
+  showEvent = false,
 }: {
   slug: string;
-  /** Absent for the society's own suggestions. */
+  /** The event whose page this board is on. Absent on the Ideas page. */
   eventSlug?: string;
   rows: SuggestionRow[];
   myMembershipId: string;
@@ -94,6 +98,8 @@ export function SuggestionBoard({
   canApprove: boolean;
   /** Shown when nothing is open for voting and nothing is waiting either. */
   emptyDescription: string;
+  /** Name the event each row belongs to — for the board that mixes both. */
+  showEvent?: boolean;
 }) {
   const voting = rows.filter((row) => row.status === 'accepted');
   const waiting = rows.filter((row) => row.status === 'new');
@@ -111,6 +117,34 @@ export function SuggestionBoard({
 
   const kind = (row: SuggestionRow) => (row.kind === 'idea' ? 'Idea' : 'Activity');
 
+  /**
+   * Which event a row is about, on the board that mixes both kinds.
+   *
+   * A link rather than a label: a suggestion about Dasara is really a question
+   * about Dasara, and that page is where the rest of the answer is.
+   */
+  const Where = ({ row, lead = true }: { row: SuggestionRow; lead?: boolean }) => {
+    if (!showEvent) return null;
+    // The separator belongs to the sentence this joins, not to the phrase, so
+    // a row that says nothing else does not open with a stray dot.
+    const sep = lead ? '· ' : '';
+    if (!row.events) return <span className="text-ink-subtle text-xs">{sep}For the society</span>;
+    return (
+      <Link
+        href={`/app/${slug}/events/${row.events.slug}?tab=vote`}
+        className="text-ink-subtle hover:text-ink text-xs underline underline-offset-2"
+      >
+        {sep}
+        {row.events.emoji} {row.events.name}
+      </Link>
+    );
+  };
+
+  // A vote cast here belongs to that event's page as much as to this one, so
+  // the action is told which event to refresh — the board itself may be on
+  // neither.
+  const eventOf = (row: SuggestionRow) => row.events?.slug ?? eventSlug;
+
   return (
     <div className="space-y-3">
       {voting.length ? (
@@ -124,7 +158,7 @@ export function SuggestionBoard({
                   <div className="min-w-0">
                     <p className="text-ink text-sm font-semibold">{row.name}</p>
                     <p className="text-ink-subtle mt-0.5 text-xs">
-                      {kind(row)} suggested by {who(row)}
+                      {kind(row)} suggested by {who(row)} <Where row={row} />
                     </p>
                     {row.description ? (
                       <p className="text-ink-muted mt-1.5 text-sm">{row.description}</p>
@@ -147,7 +181,9 @@ export function SuggestionBoard({
                     className="mt-3 flex flex-wrap items-center gap-2"
                   >
                     <input type="hidden" name="slug" value={slug} />
-                    {eventSlug ? <input type="hidden" name="event" value={eventSlug} /> : null}
+                    {eventOf(row) ? (
+                      <input type="hidden" name="event" value={eventOf(row)} />
+                    ) : null}
                     <input type="hidden" name="suggestion_id" value={row.id} />
                     <Button
                       type="submit"
@@ -194,7 +230,9 @@ export function SuggestionBoard({
                     className="border-border-base mt-3 flex flex-wrap items-center gap-2 border-t pt-3"
                   >
                     <input type="hidden" name="slug" value={slug} />
-                    {eventSlug ? <input type="hidden" name="event" value={eventSlug} /> : null}
+                    {eventOf(row) ? (
+                      <input type="hidden" name="event" value={eventOf(row)} />
+                    ) : null}
                     <input type="hidden" name="suggestion_id" value={row.id} />
                     <span className="text-ink-subtle text-xs">
                       {total
@@ -243,7 +281,7 @@ export function SuggestionBoard({
                   <div className="min-w-0">
                     <p className="text-ink text-sm font-medium">{row.name}</p>
                     <p className="text-ink-subtle mt-0.5 text-xs">
-                      {kind(row)} suggested by {who(row)}
+                      {kind(row)} suggested by {who(row)} <Where row={row} />
                     </p>
                     {row.description ? (
                       <p className="text-ink-muted mt-1.5 text-sm">{row.description}</p>
@@ -294,7 +332,8 @@ export function SuggestionBoard({
                     <p className="text-ink text-sm font-medium">{row.name}</p>
                     <p className="text-ink-subtle mt-0.5 text-xs">
                       {row.votesFor} for · {row.votesAgainst} against
-                      {row.resolved_at ? ` · closed ${relativeTime(row.resolved_at)}` : ''}
+                      {row.resolved_at ? ` · closed ${relativeTime(row.resolved_at)}` : ''}{' '}
+                      <Where row={row} />
                     </p>
                     <Voters row={row} canApprove={canApprove} />
                   </div>
@@ -319,6 +358,9 @@ export function SuggestionBoard({
                   {row.review_note ? (
                     <p className="text-ink-subtle text-xs">“{row.review_note}”</p>
                   ) : null}
+                  <p className="text-xs">
+                    <Where row={row} lead={false} />
+                  </p>
                 </div>
                 <Badge tone="neutral">Declined</Badge>
               </li>
