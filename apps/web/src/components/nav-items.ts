@@ -6,6 +6,7 @@ import {
   Lightbulb,
   Scale,
   Settings2,
+  SquareMenu,
   UserRound,
   Users,
   Wallet,
@@ -21,10 +22,10 @@ export type NavItem = {
   capability?: Capability;
   /** Shown in the compact bottom bar on small screens. */
   primary?: boolean;
-  /** A shorter name for the bottom bar, where two "Events" would be confusing. */
-  shortLabel?: string;
   /** Shows a count next to the label. */
   badge?: 'todo';
+  /** Other section roots this item stands for, so it stays lit inside them. */
+  covers?: string[];
 };
 
 /**
@@ -65,7 +66,6 @@ export function navItems(slug: string): { section: string; items: NavItem[] }[] 
         {
           href: `${base}/admin`,
           label: 'Events',
-          shortLabel: COPY.manage,
           icon: CalendarCog,
           capability: 'events:manage',
         },
@@ -97,17 +97,49 @@ export function visibleNav(slug: string, role: MemberRole) {
 }
 
 /**
- * Four tabs, the same four for everybody: Home, Events, People, Me.
+ * The Manage hub, for the bottom bar only.
  *
- * It used to be six for staff, which did not fit, so People was dropped from
- * their bar — the nav quietly telling us it was full. To do and the event
- * console are not places you navigate to; they are work waiting, and Home says
- * so at the top and links straight through. A resident and a committee member
- * now see the same shape of app, which is the whole idea: the role changes
- * what you may do, not where things live.
+ * It is deliberately not in navItems(): a desktop sidebar already lists the
+ * Manage section row by row, and a link above those rows to a page listing the
+ * same rows is the sidebar pointing at a copy of itself.
  */
-export function bottomNavItems(slug: string, role: MemberRole) {
-  return visibleNav(slug, role)
+function manageTab(slug: string): NavItem {
+  const base = `/app/${slug}`;
+  return {
+    href: `${base}/manage`,
+    label: COPY.manage,
+    icon: SquareMenu,
+    capability: 'events:manage',
+    badge: 'todo',
+    // Where the hub leads. Without these, walking from Manage into Reconcile
+    // puts out every light on the bar and the app reads as nowhere.
+    covers: [`${base}/todo`, `${base}/admin`, `${base}/people`],
+  };
+}
+
+/**
+ * Four tabs — and which four depends on whether you run the society.
+ *
+ * Residents keep Home, Events, People, Me. Staff and the committee trade
+ * People for Manage: the To do count rides on the tab, and the hub behind it
+ * leads to the event console, Reconcile, Society settings and People itself.
+ *
+ * This is the shape the phone app has always had, and it was the better answer
+ * all along. The sheet behind the society name came first and did fix the real
+ * problem — on a phone there was no route to Manage at all — and it still
+ * carries Money and Ideas. But a sheet is a drawer you have to know about, and
+ * a committee member approving a bill from their phone should not have to find
+ * one. So the work that is waiting gets a tab, and People gives up its place
+ * to it: Home links to People, and so does the first row of the hub.
+ */
+export function bottomNavItems(slug: string, role: MemberRole): NavItem[] {
+  const primary = visibleNav(slug, role)
     .flatMap((group) => group.items)
     .filter((item) => item.primary);
+  if (!can(role, 'events:manage')) return primary;
+
+  // In People's place rather than a fifth tab: five labels across a 360px
+  // phone is where they start wrapping, and four is what the phone app fits.
+  const rest = primary.filter((item) => item.href !== `/app/${slug}/people`);
+  return [...rest.slice(0, 2), manageTab(slug), ...rest.slice(2)];
 }

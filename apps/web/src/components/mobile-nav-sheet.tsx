@@ -8,8 +8,8 @@ import { ChevronsUpDown, X } from 'lucide-react';
 /**
  * Everything the desktop sidebar has, reachable from a phone.
  *
- * The bottom bar carries four tabs — Home, Events, People, Me — and that is
- * the right number to fit. What it could not carry went nowhere: on a phone
+ * The bottom bar carries four tabs and that is the right number to fit. What
+ * it could not carry went nowhere: on a phone
  * there was no route at all to Manage, To do, Reconcile, Society settings, or
  * to the society switcher and the join-and-create links inside it. A committee
  * member on their phone could not approve a bill or reconcile a statement, and
@@ -20,6 +20,12 @@ import { ChevronsUpDown, X } from 'lucide-react';
  * bottom bar already goes — becomes the way in. Tapping it opens the sidebar
  * as a sheet, with exactly the same children the sidebar renders, because
  * parity by construction beats parity by remembering to update two lists.
+ *
+ * Two of those destinations have since come back out of it, because a drawer
+ * you have to know about is the wrong home for work somebody does daily:
+ * Manage took one of the four tabs from staff and the committee, and joining
+ * or founding a society moved onto Me. The sheet still carries the rest —
+ * Money, Ideas, the whole sidebar as the desktop lists it, and the switcher.
  *
  * A sheet rather than another `<details>` menu: this is tall, it wants the
  * page not to scroll underneath it, and it wants a back gesture and Escape to

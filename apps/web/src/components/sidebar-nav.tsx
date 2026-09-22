@@ -12,7 +12,12 @@ export type NavCounts = { todo?: number };
 function useIsActive(slug: string) {
   const pathname = usePathname();
   const roots = new Set([`/app/${slug}`, `/app/${slug}/admin`]);
-  return (href: string) => {
+  const under = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  return ({ href, covers }: NavItem) => {
+    // The Manage tab stands in for a whole group of routes, so it lights up
+    // across all of them — plainly, without the root rule below, which exists
+    // to stop a link lighting for pages it does not own.
+    if (covers?.some(under)) return true;
     if (pathname === href) return true;
     if (!pathname.startsWith(`${href}/`)) return false;
     // Home and the events console own their exact page, not everything below
@@ -58,7 +63,7 @@ export function SidebarNav({
           <ul className="space-y-0.5">
             {group.items.map((item) => {
               const { href, label, icon: Icon } = item;
-              const active = isActive(href);
+              const active = isActive(item);
               return (
                 <li key={href}>
                   <Link
@@ -88,7 +93,10 @@ export function SidebarNav({
   );
 }
 
-/** Compact bar for phones — the handful of things a member opens daily. */
+/**
+ * Compact bar for phones — the handful of things a member opens daily, which
+ * for staff and the committee means Manage rather than People.
+ */
 export function BottomNav({
   slug,
   role,
@@ -109,8 +117,8 @@ export function BottomNav({
     >
       <ul className="grid auto-cols-fr grid-flow-col">
         {items.map((item) => {
-          const { href, label, shortLabel, icon: Icon } = item;
-          const active = isActive(href);
+          const { href, label, icon: Icon } = item;
+          const active = isActive(item);
           const count = item.badge ? (counts[item.badge] ?? 0) : 0;
           return (
             <li key={href}>
@@ -131,7 +139,7 @@ export function BottomNav({
                     </span>
                   ) : null}
                 </span>
-                {shortLabel ?? label}
+                {label}
               </Link>
             </li>
           );
