@@ -70,15 +70,31 @@ export function ledgerTitle(row: LedgerEntry): string {
   return row.payer_name ?? row.counterpart ?? 'Not recorded';
 }
 
+/** The flat beside the name, and whether the society actually knows it. */
+export type LedgerFlat = { label: string; known: boolean };
+
 /**
  * The flat, for the chip beside the name — and only when it is telling you
  * something the name did not. A cash payment against a door with nobody
  * living there is titled by its flat already, and printing it twice reads
  * like a bug.
+ *
+ * A row that names a person and no flat gets a chip too, saying so. That gap
+ * is real: a member nobody has listed at a door pays, and the payment carries
+ * a name and nothing else. Left blank it is indistinguishable from the app
+ * having dropped the flat — which is exactly how it was read the first time
+ * somebody scrolled past one — so the row admits it instead, and the
+ * committee can see from the ledger which flats are still missing.
+ *
+ * Money out is paid to a vendor, not by a flat, so it gets nothing.
  */
-export function ledgerUnit(row: LedgerEntry): string | null {
+export function ledgerFlat(row: LedgerEntry): LedgerFlat | null {
+  if (row.direction !== 'in') return null;
   const unit = row.unit_label ?? null;
-  return unit && unit !== ledgerTitle(row) ? unit : null;
+  if (unit) return unit === ledgerTitle(row) ? null : { label: unit, known: true };
+  // Only worth saying beside a name. A sponsor's payment is titled by how the
+  // money arrived and has no door behind it to be missing.
+  return row.payer_name ? { label: 'Flat not recorded', known: false } : null;
 }
 
 /**

@@ -5,8 +5,8 @@ import {
   formatMoney,
   ledgerEvidence,
   ledgerMeta,
+  ledgerFlat,
   ledgerTitle,
-  ledgerUnit,
   relativeTime,
   type LedgerEntry,
 } from '@samudaya/core';
@@ -46,7 +46,7 @@ export function LedgerRow({
   currency: string;
 }) {
   const incoming = row.direction === 'in';
-  const unit = ledgerUnit(row);
+  const flat = ledgerFlat(row);
   const evidence = ledgerEvidence(row);
 
   return (
@@ -65,7 +65,9 @@ export function LedgerRow({
         <div className="min-w-0">
           {/* Name and flat together. The flat is a chip rather than more of the
               same sentence, because "which flat" is what a neighbour scans the
-              list for and a run-on line is the worst place to hide an answer. */}
+              list for and a run-on line is the worst place to hide an answer.
+              A flat the society does not know gets the same chip, dashed and
+              faded, so the gap is visibly a gap rather than a blank space. */}
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-ink text-sm font-medium break-words">
               {ledgerTitle(row)}
@@ -73,9 +75,15 @@ export function LedgerRow({
                 {incoming ? ' paid the society' : ' was paid by the society'}
               </span>
             </span>
-            {unit ? (
-              <span className="bg-surface-sunken text-ink-muted shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium">
-                {unit}
+            {flat ? (
+              <span
+                className={
+                  flat.known
+                    ? 'bg-surface-sunken text-ink-muted shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium'
+                    : 'border-border-base text-ink-subtle shrink-0 rounded-md border border-dashed px-1.5 py-0.5 text-xs'
+                }
+              >
+                {flat.label}
               </span>
             ) : null}
           </p>

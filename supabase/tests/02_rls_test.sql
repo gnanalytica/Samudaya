@@ -448,6 +448,45 @@ select test.eq(
 select test.act_as('44444444-4444-4444-8444-444444444444');
 
 -- ---------------------------------------------------------------------------
+-- A payment names the flat it came from
+-- ---------------------------------------------------------------------------
+-- A member nobody has listed at a door could still pay, and their payment
+-- carried a name and no flat — on the Money page, in the UPI note, in the bank
+-- matcher — for ever. The Contribute screens ask them now, which is the first
+-- time a value a resident chose reaches contributions.unit_id.
+--
+-- So the policy has to say what they may choose. Not "a flat they live in":
+-- they are paying precisely because nobody has listed them at one, and staff
+-- confirm the payment against the bank before it counts, the same as they do
+-- the amount. The boundary is the society.
+reset role;
+insert into public.units (id, community_id, block, number) values
+  ('bbbbbbbb-0000-4000-8000-0000000000ff', 'aaaaaaaa-0000-4000-8000-000000000002', 'C', '303');
+select test.act_as('44444444-4444-4444-8444-444444444444');
+
+insert into public.contributions (event_id, community_id, membership_id, unit_id, amount, method)
+select 'cccccccc-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001',
+       app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001'),
+       'bbbbbbbb-0000-4000-8000-000000000003', 101, 'upi';
+select test.eq(
+  (select count(*) from public.contributions
+    where unit_id = 'bbbbbbbb-0000-4000-8000-000000000003'),
+  1::bigint,
+  'a resident names the flat their payment came from, so the ledger can show it');
+
+select test.raises(
+  $q$insert into public.contributions (event_id, community_id, membership_id, unit_id, amount, method)
+     select 'cccccccc-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001',
+            app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001'),
+            'bbbbbbbb-0000-4000-8000-0000000000ff', 101, 'upi'$q$,
+  'but never one that belongs to another society');
+
+-- Put the fund back the way the rest of this file expects to find it.
+reset role;
+delete from public.contributions where amount = 101;
+select test.act_as('44444444-4444-4444-8444-444444444444');
+
+-- ---------------------------------------------------------------------------
 -- The ledger: approved spending is public, pending is not
 -- ---------------------------------------------------------------------------
 reset role;
