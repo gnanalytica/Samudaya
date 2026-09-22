@@ -13,6 +13,7 @@ export * from './setup';
 export * from './notifications';
 export * from './copy';
 export * from './festivals';
+export * from './calendar';
 export * from './statement';
 export * from './ledger';
 export * from './funds';
