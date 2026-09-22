@@ -1,5 +1,13 @@
 import Link from 'next/link';
-import { CalendarDays, Lightbulb, Megaphone, Receipt } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  ChevronRight,
+  Lightbulb,
+  Megaphone,
+  Plus,
+  Receipt,
+} from 'lucide-react';
 import {
   EVENT_STATUS_LABEL,
   ROLE_LABEL,
@@ -11,7 +19,7 @@ import {
   receiptRef,
   unitLabel,
 } from '@samudaya/core';
-import { requireCommunity } from '@/lib/auth';
+import { getMemberships, requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
@@ -35,6 +43,10 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
   const { community, role, profile, membership, unitIds, user } = await requireCommunity(slug);
   const supabase = await getSupabase();
   const base = `/app/${slug}`;
+
+  // Started alongside the rest and cached per request, so this is the same
+  // list the layout already fetched for the switcher, not a second round trip.
+  const membershipsPromise = getMemberships();
 
   const [contributions, registrations, suggestions, campaigns, units] = await Promise.all([
     supabase
@@ -66,6 +78,10 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
       ? supabase.from('units').select('block, number').in('id', unitIds)
       : Promise.resolve({ data: [] as { block: string | null; number: string }[] }),
   ]);
+
+  const otherSocieties = (await membershipsPromise).filter(
+    (m) => m.communities && m.communities.slug !== community.slug,
+  );
 
   // Only confirmed payments count; reported ones are still waiting for staff.
   const totalGiven = (contributions.data ?? [])
@@ -266,6 +282,66 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
             </ul>
           </Card>
         ) : null}
+
+        {/* Joining a second society and founding one were only ever in the
+            switcher, which on a phone means inside the sheet behind the
+            society name — a drawer you have to know about. They are a fact
+            about you, not about this society, so Me is where they belong; the
+            phone app has had them here all along. The switcher keeps them
+            too: this is a second door, not a move. */}
+        <Card className="mt-5">
+          <CardHeader
+            title="Your societies"
+            description={
+              otherSocieties.length
+                ? 'Switch between them, or add another.'
+                : 'You can belong to more than one.'
+            }
+          />
+          <ul className="divide-border-base divide-y">
+            {otherSocieties.map((membership) => (
+              <li key={membership.id}>
+                <Link
+                  href={`/app/${membership.communities!.slug}`}
+                  className="hover:bg-surface-sunken flex items-center gap-3 px-5 py-3"
+                >
+                  <span className="bg-accent text-accent-ink grid size-8 shrink-0 place-items-center rounded-lg text-sm font-bold">
+                    {membership.communities!.name.charAt(0).toUpperCase()}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="text-ink block truncate text-sm font-medium">
+                      {membership.communities!.name}
+                    </span>
+                    <span className="text-ink-subtle block truncate text-xs">
+                      {ROLE_LABEL[normalizeRole(membership.role) ?? 'resident']}
+                    </span>
+                  </span>
+                  <ChevronRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link
+                href="/onboarding?mode=join"
+                className="hover:bg-surface-sunken flex items-center gap-3 px-5 py-3"
+              >
+                <Plus className="text-accent size-5 shrink-0" aria-hidden="true" />
+                <span className="text-ink flex-1 text-sm font-medium">Join another society</span>
+                <ChevronRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/onboarding?mode=create"
+                className="hover:bg-surface-sunken flex items-center gap-3 px-5 py-3"
+              >
+                <Building2 className="text-accent size-5 shrink-0" aria-hidden="true" />
+                <span className="text-ink flex-1 text-sm font-medium">Start a new society</span>
+                <ChevronRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
+              </Link>
+            </li>
+          </ul>
+        </Card>
       </PageBody>
     </>
   );

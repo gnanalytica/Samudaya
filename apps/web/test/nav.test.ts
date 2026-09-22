@@ -5,13 +5,46 @@ import { bottomNavItems, visibleNav } from '@/components/nav-items';
 import { eventTabsFor } from '@/components/event-tabs';
 
 describe('bottomNavItems', () => {
-  it('is the same four tabs whatever the role', () => {
-    // It used to be six for staff, which did not fit — so People was dropped
-    // from their bar, which is the nav admitting it was full.
-    for (const role of ['resident', 'staff', 'committee'] as const) {
+  it('gives a resident Home, Events, People and Me', () => {
+    const labels = bottomNavItems('arkala', 'resident').map((item) => item.label);
+    expect(labels).toEqual(['Home', 'Events', 'People', 'Me']);
+  });
+
+  it('trades People for Manage once you run the society', () => {
+    // The shape the phone app has always had. People does not disappear: Home
+    // links to it, and it is the first row of the Manage hub.
+    for (const role of ['staff', 'committee'] as const) {
       const labels = bottomNavItems('arkala', role).map((item) => item.label);
-      expect(labels, role).toEqual(['Home', 'Events', 'People', 'Me']);
+      expect(labels, role).toEqual(['Home', 'Events', 'Manage', 'Me']);
     }
+  });
+
+  it('never grows past four, which is what a 360px phone fits', () => {
+    for (const role of ['resident', 'staff', 'committee'] as const) {
+      expect(bottomNavItems('arkala', role), role).toHaveLength(4);
+    }
+  });
+
+  const manageTab = () => bottomNavItems('arkala', 'committee').find((i) => i.label === 'Manage');
+
+  it('puts the To do count on the tab, so the work is visible without opening it', () => {
+    expect(manageTab()?.href).toBe('/app/arkala/manage');
+    expect(manageTab()?.badge).toBe('todo');
+  });
+
+  it('keeps Manage lit inside the pages it leads to', () => {
+    // Otherwise walking from Manage into Reconcile puts out every light on the
+    // bar, and the app reads as nowhere.
+    expect(manageTab()?.covers).toEqual([
+      '/app/arkala/todo',
+      '/app/arkala/admin',
+      '/app/arkala/people',
+    ]);
+  });
+
+  it('keeps the hub out of the sidebar, which lists those rows itself', () => {
+    const hrefs = visibleNav('arkala', 'committee').flatMap((g) => g.items.map((i) => i.href));
+    expect(hrefs).not.toContain('/app/arkala/manage');
   });
 
   it('still gives staff their console, in the sidebar', () => {
@@ -98,6 +131,10 @@ const count = (haystack: string, needle: string) => haystack.split(needle).lengt
  * Worth noticing that "still gives staff their console, in the sidebar" above
  * passed the entire time. It asserted the item exists, not that anybody could
  * reach it; on a phone, nobody could.
+ *
+ * The sheet fixed that, and the two things people reach for daily have since
+ * come out of it and onto surfaces of their own: Manage has a tab, and the
+ * join-and-found links sit on Me. The sheet still carries the rest.
  */
 describe('a phone reaches everything a desktop does', () => {
   const layout = () => read('app', 'app', '[community]', 'layout.tsx');
@@ -126,6 +163,19 @@ describe('a phone reaches everything a desktop does', () => {
     // sheet at z-50 *inside* the header still loses: z-index is relative to
     // the context you are in.
     expect(read('components', 'mobile-nav-sheet.tsx')).toContain('createPortal');
+  });
+
+  it('has a page behind the Manage tab, gated by what its rows need', () => {
+    // A tab that lands on a redirect is worse than no tab.
+    const page = read('app', 'app', '[community]', 'manage', 'page.tsx');
+    expect(page).toContain("requireCapability(slug, 'events:manage')");
+    expect(page).toContain("can(role, 'payments:record')");
+  });
+
+  it('offers joining and founding a society from Me, not only from the switcher', () => {
+    const me = read('app', 'app', '[community]', 'me', 'page.tsx');
+    expect(me).toContain('/onboarding?mode=join');
+    expect(me).toContain('/onboarding?mode=create');
   });
 
   it('lets go of the page when the window grows into sidebar territory', () => {
