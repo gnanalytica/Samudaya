@@ -4,6 +4,11 @@ import { useActionState, useRef, useState, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import { COPY, DEFAULT_FUND_RULE, formatMoney, FUND_RULES, FUND_RULE_LABEL } from '@samudaya/core';
+import {
+  approximateDateNote,
+  FestivalNameField,
+  type FestivalDraft,
+} from '@/components/festival-name-field';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -131,15 +136,25 @@ export function CreateEventForm({
   pickers,
   societyName,
   flatCount,
+  today,
 }: {
   slug: string;
   pickers: Pickers;
   societyName: string;
   /** How many flats the society has, for the per-flat hint. Zero if none yet. */
   flatCount: number;
+  /** The society's own today, so a December wizard offers January's Sankranti. */
+  today: string;
 }) {
   const [state, action] = useActionState<EventFormState, FormData>(createEvent, EMPTY_STATE);
   const [emoji, setEmoji] = useState('🎉');
+  // Name and date are controlled because picking a festival fills both, and an
+  // uncontrolled field cannot be filled from anywhere but the keyboard.
+  const [name, setName] = useState('');
+  const [startsOn, setStartsOn] = useState('');
+  // Kept only to warn under the date. Cleared the moment somebody edits either
+  // field, because the warning is about the date we filled in, not theirs.
+  const [picked, setPicked] = useState<FestivalDraft | null>(null);
   // Start with the society's first three budget categories; each row keeps a
   // stable key so removing one does not shuffle the others' choices.
   const [lines, setLines] = useState<Line[]>(() =>
@@ -236,12 +251,41 @@ export function CreateEventForm({
         <Card>
           <CardHeader title={STEPS[0].title} description={STEPS[0].hint} />
           <CardBody className="space-y-4">
-            <Field label="Name" htmlFor="ne-name" error={state.fieldErrors?.name} required>
-              {(control) => <Input {...control} name="name" placeholder="Diwali 2026" required />}
-            </Field>
+            <FestivalNameField
+              value={name}
+              onChange={(next) => {
+                setName(next);
+                setPicked(null);
+              }}
+              onPick={(draft) => {
+                setStartsOn(draft.startsOn);
+                setPicked(draft);
+                setEmoji(draft.emoji);
+              }}
+              error={state.fieldErrors?.name}
+              today={today}
+            />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Date" htmlFor="ne-start" error={state.fieldErrors?.starts_on} required>
-                {(control) => <Input {...control} name="starts_on" type="date" required />}
+              <Field
+                label="Date"
+                htmlFor="ne-start"
+                error={state.fieldErrors?.starts_on}
+                hint={approximateDateNote(picked)}
+                required
+              >
+                {(control) => (
+                  <Input
+                    {...control}
+                    name="starts_on"
+                    type="date"
+                    required
+                    value={startsOn}
+                    onChange={(event) => {
+                      setStartsOn(event.target.value);
+                      setPicked(null);
+                    }}
+                  />
+                )}
               </Field>
               <CatalogueSelect
                 slug={slug}

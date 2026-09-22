@@ -1,3 +1,4 @@
+import { todayIn } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { activeItems, getCatalogue } from '@/lib/catalogue';
 import { getSupabase } from '@/lib/supabase/server';
@@ -32,6 +33,7 @@ export default async function NewEventPage(props: PageProps<'/app/[community]/ad
             slug={slug}
             societyName={community.name}
             flatCount={count ?? 0}
+            today={todayIn(community.timezone)}
             pickers={{
               event_type: pick('event_type'),
               venue: pick('venue'),
