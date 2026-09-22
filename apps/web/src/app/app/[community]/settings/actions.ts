@@ -8,7 +8,9 @@ import {
   deleteAccountMessage,
   isAccountDeleted,
   isDeleteConfirmed,
+  requestUnitChangeMessage,
   residentPhoneSchema,
+  uuid,
 } from '@samudaya/core';
 import { requireCommunity, requireUser } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
@@ -109,4 +111,41 @@ export async function deleteAccount(_prev: ActionState, formData: FormData): Pro
   // request from being an authenticated one against a deleted account.
   await supabase.auth.signOut();
   redirect('/?deleted=1');
+}
+
+/**
+ * A member says they have moved. The committee decides; this only asks.
+ *
+ * Which flat somebody lives in is not theirs to set — it decides who the
+ * ledger names against their money and who the directory lists at that door.
+ * But they are the one who knows, and until this existed they could watch
+ * every payment they made carry the wrong flat with no way to mention it.
+ */
+export async function askToChangeFlat(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const slug = String(formData.get('slug') ?? '');
+  const context = await requireCommunity(slug);
+
+  // An empty choice is "I do not live in a flat here any more", which somebody
+  // who has moved out but still runs an event needs to be able to say.
+  const raw = String(formData.get('unit_id') ?? '');
+  const unitId = raw ? uuid.safeParse(raw) : null;
+  if (unitId && !unitId.success) return { error: 'Pick a flat from the list.' };
+
+  const supabase = await getSupabase();
+  const { data, error } = await supabase.rpc('request_unit_change', {
+    p_community_id: context.community.id,
+    p_unit_id: unitId?.data ?? undefined,
+    p_note: String(formData.get('note') ?? '').trim() || undefined,
+  });
+  if (error) return { error: friendlyDbError(error) };
+  if (data !== 'ok') return { error: requestUnitChangeMessage(data ?? '') };
+
+  revalidatePath(`/app/${slug}/settings`);
+  return {
+    ...EMPTY_STATE,
+    success: 'Sent. The committee will confirm it, and you will hear either way.',
+  };
 }

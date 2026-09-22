@@ -1982,6 +1982,157 @@ select test.eq(
   0, 'and then they live nowhere, without their history being erased');
 
 -- ---------------------------------------------------------------------------
+-- A resident can say they moved
+-- ---------------------------------------------------------------------------
+-- Seating somebody is the committee's, because it decides who the ledger
+-- names against their money. Saying "I moved" is the resident's, and until
+-- 0922.0400 they had nowhere to say it — they could watch every payment they
+-- made carry the wrong flat and not even mention it in the app.
+reset role;
+insert into public.units (id, community_id, block, number)
+select 'b2b2b2b2-0000-4000-8000-00000000000a', c.id, 'C', '1102'
+  from public.communities c where c.slug = 'hill-crest';
+
+-- The seating block above left Ria living nowhere, so put her back in a flat:
+-- this is about moving between two, not about being seated for the first time.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select public.set_member_unit((select id from t_seat), 'b2b2b2b2-0000-4000-8000-000000000009');
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  public.request_unit_change(
+    (select id from public.communities where slug = 'hill-crest'),
+    'b2b2b2b2-0000-4000-8000-00000000000a', 'Moved last month'),
+  'ok', 'a resident can ask to be moved');
+
+select test.eq(
+  public.request_unit_change(
+    (select id from public.communities where slug = 'hill-crest'),
+    'b2b2b2b2-0000-4000-8000-00000000000a'),
+  'ok', 'asking again is allowed');
+reset role;
+select test.eq(
+  (select count(*)::int from public.unit_change_requests where status = 'pending'),
+  1, 'and edits the question rather than queueing a second one');
+
+-- Asking does not move anybody. If it did, the committee''s say would be a
+-- formality and the ledger would follow whoever typed last.
+select test.eq(
+  (select btrim(coalesce(u.block || ' ', '') || u.number)
+     from public.unit_occupants o join public.units u on u.id = o.unit_id
+     join public.memberships m on m.id = o.membership_id
+    where m.user_id = 'abababab-abab-4bab-8bab-abababababab'
+      and m.community_id = (select id from public.communities where slug = 'hill-crest')
+      and o.moved_out_on is null),
+  'A 1106', 'asking does not move them');
+
+select test.eq(
+  (select count(*)::int from public.notifications
+    where kind = 'unit_change_requested'),
+  2, 'the committee is told, and told again when the question changes');
+
+-- The queue is where the committee answers it.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select count(*)::int from public.todo_items(
+     (select id from public.communities where slug = 'hill-crest'))
+    where kind = 'flat_change'),
+  1, 'and it waits in the To do queue');
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  (select count(*)::int from public.todo_items(
+     (select id from public.communities where slug = 'hill-crest'))
+    where kind = 'flat_change'),
+  0, 'staff do not see it, because it is not theirs to answer');
+
+-- Only the committee answers. A resident approving their own move would make
+-- the whole request a formality.
+reset role;
+create temporary table t_move as
+select id from public.unit_change_requests where status = 'pending';
+grant select on t_move to authenticated;
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(public.review_unit_change((select id from t_move), true),
+  'not_committee', 'a resident cannot approve their own move');
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(public.review_unit_change((select id from t_move), true),
+  'not_committee', 'nor can staff');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(public.review_unit_change((select id from t_move), true), 'ok',
+  'the committee can');
+select test.eq(public.review_unit_change((select id from t_move), true),
+  'already_decided', 'and a second click is a no-op, not an error');
+
+reset role;
+select test.eq(
+  (select btrim(coalesce(u.block || ' ', '') || u.number)
+     from public.unit_occupants o join public.units u on u.id = o.unit_id
+     join public.memberships m on m.id = o.membership_id
+    where m.user_id = 'abababab-abab-4bab-8bab-abababababab'
+      and m.community_id = (select id from public.communities where slug = 'hill-crest')
+      and o.moved_out_on is null),
+  'C 1102', 'approving actually moves them');
+select test.eq(
+  (select count(*)::int from public.notifications
+    where kind = 'unit_change_approved'),
+  1, 'and the resident is told');
+
+-- Asking for the flat you are already in is a misunderstanding worth naming.
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  public.request_unit_change(
+    (select id from public.communities where slug = 'hill-crest'),
+    'b2b2b2b2-0000-4000-8000-00000000000a'),
+  'already_there', 'asking for the flat you are already in says so');
+select test.eq(
+  public.request_unit_change(
+    (select id from public.communities where slug = 'hill-crest'),
+    'bbbbbbbb-0000-4000-8000-000000000002'),
+  'wrong_community', 'and a flat in another society is refused');
+
+-- Nobody reads somebody else's request. It carries where they live and why
+-- they say they moved.
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select public.request_unit_change(
+  (select id from public.communities where slug = 'hill-crest'), null, 'Moved out');
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.eq(test.visible('select id from public.unit_change_requests'), 0::bigint,
+  'a neighbour cannot read a flat-change request');
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(test.visible('select id from public.unit_change_requests'), 2::bigint,
+  'the person who asked can read their own, decided and open');
+
+-- Every write goes through the two functions, so the table itself takes none.
+-- Asserted by counting rather than by expecting an error: with no UPDATE
+-- policy, RLS narrows the statement to no rows instead of refusing it, and an
+-- update that quietly changes nothing looks like success to test.raises.
+update public.unit_change_requests set status = 'approved';
+reset role;
+select test.eq(
+  (select count(*)::int from public.unit_change_requests where status = 'pending'),
+  1, 'and cannot approve their own by writing the row');
+
+-- Seating somebody by hand answers what they were asking, rather than leaving
+-- it in the queue for a click that would undo the flat just chosen.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  public.set_member_unit(
+    (select m.id from public.memberships m
+      where m.user_id = 'abababab-abab-4bab-8bab-abababababab'
+        and m.community_id = (select id from public.communities where slug = 'hill-crest')),
+    'b2b2b2b2-0000-4000-8000-000000000009'),
+  'ok', 'the committee can still seat somebody directly');
+reset role;
+select test.eq(
+  (select count(*)::int from public.unit_change_requests where status = 'pending'),
+  0, 'which settles the request they had open');
+select test.eq(
+  (select count(*)::int from public.notifications where kind = 'unit_change_declined'),
+  1, 'and tells them a different flat was chosen');
+
+-- ---------------------------------------------------------------------------
 -- The evidence, to the people the bucket already opens it to
 -- ---------------------------------------------------------------------------
 -- A bill belongs to the whole society: it is the society's money being spent

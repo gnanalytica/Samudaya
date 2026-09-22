@@ -27,7 +27,8 @@ export type TodoKind =
   | 'bill_to_approve'
   | 'bill_sent_back'
   | 'campaign_to_review'
-  | 'suggestion_to_review';
+  | 'suggestion_to_review'
+  | 'flat_change';
 
 /** Section headings and action labels for the To do queue. */
 export const TODO_KIND: Record<TodoKind, { section: string; action: string; emoji: string }> = {
@@ -37,6 +38,7 @@ export const TODO_KIND: Record<TodoKind, { section: string; action: string; emoj
   bill_sent_back: { section: 'Your bills sent back', action: 'Fix', emoji: '↩️' },
   campaign_to_review: { section: 'Campaigns to review', action: 'Review', emoji: '📣' },
   suggestion_to_review: { section: 'Suggestions to review', action: 'Review', emoji: '💡' },
+  flat_change: { section: 'Residents who moved', action: 'Approve', emoji: '🏠' },
 };
 
 export const TODO_ORDER: TodoKind[] = [
@@ -46,6 +48,9 @@ export const TODO_ORDER: TodoKind[] = [
   'bill_sent_back',
   'campaign_to_review',
   'suggestion_to_review',
+  // Last, because it is the one whose delay costs least: a wrong flat beside
+  // somebody's name is worth fixing, and it is not money waiting on a signature.
+  'flat_change',
 ];
 
 /** The event page's tabs, in order. */

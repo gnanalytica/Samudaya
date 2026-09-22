@@ -4,6 +4,7 @@ import { getSupabase } from '@/lib/supabase/server';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { FlatCard } from './flat-card';
 import { ProfileCard } from './profile-card';
 import { DeleteAccountCard } from './delete-account-card';
 
@@ -15,10 +16,34 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
   const role = normalizeRole(rawRole) ?? 'resident';
   const supabase = await getSupabase();
 
-  const units = unitIds.length
-    ? await supabase.from('units').select('block, number').in('id', unitIds)
-    : { data: [] as { block: string | null; number: string }[] };
+  // Their own flats for the summary, every flat for the "I have moved" list,
+  // and whatever they have already asked for so the card can say so rather
+  // than inviting them to ask twice.
+  const [units, allFlats, asked] = await Promise.all([
+    unitIds.length
+      ? supabase.from('units').select('block, number').in('id', unitIds)
+      : Promise.resolve({ data: [] as { block: string | null; number: string }[] }),
+    supabase
+      .from('units')
+      .select('id, block, number')
+      .eq('community_id', community.id)
+      .order('block')
+      .order('number')
+      .limit(5000),
+    supabase
+      .from('unit_change_requests')
+      .select('unit_id, units(block, number)')
+      .eq('community_id', community.id)
+      .eq('status', 'pending')
+      .maybeSingle(),
+  ]);
   const myUnits = (units.data ?? []).map((unit) => unitLabel(unit)).join(', ');
+  const flats = allFlats.data ?? [];
+  const pendingFlat = asked.data
+    ? asked.data.units
+      ? unitLabel(asked.data.units)
+      : 'no flat'
+    : null;
 
   return (
     <>
@@ -52,6 +77,17 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
               <p className="text-ink-subtle mt-3 text-xs">{ROLE_DESCRIPTION[role]}</p>
             </CardBody>
           </Card>
+
+          {/* Only where there are flats to pick from: a society still doing
+              its setup has none, and an empty dropdown is worse than no card. */}
+          {flats.length ? (
+            <FlatCard
+              slug={slug}
+              current={myUnits || 'no flat'}
+              units={flats}
+              pending={pendingFlat}
+            />
+          ) : null}
 
           <Card>
             <CardHeader title="Session" />
