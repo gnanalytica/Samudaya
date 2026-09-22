@@ -1,0 +1,24 @@
+{
+  "name": "@samudaya/video",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The Samudaya product demo video, built from the app's own components.",
+  "scripts": {
+    "capture": "node capture/capture.mjs",
+    "studio": "remotion studio src/index.ts",
+    "render:walkthrough": "remotion render src/index.ts Walkthrough out/samudaya-walkthrough.mp4",
+    "render:launch": "remotion render src/index.ts Launch out/samudaya-launch.mp4",
+    "render": "npm run render:walkthrough && npm run render:launch"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.527",
+    "@remotion/google-fonts": "4.0.527",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.527"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.7",
+    "typescript": "5.9.3"
+  }
+}
