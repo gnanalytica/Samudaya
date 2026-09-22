@@ -3,7 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Sparkles } from 'lucide-react';
-import { societySlug } from '@samudaya/core';
+import { isFlatLabel, societySlug, splitFlat } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
 import { Field, Input } from '@/components/ui/field';
@@ -37,10 +37,16 @@ function Submit() {
 export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
   const [state, action] = useActionState(createSociety, initial);
   const [name, setName] = useState('');
+  const [flat, setFlat] = useState('');
 
   // What the web address will look like. create_society() derives the real one
   // the same way, and adds a suffix if another society got there first.
   const preview = name.trim() ? societySlug(name) : '';
+
+  // How the flat was read, shown back. "G01" and "B G01" are the same letters
+  // and different flats, and the only way the founder can tell which one they
+  // got is to be shown it while they can still add a space.
+  const read = flat.trim() && isFlatLabel(flat) ? splitFlat(flat) : null;
 
   return (
     <Card>
@@ -107,6 +113,40 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
                 autoComplete="tel"
                 maxLength={20}
                 required
+              />
+            )}
+          </Field>
+
+          {/* Every resident is asked which flat they live in. The founder
+              never was, and ended up the one member of a society who lived
+              nowhere — which is why their own payments showed up in the ledger
+              with no flat beside them. */}
+          <Field
+            label="Your flat"
+            htmlFor="cs-flat"
+            error={state.fieldErrors?.flat}
+            hint={
+              read ? (
+                read.block ? (
+                  <>
+                    Tower {read.block}, flat {read.number}
+                  </>
+                ) : (
+                  <>Flat {read.number}, no tower</>
+                )
+              ) : (
+                'As it is on your door. Leave it blank if you run the society without living in it.'
+              )
+            }
+          >
+            {(control) => (
+              <Input
+                {...control}
+                name="flat"
+                value={flat}
+                onChange={(event) => setFlat(event.target.value)}
+                placeholder="A 703"
+                maxLength={24}
               />
             )}
           </Field>

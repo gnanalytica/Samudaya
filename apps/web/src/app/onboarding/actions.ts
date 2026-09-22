@@ -155,6 +155,7 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
     address: String(formData.get('address') ?? ''),
     pincode: String(formData.get('pincode') ?? ''),
     phone: formData.get('phone'),
+    flat: String(formData.get('flat') ?? ''),
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
@@ -165,6 +166,7 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
     p_address: parsed.data.address,
     p_pincode: parsed.data.pincode,
     p_phone: parsed.data.phone,
+    p_flat: parsed.data.flat,
   });
   if (error) return { error: friendlyDbError(error) };
 
@@ -177,6 +179,9 @@ export async function createSociety(_prev: ActionState, formData: FormData): Pro
     }
     if (row?.status === 'invalid_phone') {
       return { fieldErrors: { phone: foundSocietyMessage(row.status) } };
+    }
+    if (row?.status === 'invalid_flat') {
+      return { fieldErrors: { flat: foundSocietyMessage(row.status) } };
     }
     return { error: foundSocietyMessage(row?.status ?? '') };
   }

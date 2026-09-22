@@ -6,7 +6,13 @@ import { z } from 'zod';
 
 /** The statuses public.create_society() can return. */
 export type FoundSocietyStatus =
-  'ok' | 'unauthenticated' | 'invalid_name' | 'invalid_phone' | 'too_many' | 'no_slug_free';
+  | 'ok'
+  | 'unauthenticated'
+  | 'invalid_name'
+  | 'invalid_phone'
+  | 'invalid_flat'
+  | 'too_many'
+  | 'no_slug_free';
 
 /** How many societies one account may open before the platform team steps in. */
 export const SOCIETY_LIMIT = 3;
@@ -16,6 +22,7 @@ const FOUND_MESSAGES: Record<FoundSocietyStatus, string> = {
   unauthenticated: 'Please sign in first.',
   invalid_name: 'Give your society a name of at least two characters.',
   invalid_phone: 'Check the phone number — 10 digits, or the full international form.',
+  invalid_flat: 'Write your flat the way it is on the door, like A 703 or 1402.',
   too_many: `You have already opened ${SOCIETY_LIMIT} societies. Write to us and we'll set the next one up with you.`,
   no_slug_free:
     'That name is taken by too many societies already. Add your area or city to tell them apart.',
@@ -26,6 +33,39 @@ export function foundSocietyMessage(status: string): string {
     FOUND_MESSAGES[status as FoundSocietyStatus] ??
     'We could not create that society. Please try again.'
   );
+}
+
+/**
+ * Reads a typed flat label the way the flats table stores it.
+ *
+ * The founder types one thing; units keep a block and a number. Splitting it
+ * here rather than asking for two fields keeps "start your society" to the
+ * questions somebody will answer on a phone.
+ *
+ * The shape has to match generateFlats() below — an upper-case block and a
+ * bare number — or a founder's hand-typed "A 703" and the generator's later
+ * A/703 would be two different flats, and the resident who picked the wrong
+ * one would be invisible to the other. app.split_flat() does the same in SQL,
+ * and a test holds the two together.
+ *
+ * A space settles the ambiguous case: "B G01" is flat G01 of tower B, where
+ * that G is the ground floor; "G01" on its own reads as tower G, flat 01.
+ */
+export function splitFlat(label: string): { block: string | null; number: string } {
+  const trimmed = label.replace(/\s+/g, ' ').trim();
+  const parts =
+    /^([A-Za-z]+)[\s._/-]+(.+)$/.exec(trimmed) ?? /^([A-Za-z]{1,3})([0-9].*)$/.exec(trimmed);
+  const block = parts?.[1];
+  const number = parts?.[2];
+  return block && number
+    ? { block: block.toUpperCase(), number: number.trim() }
+    : { block: null, number: trimmed };
+}
+
+/** A flat has to have a number in it; "nowhere" is not one. */
+export function isFlatLabel(label: string): boolean {
+  const trimmed = label.trim();
+  return trimmed.length > 0 && trimmed.length <= 24 && /[0-9]/.test(splitFlat(trimmed).number);
 }
 
 // ---------------------------------------------------------------------------

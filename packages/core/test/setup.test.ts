@@ -3,11 +3,13 @@ import {
   catalogueItemSchema,
   flatGeneratorSchema,
   generateFlats,
+  isFlatLabel,
   joinLink,
   parseFlatsCsv,
   residentInviteMessage,
   setupProgress,
   setupSteps,
+  splitFlat,
 } from '../src/setup';
 
 describe('flat generator', () => {
@@ -92,5 +94,60 @@ describe('catalogue items', () => {
       label: 'Shubh Tents',
       emoji: null,
     });
+  });
+});
+
+/**
+ * The founder types one flat; units store a block and a number.
+ *
+ * The founder was the one member of a society never asked where they live —
+ * create_society() made them a member and app.seed_community_owner() seated
+ * them nowhere — so their own payments appeared on the Money page with no flat
+ * beside them. Asking is the fix; reading the answer the same way the flat
+ * generator writes it is what stops the answer becoming a second, duplicate
+ * flat the moment somebody bulk-generates the rest.
+ */
+describe('reading a typed flat', () => {
+  it('reads the shapes people actually type', () => {
+    expect(splitFlat('A 703')).toEqual({ block: 'A', number: '703' });
+    expect(splitFlat('a-703')).toEqual({ block: 'A', number: '703' });
+    expect(splitFlat('A703')).toEqual({ block: 'A', number: '703' });
+    expect(splitFlat('  A   703 ')).toEqual({ block: 'A', number: '703' });
+  });
+
+  it('leaves a society without towers its bare numbers', () => {
+    expect(splitFlat('703')).toEqual({ block: null, number: '703' });
+    expect(splitFlat('1402')).toEqual({ block: null, number: '1402' });
+  });
+
+  it('lets a space settle the ground floor', () => {
+    // In "B G01" that G is the floor, not the tower. Without the space there
+    // is nothing to tell the two apart, and the comment on app.split_flat
+    // says so out loud rather than pretending otherwise.
+    expect(splitFlat('B G01')).toEqual({ block: 'B', number: 'G01' });
+    expect(splitFlat('G01')).toEqual({ block: 'G', number: '01' });
+  });
+
+  it('agrees with what the generator writes, or the two become different flats', () => {
+    const rows = generateFlats(
+      flatGeneratorSchema.parse({
+        towers: 'A, B',
+        floors: 2,
+        flats_per_floor: 2,
+        include_ground_floor: true,
+      }),
+    );
+    for (const row of rows) {
+      const typed = `${row.block} ${row.number}`;
+      expect(splitFlat(typed), typed).toEqual({ block: row.block, number: row.number });
+    }
+  });
+
+  it('knows a flat from a sentence', () => {
+    expect(isFlatLabel('A 703')).toBe(true);
+    expect(isFlatLabel('1402')).toBe(true);
+    expect(isFlatLabel('nowhere')).toBe(false);
+    expect(isFlatLabel('')).toBe(false);
+    expect(isFlatLabel('a'.repeat(30))).toBe(false);
   });
 });
