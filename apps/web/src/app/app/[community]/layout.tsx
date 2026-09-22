@@ -1,6 +1,7 @@
-import Link from 'next/link';
 import { getMemberships, requireCommunity } from '@/lib/auth';
 import { CommunitySwitcher } from '@/components/community-switcher';
+import { DismissMenus } from '@/components/dismiss-menus';
+import { MobileNavSheet } from '@/components/mobile-nav-sheet';
 import { BottomNav, SidebarNav } from '@/components/sidebar-nav';
 import { NotificationBell } from '@/components/notification-bell';
 import { ProfileMenu } from '@/components/profile-menu';
@@ -31,23 +32,27 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
   const counts = { todo: todoCount };
   const name = profile?.full_name ?? 'You';
 
+  // The sidebar's contents, built once and rendered twice: as the sidebar on a
+  // desktop and inside the sheet on a phone. Two lists would drift, and the
+  // half that drifted last time was the half only phones could see.
+  const switcher = (
+    <CommunitySwitcher
+      current={{ name: community.name, slug: community.slug }}
+      role={role}
+      memberships={memberships}
+    />
+  );
+  const nav = <SidebarNav slug={community.slug} role={viewRole} counts={counts} />;
+  const viewSwitch = viewMode ? <ViewSwitch slug={community.slug} mode={viewMode} /> : null;
+
   return (
     <div className="flex min-h-dvh">
+      <DismissMenus />
       <aside className="border-border-base bg-surface-raised sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r px-3 py-4 md:flex">
-        <CommunitySwitcher
-          current={{ name: community.name, slug: community.slug }}
-          role={role}
-          memberships={memberships}
-        />
-        {viewMode ? (
-          <div className="mt-3 px-1">
-            <ViewSwitch slug={community.slug} mode={viewMode} />
-          </div>
-        ) : null}
+        {switcher}
+        {viewSwitch ? <div className="mt-3 px-1">{viewSwitch}</div> : null}
 
-        <div className="mt-4 flex-1 overflow-y-auto">
-          <SidebarNav slug={community.slug} role={viewRole} counts={counts} />
-        </div>
+        <div className="mt-4 flex-1 overflow-y-auto">{nav}</div>
 
         <div className="border-border-base mt-4 border-t pt-3">
           <ProfileMenu
@@ -61,12 +66,13 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="border-border-base bg-surface-raised/95 sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur md:hidden">
-          <Link href={`/app/${community.slug}`} className="flex min-w-0 items-center gap-2">
-            <span className="bg-accent text-accent-ink grid size-7 shrink-0 place-items-center rounded-lg text-xs font-bold">
-              {community.name.charAt(0).toUpperCase()}
-            </span>
-            <span className="truncate text-sm font-semibold">{community.name}</span>
-          </Link>
+          {/* The society name used to link to Home, which the bottom bar
+              already reaches. It opens the rest of the app instead. */}
+          <MobileNavSheet societyName={community.name}>
+            {switcher}
+            {viewSwitch ? <div className="px-1">{viewSwitch}</div> : null}
+            {nav}
+          </MobileNavSheet>
           <div className="flex items-center gap-1">
             <NotificationBell slug={community.slug} unread={unread ?? 0} className="p-1.5" />
             <ProfileMenu slug={community.slug} name={name} unread={0} viewMode={viewMode} compact />

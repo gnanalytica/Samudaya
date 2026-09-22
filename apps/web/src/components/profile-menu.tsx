@@ -28,7 +28,7 @@ export function ProfileMenu({
   const item =
     'text-ink-muted hover:bg-surface-sunken hover:text-ink flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm';
   return (
-    <details className="group relative">
+    <details className="group relative" data-menu>
       <summary
         className={cn(
           'hover:bg-surface-sunken flex cursor-pointer list-none items-center gap-2 rounded-lg [&::-webkit-details-marker]:hidden',

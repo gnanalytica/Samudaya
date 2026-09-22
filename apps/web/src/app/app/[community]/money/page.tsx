@@ -1,5 +1,4 @@
-import Link from 'next/link';
-import { ArrowDownLeft, ArrowUpRight, PiggyBank, Scale, Wallet } from 'lucide-react';
+import { PiggyBank, Scale, Wallet } from 'lucide-react';
 import {
   LEDGER_FILTERS,
   filterLedger,
@@ -18,7 +17,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile, StatTiles } from '@/components/badges';
-import { BillLink } from '@/components/bill-link';
+import { LedgerRow } from '@/components/ledger-row';
 
 export const metadata = { title: 'Money' };
 
@@ -31,9 +30,13 @@ export const metadata = { title: 'Money' };
  * looked like. The history existed and was unreachable, which for a
  * transparency ledger is close to not existing.
  *
- * Money in names the payer and their flat, money out the vendor — the line
- * society_ledger draws and explains. Payments nobody has confirmed are not
- * here: a ledger of claims is what this replaces.
+ * Money in names the payer, their flat and how they paid; money out names the
+ * vendor — the line society_ledger draws and explains. Payments nobody has
+ * confirmed are not here: a ledger of claims is what this replaces.
+ *
+ * Every row carries its evidence where there is any to carry: the bill behind
+ * a payment out, which every member may open, and the screenshot behind a
+ * payment in, which the view hands only to the payer and to staff.
  */
 export default async function MoneyPage(props: PageProps<'/app/[community]/money'>) {
   const { community: slug } = await props.params;
@@ -45,7 +48,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
     supabase
       .from('society_ledger')
       .select(
-        'id, direction, happened_at, amount, counterpart, detail, receipt_no, document_url, confirmed_by, confirmed_at, event_slug, event_name',
+        'id, direction, happened_at, amount, counterpart, detail, payer_name, unit_label, method, receipt_no, document_url, confirmed_by, confirmed_at, event_slug, event_name',
       )
       .eq('community_id', community.id)
       .order('happened_at', { ascending: false })
@@ -188,73 +191,9 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
 
           {visible.length ? (
             <ul className="divide-border-base divide-y">
-              {visible.map((row) => {
-                const incoming = row.direction === 'in';
-                return (
-                  <li key={row.id} className="flex items-start justify-between gap-3 px-5 py-3">
-                    <div className="flex min-w-0 gap-3">
-                      <span
-                        className={
-                          incoming
-                            ? 'bg-success/10 text-success mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
-                            : 'bg-warning/10 text-warning mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
-                        }
-                        aria-hidden="true"
-                      >
-                        {incoming ? (
-                          <ArrowDownLeft className="size-4" />
-                        ) : (
-                          <ArrowUpRight className="size-4" />
-                        )}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="text-ink text-sm font-medium">
-                          {row.counterpart}
-                          <span className="sr-only">
-                            {incoming ? ' paid the society' : ' was paid by the society'}
-                          </span>
-                        </p>
-                        <p className="text-ink-subtle mt-0.5 text-xs">
-                          {[
-                            row.detail,
-                            row.happened_at ? formatDate(row.happened_at.slice(0, 10)) : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                          {row.event_slug ? (
-                            <>
-                              {' · '}
-                              <Link
-                                href={`/app/${slug}/events/${row.event_slug}?tab=money`}
-                                className="hover:text-ink underline underline-offset-2"
-                              >
-                                {row.event_name}
-                              </Link>
-                            </>
-                          ) : null}
-                        </p>
-                        {row.confirmed_at ? (
-                          <p className="text-ink-subtle mt-0.5 text-xs">
-                            {incoming ? 'Confirmed' : 'Approved'} by{' '}
-                            {row.confirmed_by ?? 'the society'} · {relativeTime(row.confirmed_at)}
-                          </p>
-                        ) : null}
-                        <BillLink url={row.document_url} />
-                      </div>
-                    </div>
-                    <span
-                      className={
-                        incoming
-                          ? 'text-success shrink-0 text-sm font-semibold'
-                          : 'text-ink shrink-0 text-sm font-semibold'
-                      }
-                    >
-                      {incoming ? '+' : '−'}
-                      {formatMoney(Math.abs(Number(row.amount)), community.currency)}
-                    </span>
-                  </li>
-                );
-              })}
+              {visible.map((row) => (
+                <LedgerRow key={row.id} row={row} slug={slug} currency={community.currency} />
+              ))}
             </ul>
           ) : (
             <EmptyState
@@ -272,10 +211,12 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         <p className="text-ink-subtle mt-4 flex items-start gap-2 text-xs">
           <Scale className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           <span>
-            Money in names who paid and their flat, the way a contribution list always has. Money
-            out names the vendor, the amount and whoever on the committee approved it. Nothing here
-            is a way to contact anybody — phone numbers and email addresses stay on the People page,
-            for the people entitled to them.{' '}
+            Money in names who paid, their flat and how the money arrived, the way a contribution
+            list always has. Money out names the vendor, the amount and whoever on the committee
+            approved it, with the bill attached for anyone to open. A payment screenshot is not
+            everybody&rsquo;s — it carries the payer&rsquo;s UPI handle — so it opens only for them
+            and for staff. Nothing here is a way to contact anybody: phone numbers and email
+            addresses stay on the People page, for the people entitled to them.{' '}
             {totals.data?.last_movement_at ? (
               <>Last movement {relativeTime(totals.data.last_movement_at)}.</>
             ) : null}

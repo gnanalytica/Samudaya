@@ -45,7 +45,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "lint": "expo lint",
+    "lint": "expo lint --max-warnings 0",
     "prebuild": "expo prebuild",
     "test": "echo \"no mobile unit tests yet\" && exit 0"
   },

@@ -3,7 +3,6 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Check, Lightbulb, ThumbsUp } from 'lucide-react';
-import { formatMoney } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
