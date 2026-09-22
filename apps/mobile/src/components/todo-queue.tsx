@@ -50,10 +50,13 @@ function detailRoute(item: TodoItem): Href {
       return item.event_slug
         ? { pathname: '/event/[slug]', params: { slug: item.event_slug } }
         : '/events';
+    // A suggestion about the society belongs to no event, and this used to send
+    // the committee to the events list — a tab called "See the event" landing
+    // them nowhere near the thing they were asked to decide on.
     case 'suggestion_to_review':
       return item.event_slug
         ? { pathname: '/event/[slug]', params: { slug: item.event_slug, tab: 'vote' } }
-        : '/events';
+        : '/ideas';
     // The whole list, so the committee can see who else has no flat while
     // they are already thinking about flats.
     case 'flat_change':

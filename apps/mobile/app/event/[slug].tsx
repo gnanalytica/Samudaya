@@ -33,9 +33,10 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
-import { Chip, ChipRow, ErrorText, Segmented } from '../../src/components/admin-ui';
+import { Chip, ChipRow, Segmented } from '../../src/components/admin-ui';
 import { FUND_RULE_PLAIN } from '../../src/components/event-form';
 import { KeyValue, Meter, StatTile } from '../../src/components/event-ui';
+import { Suggestions } from '../../src/components/suggestions';
 import { ViewFileButton } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
 
@@ -177,7 +178,16 @@ export default function EventDetail() {
 
         {tab === 'activities' ? <Activities data={data} open={open} onChange={changed} /> : null}
 
-        {tab === 'vote' ? <Suggestions data={data} open={open} onChange={changed} /> : null}
+        {tab === 'vote' ? (
+          // One target, so no picker: on an event's own page there is only one
+          // thing a suggestion could be about.
+          <Suggestions
+            rows={data.suggestions}
+            targets={[{ id: data.event.id, label: data.event.name }]}
+            open={open}
+            onChange={changed}
+          />
+        ) : null}
         <View style={{ height: spacing.xl }} />
       </ScrollView>
     </Screen>
@@ -588,187 +598,6 @@ function Activities({
           </View>
         );
       })}
-    </Card>
-  );
-}
-
-function Suggestions({
-  data,
-  open,
-  onChange,
-}: {
-  data: Detail;
-  open: boolean;
-  onChange: () => void;
-}) {
-  const { viewRole: role, membershipId, activeCommunity } = useAuth();
-  const [kind, setKind] = useState<'activity' | 'idea'>('activity');
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-
-  const mayVote = can(role, 'vote');
-  const maySuggest = open && can(role, 'suggest');
-  const voting = data.suggestions.filter((row) => row.status === 'accepted');
-  const waiting = data.suggestions.filter(
-    (row) =>
-      row.status !== 'accepted' &&
-      (row.suggested_by === membershipId || can(role, 'events:manage')),
-  );
-
-  const submit = async () => {
-    if (!membershipId || !activeCommunity) return;
-    if (name.trim().length < 3) {
-      setError('Give your suggestion a short title.');
-      return;
-    }
-    setBusy('submit');
-    setError(null);
-    const { error: insertError } = await supabase.from('activity_suggestions').insert({
-      community_id: activeCommunity.id,
-      event_id: data.event.id,
-      kind,
-      name: name.trim(),
-      description: description.trim() || null,
-      suggested_by: membershipId,
-      status: 'new',
-    });
-    setBusy(null);
-    if (insertError) {
-      setError('That did not go through. Please try again.');
-      return;
-    }
-    setName('');
-    setDescription('');
-    setSent(true);
-    onChange();
-  };
-
-  const vote = async (suggestionId: string, support: boolean) => {
-    if (!membershipId) return;
-    setBusy(suggestionId);
-    const { error: voteError } = await supabase
-      .from('suggestion_votes')
-      .upsert(
-        { suggestion_id: suggestionId, membership_id: membershipId, support },
-        { onConflict: 'suggestion_id,membership_id' },
-      );
-    setBusy(null);
-    if (voteError) {
-      Alert.alert('Your vote did not go through', 'Voting may have closed. Pull down to refresh.');
-      return;
-    }
-    onChange();
-  };
-
-  if (!voting.length && !waiting.length && !maySuggest) {
-    return (
-      <Card>
-        <EmptyState
-          title="Nothing to vote on yet"
-          description="Suggestions the committee opens for voting appear here."
-        />
-      </Card>
-    );
-  }
-
-  return (
-    <Card style={{ gap: spacing.lg }}>
-      <View style={{ gap: 2 }}>
-        <Heading>Suggestions</Heading>
-        <Caption>
-          The committee reviews each suggestion, then residents vote. One vote per person.
-        </Caption>
-      </View>
-
-      {voting.map((row) => {
-        const total = row.tally.support + row.tally.against;
-        const percent = total > 0 ? Math.round((row.tally.support / total) * 100) : 0;
-        return (
-          <View key={row.id} style={{ gap: spacing.sm }}>
-            <View
-              style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
-            >
-              <View style={{ flex: 1, gap: 2 }}>
-                <Body>{row.name}</Body>
-                {row.description ? <Caption>{row.description}</Caption> : null}
-              </View>
-              <Badge label={row.kind === 'idea' ? 'Idea' : 'Activity'} />
-            </View>
-            <Meter percent={percent} tone="success" label={`${row.name}: support`} />
-            <Caption>
-              {row.tally.support} for · {row.tally.against} against
-              {row.tally.mine === null ? '' : ` · you voted ${row.tally.mine ? 'for' : 'against'}`}
-            </Caption>
-            {mayVote ? (
-              <ChipRow>
-                <Chip
-                  label="👍 For"
-                  selected={row.tally.mine === true}
-                  onPress={() => void vote(row.id, true)}
-                  disabled={busy !== null}
-                />
-                <Chip
-                  label="👎 Against"
-                  selected={row.tally.mine === false}
-                  onPress={() => void vote(row.id, false)}
-                  disabled={busy !== null}
-                />
-              </ChipRow>
-            ) : null}
-          </View>
-        );
-      })}
-
-      {waiting.length ? (
-        <View style={{ gap: spacing.xs }}>
-          <Caption>WAITING FOR THE COMMITTEE</Caption>
-          {waiting.map((row) => (
-            <Body key={row.id} muted>
-              {row.kind === 'idea' ? '💡' : '🎭'} {row.name}
-            </Body>
-          ))}
-        </View>
-      ) : null}
-
-      {maySuggest ? (
-        <View style={{ gap: spacing.sm }}>
-          <Caption>SUGGEST SOMETHING</Caption>
-          <ChipRow>
-            <Chip
-              label="Activity"
-              selected={kind === 'activity'}
-              onPress={() => setKind('activity')}
-            />
-            <Chip label="Idea" selected={kind === 'idea'} onPress={() => setKind('idea')} />
-          </ChipRow>
-          <Input
-            value={name}
-            onChangeText={(value) => {
-              setName(value);
-              setSent(false);
-            }}
-            placeholder={kind === 'activity' ? 'e.g. Kids’ lantern walk' : 'e.g. Eco-friendly idol'}
-          />
-          <Input
-            value={description}
-            onChangeText={setDescription}
-            placeholder="A line or two of detail (optional)"
-            multiline
-          />
-          <Button
-            label="Send to the committee"
-            onPress={() => void submit()}
-            loading={busy === 'submit'}
-          />
-          {sent ? (
-            <Caption>Sent. The committee will review it before it goes to a vote.</Caption>
-          ) : null}
-          <ErrorText message={error} />
-        </View>
-      ) : null}
     </Card>
   );
 }
