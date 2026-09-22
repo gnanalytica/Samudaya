@@ -7,7 +7,11 @@ import {
   formatDate,
   formatMoney,
   fundMovementLine,
+  ledgerEvidence,
   ledgerFilterFrom,
+  ledgerMeta,
+  ledgerTitle,
+  ledgerUnit,
   relativeTime,
 } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
@@ -32,10 +36,12 @@ import { useTheme } from '../src/lib/use-theme';
  * @samudaya/core, so the two surfaces cannot drift into disagreeing about what
  * "money in" means.
  *
- * Money in names the payer and their flat, money out the vendor — the line
- * society_ledger draws. Payments nobody has confirmed are not here. Nothing on
- * this screen is a way to contact anybody; RLS decides what comes back, so a
- * resident gets the resident's ledger without this screen deciding anything.
+ * Money in names the payer, their flat and how they paid; money out names the
+ * vendor — the line society_ledger draws. Payments nobody has confirmed are not
+ * here. Nothing on this screen is a way to contact anybody; RLS decides what
+ * comes back, so a resident gets the resident's ledger without this screen
+ * deciding anything — including which rows offer their evidence, since the view
+ * hands a payment screenshot only to the payer and to staff.
  */
 export default function Money() {
   const router = useRouter();
@@ -56,7 +62,7 @@ export default function Money() {
         supabase
           .from('society_ledger')
           .select(
-            'id, direction, happened_at, amount, counterpart, detail, receipt_no, document_url, confirmed_by, confirmed_at, event_slug, event_name',
+            'id, direction, happened_at, amount, counterpart, detail, payer_name, unit_label, method, receipt_no, document_url, confirmed_by, confirmed_at, event_slug, event_name',
           )
           .eq('community_id', communityId)
           .order('happened_at', { ascending: false })
@@ -224,10 +230,11 @@ export default function Money() {
         ListFooterComponent={
           <View style={{ gap: spacing.xs, paddingTop: spacing.lg }}>
             <Caption>
-              Money in names who paid and their flat, the way a contribution list always has. Money
-              out names the vendor, the amount and whoever on the committee approved it. Nothing
-              here is a way to contact anybody — that stays on People, for the people entitled to
-              it.
+              Money in names who paid, their flat and how the money arrived, the way a contribution
+              list always has. Money out names the vendor, the amount and whoever on the committee
+              approved it, with the bill attached for anyone to open. A payment screenshot opens
+              only for the payer and for staff. Nothing here is a way to contact anybody — that
+              stays on People, for the people entitled to it.
             </Caption>
             {totals?.last_movement_at ? (
               <Caption>Last movement {relativeTime(totals.last_movement_at)}.</Caption>
@@ -238,12 +245,17 @@ export default function Money() {
         renderItem={({ item }) => {
           const incoming = item.direction === 'in';
           const when = item.happened_at ? formatDate(item.happened_at.slice(0, 10)) : null;
+          const unit = ledgerUnit(item);
+          const evidence = ledgerEvidence(item);
           return (
             <Card style={{ gap: spacing.xs, marginBottom: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
                 <View style={{ flex: 1, gap: 2 }}>
-                  <Body>{item.counterpart ?? 'Unnamed'}</Body>
-                  <Caption>{[item.detail, when].filter(Boolean).join(' · ')}</Caption>
+                  {/* Name and flat on one line, the same pair the laptop shows
+                      — through the same functions, so the two cannot drift
+                      into naming a payment differently. */}
+                  <Body>{[ledgerTitle(item), unit].filter(Boolean).join(' · ')}</Body>
+                  <Caption>{[ledgerMeta(item), when].filter(Boolean).join(' · ')}</Caption>
                   {item.confirmed_at ? (
                     <Caption>
                       {incoming ? 'Confirmed' : 'Approved'} by {item.confirmed_by ?? 'the society'}{' '}
@@ -279,7 +291,16 @@ export default function Money() {
                 </Pressable>
               ) : null}
 
-              <ViewFileButton bucket="bills" value={item.document_url} label="View bill" />
+              {/* The bill for money out, the payer's screenshot for money in.
+                  A row whose evidence is not this viewer's to open arrives
+                  with a null path and grows no button. */}
+              {evidence ? (
+                <ViewFileButton
+                  bucket={evidence.bucket}
+                  value={evidence.path}
+                  label={evidence.label}
+                />
+              ) : null}
             </Card>
           );
         }}

@@ -1761,12 +1761,107 @@ select test.eq(
     where id = (select ledger_id from t_named)),
   1001::numeric, 'and how much they paid');
 
--- Cash staff collected against a door, with no account behind it, still has a
--- flat to name even though it has no payer.
+-- ---------------------------------------------------------------------------
+-- Both halves of the answer, on every row
+-- ---------------------------------------------------------------------------
+-- The ledger used to have one field for "who", so a row could say the name or
+-- the flat and never both: a resident reporting their own payment records a
+-- membership and no unit, staff recording cash record a unit and no
+-- membership. Each half is recoverable from unit_occupants, and now is.
+reset role;
+insert into public.units (id, community_id, block, number)
+select 'b2b2b2b2-0000-4000-8000-000000000002', c.id, 'A', '1105'
+  from public.communities c where c.slug = 'hill-crest';
+insert into public.unit_occupants (unit_id, membership_id, relation, is_primary, moved_in_on)
+select 'b2b2b2b2-0000-4000-8000-000000000002', m.id, 'owner', true, current_date - 30
+  from public.memberships m
+  join public.communities c on c.id = m.community_id and c.slug = 'hill-crest'
+ where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
 select test.eq(
-  (select counterpart from public.society_ledger
+  (select payer_name from public.society_ledger
+    where id = (select ledger_id from t_named)),
+  'Tom Menon', 'a payment that recorded no flat still names the payer');
+select test.eq(
+  (select unit_label from public.society_ledger
+    where id = (select ledger_id from t_named)),
+  'A 1105', 'and finds the flat they were living in when they paid');
+select test.eq(
+  (select method from public.society_ledger
+    where id = (select ledger_id from t_named)),
+  'Upi', 'and says how the money arrived');
+
+-- Cash staff collected against a door names the flat's resident, and keeps the
+-- flat beside it so nothing is being asserted that the row cannot show.
+select test.eq(
+  (select payer_name from public.society_ledger
     where id = (select ledger_id from t_cash)),
-  'A 1104', 'money with no account behind it is named by flat');
+  'Omar Sheikh', 'money with no account behind it is named by whoever lives there');
+select test.eq(
+  (select unit_label from public.society_ledger
+    where id = (select ledger_id from t_cash)),
+  'A 1104', 'with the flat it was collected from');
+select test.eq(
+  (select method from public.society_ledger
+    where id = (select ledger_id from t_cash)),
+  'Cash', 'and how it was handed over');
+
+-- The join is bounded by the occupancy dates, not by who lives there today.
+-- Naming the current resident on a payment the previous one made would be
+-- worse than the blank it replaces.
+reset role;
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference, paid_at)
+select 'dddddddd-0000-4000-8000-0000000000e1', 'cccccccc-0000-4000-8000-0000000000aa',
+       m.community_id, m.id, 777, 'upi', 'succeeded', '601100022200',
+       (current_date - 400)::timestamptz
+  from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  (select unit_label from public.society_ledger
+    where id = 'in:dddddddd-0000-4000-8000-0000000000e1'),
+  null, 'a payment from before they moved in is not pinned to that flat');
+select test.eq(
+  (select payer_name from public.society_ledger
+    where id = 'in:dddddddd-0000-4000-8000-0000000000e1'),
+  'Tom Menon', 'though it still names who paid it');
+
+-- ---------------------------------------------------------------------------
+-- The evidence, to the people the bucket already opens it to
+-- ---------------------------------------------------------------------------
+-- A bill belongs to the whole society: it is the society's money being spent
+-- by people the society elected. A UPI screenshot carries the payer's handle
+-- and often their phone number, so it goes to the payer and to staff and
+-- nobody else -- the same line storage draws, said here so a screen can
+-- offer the button only when it will work.
+reset role;
+update public.contributions set proof_path =
+  community_id::text || '/' || membership_id::text || '/upi.jpg'
+ where reference = '612345678901';
+
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  (select document_url from public.society_ledger
+    where id = (select ledger_id from t_named)),
+  null, 'a neighbour is not handed somebody else''s payment screenshot');
+select test.ok(
+  (select document_url from public.society_ledger
+    where id = 'out:dddddddd-0000-4000-8000-0000000000bb') is not null,
+  'but an approved bill is every member''s to open');
+
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+select test.ok(
+  (select document_url from public.society_ledger
+    where id = (select ledger_id from t_named)) like '%/upi.jpg',
+  'the payer can open their own');
+
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.ok(
+  (select document_url from public.society_ledger
+    where id = (select ledger_id from t_named)) like '%/upi.jpg',
+  'and so can the staff who have to check it against the bank');
 
 -- The ledger is a definer view, so what it does not select is the only thing
 -- stopping it. Pin the column list: a later edit that adds a contact column
@@ -1778,8 +1873,8 @@ select test.eq(
     where table_schema = 'public' and table_name = 'society_ledger'),
   'amount,community_id,confirmed_at,confirmed_by,counterpart,detail,direction,'
   'document_url,event_id,event_name,event_slug,happened_at,id,membership_id,'
-  'receipt_no',
-  'and the ledger carries a name and a flat, never a way to contact anyone');
+  'method,payer_name,receipt_no,unit_label',
+  'and the ledger carries a name, a flat and a method, never a way to contact anyone');
 
 select test.ok(
   (select balance = total_in - total_out from public.society_money

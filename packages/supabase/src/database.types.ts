@@ -2585,6 +2585,9 @@ export type Database = {
           confirmed_by: string | null
           confirmed_at: string | null
           membership_id: string | null
+          payer_name: string | null
+          unit_label: string | null
+          method: string | null
         }
         Relationships: [
 
