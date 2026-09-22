@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input, Select } from '@/components/ui/field';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { RemoveForm, RoleForm } from './member-controls';
+import { FlatForm, RemoveForm, RoleForm } from './member-controls';
 import { PeopleTabs } from './people-tabs';
 import { ROLE_FILTERS, filterPeople, roleFilterFrom } from '@/lib/people-filter';
 
@@ -32,7 +32,7 @@ export default async function PeoplePage(props: PageProps<'/app/[community]/peop
   const staff = can(role, 'residents:remove');
   const committee = can(role, 'roles:manage');
 
-  const [{ data: people }, pending] = await Promise.all([
+  const [{ data: people }, pending, { data: flats }, { data: seats }] = await Promise.all([
     supabase.rpc('society_people', { p_community_id: community.id }),
     staff
       ? supabase
@@ -41,7 +41,29 @@ export default async function PeoplePage(props: PageProps<'/app/[community]/peop
           .eq('community_id', community.id)
           .eq('status', 'pending')
       : Promise.resolve({ count: 0 }),
+    // The list to choose from, and who currently sits where. society_people()
+    // hands back a flat label, which is what a reader wants and not enough to
+    // preselect a dropdown with.
+    committee
+      ? supabase
+          .from('units')
+          .select('id, block, number')
+          .eq('community_id', community.id)
+          .order('block')
+          .order('number')
+          .limit(5000)
+      : Promise.resolve({ data: [] }),
+    committee
+      ? supabase
+          .from('unit_occupants')
+          .select('membership_id, unit_id, units!inner(community_id)')
+          .eq('units.community_id', community.id)
+          .is('moved_out_on', null)
+      : Promise.resolve({ data: [] }),
   ]);
+
+  const units = flats ?? [];
+  const seatOf = new Map((seats ?? []).map((seat) => [seat.membership_id, seat.unit_id]));
 
   const rows = (people ?? []).flatMap((row) =>
     row.membership_id
@@ -202,7 +224,23 @@ export default async function PeoplePage(props: PageProps<'/app/[community]/peop
                               joined {relativeTime(member.joined_at)}
                             </p>
                           </td>
-                          <td className="text-ink-muted px-5 py-3">{flat}</td>
+                          <td className="text-ink-muted px-5 py-3">
+                            {/* Offered on your own row too: the founder is
+                                never asked where they live when they create
+                                the society, so they are usually the person who
+                                needs this. */}
+                            {committee && units.length ? (
+                              <FlatForm
+                                slug={slug}
+                                membershipId={member.membership_id}
+                                unitId={seatOf.get(member.membership_id) ?? null}
+                                units={units}
+                                name={name}
+                              />
+                            ) : (
+                              flat
+                            )}
+                          </td>
                           <td className="px-5 py-3">
                             {committee && !isMe ? (
                               <RoleForm

@@ -6,7 +6,7 @@ import { ROLE_LABEL, ASSIGNABLE_ROLES, type Role } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
-import { changeMemberRole, removeMember } from './actions';
+import { changeMemberRole, removeMember, setMemberFlat } from './actions';
 
 function Submit({
   label,
@@ -109,6 +109,86 @@ export function RemoveForm({
       <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="membership_id" value={membershipId} />
       <Submit label="Remove" variant="ghost" />
+      <Message state={state} />
+    </form>
+  );
+}
+
+export type FlatOption = { id: string; block: string | null; number: string };
+
+/**
+ * Which flat a member lives in.
+ *
+ * There was no way to answer this after somebody joined: the join form and a
+ * unit-bound invite code both ask once, the Flats page counts occupants
+ * without being able to add one, and Settings edits a name and a phone. So a
+ * founder — who was never asked at all — stayed flatless for good, and their
+ * payments reached the ledger with no flat beside them.
+ *
+ * Offered on your own row too, unlike the role control. The founder is usually
+ * the person who needs it, and the database gates it on being committee rather
+ * than on whose row it is.
+ */
+export function FlatForm({
+  slug,
+  membershipId,
+  unitId,
+  units,
+  name,
+}: {
+  slug: string;
+  membershipId: string;
+  unitId: string | null;
+  units: FlatOption[];
+  name: string;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(setMemberFlat, EMPTY_STATE);
+  // Same reason as the role control: a live Save beside every name in a long
+  // table is one stray click from a change nobody meant to make.
+  const [choice, setChoice] = useState(unitId ?? '');
+
+  const towers = [...new Set(units.map((unit) => unit.block ?? ''))];
+
+  return (
+    <form action={action}>
+      <input type="hidden" name="slug" value={slug} />
+      <input type="hidden" name="membership_id" value={membershipId} />
+      <div className="flex items-center gap-2">
+        <label htmlFor={`flat-${membershipId}`} className="sr-only">
+          Flat for {name}
+        </label>
+        <Select
+          id={`flat-${membershipId}`}
+          name="unit_id"
+          value={choice}
+          onChange={(event) => setChoice(event.target.value)}
+          className="h-8 w-32 py-1 text-xs"
+        >
+          <option value="">No flat</option>
+          {towers.map((tower) =>
+            tower ? (
+              <optgroup key={tower} label={`Tower ${tower}`}>
+                {units
+                  .filter((unit) => (unit.block ?? '') === tower)
+                  .map((unit) => (
+                    <option key={unit.id} value={unit.id}>
+                      {unit.block} {unit.number}
+                    </option>
+                  ))}
+              </optgroup>
+            ) : (
+              units
+                .filter((unit) => !unit.block)
+                .map((unit) => (
+                  <option key={unit.id} value={unit.id}>
+                    {unit.number}
+                  </option>
+                ))
+            ),
+          )}
+        </Select>
+        <Submit label="Save" variant="secondary" disabled={choice === (unitId ?? '')} />
+      </div>
       <Message state={state} />
     </form>
   );

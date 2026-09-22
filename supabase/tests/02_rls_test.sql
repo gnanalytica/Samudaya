@@ -157,9 +157,60 @@ select test.eq((select count(*) from public.communities where name = 'Hill Crest
 select test.eq((select phone from public.profiles where id = '88888888-8888-4888-8888-888888888888'),
   '+919845010101', 'a number already set is never overwritten by a later society');
 
+-- ---------------------------------------------------------------------------
+-- The founder lives somewhere too
+-- ---------------------------------------------------------------------------
+-- Every resident is asked which flat they live in; the founder never was, and
+-- was the one member of a society who lived nowhere. Their own payments then
+-- showed up on the Money page with no flat beside them — not the ledger
+-- failing to look, but nothing to find.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  (select status from public.create_society('Hill Crest Mews', 'Bengaluru', null, null, null, 'nowhere')),
+  'invalid_flat', 'a flat with no number in it is named, not silently dropped');
+reset role;
+select test.eq((select count(*) from public.communities where name = 'Hill Crest Mews'), 0::bigint,
+  'and nothing is created when it is refused');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+create temporary table t_founded as
+select * from public.create_society('Hill Crest Towers', 'Bengaluru', null, null, null, 'C 1402');
+grant select on t_founded to authenticated;
+select test.eq((select status from t_founded), 'ok', 'a founder can say which flat is theirs');
+
+reset role;
+select test.eq(
+  (select btrim(coalesce(u.block || ' ', '') || u.number) from public.units u
+    where u.community_id = (select community_id from t_founded)),
+  'C 1402', 'the society''s first flat is the founder''s own');
+select test.eq(
+  (select count(*)::int from public.unit_occupants o
+     join public.memberships m on m.id = o.membership_id
+    where m.community_id = (select community_id from t_founded)
+      and m.user_id = '88888888-8888-4888-8888-888888888888'
+      and o.moved_out_on is null),
+  1, 'and they are seated in it');
+
+-- Split the way generateFlats() writes them, or a founder's hand-typed flat
+-- and the generator's later one are two different rows and the resident who
+-- picked the wrong one is invisible to the other.
+select test.eq((select block || '|' || number from app.split_flat('A 703')), 'A|703',
+  'a space between the tower and the number is not part of either');
+select test.eq((select block || '|' || number from app.split_flat('a-703')), 'A|703',
+  'nor is a dash, and the tower is stored upper case');
+select test.eq((select block || '|' || number from app.split_flat('A703')), 'A|703',
+  'and the two run together is the same flat again');
+select test.eq((select block || '|' || number from app.split_flat('B G01')), 'B|G01',
+  'a ground-floor flat keeps its letter, because that letter is part of the number');
+select test.eq((select block || '|' || number from app.split_flat('G01')), 'G|01',
+  'the same thing without the space is a tower instead, which a space settles');
+select test.ok((select block is null and number = '703' from app.split_flat('703')),
+  'a society without towers has flats that are only a number');
+
 -- Hand the suite back the society count it was written against.
 select test.act_as('88888888-8888-4888-8888-888888888888');
 delete from public.communities where slug = 'hill-crest-annexe';
+delete from public.communities where slug = 'hill-crest-towers';
 reset role;
 select test.eq((select count(*) from public.communities where slug = 'hill-crest-annexe'), 0::bigint,
   'and the society founded to prove it is cleaned up again');
@@ -1808,8 +1859,17 @@ select test.eq(
   'Cash', 'and how it was handed over');
 
 -- The join is bounded by the occupancy dates, not by who lives there today.
--- Naming the current resident on a payment the previous one made would be
--- worse than the blank it replaces.
+-- The two lookups carry different risks, so they are bounded differently.
+--
+-- moved_in_on is not when somebody moved in: every path that seats a resident
+-- writes current_date, the day they were typed into the app. A society
+-- onboarding now gives everyone a move-in date of today, so a hard date bound
+-- throws away the very rows it was meant to help.
+--
+-- Deciding *who paid* is where getting it wrong puts a neighbour's name
+-- against money they never paid, so that one stays hard-bounded. Deciding
+-- which flat to print beside a payer we have already identified is a label,
+-- and falls back to where they live now.
 reset role;
 insert into public.contributions
   (id, event_id, community_id, membership_id, amount, method, status, reference, paid_at)
@@ -1818,15 +1878,108 @@ select 'dddddddd-0000-4000-8000-0000000000e1', 'cccccccc-0000-4000-8000-00000000
        (current_date - 400)::timestamptz
   from public.memberships m where m.user_id = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd';
 
+-- Cash against a door, from long before the person now living there arrived.
+insert into public.contributions
+  (id, event_id, community_id, unit_id, amount, method, status, paid_at)
+select 'dddddddd-0000-4000-8000-0000000000e2', 'cccccccc-0000-4000-8000-0000000000aa',
+       c.id, 'b2b2b2b2-0000-4000-8000-000000000001',
+       350, 'cash', 'succeeded', (current_date - 400)::timestamptz
+  from public.communities c where c.slug = 'hill-crest';
+
 select test.act_as('abababab-abab-4bab-8bab-abababababab');
-select test.eq(
-  (select unit_label from public.society_ledger
-    where id = 'in:dddddddd-0000-4000-8000-0000000000e1'),
-  null, 'a payment from before they moved in is not pinned to that flat');
 select test.eq(
   (select payer_name from public.society_ledger
     where id = 'in:dddddddd-0000-4000-8000-0000000000e1'),
-  'Tom Menon', 'though it still names who paid it');
+  'Tom Menon', 'an old payment still names who paid it');
+select test.eq(
+  (select unit_label from public.society_ledger
+    where id = 'in:dddddddd-0000-4000-8000-0000000000e1'),
+  'A 1105', 'and prints where they live now, because a move-in date is only when we typed it');
+
+select test.eq(
+  (select payer_name from public.society_ledger
+    where id = 'in:dddddddd-0000-4000-8000-0000000000e2'),
+  null, 'but cash from before the current resident arrived is never pinned on them');
+select test.eq(
+  (select unit_label from public.society_ledger
+    where id = 'in:dddddddd-0000-4000-8000-0000000000e2'),
+  'A 1104', 'it keeps the flat it was collected from, and says nothing more');
+
+-- ---------------------------------------------------------------------------
+-- Seating somebody after they have already joined
+-- ---------------------------------------------------------------------------
+-- The only two doors into a flat were request_to_join() and a unit-bound
+-- invite code, both one-time and both at the moment of joining. The Flats page
+-- counts occupants without being able to add one and Settings edits a name and
+-- a phone, so a member who joined without a flat — every founder, until
+-- 0922.0300 — had no way to ever have one.
+reset role;
+insert into public.units (id, community_id, block, number)
+select 'b2b2b2b2-0000-4000-8000-000000000009', c.id, 'A', '1106'
+  from public.communities c where c.slug = 'hill-crest';
+create temporary table t_seat as
+select m.id from public.memberships m
+ where m.user_id = 'abababab-abab-4bab-8bab-abababababab'
+   and m.community_id = (select id from public.communities where slug = 'hill-crest');
+grant select on t_seat to authenticated;
+
+-- Which flat somebody lives in decides who the ledger names against their
+-- money. That is the committee's to answer for, not a resident's and not the
+-- staff who run the events.
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+select test.eq(
+  public.set_member_unit((select id from t_seat), 'b2b2b2b2-0000-4000-8000-000000000009'),
+  'not_committee', 'a resident cannot put themselves in a flat');
+select test.act_as('99999999-9999-4999-8999-999999999999');
+select test.eq(
+  public.set_member_unit((select id from t_seat), 'b2b2b2b2-0000-4000-8000-000000000009'),
+  'not_committee', 'nor can the staff who run the events');
+
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  public.set_member_unit((select id from t_seat), 'b2b2b2b2-0000-4000-8000-000000000009'),
+  'ok', 'the committee can');
+reset role;
+select test.eq(
+  (select btrim(coalesce(u.block || ' ', '') || u.number)
+     from public.unit_occupants o join public.units u on u.id = o.unit_id
+    where o.membership_id = (select id from t_seat) and o.moved_out_on is null),
+  'A 1106', 'and the member is living there afterwards');
+
+-- Moving is the normal case, not a special one: a tenant leaves, an owner
+-- arrives, somebody picked the wrong flat when they joined.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  public.set_member_unit((select id from t_seat), 'b2b2b2b2-0000-4000-8000-000000000002'),
+  'ok', 'moving them again is the same call');
+reset role;
+select test.eq(
+  (select count(*)::int from public.unit_occupants o
+    where o.membership_id = (select id from t_seat) and o.moved_out_on is null),
+  1, 'a move does not stack a second flat on top of the first');
+select test.eq(
+  (select count(*)::int from public.unit_occupants o
+    where o.membership_id = (select id from t_seat) and o.moved_out_on is not null),
+  1, 'and the flat they left stays as history, so their old payments keep it');
+
+-- A flat from another society would make the directory and the ledger nonsense.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(
+  public.set_member_unit((select id from t_seat), 'bbbbbbbb-0000-4000-8000-000000000002'),
+  'wrong_community', 'a flat in someone else''s society is refused');
+select test.eq(
+  public.set_member_unit('dddddddd-dddd-4ddd-8ddd-dddddddddddd', null),
+  'no_member', 'and a membership that does not exist is not a silent no-op');
+
+-- Clearing is the other half: somebody who has moved out and not back in.
+select test.act_as('88888888-8888-4888-8888-888888888888');
+select test.eq(public.set_member_unit((select id from t_seat), null), 'ok',
+  'the committee can take a member out of a flat as well');
+reset role;
+select test.eq(
+  (select count(*)::int from public.unit_occupants o
+    where o.membership_id = (select id from t_seat) and o.moved_out_on is null),
+  0, 'and then they live nowhere, without their history being erased');
 
 -- ---------------------------------------------------------------------------
 -- The evidence, to the people the bucket already opens it to

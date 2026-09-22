@@ -1,7 +1,13 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { foundSocietyMessage, foundSocietySchema, societySlug } from '@samudaya/core';
+import {
+  foundSocietyMessage,
+  foundSocietySchema,
+  isFlatLabel,
+  societySlug,
+  splitFlat,
+} from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
 import { Body, Button, Caption, Card, Input, Screen, Title } from '../src/components/ui';
@@ -23,6 +29,7 @@ export default function Found() {
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
+  const [flat, setFlat] = useState('');
   const [address, setAddress] = useState('');
   const [pincode, setPincode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -31,7 +38,7 @@ export default function Found() {
   const preview = name.trim() ? societySlug(name) : '';
 
   const submit = async () => {
-    const parsed = foundSocietySchema.safeParse({ name, city, address, pincode, phone });
+    const parsed = foundSocietySchema.safeParse({ name, city, address, pincode, phone, flat });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Check the details and try again.');
       return;
@@ -45,6 +52,7 @@ export default function Found() {
       p_address: parsed.data.address,
       p_pincode: parsed.data.pincode,
       p_phone: parsed.data.phone,
+      p_flat: parsed.data.flat,
     });
     setBusy(false);
 
@@ -116,6 +124,30 @@ export default function Found() {
                 maxLength={20}
               />
               <Caption>Residents and the committee see it. Nobody else does.</Caption>
+            </View>
+
+            {/* Every resident is asked which flat they live in; the founder
+                never was, and ended up the one member of a society who lived
+                nowhere. That is why their own payments reached the ledger with
+                no flat beside them. */}
+            <View style={{ gap: spacing.xs }}>
+              <Input
+                label="Your flat"
+                value={flat}
+                onChangeText={setFlat}
+                placeholder="A 703"
+                autoCapitalize="characters"
+                maxLength={24}
+              />
+              {/* How it was read, shown back: "G01" and "B G01" are the same
+                  letters and different flats, and a space is what settles it. */}
+              <Caption>
+                {flat.trim() && isFlatLabel(flat)
+                  ? splitFlat(flat).block
+                    ? `Tower ${splitFlat(flat).block}, flat ${splitFlat(flat).number}`
+                    : `Flat ${splitFlat(flat).number}, no tower`
+                  : 'As it is on your door. Leave it blank if you run the society without living in it.'}
+              </Caption>
             </View>
 
             <View style={{ gap: spacing.xs }}>

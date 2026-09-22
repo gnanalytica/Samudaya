@@ -164,3 +164,25 @@ export function roleForView<R extends MemberRole | null | undefined>(
 ): R | 'resident' {
   return mode === 'resident' && canSwitchView(role) ? 'resident' : role;
 }
+
+// ---------------------------------------------------------------------------
+// Which flat somebody lives in
+// ---------------------------------------------------------------------------
+/** The statuses public.set_member_unit() can return. */
+export type SetMemberUnitStatus =
+  'ok' | 'not_committee' | 'no_member' | 'no_unit' | 'wrong_community';
+
+const SET_UNIT_MESSAGES: Record<SetMemberUnitStatus, string> = {
+  ok: 'Flat updated.',
+  not_committee: 'Only the committee can change which flat somebody lives in.',
+  no_member: 'That member is no longer in this society.',
+  no_unit: 'That flat no longer exists.',
+  wrong_community: 'That flat belongs to another society.',
+};
+
+export function setMemberUnitMessage(status: string): string {
+  return (
+    SET_UNIT_MESSAGES[status as SetMemberUnitStatus] ??
+    'We could not change that flat. Please try again.'
+  );
+}

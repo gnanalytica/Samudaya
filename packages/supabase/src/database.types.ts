@@ -2682,6 +2682,7 @@ export type Database = {
         p_address?: string
         p_pincode?: string
         p_phone?: string
+        p_flat?: string
       }
         Returns: {
         status: string | null
@@ -2843,6 +2844,13 @@ export type Database = {
         p_reason?: string
       }
         Returns: Database["public"]["Tables"]["join_requests"]["Row"]
+      }
+      set_member_unit: {
+        Args: {
+        p_membership_id: string
+        p_unit_id?: string
+      }
+        Returns: string
       }
       society_people: {
         Args: {

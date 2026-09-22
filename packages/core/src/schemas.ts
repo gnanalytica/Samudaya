@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isFlatLabel } from './setup';
 
 /**
  * Input validation shared by the server actions, the REST API, the mobile app
@@ -130,6 +131,18 @@ export const foundSocietySchema = z.object({
   // Asked for here rather than left to the checklist: the founder is the
   // committee, and was the one member nobody could reach.
   phone: residentPhoneSchema,
+  // And the one member who lived nowhere. Optional, because a managing
+  // committee member who does not live in the society is a real case — but
+  // asked for, because every resident is asked and the founder never was.
+  flat: z
+    .string()
+    .trim()
+    .max(24, 'Keep it to what is written on the door')
+    .refine((value) => value === '' || isFlatLabel(value), {
+      message: 'Write your flat the way it is on the door, like A 703 or 1402.',
+    })
+    .optional()
+    .or(z.literal('').transform(() => undefined)),
 });
 export type FoundSocietyInput = z.infer<typeof foundSocietySchema>;
 
