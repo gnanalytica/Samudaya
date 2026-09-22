@@ -2,13 +2,14 @@
 
 import {
   COPY,
-  SURPLUS_CHOICES,
-  SURPLUS_CHOICE_DETAIL,
-  SURPLUS_CHOICE_LABEL,
+  NEW_EDITION,
+  SURPLUS_ANSWERS,
+  SURPLUS_ANSWER_DETAIL,
+  SURPLUS_ANSWER_LABEL,
   formatDate,
   formatMoney,
   todayIn,
-  type SurplusChoice,
+  type SurplusAnswer,
 } from '@samudaya/core';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
@@ -859,9 +860,7 @@ export function AllocateSurplusForm({
   nextEdition: string;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(allocateSurplus, EMPTY_STATE);
-  const [kind, setKind] = useState<SurplusChoice>(
-    openEvents.length ? 'next_event' : 'society_balance',
-  );
+  const [answer, setAnswer] = useState<SurplusAnswer>('society_balance');
 
   return (
     <Card className="border-accent/40">
@@ -874,61 +873,51 @@ export function AllocateSurplusForm({
           <Hidden slug={slug} eventSlug={eventSlug} />
           <fieldset className="space-y-2">
             <legend className="sr-only">Where the leftover goes</legend>
-            {SURPLUS_CHOICES.map((choice) => (
+            {SURPLUS_ANSWERS.map((choice) => (
               <label
                 key={choice}
                 className={
-                  kind === choice
+                  answer === choice
                     ? 'border-accent bg-surface-raised flex cursor-pointer gap-3 rounded-lg border-2 p-3'
                     : 'border-border-base bg-surface-raised hover:bg-surface-sunken flex cursor-pointer gap-3 rounded-lg border p-3'
                 }
               >
                 <input
                   type="radio"
-                  name="kind"
+                  name="answer"
                   value={choice}
-                  checked={kind === choice}
-                  onChange={() => setKind(choice)}
+                  checked={answer === choice}
+                  onChange={() => setAnswer(choice)}
                   className="mt-1"
-                  disabled={choice === 'next_event' && openEvents.length === 0}
                 />
                 <span className="min-w-0">
                   <span className="text-ink block text-sm font-medium">
-                    {SURPLUS_CHOICE_LABEL[choice]}
+                    {SURPLUS_ANSWER_LABEL[choice]}
                   </span>
                   <span className="text-ink-subtle block text-xs">
-                    {choice === 'next_edition'
-                      ? `The same, for ${nextEdition}. We’ll create it if it isn’t on the calendar yet.`
-                      : choice === 'next_event' && openEvents.length === 0
-                        ? 'No event is open to carry it to yet.'
-                        : SURPLUS_CHOICE_DETAIL[choice]}
+                    {SURPLUS_ANSWER_DETAIL[choice]}
                   </span>
                 </span>
               </label>
             ))}
           </fieldset>
 
-          {kind === 'next_event' || kind === 'next_edition' ? (
-            <Field
-              label={kind === 'next_edition' ? 'Carry it to (optional)' : 'Carry it to'}
-              htmlFor="surplus-target"
-              error={state.fieldErrors?.to_event_id}
-              hint={
-                kind === 'next_edition'
-                  ? `Leave it blank and we’ll create ${nextEdition} as a draft.`
-                  : undefined
-              }
-            >
+          {/* Which event, asked only once they have said it goes behind one.
+              Nothing is preselected: a default here either creates a draft
+              event nobody asked for, or quietly picks the wrong fund. */}
+          {answer === 'another_event' ? (
+            <Field label="Which event" htmlFor="surplus-target" error={state.fieldErrors?.to_event}>
               {(control) => (
-                <Select {...control} name="to_event_id" defaultValue="">
-                  <option value="">
-                    {kind === 'next_edition' ? `Create ${nextEdition}` : 'Pick an event'}
+                <Select {...control} name="to_event" defaultValue="">
+                  <option value="" disabled>
+                    Choose where it goes
                   </option>
                   {openEvents.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.emoji} {option.name} · {formatDate(option.starts_on)}
                     </option>
                   ))}
+                  <option value={NEW_EDITION}>Create {nextEdition} as a draft</option>
                 </Select>
               )}
             </Field>

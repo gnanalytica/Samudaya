@@ -20,40 +20,80 @@ export const FUND_MOVEMENT_KINDS = [
 
 export type FundMovementKind = (typeof FUND_MOVEMENT_KINDS)[number];
 
-/** The three answers the committee can give at closure. `from_balance` is the way back out. */
+/** The three movements a closure can write. `from_balance` is the way back out. */
 export const SURPLUS_CHOICES = ['next_event', 'next_edition', 'society_balance'] as const;
 
 export type SurplusChoice = (typeof SURPLUS_CHOICES)[number];
 
-export const SURPLUS_CHOICE_LABEL: Record<SurplusChoice, string> = {
-  next_event: 'Carry it to the next event',
-  next_edition: 'Keep it for next year’s edition',
-  society_balance: 'Keep it as society balance',
+export const surplusChoiceSchema = z.enum(SURPLUS_CHOICES);
+
+/**
+ * The two answers the committee is actually asked for.
+ *
+ * There were three, and one of them — "keep it for next year's edition" — was
+ * not a third answer at all. It is the second one with the event not created
+ * yet, which is a detail of the calendar rather than a decision about money.
+ * A committee closing Ganesh 2026 was being asked to tell two kinds of
+ * carrying apart before it had decided to carry anything.
+ *
+ * So the question is: does the society keep it, or does it go behind another
+ * event? Only then, and only for the second, which event — one already on the
+ * calendar, or next year's, created there and then.
+ *
+ * Both movements stay in the database, because they read differently ever
+ * after: "carried to Ganesh 2027" is a sentence about next year's festival,
+ * and "carried to the Diwali fund" is a sentence about this month.
+ */
+export const SURPLUS_ANSWERS = ['society_balance', 'another_event'] as const;
+
+export type SurplusAnswer = (typeof SURPLUS_ANSWERS)[number];
+
+export const SURPLUS_ANSWER_LABEL: Record<SurplusAnswer, string> = {
+  society_balance: 'Keep it for the society',
+  another_event: 'Put it behind another event',
 };
 
-export const SURPLUS_CHOICE_DETAIL: Record<SurplusChoice, string> = {
-  next_event:
-    'It shows on that event’s bar as money already received, so residents are asked only for the difference.',
-  next_edition:
-    'The same, for next year’s run of this festival. We’ll create the event if it isn’t on the calendar yet.',
+export const SURPLUS_ANSWER_DETAIL: Record<SurplusAnswer, string> = {
   society_balance:
     'It sits with the society, on everybody’s home screen, until the committee puts it behind an event.',
+  another_event:
+    'It shows on that event’s bar as money already received, so residents are asked only for the difference.',
 };
 
-export const surplusChoiceSchema = z.enum(SURPLUS_CHOICES);
+export const surplusAnswerSchema = z.enum(SURPLUS_ANSWERS);
+
+/**
+ * What the form posts when the committee wants next year's edition, which does
+ * not exist yet and therefore has no id to post.
+ */
+export const NEW_EDITION = 'new-edition';
+
+export const surplusTargetSchema = z.union([uuid, z.literal(NEW_EDITION)]);
 
 export const allocateSurplusSchema = z
   .object({
     event_id: uuid,
-    kind: surplusChoiceSchema,
-    /** The event to carry into. Absent for `society_balance`, and for a `next_edition` we create. */
-    to_event_id: uuid.optional(),
+    answer: surplusAnswerSchema,
+    /** An event's id, NEW_EDITION, or absent when the society keeps it. */
+    to_event: surplusTargetSchema.optional(),
     note: z.string().trim().max(300).optional(),
   })
-  .refine((value) => value.kind !== 'next_event' || Boolean(value.to_event_id), {
-    message: 'Pick the event to carry it to',
-    path: ['to_event_id'],
+  .refine((value) => value.answer !== 'another_event' || Boolean(value.to_event), {
+    message: 'Choose which event it goes behind',
+    path: ['to_event'],
   });
+
+/**
+ * Which movement the answer becomes.
+ *
+ * The mapping lives here rather than in either app so the two cannot disagree
+ * about what a closure wrote — a ledger that says "carried to the next event"
+ * on the web and "kept for next year" on a phone is worse than either.
+ */
+export function surplusKindFor(answer: SurplusAnswer, target?: string | null): SurplusChoice {
+  if (answer === 'society_balance') return 'society_balance';
+  return target === NEW_EDITION ? 'next_edition' : 'next_event';
+}
 
 export const spendBalanceSchema = z.object({
   to_event_id: uuid,
@@ -74,7 +114,10 @@ export type FundMovementRow = {
 };
 
 /**
- * One line of the log behind the society balance.
+ * One line of the ledger of where money moved.
+ *
+ * Not only into the society's balance: most of these are one event handing
+ * what it did not spend to another, which never touches the balance at all.
  *
  * Written from the row rather than from the kind alone, because the sentence
  * people want is "₹10,000 left over from Ganesh 2026, now counting towards

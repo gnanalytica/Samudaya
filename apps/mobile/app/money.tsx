@@ -160,13 +160,18 @@ export default function Money() {
             />
 
             {/* What was left when an event closed, and what the committee
-                decided to do with it. "The society is holding ₹12,000" is only
-                worth saying if the next question — from what, and decided by
-                whom — has an answer on the same screen. */}
+                decided to do with it — carry it to another event, or keep it.
+                Only the second kind touches the balance, so the card is titled
+                for the movements rather than for the figure. "The society is
+                holding ₹12,000" is only worth saying if the next question —
+                from what, and decided by whom — is answered here too. */}
             {movements.length ? (
               <Card style={{ gap: spacing.sm }}>
-                <Body>Society balance · {formatMoney(heldBySociety, currency)}</Body>
-                <Caption>Held by the society and not behind any event.</Caption>
+                <Body>Where money has moved</Body>
+                <Caption>
+                  Society balance · {formatMoney(heldBySociety, currency)} — what is left after all
+                  of this, behind no event.
+                </Caption>
                 {movements.map((movement) => (
                   <View key={movement.id} style={{ gap: 2 }}>
                     <Body>{fundMovementLine(movement, currency)}</Body>

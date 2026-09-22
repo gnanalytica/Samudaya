@@ -13,9 +13,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import {
   COPY,
   EVENT_STATUS_LABEL,
-  SURPLUS_CHOICES,
-  SURPLUS_CHOICE_DETAIL,
-  SURPLUS_CHOICE_LABEL,
+  NEW_EDITION,
+  SURPLUS_ANSWERS,
+  SURPLUS_ANSWER_DETAIL,
+  SURPLUS_ANSWER_LABEL,
   can,
   createActivitySchema,
   eventSlug as makeEventSlug,
@@ -23,7 +24,8 @@ import {
   nextEditionDate,
   nextEditionName,
   type FundRule,
-  type SurplusChoice,
+  surplusKindFor,
+  type SurplusAnswer,
 } from '@samudaya/core';
 import { useAuth } from '../../../src/lib/auth';
 import { supabase } from '../../../src/lib/supabase';
@@ -697,10 +699,10 @@ function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void })
   const currency = activeCommunity?.currency ?? 'INR';
   const { event } = data;
   const surplus = Number(data.stats?.available ?? 0);
-  const [kind, setKind] = useState<SurplusChoice>(
-    data.openEvents.length ? 'next_event' : 'society_balance',
-  );
-  const [target, setTarget] = useState<string>(data.openEvents[0]?.id ?? '');
+  const [answer, setAnswer] = useState<SurplusAnswer>('society_balance');
+  // Nothing preselected: a default either creates a draft event nobody asked
+  // for, or quietly picks the wrong fund.
+  const [target, setTarget] = useState<string>('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -711,17 +713,19 @@ function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void })
   const nextEdition = nextEditionName(event.name, event.starts_on);
 
   const decide = async () => {
-    if (kind === 'next_event' && !target) {
-      setError('Pick the event to carry it to.');
+    if (answer === 'another_event' && !target) {
+      setError('Choose which event it goes behind.');
       return;
     }
     setBusy(true);
     setError(null);
-    let carryTo: string | undefined = kind === 'society_balance' ? undefined : target || undefined;
+    const kind = surplusKindFor(answer, target);
+    let carryTo: string | undefined =
+      kind === 'society_balance' || target === NEW_EDITION ? undefined : target;
 
-    // "Keep it for next year" is useless if next year's event has to exist
+    // "Next year's edition" is useless if next year's event has to exist
     // before you can say it, so the draft is made here.
-    if (kind === 'next_edition' && !carryTo) {
+    if (kind === 'next_edition') {
       const { data: created, error: createError } = await supabase
         .from('events')
         .insert({
@@ -772,40 +776,23 @@ function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void })
       </View>
 
       <View style={{ gap: spacing.sm }}>
-        {SURPLUS_CHOICES.map((choice) => (
-          <Pressable
-            key={choice}
-            onPress={() => setKind(choice)}
-            disabled={choice === 'next_event' && data.openEvents.length === 0}
-            style={{ opacity: choice === 'next_event' && data.openEvents.length === 0 ? 0.5 : 1 }}
-          >
+        {SURPLUS_ANSWERS.map((choice) => (
+          <Pressable key={choice} onPress={() => setAnswer(choice)}>
             <View style={{ gap: 2 }}>
               <Body>
-                {kind === choice ? '◉' : '○'} {SURPLUS_CHOICE_LABEL[choice]}
+                {answer === choice ? '◉' : '○'} {SURPLUS_ANSWER_LABEL[choice]}
               </Body>
-              <Caption>
-                {choice === 'next_edition'
-                  ? `The same, for ${nextEdition}. We’ll create it if it isn’t on the calendar yet.`
-                  : choice === 'next_event' && data.openEvents.length === 0
-                    ? 'No event is open to carry it to yet.'
-                    : SURPLUS_CHOICE_DETAIL[choice]}
-              </Caption>
+              <Caption>{SURPLUS_ANSWER_DETAIL[choice]}</Caption>
             </View>
           </Pressable>
         ))}
       </View>
 
-      {kind === 'next_event' || kind === 'next_edition' ? (
+      {/* Which event, asked only once they have said it goes behind one. */}
+      {answer === 'another_event' ? (
         <View style={{ gap: spacing.xs }}>
-          <Body>{kind === 'next_edition' ? 'Carry it to (optional)' : 'Carry it to'}</Body>
+          <Body>Which event</Body>
           <ChipRow>
-            {kind === 'next_edition' ? (
-              <Chip
-                label={`Create ${nextEdition}`}
-                selected={target === ''}
-                onPress={() => setTarget('')}
-              />
-            ) : null}
             {data.openEvents.map((option) => (
               <Chip
                 key={option.id}
@@ -814,6 +801,11 @@ function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void })
                 onPress={() => setTarget(option.id)}
               />
             ))}
+            <Chip
+              label={`+ Create ${nextEdition}`}
+              selected={target === NEW_EDITION}
+              onPress={() => setTarget(NEW_EDITION)}
+            />
           </ChipRow>
         </View>
       ) : null}
