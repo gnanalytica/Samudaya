@@ -24,7 +24,7 @@ import {
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getTodoItems } from '@/lib/todo';
-import { getSocietyBalance, getSocietySuggestions, listEvents, getStatsFor } from '@/lib/events';
+import { getSocietyBalance, getIdeas, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { bottomNavItems } from '@/components/nav-items';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
@@ -98,13 +98,14 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     next?.name,
   );
   const balance = await getSocietyBalance(community.id);
-  const societySuggestions = await getSocietySuggestions(community.id, membership.id);
-  const societyIdeas = societySuggestions.filter((row) => row.status === 'accepted').length;
+  // Every idea in the society, an event's as much as its own: a vote you have
+  // not cast is a vote you have not cast, and this used to count only half of
+  // them because the other half lived on their event's page.
+  const ideas = await getIdeas(community.id, membership.id);
+  const societyIdeas = ideas.filter((row) => row.status === 'accepted').length;
   // Voting is the best thing in the app and it was four taps down. This is what
   // is waiting on you — a vote you have not cast — rather than what exists.
-  const needsMySay = societySuggestions.filter(
-    (row) => row.status === 'accepted' && row.myVote === null,
-  ).length;
+  const needsMySay = ideas.filter((row) => row.status === 'accepted' && row.myVote === null).length;
 
   return (
     <>
@@ -381,7 +382,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                         Suggest an idea or an activity
                       </span>
                       <span className="text-ink-muted block text-xs">
-                        For the society, not one event. The committee puts it to a vote.
+                        For an event or for the society. The committee puts it to a vote.
                         {societyIdeas ? ` ${societyIdeas} open for voting now.` : ''}
                       </span>
                     </span>

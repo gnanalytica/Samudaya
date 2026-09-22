@@ -235,15 +235,15 @@ export async function suggestForEvent(
 }
 
 /**
- * The same three stages, for something that belongs to the society rather than
- * to one event — a request to the committee, or an activity worth doing
- * whenever. `event_id` stays null; everything else, from the row-level policies
- * to the To do queue, treats it exactly like an event's suggestion.
+ * The same three stages, from the Ideas page — for the society itself, or for
+ * an event the resident picks from there.
+ *
+ * `event` is a slug rather than an id because that is what a form can carry
+ * without trusting the browser with a primary key, and it is resolved against
+ * this community's published events: an id posted for somebody else's society,
+ * or for a draft nobody can see yet, finds no row and is refused.
  */
-export async function suggestToSociety(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
+export async function suggestIdea(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const slug = String(formData.get('slug') ?? '');
   const context = await requireCapability(slug, 'suggest');
 
@@ -255,9 +255,24 @@ export async function suggestToSociety(
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
+
+  const eventSlug = String(formData.get('event') ?? '');
+  let eventId: string | null = null;
+  if (eventSlug) {
+    const { data: event } = await supabase
+      .from('events')
+      .select('id')
+      .eq('community_id', context.community.id)
+      .eq('slug', eventSlug)
+      .eq('status', 'published')
+      .maybeSingle();
+    if (!event) return { fieldErrors: { event: 'Pick the society or an event that is running.' } };
+    eventId = event.id;
+  }
+
   const { error } = await supabase.from('activity_suggestions').insert({
     ...parsed.data,
-    event_id: null,
+    event_id: eventId,
     community_id: context.community.id,
     suggested_by: context.membership.id,
     status: 'new',
@@ -265,6 +280,7 @@ export async function suggestToSociety(
   if (error) return { error: friendlyDbError(error) };
 
   revalidatePath(`/app/${slug}/suggest`);
+  if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/todo`);
   return {
     ...EMPTY_STATE,
@@ -308,7 +324,10 @@ export async function voteOnSuggestion(formData: FormData): Promise<void> {
   }
 
   // Society-wide suggestions carry no event, and live on their own page.
-  revalidatePath(eventSlug ? `/app/${slug}/events/${eventSlug}` : `/app/${slug}/suggest`);
+  // The row appears on the Ideas page whether or not it has an event, and on
+  // that event's page when it does. Refreshing one left the other stale.
+  if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
+  revalidatePath(`/app/${slug}/suggest`);
 }
 
 /**
@@ -334,7 +353,10 @@ export async function closeSuggestionVote(formData: FormData): Promise<void> {
     p_adopt: override === null ? undefined : override === '1',
   });
 
-  revalidatePath(eventSlug ? `/app/${slug}/events/${eventSlug}` : `/app/${slug}/suggest`);
+  // The row appears on the Ideas page whether or not it has an event, and on
+  // that event's page when it does. Refreshing one left the other stale.
+  if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
+  revalidatePath(`/app/${slug}/suggest`);
   revalidatePath(`/app/${slug}/todo`);
 }
 

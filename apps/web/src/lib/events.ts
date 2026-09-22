@@ -305,7 +305,7 @@ export const getRegistrations = cache(async (eventId: string) => {
 });
 
 const SUGGESTION_COLUMNS =
-  'id, kind, name, description, status, review_note, resolved_at, created_at, suggested_by, memberships!activity_suggestions_suggested_by_fkey(profiles(full_name))';
+  'id, kind, name, description, status, review_note, resolved_at, created_at, suggested_by, memberships!activity_suggestions_suggested_by_fkey(profiles(full_name)), events(slug, name, emoji)';
 
 /**
  * Attaches each suggestion's tally, the caller's own vote, and the ballots the
@@ -375,24 +375,28 @@ export const getSuggestions = cache(async (eventId: string, membershipId: string
 });
 
 /**
- * The society's own suggestions — the ones not tied to any event. Same three
- * stages as an event's: a resident suggests, the committee opens it, everybody
- * votes. Kept separate by `event_id is null` rather than by a second table, so
- * one To do queue and one set of policies still cover both.
+ * Every suggestion in the society, about an event or about nothing in
+ * particular. Same three stages either way: a resident suggests, the committee
+ * opens it, everybody votes — which is why `event_id is null` was only ever a
+ * column and not a second table.
+ *
+ * It used to filter on that column, so the Ideas page was the society's own
+ * suggestions and an event's lived only on its own page. A resident thinking
+ * "didn't somebody already suggest that?" does not know which kind theirs was,
+ * and a vote they have not cast is a vote either way; the board names the
+ * event on each row instead of hiding the row.
  */
-export const getSocietySuggestions = cache(
-  async (communityId: string, membershipId: string | null) => {
-    const supabase = await getSupabase();
-    const result = await supabase
-      .from('activity_suggestions')
-      .select(SUGGESTION_COLUMNS)
-      .eq('community_id', communityId)
-      .is('event_id', null)
-      .order('created_at', { ascending: false });
+export const getIdeas = cache(async (communityId: string, membershipId: string | null) => {
+  const supabase = await getSupabase();
+  const result = await supabase
+    .from('activity_suggestions')
+    .select(SUGGESTION_COLUMNS)
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false })
+    .limit(200);
 
-    return withVotes(rowsOf(result, "the society's own suggestions"), membershipId);
-  },
-);
+  return withVotes(rowsOf(result, "the society's suggestions"), membershipId);
+});
 
 /**
  * Every payment for an event with the flat and payer. RLS returns all rows to
