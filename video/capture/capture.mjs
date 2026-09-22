@@ -69,7 +69,10 @@ async function stageRoutes() {
   // very well and show nothing.
   const proxy = await readFile(PROXY, 'utf8');
   await writeFile(`${PROXY}.demo-backup`, proxy);
-  await writeFile(PROXY, proxy.replace('const PUBLIC_PATHS = [', "const PUBLIC_PATHS = [\n  '/zz-demo',"));
+  await writeFile(
+    PROXY,
+    proxy.replace('const PUBLIC_PATHS = [', "const PUBLIC_PATHS = [\n  '/zz-demo',"),
+  );
 }
 
 async function unstageRoutes() {

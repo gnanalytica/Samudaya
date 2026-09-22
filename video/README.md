@@ -2,10 +2,10 @@
 
 Two cuts of one video, built from the app's own components:
 
-| Composition   | Length | For                                                        |
-| ------------- | ------ | ---------------------------------------------------------- |
-| `Walkthrough` | ~1:32  | A committee deciding whether to put their money in this.     |
-| `Launch`      | ~0:41  | A landing page, or a forward into a society's WhatsApp group.|
+| Composition   | Length | For                                                           |
+| ------------- | ------ | ------------------------------------------------------------- |
+| `Walkthrough` | ~1:32  | A committee deciding whether to put their money in this.      |
+| `Launch`      | ~0:41  | A landing page, or a forward into a society's WhatsApp group. |
 
 Captions, no voiceover — most of the people this reaches will watch it on mute.
 

@@ -43,7 +43,15 @@ function travel(shot: { width: number; height: number }, scale: number, viewport
 }
 
 /** A framed shot with its caption, which is how every screen scene is built. */
-function Scene({ children, caption, hold }: { children: React.ReactNode; caption?: string; hold: number }) {
+function Scene({
+  children,
+  caption,
+  hold,
+}: {
+  children: React.ReactNode;
+  caption?: string;
+  hold: number;
+}) {
   return (
     <AbsoluteFill>
       {children}
@@ -66,7 +74,11 @@ export const SCENES: Record<string, SceneSpec> = {
     id: 'open',
     hold: sec(4),
     node: (hold) => (
-      <Bookend headline="Samudaya" sub="Your society's events and money, in the open." hold={hold} />
+      <Bookend
+        headline="Samudaya"
+        sub="Your society's events and money, in the open."
+        hold={hold}
+      />
     ),
   },
 
@@ -88,7 +100,10 @@ export const SCENES: Record<string, SceneSpec> = {
     node: (hold) => {
       const scale = WINDOW.width / SHOTS.landing.width;
       return (
-        <Scene hold={hold} caption="One place for the whole society — not a group chat and a notebook.">
+        <Scene
+          hold={hold}
+          caption="One place for the whole society — not a group chat and a notebook."
+        >
           <Shot
             {...SHOTS.landing}
             viewport={WINDOW}

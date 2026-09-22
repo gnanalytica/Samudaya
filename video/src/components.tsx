@@ -97,7 +97,11 @@ export function Statement({
                   lineHeight: 1.45,
                   marginTop: 34,
                   fontWeight: 400,
-                  opacity: ramp(frame, sec(0.6 + lines.length * 0.45), sec(1.4 + lines.length * 0.45)),
+                  opacity: ramp(
+                    frame,
+                    sec(0.6 + lines.length * 0.45),
+                    sec(1.4 + lines.length * 0.45),
+                  ),
                 }}
               >
                 {sub}
@@ -208,29 +212,29 @@ export function Shot({
           style={{ justifyContent: 'center', alignItems: 'center', paddingBottom: 170 }}
         >
           <div style={{ transform: `scale(${zoom})` }}>
-          <WindowFrame label={label}>
-            <div
-              style={{
-                width: viewport.width,
-                height: viewport.height,
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              <Img
-                src={staticFile(src)}
+            <WindowFrame label={label}>
+              <div
                 style={{
-                  position: 'absolute',
-                  width,
-                  height,
-                  top: 0,
-                  left: 0,
-                  transformOrigin: 'top left',
-                  transform: `scale(${scale}) translate(${-at('x')}px, ${-at('y')}px)`,
+                  width: viewport.width,
+                  height: viewport.height,
+                  overflow: 'hidden',
+                  position: 'relative',
                 }}
-              />
-            </div>
-          </WindowFrame>
+              >
+                <Img
+                  src={staticFile(src)}
+                  style={{
+                    position: 'absolute',
+                    width,
+                    height,
+                    top: 0,
+                    left: 0,
+                    transformOrigin: 'top left',
+                    transform: `scale(${scale}) translate(${-at('x')}px, ${-at('y')}px)`,
+                  }}
+                />
+              </div>
+            </WindowFrame>
           </div>
         </AbsoluteFill>
       </Fade>
@@ -413,15 +417,7 @@ export function Caption({ text, hold }: { text: string; hold: number }) {
 }
 
 /** The opening and closing card: the name, and what it is for. */
-export function Bookend({
-  headline,
-  sub,
-  hold,
-}: {
-  headline: string;
-  sub: string;
-  hold: number;
-}) {
+export function Bookend({ headline, sub, hold }: { headline: string; sub: string; hold: number }) {
   const frame = useCurrentFrame();
   const entered = ramp(frame, sec(0.2), sec(1.2));
   return (
