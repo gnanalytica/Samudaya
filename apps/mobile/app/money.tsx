@@ -10,8 +10,8 @@ import {
   ledgerEvidence,
   ledgerFilterFrom,
   ledgerMeta,
+  ledgerFlat,
   ledgerTitle,
-  ledgerUnit,
   relativeTime,
 } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
@@ -250,7 +250,7 @@ export default function Money() {
         renderItem={({ item }) => {
           const incoming = item.direction === 'in';
           const when = item.happened_at ? formatDate(item.happened_at.slice(0, 10)) : null;
-          const unit = ledgerUnit(item);
+          const flat = ledgerFlat(item);
           const evidence = ledgerEvidence(item);
           return (
             <Card style={{ gap: spacing.xs, marginBottom: spacing.sm }}>
@@ -258,8 +258,24 @@ export default function Money() {
                 <View style={{ flex: 1, gap: 2 }}>
                   {/* Name and flat on one line, the same pair the laptop shows
                       — through the same functions, so the two cannot drift
-                      into naming a payment differently. */}
-                  <Body>{[ledgerTitle(item), unit].filter(Boolean).join(' · ')}</Body>
+                      into naming a payment differently. A flat the society
+                      does not know is said in the quieter ink the laptop
+                      gives it, so the gap reads as a gap and not as a name
+                      with something chopped off the end. */}
+                  <Body>
+                    {ledgerTitle(item)}
+                    {flat ? (
+                      <Text
+                        style={
+                          flat.known
+                            ? { color: colors.inkMuted }
+                            : { color: colors.inkSubtle, fontSize: 12 }
+                        }
+                      >
+                        {` · ${flat.label}`}
+                      </Text>
+                    ) : null}
+                  </Body>
                   <Caption>{[ledgerMeta(item), when].filter(Boolean).join(' · ')}</Caption>
                   {item.confirmed_at ? (
                     <Caption>

@@ -24,11 +24,24 @@ export default async function ContributePage(
   if (event.status !== 'published' || !can(role, 'contribute')) notFound();
 
   const supabase = await getSupabase();
-  const [stats, flat, mine] = await Promise.all([
+  const [stats, flat, allFlats, mine] = await Promise.all([
     getEventStats(event.id),
     unitIds[0]
       ? supabase.from('units').select('block, number').eq('id', unitIds[0]).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Nobody has listed this member at a door yet, so the form asks. Without
+    // it the payment joins the ledger under a name and no flat, the UPI note
+    // goes out with no flat for the bank matcher to read, and both stay that
+    // way for ever — nothing downstream ever gets a second chance to know.
+    unitIds[0]
+      ? Promise.resolve({ data: null })
+      : supabase
+          .from('units')
+          .select('id, block, number')
+          .eq('community_id', community.id)
+          .order('block')
+          .order('number')
+          .limit(5000),
     supabase
       .from('contributions')
       .select('id, amount, status, reference, review_note, paid_at')
@@ -98,6 +111,7 @@ export default async function ContributePage(
               askedPerFlat={event.suggested_amount ? Number(event.suggested_amount) : null}
               upi={{ vpa: community.upi_vpa, payeeName: community.upi_payee_name }}
               flatLabel={flat.data ? unitLabel(flat.data) : null}
+              flats={allFlats.data ?? null}
               proofFolder={`${community.id}/${membership.id}`}
             />
           ) : (

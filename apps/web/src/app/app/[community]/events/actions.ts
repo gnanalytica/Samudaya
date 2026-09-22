@@ -78,11 +78,34 @@ export async function contribute(
   const missing = paymentEvidenceProblem(parsed.data.reference, Boolean(proof));
   if (missing) return { fieldErrors: { reference: missing } };
 
+  // Which flat the money is for. Usually the society already knows, and what
+  // the form sends is ignored. When it does not — a member nobody has listed
+  // at a door yet — the form asks, because this is the last moment anybody
+  // can know: the payment's row on the Money page would otherwise carry a
+  // name and no flat for ever. The choice is checked against this society
+  // here and again by the insert policy, and staff confirm the payment before
+  // it counts, the same as they do the amount.
+  let unitId = context.unitIds[0] ?? null;
+  if (!unitId) {
+    const asked = uuid.safeParse(String(formData.get('unit_id') ?? '').trim());
+    if (!asked.success) {
+      return { fieldErrors: { unit_id: 'Tell us which flat this payment is for.' } };
+    }
+    const { data: unit } = await supabase
+      .from('units')
+      .select('id')
+      .eq('id', asked.data)
+      .eq('community_id', context.community.id)
+      .maybeSingle();
+    if (!unit) return { fieldErrors: { unit_id: 'Pick a flat from the list.' } };
+    unitId = unit.id;
+  }
+
   const { error } = await supabase.from('contributions').insert({
     event_id: event.id,
     community_id: context.community.id,
     membership_id: context.membership.id,
-    unit_id: context.unitIds[0] ?? null,
+    unit_id: unitId,
     amount: parsed.data.amount,
     method: 'upi',
     reference: parsed.data.reference,
@@ -96,6 +119,18 @@ export async function contribute(
     return message.startsWith('That UPI reference')
       ? { fieldErrors: { reference: message } }
       : { error: message };
+  }
+
+  // They told us where they live, so tell the committee — who are the ones
+  // who decide it. Best effort: the payment is recorded either way, and the
+  // request upserts, so paying three times does not ask three times. Failing
+  // this must not read to the resident as a payment that did not go through.
+  if (!context.unitIds.length) {
+    await supabase.rpc('request_unit_change', {
+      p_community_id: context.community.id,
+      p_unit_id: unitId ?? undefined,
+      p_note: 'Told us when reporting a payment.',
+    });
   }
 
   revalidatePath(`/app/${slug}/events/${eventSlug}`);

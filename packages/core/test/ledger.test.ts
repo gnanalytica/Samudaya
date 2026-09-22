@@ -6,7 +6,7 @@ import {
   ledgerFilterFrom,
   ledgerMeta,
   ledgerTitle,
-  ledgerUnit,
+  ledgerFlat,
   type LedgerEntry,
   type LedgerRow,
 } from '../src/ledger';
@@ -100,7 +100,7 @@ describe('reading one ledger row', () => {
   it('says the name and the flat, not one or the other', () => {
     const row = entry();
     expect(ledgerTitle(row)).toBe('Pranav Aditya');
-    expect(ledgerUnit(row)).toBe('A 703');
+    expect(ledgerFlat(row)).toEqual({ label: 'A 703', known: true });
     expect(ledgerMeta(row)).toBe('Upi');
   });
 
@@ -114,7 +114,7 @@ describe('reading one ledger row', () => {
       method: null,
     });
     expect(ledgerTitle(bill)).toBe('Paper Glow');
-    expect(ledgerUnit(bill)).toBeNull();
+    expect(ledgerFlat(bill)).toBeNull();
     expect(ledgerMeta(bill)).toBe('Decoration');
   });
 
@@ -123,7 +123,23 @@ describe('reading one ledger row', () => {
     // all the row knows, so it becomes the name rather than repeating.
     const row = entry({ counterpart: 'A 703', payer_name: null });
     expect(ledgerTitle(row)).toBe('A 703');
-    expect(ledgerUnit(row)).toBeNull();
+    expect(ledgerFlat(row)).toBeNull();
+  });
+
+  it('says so when it names a person and no flat', () => {
+    // A member nobody has listed at a door yet. Blank reads as a dropped
+    // field; this reads as the gap it is, and tells the committee to close it.
+    const row = entry({ unit_label: null });
+    expect(ledgerTitle(row)).toBe('Pranav Aditya');
+    expect(ledgerFlat(row)).toEqual({ label: 'Flat not recorded', known: false });
+  });
+
+  it('but not on a payment with nobody behind it either', () => {
+    // A sponsor's cash, titled by how it arrived. There is no door for the
+    // row to be missing, so claiming one is missing would be a lie.
+    const row = entry({ counterpart: 'Cash', payer_name: null, unit_label: null, method: 'Cash' });
+    expect(ledgerTitle(row)).toBe('Cash');
+    expect(ledgerFlat(row)).toBeNull();
   });
 
   it('still reads a row from a view that has not been widened yet', () => {
@@ -136,7 +152,7 @@ describe('reading one ledger row', () => {
       detail: 'E 802 · Upi',
     };
     expect(ledgerTitle(row)).toBe('Surya Pratap');
-    expect(ledgerUnit(row)).toBeNull();
+    expect(ledgerFlat(row)).toBeNull();
     expect(ledgerMeta(row)).toBeNull();
   });
 

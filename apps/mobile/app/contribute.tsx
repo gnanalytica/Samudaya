@@ -36,7 +36,7 @@ import {
   Screen,
   Title,
 } from '../src/components/ui';
-import { ErrorText } from '../src/components/admin-ui';
+import { Chip, ChipRow, ErrorText } from '../src/components/admin-ui';
 import { FilePickerField } from '../src/components/file-ui';
 import { radius, spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
@@ -71,7 +71,19 @@ export default function Contribute() {
           .limit(1)
           .maybeSingle(),
       ]);
-      return { event, unit: flat.data?.units ?? null };
+      const unit = flat.data?.units ?? null;
+      // Only when nobody has listed them at a door. A second round trip on
+      // the rare path beats a list of every flat in the society on every one.
+      const flats = unit
+        ? null
+        : await supabase
+            .from('units')
+            .select('id, block, number')
+            .eq('community_id', communityId)
+            .order('block')
+            .order('number')
+            .limit(5000);
+      return { event, unit, flats: flats?.data ?? null };
     },
   );
 
@@ -118,6 +130,7 @@ export default function Contribute() {
     <PayWithUpi
       event={data.event}
       unit={data.unit}
+      flats={data.flats}
       vpa={activeCommunity.upi_vpa}
       payeeName={activeCommunity.upi_payee_name ?? activeCommunity.name}
     />
@@ -157,11 +170,14 @@ type AppResponse = Record<string, string | null>;
 function PayWithUpi({
   event,
   unit,
+  flats,
   vpa,
   payeeName,
 }: {
   event: { id: string; slug: string; name: string; suggested_amount?: number | null };
   unit: { id: string; block: string | null; number: string } | null;
+  /** Every flat in the society, and only when `unit` is null. */
+  flats: { id: string; block: string | null; number: string }[] | null;
   vpa: string;
   payeeName: string;
 }) {
@@ -194,7 +210,29 @@ function PayWithUpi({
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const note = upiNote(unit ? unitLabel(unit) : null, event.name);
+  // Which flat the money is for, asked only when the society has none on
+  // record. It has to be settled before they pay, not after: the note they
+  // carry into their UPI app is what the committee matches the bank line
+  // against, and a note with no flat in it is one more line nobody can place.
+  // Narrowed by typing rather than listed, because a society is hundreds of
+  // flats and a wall of chips is not a picker.
+  const [flatQuery, setFlatQuery] = useState('');
+  const [flatId, setFlatId] = useState<string | null>(null);
+  const needle = flatQuery.replace(/[^a-z0-9]/gi, '').toUpperCase();
+  const found = needle
+    ? (flats ?? []).filter((flat) =>
+        `${flat.block ?? ''}${flat.number}`
+          .replace(/[^a-z0-9]/gi, '')
+          .toUpperCase()
+          .includes(needle),
+      )
+    : [];
+  const matches = found.slice(0, 24);
+  const chosenFlat = flats?.find((flat) => flat.id === flatId) ?? null;
+  const flatNeeded = Boolean(flats?.length) && !unit;
+
+  const payingFor = unit ?? chosenFlat;
+  const note = upiNote(payingFor ? unitLabel(payingFor) : null, event.name);
 
   const openUpiApp = async () => {
     if (!amount) return;
@@ -299,7 +337,7 @@ function PayWithUpi({
       event_id: event.id,
       community_id: activeCommunity.id,
       membership_id: membershipId,
-      unit_id: unit?.id ?? null,
+      unit_id: payingFor?.id ?? null,
       amount,
       method: 'upi',
       reference: upiReference,
@@ -332,6 +370,18 @@ function PayWithUpi({
     }
 
     setCaptured(Boolean(appResponse));
+
+    // They told us where they live, so tell the committee — who are the ones
+    // who decide it. Best effort: the payment is in either way, and the
+    // request upserts, so paying three times does not ask three times.
+    if (flatNeeded && payingFor) {
+      await supabase.rpc('request_unit_change', {
+        p_community_id: activeCommunity.id,
+        p_unit_id: payingFor.id,
+        p_note: 'Told us when reporting a payment.',
+      });
+    }
+
     // Keys embed the member and event (`more:<id>`, `event:<slug>`), so refresh
     // everything rather than guessing prefixes.
     await queryClient.invalidateQueries();
@@ -392,6 +442,51 @@ function PayWithUpi({
           </View>
 
           <Card style={{ gap: spacing.lg }}>
+            {/* Nobody has listed this member at a flat, so the app asks before
+                they pay rather than filing a payment that can never say which
+                door it came from. Answering it also puts the question to the
+                committee, who are the ones who decide where somebody lives. */}
+            {flatNeeded ? (
+              <View style={{ gap: spacing.sm }}>
+                <Body>Your flat</Body>
+                {chosenFlat ? (
+                  <Caption>Paying as {unitLabel(chosenFlat)}. Tap another to change it.</Caption>
+                ) : (
+                  <Caption>
+                    Your society hasn&rsquo;t recorded a flat for you. The committee will be asked
+                    to list you here.
+                  </Caption>
+                )}
+                <Input
+                  label="Find your flat"
+                  value={flatQuery}
+                  onChangeText={setFlatQuery}
+                  placeholder="A 703"
+                  autoCapitalize="characters"
+                  editable={stage === 'amount'}
+                />
+                {flatQuery.trim() ? (
+                  matches.length ? (
+                    <ChipRow>
+                      {matches.map((flat) => (
+                        <Chip
+                          key={flat.id}
+                          label={unitLabel(flat)}
+                          selected={flat.id === flatId}
+                          disabled={stage !== 'amount'}
+                          onPress={() => setFlatId(flat.id)}
+                        />
+                      ))}
+                    </ChipRow>
+                  ) : (
+                    <Caption>No flat matches that.</Caption>
+                  )
+                ) : (
+                  <Caption>{flats?.length} flats in this society. Type part of one.</Caption>
+                )}
+              </View>
+            ) : null}
+
             <View style={{ gap: spacing.sm }}>
               <Body>Amount</Body>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -469,17 +564,21 @@ function PayWithUpi({
               <ErrorText message={error} />
               <Button
                 label={
-                  amount ? `Pay ${formatMoney(amount, currency)} with UPI` : 'Choose an amount'
+                  flatNeeded && !chosenFlat
+                    ? 'Pick your flat first'
+                    : amount
+                      ? `Pay ${formatMoney(amount, currency)} with UPI`
+                      : 'Choose an amount'
                 }
                 onPress={() => void openUpiApp()}
                 loading={busy}
-                disabled={!amount}
+                disabled={!amount || (flatNeeded && !chosenFlat)}
               />
               <Button
                 label="I’ve already paid"
                 variant="secondary"
                 onPress={() => setStage('report')}
-                disabled={!amount}
+                disabled={!amount || (flatNeeded && !chosenFlat)}
               />
             </>
           ) : (

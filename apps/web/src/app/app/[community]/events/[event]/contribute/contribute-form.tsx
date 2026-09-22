@@ -8,11 +8,12 @@ import {
   contributionPresets,
   formatMoney,
   isSuggestedAmount,
+  unitLabel,
   upiNote,
   upiPayUri,
 } from '@samudaya/core';
 import { Button, ButtonLink, buttonClass } from '@/components/ui/button';
-import { Field, Input } from '@/components/ui/field';
+import { Field, Input, Select } from '@/components/ui/field';
 import { Card, CardBody } from '@/components/ui/card';
 import { FileUpload } from '@/components/file-upload';
 import { FocusFirstError } from '@/components/focus-first-error';
@@ -58,6 +59,9 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
+/** A flat the resident can say this payment came from. */
+export type FlatChoice = { id: string; block: string | null; number: string };
+
 function Submit({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
@@ -81,6 +85,7 @@ export function ContributeForm({
   askedPerFlat,
   upi,
   flatLabel,
+  flats,
   proofFolder,
 }: {
   slug: string;
@@ -93,6 +98,12 @@ export function ContributeForm({
   askedPerFlat: number | null;
   upi: { vpa: string; payeeName: string };
   flatLabel: string | null;
+  /**
+   * Every flat in the society, and only when nobody has listed this member at
+   * one. Null is "the society already knows", which is the usual case and
+   * renders no picker at all.
+   */
+  flats: FlatChoice[] | null;
   /** `{community_id}/{membership_id}`, where this resident's screenshots go. */
   proofFolder: string;
 }) {
@@ -126,10 +137,22 @@ export function ContributeForm({
     setReported(amount === null ? '' : String(amount));
   }
 
-  const note = upiNote(flatLabel, eventName);
+  // Which flat the money is for. Asked only when the society has none on
+  // record: it goes onto the payment, so the ledger can name the flat beside
+  // the name, and into the note, so the bank line can be matched to it too.
+  const [flatId, setFlatId] = useState('');
+  const chosen = flats?.find((unit) => unit.id === flatId) ?? null;
+  const towers = [...new Set((flats ?? []).map((unit) => unit.block ?? ''))];
+  const flatNeeded = Boolean(flats?.length);
+  const note = upiNote(flatLabel ?? (chosen ? unitLabel(chosen) : null), eventName);
+  // No link until the note is final. A deep link built before they picked a
+  // flat would carry a note with no flat in it, which is the whole problem
+  // this screen exists to stop.
+  const ready = Boolean(amount) && (!flatNeeded || Boolean(flatId));
   const uri = useMemo(
-    () => (amount ? upiPayUri({ vpa: upi.vpa, payeeName: upi.payeeName, amount, note }) : null),
-    [amount, note, upi.vpa, upi.payeeName],
+    () =>
+      ready && amount ? upiPayUri({ vpa: upi.vpa, payeeName: upi.payeeName, amount, note }) : null,
+    [ready, amount, note, upi.vpa, upi.payeeName],
   );
 
   if (state.reported) {
@@ -169,6 +192,57 @@ export function ContributeForm({
   return (
     <Card>
       <CardBody className="space-y-6">
+        {/* Before anything else, and only when nobody has listed this member
+            at a door. It has to be settled here rather than beside the rest
+            of step 3: the note in step 2 carries the flat into their UPI app,
+            and by the time they are telling us they have paid, that note has
+            already gone. Unnumbered because it is not a step everybody has —
+            most residents never see this at all. */}
+        {flatNeeded ? (
+          <div className="border-border-base bg-surface-sunken space-y-1 rounded-lg border p-4">
+            <Field
+              label="Which flat is this payment for?"
+              htmlFor="pay-flat"
+              error={state.fieldErrors?.unit_id}
+              hint="Your society hasn’t recorded a flat for you. The committee will be asked to list you here."
+              required
+            >
+              {(control) => (
+                <Select
+                  {...control}
+                  value={flatId}
+                  onChange={(event) => setFlatId(event.target.value)}
+                >
+                  <option value="" disabled>
+                    Choose your flat
+                  </option>
+                  {towers.map((tower) =>
+                    tower ? (
+                      <optgroup key={tower} label={`Tower ${tower}`}>
+                        {(flats ?? [])
+                          .filter((unit) => (unit.block ?? '') === tower)
+                          .map((unit) => (
+                            <option key={unit.id} value={unit.id}>
+                              {unitLabel(unit)}
+                            </option>
+                          ))}
+                      </optgroup>
+                    ) : (
+                      (flats ?? [])
+                        .filter((unit) => !unit.block)
+                        .map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unitLabel(unit)}
+                          </option>
+                        ))
+                    ),
+                  )}
+                </Select>
+              )}
+            </Field>
+          </div>
+        ) : null}
+
         <fieldset>
           <legend className="text-ink mb-2 block text-sm font-semibold">1. Amount</legend>
           <div
@@ -242,8 +316,19 @@ export function ContributeForm({
               </div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
                 <dt className="text-ink-muted w-full text-xs font-medium sm:w-auto">Note</dt>
-                <dd className="text-ink min-w-0 flex-1 font-mono text-sm break-all">{note}</dd>
-                <CopyButton value={note} label="note" />
+                {/* Not offered until the flat is in it. A half-built note is
+                    worse than none: it copies cleanly, reads fine, and lands
+                    on the statement as one more line nobody can place. */}
+                {flatNeeded && !flatId ? (
+                  <dd className="text-ink-subtle min-w-0 flex-1 text-sm">
+                    Pick your flat above and the note will say which one paid.
+                  </dd>
+                ) : (
+                  <>
+                    <dd className="text-ink min-w-0 flex-1 font-mono text-sm break-all">{note}</dd>
+                    <CopyButton value={note} label="note" />
+                  </>
+                )}
               </div>
             </dl>
             {uri ? (
@@ -257,7 +342,9 @@ export function ContributeForm({
               </a>
             ) : (
               <p className="border-border-base text-ink-muted rounded-lg border border-dashed px-4 py-3 text-center text-sm">
-                Choose an amount above to open your UPI app with it filled in.
+                {flatNeeded && !flatId
+                  ? 'Choose your flat and an amount above to open your UPI app with them filled in.'
+                  : 'Choose an amount above to open your UPI app with it filled in.'}
               </p>
             )}
             {/* Most residents pay from the phone they are reading this on.
@@ -282,6 +369,10 @@ export function ContributeForm({
             </h2>
             <input type="hidden" name="slug" value={slug} />
             <input type="hidden" name="event" value={eventSlug} />
+
+            {/* The choice is made above, before the note is copied; this is
+                what carries it into the form. */}
+            {flatNeeded ? <input type="hidden" name="unit_id" value={flatId} /> : null}
 
             <Field
               label="Amount you actually paid"
@@ -345,7 +436,7 @@ export function ContributeForm({
             {/* Only the upload blocks the button. Missing an amount used to
                 disable it too, which said nothing about why — the action
                 answers that in the same branded style as every other error. */}
-            <Submit disabled={uploading} />
+            <Submit disabled={uploading || (flatNeeded && !flatId)} />
             <p className="text-ink-subtle text-center text-xs">
               It shows as waiting until staff confirm it against the bank statement.
             </p>
