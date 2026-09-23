@@ -9,13 +9,24 @@ import { cn } from '@/lib/utils';
  * vermilion on a Dasara one.
  *
  * `light-dark()` carries both themes in one value, so this works without a
- * second set of rules under the dark-mode media query.
+ * second set of rules under the dark-mode media query — in a browser that has
+ * it. Safari gained it in 17.5 and Chrome in 123, after the 16.4 and 111 this
+ * app is built for, and without it the value is invalid and `--accent` has
+ * none: a white button label on nothing. So both halves are set again on
+ * their own, and globals.css picks between them where `light-dark()` is
+ * missing.
  */
 export function festivalVars(festival: Festival): CSSProperties {
   return {
     '--accent': `light-dark(${festival.accent[0]}, ${festival.accent[1]})`,
     '--ribbon': `light-dark(${festival.ribbon[0]}, ${festival.ribbon[1]})`,
     '--festival-wash': `light-dark(${festival.wash[0]}, ${festival.wash[1]})`,
+    '--accent-light': festival.accent[0],
+    '--accent-dark': festival.accent[1],
+    '--ribbon-light': festival.ribbon[0],
+    '--ribbon-dark': festival.ribbon[1],
+    '--festival-wash-light': festival.wash[0],
+    '--festival-wash-dark': festival.wash[1],
   } as CSSProperties;
 }
 

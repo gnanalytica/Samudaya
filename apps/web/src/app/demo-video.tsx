@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Forty seconds of the app, on the front page.
+ * Under two minutes of the app, on the front page.
  *
  * Animated rather than filmed since `video/src/story.tsx` — what plays here is
  * the `Explain` cut, drawn from the app's own screens and data.

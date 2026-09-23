@@ -18,6 +18,16 @@ import { describe, expect, it } from 'vitest';
  */
 const ROOT = join(import.meta.dirname, '..');
 const page = () => readFileSync(join(ROOT, 'src', 'app', 'page.tsx'), 'utf8');
+/**
+ * What the page says, rather than how its source is laid out: comments out,
+ * and whitespace collapsed, since Prettier decides where a sentence in JSX
+ * breaks across lines and a phrase checked here can land on either side.
+ */
+const copy = () =>
+  page()
+    .replace(/\{?\/\*[\s\S]*?\*\/\}?/g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\s+/g, ' ');
 const player = () => readFileSync(join(ROOT, 'src', 'app', 'demo-video.tsx'), 'utf8');
 const proxy = () => readFileSync(join(ROOT, 'src', 'proxy.ts'), 'utf8');
 const asset = (name: string) => join(ROOT, 'public', name);
@@ -51,7 +61,7 @@ describe('the demo video on the landing page', () => {
   it('says the society in it is invented', () => {
     // The footage names residents and what they paid. They are made up, and a
     // page about transparency is the last place to be coy about that.
-    expect(page()).toContain('are invented');
+    expect(copy()).toContain('are invented');
   });
 
   it('never autoplays at somebody who asked for less motion', () => {
@@ -117,5 +127,34 @@ describe('the demo video on the landing page', () => {
     // somebody should decide whether a video that long belongs on the front page.
     expect(statSync(file).size).toBeLessThan(12 * 1024 * 1024);
     expect(statSync(asset('samudaya-demo-poster.jpg')).size).toBeLessThan(200 * 1024);
+  });
+});
+
+describe('what the landing page says', () => {
+  it('says how long the video is, and is right', () => {
+    // The caption said "under a minute" long after the cut had grown to nearly
+    // two, because nothing tied the sentence to the file.
+    const claim = /Under (a|two|three) minutes?/.exec(copy());
+    expect(claim, 'the caption should say how long the video is').not.toBeNull();
+    const limit = { a: 60, two: 120, three: 180 }[claim![1] as 'a' | 'two' | 'three'];
+    const seconds = mp4Seconds(asset('samudaya-demo.mp4'));
+    expect(seconds, `the video runs ${seconds.toFixed(0)} seconds`).toBeLessThan(limit);
+  });
+
+  it('never promises that what a resident paid is private', () => {
+    // It is not, deliberately: a confirmed payment is on the society's ledger
+    // with the payer's name and flat, where every resident can read it
+    // (20260920000500_every_resident_can_see_the_ledger.sql). The fund card
+    // said otherwise for months.
+    expect(copy()).not.toMatch(/amounts? (stays?|are|is|remains?) private/i);
+    expect(copy()).toContain('with the payer’s name and flat');
+  });
+
+  it('wears the next festival’s colours, deepened until its text can be read', () => {
+    // The palette comes from the calendar (lib/season.ts) and every palette it
+    // hands back has been through legible() — tested in contrast.test.ts.
+    const source = page();
+    expect(source).toContain('season(todayIn(), 6)');
+    expect(source).toContain('style={festivalVars(palette)}');
   });
 });
