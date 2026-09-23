@@ -40,8 +40,9 @@ export function DemoVideo() {
       playsInline
       preload="metadata"
     >
-      Forty seconds of Samudaya: an event&rsquo;s ledger with a name and a flat on every row, a
-      resident naming which flat their payment came from, and the same ledger on a phone.
+      A short tour of Samudaya: a festival&rsquo;s own page with its checklist and fund, a bill
+      naming the committee member who approved it, the society ledger with a name and a flat on
+      every row, and the same accounts answering on WhatsApp.
     </video>
   );
 }

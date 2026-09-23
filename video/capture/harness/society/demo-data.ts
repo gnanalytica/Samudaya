@@ -213,3 +213,97 @@ export const EVENTS = [
     note: '₹4,200 left over, kept for the society',
   },
 ];
+
+// ---------------------------------------------------------------------------
+// What actually hangs off an event
+// ---------------------------------------------------------------------------
+// The product spec puts it plainly: the organising unit is the event, and it
+// carries a checklist, a fund, activities, volunteer roles, expenses and a
+// closure rule. The first cut of this video showed the fund and nothing else,
+// which made a co-ordination product look like a payments app.
+
+/** Readiness % is completed ÷ total. Computed here for the same reason. */
+export const CHECKLIST = [
+  { id: 'c1', title: 'Book the idol', owner: 'Bala Krishnan', due: '2026-08-28', done: true },
+  { id: 'c2', title: 'Confirm the priest', owner: 'Chitra Rao', due: '2026-09-01', done: true },
+  { id: 'c3', title: 'Sound and lights', owner: 'Bala Krishnan', due: '2026-09-05', done: true },
+  { id: 'c4', title: 'Order prasadam for 180', owner: 'Chitra Rao', due: '2026-09-09', done: true },
+  { id: 'c5', title: 'Print the programme', owner: 'Asha Menon', due: '2026-09-12', done: false },
+  { id: 'c6', title: 'Arrange parking marshals', owner: null, due: '2026-09-14', done: false },
+];
+
+export const ACTIVITIES = [
+  { id: 'a1', name: 'Classical dance', slot: '15 Sept · 6:30 pm', signed: 7, cap: 10 },
+  { id: 'a2', name: 'Children’s fancy dress', slot: '15 Sept · 5:00 pm', signed: 12, cap: 12 },
+  { id: 'a3', name: 'Bhajan group', slot: '16 Sept · 7:00 pm', signed: 4, cap: 8 },
+];
+
+export const VOLUNTEER_ROLES = [
+  { id: 'v1', name: 'Kitchen help', needed: 6, signed: 6 },
+  { id: 'v2', name: 'Parking marshal', needed: 4, signed: 1 },
+  { id: 'v3', name: 'Stage and sound', needed: 3, signed: 2 },
+];
+
+/** Approved spending: what a resident sees, with the bill and who signed it. */
+export const APPROVED_EXPENSES = [
+  {
+    id: 'e1',
+    name: 'Prasadam for 180',
+    category: 'Food',
+    vendor: 'Anand Caterers',
+    spent_on: '2026-09-10',
+    amount: 16300,
+    approved_by: 'Chitra Rao',
+    approved_at: '2026-09-10T14:25:00Z',
+  },
+  {
+    id: 'e2',
+    name: 'Decoration',
+    category: 'Decor',
+    vendor: 'Paper Glow Decorators',
+    spent_on: '2026-09-13',
+    amount: 8400,
+    approved_by: 'Bala Krishnan',
+    approved_at: '2026-09-13T15:30:00Z',
+  },
+  {
+    id: 'e3',
+    name: 'Sound and lights',
+    category: 'Production',
+    vendor: 'Sri Ganesh Sound Service',
+    spent_on: '2026-09-11',
+    amount: 6500,
+    approved_by: 'Bala Krishnan',
+    approved_at: '2026-09-11T16:10:00Z',
+  },
+];
+
+/**
+ * The one waiting, filed by the person looking at it.
+ *
+ * "Nobody signs off their own money" is a rule the database enforces, and the
+ * only way to show it is a bill whose Approve button is not there.
+ */
+export const AWAITING_EXPENSE = {
+  id: 'e4',
+  name: 'Idol and puja items',
+  vendor: 'Sri Vinayaka Stores',
+  amount: 9200,
+  filed_by: 'Chitra Rao',
+};
+
+export const BUDGET = [
+  { id: 'b1', category: 'Food', planned: 18000, spent: 16300 },
+  { id: 'b2', category: 'Decor', planned: 9000, spent: 8400 },
+  { id: 'b3', category: 'Production', planned: 6000, spent: 6500 },
+  { id: 'b4', category: 'Printing', planned: 2000, spent: 0 },
+];
+
+export const FUND = {
+  target: 30000,
+  raised: 24500,
+  pending: 2002,
+  carried: 7800,
+  contributors: 18,
+  spent: 31200,
+};

@@ -254,7 +254,9 @@ async function warm(page) {
     DEMO_BASE,
     `${DEMO_BASE}/money`,
     `${DEMO_BASE}/events`,
+    `${DEMO_BASE}/event`,
     `${DEMO_BASE}/contribute`,
+    `${DEMO_BASE}/admin/reconcile`,
   ];
   for (const route of routes) {
     await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' });
@@ -369,8 +371,31 @@ async function main() {
     await glide(page, 760, 360, 800);
     await page.waitForTimeout(1200);
 
-    // Into the event that is collecting, which is where a resident pays.
+    // Into the event itself, which is what everything else hangs off.
     await press(page, page.getByRole('link', { name: /Ganesh Chaturthi 2026/i }).first());
+    await arrived(page, page.getByText('Readiness'));
+    await page.waitForTimeout(1200);
+    beat('app:event');
+
+    // The checklist, and the readiness figure it computes.
+    await glide(page, 600, 300, 900);
+    await page.waitForTimeout(1600);
+    beat('app:readiness');
+
+    // Down to the bills: vendor, amount, who approved it, and the bill itself.
+    await readDown(page, 470, 2400);
+    await page.waitForTimeout(1500);
+    beat('app:bills');
+
+    // And the one nobody may approve, because they filed it.
+    await readDown(page, 520, 2200);
+    await page.waitForTimeout(1800);
+    beat('app:ownMoney');
+
+    // Back up to the fund, and through the door a resident walks.
+    await readDown(page, -990, 1800);
+    await page.waitForTimeout(700);
+    await press(page, page.getByRole('link', { name: 'Contribute', exact: true }).first());
     await arrived(page, page.getByText('Which flat is this payment for?'));
     await page.waitForTimeout(1000);
     beat('app:contribute');
@@ -388,6 +413,15 @@ async function main() {
     await readDown(page, 420, 2000);
     await page.waitForTimeout(1600);
     beat('app:note');
+
+    // A reported payment is a claim until the bank agrees with it.
+    await press(page, page.getByRole('link', { name: 'Reconcile', exact: true }).first());
+    await arrived(page, page.getByText('Nobody has explained these yet'));
+    await page.waitForTimeout(1300);
+    beat('app:reconcile');
+    await glide(page, 700, 430, 900);
+    await page.waitForTimeout(2200);
+    beat('app:matched');
 
     beat('end');
     await page.waitForTimeout(800);

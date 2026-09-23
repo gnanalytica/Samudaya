@@ -24,7 +24,7 @@ export default function DemoEvents() {
             {EVENTS.map((event) => (
               <li key={event.slug}>
                 <Link
-                  href={`/app/${slug}/contribute`}
+                  href={`/app/${slug}/event`}
                   className="hover:bg-surface-sunken block px-5 py-4"
                 >
                   <div className="flex flex-wrap items-center gap-2">

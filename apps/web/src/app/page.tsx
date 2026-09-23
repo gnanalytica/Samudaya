@@ -115,7 +115,7 @@ export default async function LandingPage(props: PageProps<'/'>) {
           <figure className="border-border-base overflow-hidden rounded-2xl border shadow-sm">
             <DemoVideo />
             <figcaption className="text-ink-subtle border-border-base bg-surface-raised border-t px-5 py-3 text-sm">
-              Forty seconds, captioned. Every screen is the app&rsquo;s own — the society, the
+              Under a minute, captioned. Every screen is the app&rsquo;s own — the society, the
               neighbours and the amounts are invented.
             </figcaption>
           </figure>

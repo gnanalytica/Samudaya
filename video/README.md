@@ -4,8 +4,8 @@ Two cuts of one video, filmed from the app itself:
 
 | Composition   | Length | For                                                           |
 | ------------- | ------ | ------------------------------------------------------------- |
-| `Walkthrough` | ~1:35  | A committee deciding whether to put their money in this.      |
-| `Launch`      | ~0:41  | A landing page, or a forward into a society's WhatsApp group. |
+| `Walkthrough` | ~2:22  | A committee deciding whether to put their money in this.      |
+| `Launch`      | ~0:51  | A landing page, or a forward into a society's WhatsApp group. |
 
 Captions and a score, no voiceover — most of the people this reaches will
 watch it on mute, and the ones who don't get something under it.
@@ -29,6 +29,10 @@ its own path would have a sidebar that navigates nowhere. Served where the app
 expects it, clicking Money loads the real Money page through a real client-side
 transition. The shell, the switcher, the profile menu, the bottom bar and every
 row are the app's own components. Only the residents are made up.
+
+The staged pages sit where the app would put them — the sidebar's Reconcile
+link points at `/admin/reconcile`, so the harness page does too. A page at the
+wrong path is a click that lands on a 404 in the middle of a take.
 
 Both scripts remove everything they wrote before they exit, so no page that
 exists only to be filmed can reach a commit or a build.
@@ -67,8 +71,20 @@ beside it, which is.
 - **The journey** is `capture/record.mjs` — where the cursor goes, what it
   clicks, how long it reads. Every stop is a named beat.
 - **The society** is `capture/harness/society/demo-data.ts`. One file, so the
-  total on Home is the total on Money and the event the ledger credits is the
-  event the Events page lists.
+  total on Home is the total on Money, the event the ledger credits is the event
+  the Events page lists, and the figures the WhatsApp bot quotes are the ones on
+  the screen before it.
+- **The two drawn scenes** are `src/surfaces.tsx`. Samudaya has four surfaces
+  and a screen recorder can only point at two: filming WhatsApp would mean
+  photographing somebody else's app, and an MCP server has no pixels at all. So
+  those are animated, in the app's palette, from the app's own source — every
+  command from `packages/core/src/whatsapp/commands.ts`, every tool name and
+  scope from `apps/web/src/lib/api/mcp-tools.ts`.
+
+  A drawing can claim anything, so `apps/web/test/demo-video-claims.test.ts`
+  checks both against those files. The first draft of the MCP scene invented
+  four scope names that read perfectly and matched nothing.
+
 - **The music** is `score/compose.mjs`: plucked notes with harmonics that decay
   at different rates, two detuned sines per pad voice, D major pentatonic at
   68bpm, no percussion. Written rather than licensed, because every other way

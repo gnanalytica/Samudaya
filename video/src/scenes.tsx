@@ -1,5 +1,6 @@
 import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useVideoConfig } from 'remotion';
 import { Bookend, Caption, Clip, PhoneShot, Shot, Statement } from './components';
+import { McpScene, WhatsAppScene } from './surfaces';
 import { sec } from './theme';
 import clips from './clips.json';
 import shots from './shots.json';
@@ -237,6 +238,130 @@ export const SCENES: Record<string, SceneSpec> = {
         caption="Name your flat and the payment note writes itself. Samudaya never touches the money."
       >
         <Take at="app:contribute" lead={2.6} hold={hold} label="Shanti Nivas · Contribute" />
+      </Scene>
+    ),
+  },
+
+  eventIsTheUnit: {
+    id: 'eventIsTheUnit',
+    hold: sec(4),
+    node: (hold) => (
+      <Statement
+        lines={['Everything hangs off one event.']}
+        sub="A checklist, a fund, the acts people perform in, the jobs that need doing, and every bill."
+        hold={hold}
+      />
+    ),
+  },
+
+  eventLive: {
+    id: 'eventLive',
+    hold: sec(5),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="One page for the festival: what is ready, what is raised, what is spent, and who is doing what."
+      >
+        <Take at="app:event" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
+      </Scene>
+    ),
+  },
+
+  readiness: {
+    id: 'readiness',
+    hold: sec(5),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Readiness is finished tasks over total tasks — computed, never a number somebody typed in."
+      >
+        <Take at="app:readiness" lead={1.4} hold={hold} label="Ganesh Chaturthi 2026" />
+      </Scene>
+    ),
+  },
+
+  billTrail: {
+    id: 'billTrail',
+    hold: sec(6),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Every rupee out names the vendor, the date, the committee member who approved it — and carries the bill."
+      >
+        <Take at="app:bills" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
+      </Scene>
+    ),
+  },
+
+  ownMoney: {
+    id: 'ownMoney',
+    hold: sec(5.5),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Nobody approves a bill they filed themselves. The database refuses it, not just the screen."
+      >
+        <Take at="app:ownMoney" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
+      </Scene>
+    ),
+  },
+
+  aClaim: {
+    id: 'aClaim',
+    hold: sec(4),
+    node: (hold) => (
+      <Statement
+        lines={['A reported payment is a claim', 'until the bank agrees.']}
+        hold={hold}
+        size={72}
+      />
+    ),
+  },
+
+  reconcileLive: {
+    id: 'reconcileLive',
+    hold: sec(8),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Import the statement and pair each line. The note Samudaya wrote carries the flat all the way onto the bank record."
+      >
+        <Take at="app:reconcile" lead={2} hold={hold} label="Shanti Nivas · Reconcile" />
+      </Scene>
+    ),
+  },
+
+  fourSurfaces: {
+    id: 'fourSurfaces',
+    hold: sec(4),
+    node: (hold) => (
+      <Statement
+        lines={['Not everyone will open an app.']}
+        sub="So the same society answers on WhatsApp, and to whatever assistant a committee already uses."
+        hold={hold}
+      />
+    ),
+  },
+
+  whatsapp: {
+    id: 'whatsapp',
+    hold: sec(10),
+    node: (hold) => (
+      <Scene hold={hold} caption="The society's accounts, in the app everybody already has open.">
+        <WhatsAppScene hold={hold} />
+      </Scene>
+    ),
+  },
+
+  mcp: {
+    id: 'mcp',
+    hold: sec(8),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="And an MCP server, scoped by key — a read-only key is never even shown the tools that write."
+      >
+        <McpScene hold={hold} />
       </Scene>
     ),
   },
