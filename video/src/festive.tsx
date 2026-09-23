@@ -36,6 +36,7 @@ export function Rangoli({
   opacity = 1,
   spin = 0,
   strokeWidth = 1.5,
+  dots = true,
 }: {
   petals?: number;
   size: number;
@@ -45,6 +46,12 @@ export function Rangoli({
   /** Degrees turned over the scene. */
   spin?: number;
   strokeWidth?: number;
+  /**
+   * The ring of dots the kolam is laid out around. Drawn a frame and a half
+   * across, as the covers draw it, each dot is the size of a coin and reads as
+   * a smudge rather than as part of a pattern.
+   */
+  dots?: boolean;
 }) {
   const step = (Math.PI * 2) / petals;
   const petal = (index: number, radius: number, length: number, width: number) => {
@@ -85,7 +92,7 @@ export function Rangoli({
       {ring.map((index) => (
         <path key={`o${index}`} d={petal(index + 0.5, 23, 17, step * 0.3)} stroke={ribbon} />
       ))}
-      {ring.map((index) => {
+      {(dots ? ring : []).map((index) => {
         const angle = index * step;
         return (
           <circle

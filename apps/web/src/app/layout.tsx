@@ -2,6 +2,18 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
+  /**
+   * The link preview a shared URL unfurls into — on WhatsApp above all, which
+   * is where a society's links get passed around. The image is
+   * app/opengraph-image.jpg: the video's cover, play button and length
+   * included, made by `npm run share` in video/. It needs an absolute URL, and
+   * this is what it is built on.
+   *
+   * No og:title or og:description here on purpose: children inherit them, so
+   * a shared privacy policy would unfurl as the front page's pitch. Without
+   * them each page falls back to its own title and description.
+   */
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://samudaya.gnanalytica.com'),
   title: {
     default: 'Samudaya',
     template: '%s · Samudaya',
@@ -9,6 +21,8 @@ export const metadata: Metadata = {
   description:
     'Plan society events together: activities, budgets, contributions and every bill, open to residents on the web and on their phone.',
   applicationName: 'Samudaya',
+  openGraph: { type: 'website', siteName: 'Samudaya', locale: 'en_IN' },
+  twitter: { card: 'summary_large_image' },
 };
 
 export const viewport: Viewport = {
