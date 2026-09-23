@@ -115,11 +115,19 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Everything except static assets, image files and crawler metadata —
+     * Everything except static assets, media files and crawler metadata —
      * matching those would burn a Node invocation per asset for no benefit,
      * and robots.txt and /.well-known files must answer crawlers and Android's
      * link verifier directly rather than redirect them to /login.
+     *
+     * Video belongs on that list for a harder reason than cost. Anything this
+     * matcher catches goes through the session check below, and a file that is
+     * not under a PUBLIC_PATHS prefix is answered with a redirect to /login —
+     * so the demo on the landing page, which exists for people who have not
+     * signed in, would be served to them as an HTML login page. The <video>
+     * tag reports that as a decode failure, which is a long way from the
+     * cause.
      */
-    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|mp4|webm)$).*)',
   ],
 };
