@@ -52,7 +52,7 @@ export function Root() {
         fps={FPS}
         width={WIDTH}
         height={HEIGHT}
-        defaultProps={{ order: WALKTHROUGH }}
+        defaultProps={{ order: WALKTHROUGH, score: 'score-walkthrough.wav' }}
       />
       <Composition
         id="Launch"
@@ -61,7 +61,7 @@ export function Root() {
         fps={FPS}
         width={WIDTH}
         height={HEIGHT}
-        defaultProps={{ order: LAUNCH }}
+        defaultProps={{ order: LAUNCH, score: 'score-launch.wav' }}
       />
     </>
   );

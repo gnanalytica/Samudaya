@@ -1,4 +1,4 @@
-import { AbsoluteFill, Sequence } from 'remotion';
+import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useVideoConfig } from 'remotion';
 import { Bookend, Caption, Clip, PhoneShot, Shot, Statement } from './components';
 import { sec } from './theme';
 import timing from './clips.json';
@@ -311,12 +311,35 @@ export const SCENES: Record<string, SceneSpec> = {
 };
 
 /** Lays a list of scenes end to end, each overlapping the last as it fades. */
-export function Reel({ order }: { order: { id: keyof typeof SCENES; hold?: number }[] }) {
+export function Reel({
+  order,
+  score,
+}: {
+  order: { id: keyof typeof SCENES; hold?: number }[];
+  /** The bed under the whole cut, sized to it by score/compose.mjs. */
+  score?: string;
+}) {
+  const { durationInFrames } = useVideoConfig();
   let at = 0;
   const overlap = sec(0.3);
 
   return (
     <AbsoluteFill>
+      {score ? (
+        <Audio
+          src={staticFile(score)}
+          // Up over half a second so it does not begin mid-note, and away over
+          // the last two so the end is a decision rather than a power cut.
+          volume={(frame) =>
+            Math.min(
+              interpolate(frame, [0, sec(0.5)], [0, 1], { extrapolateRight: 'clamp' }),
+              interpolate(frame, [durationInFrames - sec(2), durationInFrames], [1, 0], {
+                extrapolateLeft: 'clamp',
+              }),
+            )
+          }
+        />
+      ) : null}
       {order.map(({ id, hold }) => {
         const scene = SCENES[id];
         const length = hold ?? scene.hold;
