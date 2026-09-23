@@ -106,23 +106,19 @@ export type SceneSpec = { id: string; hold: number; node: (hold: number) => Reac
 export const SCENES: Record<string, SceneSpec> = {
   open: {
     id: 'open',
-    hold: sec(4),
+    hold: sec(3.5),
     node: (hold) => (
-      <Bookend
-        headline="Samudaya"
-        sub="Your society's events and money, in the open."
-        hold={hold}
-      />
+      <Bookend headline="Samudaya" sub="Your society's festivals, in the open." hold={hold} />
     ),
   },
 
   problem: {
     id: 'problem',
-    hold: sec(5),
+    hold: sec(4.5),
     node: (hold) => (
       <Statement
         lines={['₹40,000 collected for Diwali.', 'Four people know where it went.']}
-        sub="Every residents’ society has this problem, and it is never really about the money."
+        sub="Every society has this problem, and it was never really about the money."
         hold={hold}
       />
     ),
@@ -130,12 +126,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   landing: {
     id: 'landing',
-    hold: sec(8),
+    hold: sec(5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="One place for the whole society — not a group chat and a notebook."
-      >
+      <Scene hold={hold} caption="One place, instead of a group chat and a notebook.">
         <Take at="landing:top" lead={1.2} hold={hold} label="samudaya.app" />
       </Scene>
     ),
@@ -143,18 +136,15 @@ export const SCENES: Record<string, SceneSpec> = {
 
   startEvent: {
     id: 'startEvent',
-    hold: sec(3.5),
-    node: (hold) => <Statement lines={['It starts with an event.']} hold={hold} />,
+    hold: sec(2.5),
+    node: (hold) => <Statement lines={['Every festival starts the same way.']} hold={hold} />,
   },
 
   festival: {
     id: 'festival',
-    hold: sec(9),
+    hold: sec(6.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Type three letters. It knows when the festival falls — and says so when the date still moves."
-      >
+      <Scene hold={hold} caption="Type three letters. It already knows the date.">
         <Clip
           src="captures/festival.webm"
           width={900}
@@ -170,18 +160,15 @@ export const SCENES: Record<string, SceneSpec> = {
 
   residentsPay: {
     id: 'residentsPay',
-    hold: sec(3.5),
-    node: (hold) => <Statement lines={['Then the flats pay.']} hold={hold} />,
+    hold: sec(2.5),
+    node: (hold) => <Statement lines={['Then the whole building chips in.']} hold={hold} />,
   },
 
   openApp: {
     id: 'openApp',
-    hold: sec(5.5),
+    hold: sec(4),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="What the society is running, and what its money looks like, on the way in."
-      >
+      <Scene hold={hold} caption="Open it in September and it looks like September.">
         <Take at="app:home" lead={2} hold={hold} label="Shanti Nivas · Home" />
       </Scene>
     ),
@@ -189,18 +176,15 @@ export const SCENES: Record<string, SceneSpec> = {
 
   oneLedger: {
     id: 'oneLedger',
-    hold: sec(3.5),
-    node: (hold) => <Statement lines={['Every rupee lands in one ledger.']} hold={hold} />,
+    hold: sec(2.5),
+    node: (hold) => <Statement lines={['And every rupee lands in one place.']} hold={hold} />,
   },
 
   ledgerLive: {
     id: 'ledgerLive',
-    hold: sec(9),
+    hold: sec(6.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Who paid, which flat, how it arrived — and which committee member confirmed it."
-      >
+      <Scene hold={hold} caption="Every rupee in, with a name and a flat beside it.">
         <Take at="app:money" lead={2.2} hold={hold} label="Shanti Nivas · Money" />
       </Scene>
     ),
@@ -208,12 +192,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   flatGap: {
     id: 'flatGap',
-    hold: sec(4.5),
+    hold: sec(4),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Nobody listed this neighbour at a door. The ledger says so, rather than leaving a blank."
-      >
+      <Scene hold={hold} caption="Nothing quietly goes missing.">
         <Take at="app:flat-gap" lead={1} hold={hold} label="Shanti Nivas · Money" />
       </Scene>
     ),
@@ -221,9 +202,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   eventsLive: {
     id: 'eventsLive',
-    hold: sec(4),
+    hold: sec(3.5),
     node: (hold) => (
-      <Scene hold={hold} caption="Every event the society has run, is running, and has planned.">
+      <Scene hold={hold} caption="Every festival you have run, and the next one.">
         <Take at="app:events" lead={2} hold={hold} label="Shanti Nivas · Events" />
       </Scene>
     ),
@@ -231,12 +212,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   contributeLive: {
     id: 'contributeLive',
-    hold: sec(9.5),
+    hold: sec(6.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Name your flat and the payment note writes itself. Samudaya never touches the money."
-      >
+      <Scene hold={hold} caption="Two taps to pay, straight into the society's own account.">
         <Take at="app:contribute" lead={2.6} hold={hold} label="Shanti Nivas · Contribute" />
       </Scene>
     ),
@@ -244,11 +222,11 @@ export const SCENES: Record<string, SceneSpec> = {
 
   eventIsTheUnit: {
     id: 'eventIsTheUnit',
-    hold: sec(4),
+    hold: sec(3),
     node: (hold) => (
       <Statement
-        lines={['Everything hangs off one event.']}
-        sub="A checklist, a fund, the acts people perform in, the jobs that need doing, and every bill."
+        lines={['Everything hangs off one festival.']}
+        sub="The checklist, the fund, the performances, the bills."
         hold={hold}
       />
     ),
@@ -256,11 +234,11 @@ export const SCENES: Record<string, SceneSpec> = {
 
   eventLive: {
     id: 'eventLive',
-    hold: sec(5),
+    hold: sec(5.5),
     node: (hold) => (
       <Scene
         hold={hold}
-        caption="One page for the festival: what is ready, what is raised, what is spent, and who is doing what."
+        caption="One page for the whole festival — and everyone can see how ready you are."
       >
         <Take at="app:event" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
       </Scene>
@@ -269,12 +247,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   readiness: {
     id: 'readiness',
-    hold: sec(5),
+    hold: sec(4),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Readiness is finished tasks over total tasks — computed, never a number somebody typed in."
-      >
+      <Scene hold={hold} caption="Everyone can see how ready you are.">
         <Take at="app:readiness" lead={1.4} hold={hold} label="Ganesh Chaturthi 2026" />
       </Scene>
     ),
@@ -282,12 +257,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   billTrail: {
     id: 'billTrail',
-    hold: sec(6),
+    hold: sec(5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Every rupee out names the vendor, the date, the committee member who approved it — and carries the bill."
-      >
+      <Scene hold={hold} caption="Every rupee out, with the bill attached.">
         <Take at="app:bills" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
       </Scene>
     ),
@@ -295,12 +267,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   ownMoney: {
     id: 'ownMoney',
-    hold: sec(5.5),
+    hold: sec(4.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Nobody approves a bill they filed themselves. The database refuses it, not just the screen."
-      >
+      <Scene hold={hold} caption="And nobody signs off their own money.">
         <Take at="app:ownMoney" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
       </Scene>
     ),
@@ -308,24 +277,17 @@ export const SCENES: Record<string, SceneSpec> = {
 
   aClaim: {
     id: 'aClaim',
-    hold: sec(4),
+    hold: sec(3),
     node: (hold) => (
-      <Statement
-        lines={['A reported payment is a claim', 'until the bank agrees.']}
-        hold={hold}
-        size={72}
-      />
+      <Statement lines={['Nothing counts', 'until the bank agrees.']} hold={hold} size={72} />
     ),
   },
 
   reconcileLive: {
     id: 'reconcileLive',
-    hold: sec(8),
+    hold: sec(4.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Import the statement and pair each line. The note Samudaya wrote carries the flat all the way onto the bank record."
-      >
+      <Scene hold={hold} caption="Checked against the bank, line by line.">
         <Take at="app:reconcile" lead={2} hold={hold} label="Shanti Nivas · Reconcile" />
       </Scene>
     ),
@@ -333,11 +295,11 @@ export const SCENES: Record<string, SceneSpec> = {
 
   fourSurfaces: {
     id: 'fourSurfaces',
-    hold: sec(4),
+    hold: sec(3),
     node: (hold) => (
       <Statement
         lines={['Not everyone will open an app.']}
-        sub="So the same society answers on WhatsApp, and to whatever assistant a committee already uses."
+        sub="So the society answers wherever they already are."
         hold={hold}
       />
     ),
@@ -345,9 +307,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   whatsapp: {
     id: 'whatsapp',
-    hold: sec(10),
+    hold: sec(7),
     node: (hold) => (
-      <Scene hold={hold} caption="The society's accounts, in the app everybody already has open.">
+      <Scene hold={hold} caption="So just ask on WhatsApp.">
         <WhatsAppScene hold={hold} />
       </Scene>
     ),
@@ -355,12 +317,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   mcp: {
     id: 'mcp',
-    hold: sec(8),
+    hold: sec(4.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="And an MCP server, scoped by key — a read-only key is never even shown the tools that write."
-      >
+      <Scene hold={hold} caption="Your AI assistant can read it too.">
         <McpScene hold={hold} />
       </Scene>
     ),
@@ -368,15 +327,15 @@ export const SCENES: Record<string, SceneSpec> = {
 
   whenItCloses: {
     id: 'whenItCloses',
-    hold: sec(3.5),
-    node: (hold) => <Statement lines={['And when the event is over?']} hold={hold} />,
+    hold: sec(2.5),
+    node: (hold) => <Statement lines={['And when it is all over?']} hold={hold} />,
   },
 
   closure: {
     id: 'closure',
-    hold: sec(4.5),
+    hold: sec(4),
     node: (hold) => (
-      <Scene hold={hold} caption="Two answers, not a conversation that never happens.">
+      <Scene hold={hold} caption="Money left over? The society decides where it goes.">
         <Shot
           {...SHOTS.closure}
           viewport={{ width: 900, height: 700 }}
@@ -392,12 +351,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   closureChosen: {
     id: 'closureChosen',
-    hold: sec(4.5),
+    hold: sec(4),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Keep it for the society, or put it behind the next event — and say which."
-      >
+      <Scene hold={hold} caption="Kept for the society, or saved for next year.">
         <Shot
           {...SHOTS['closure-chosen']}
           viewport={{ width: 900, height: 700 }}
@@ -413,12 +369,9 @@ export const SCENES: Record<string, SceneSpec> = {
 
   movements: {
     id: 'movements',
-    hold: sec(6),
+    hold: sec(4.5),
     node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="Money moved between events is on the record too, with the name of whoever decided it."
-      >
+      <Scene hold={hold} caption="And that decision is on the record too.">
         <Shot
           {...SHOTS.ledger}
           viewport={{ width: 1180, height: 520 }}
@@ -433,14 +386,11 @@ export const SCENES: Record<string, SceneSpec> = {
 
   phone: {
     id: 'phone',
-    hold: sec(8),
+    hold: sec(5),
     node: (hold) => {
       const phone = SHOTS['ledger-phone'];
       return (
-        <Scene
-          hold={hold}
-          caption="The same ledger on the phone, which is where most of the society will read it."
-        >
+        <Scene hold={hold} caption="All of it, in everybody's pocket.">
           <PhoneShot {...phone} from={0} to={Math.max(0, phone.height - 844)} hold={hold} />
         </Scene>
       );
@@ -449,7 +399,7 @@ export const SCENES: Record<string, SceneSpec> = {
 
   close: {
     id: 'close',
-    hold: sec(5),
+    hold: sec(4.5),
     node: (hold) => (
       <Bookend headline="Samudaya" sub="Nothing hidden. Nothing to chase." hold={hold} />
     ),

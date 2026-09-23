@@ -6,9 +6,10 @@
 // first thing anybody sees and the shot the video opens the app on.
 import Link from 'next/link';
 import { CalendarDays, Wallet } from 'lucide-react';
-import { formatDate, formatMoney } from '@samudaya/core';
+import { festivalFor, formatDate, formatMoney } from '@samudaya/core';
 import { StatTile, StatTiles } from '@/components/badges';
-import { PageBody, PageHeader } from '@/components/page-header';
+import { PageBody } from '@/components/page-header';
+import { FestivalHeader, festivalVars } from '@/components/festival';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { EVENTS, SOCIETY, TOTALS, YOU } from './demo-data';
@@ -18,12 +19,15 @@ const base = `/app/${slug}`;
 
 export default function DemoHome() {
   const open = EVENTS.filter((event) => event.status !== 'Closed');
+  // Opening the app in September should look like September.
+  const festival = festivalFor(open[0]?.name);
 
   return (
-    <>
-      <PageHeader
-        title={`Good evening, ${YOU.name.split(' ')[0]}`}
-        description="Shanti Nivas · 24 flats · you are on the committee"
+    <div style={festivalVars(festival)}>
+      <FestivalHeader
+        festival={festival}
+        title={`Hello, ${YOU.name.split(' ')[0]}`}
+        description={`${SOCIETY.name} · ${festival.label} next`}
       />
       <PageBody>
         <StatTiles>
@@ -79,6 +83,6 @@ export default function DemoHome() {
           </CardBody>
         </Card>
       </PageBody>
-    </>
+    </div>
   );
 }

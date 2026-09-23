@@ -29,8 +29,13 @@ const PUBLIC = join(HERE, '..', 'apps', 'web', 'public');
 const VIDEO = join(PUBLIC, 'samudaya-demo.mp4');
 const POSTER = join(PUBLIC, 'samudaya-demo-poster.jpg');
 
-/** The ledger, which is the one frame that says what the product is. */
-const POSTER_AT = '26';
+/**
+ * The festival's own page: marigold, a toran, the fund and the checklist. The
+ * poster is what most visitors actually see — on a slow connection, and for
+ * anybody who has asked their system for less motion, it is the whole video —
+ * so it gets the most inviting frame rather than the most informative one.
+ */
+const POSTER_AT = '7.5';
 
 const log = (message) => console.log(`\x1b[36m▸\x1b[0m ${message}`);
 const mb = (bytes) => `${(bytes / 1_048_576).toFixed(2)} MB`;
