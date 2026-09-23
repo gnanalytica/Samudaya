@@ -21,6 +21,10 @@ const ROOT = join(import.meta.dirname, '..', '..', '..');
 const surfaces = () => readFileSync(join(ROOT, 'video', 'src', 'surfaces.tsx'), 'utf8');
 const screens = () => readFileSync(join(ROOT, 'video', 'src', 'screens.tsx'), 'utf8');
 const scenes = () => readFileSync(join(ROOT, 'video', 'src', 'scenes.tsx'), 'utf8');
+const logo = () => readFileSync(join(ROOT, 'video', 'src', 'logo.tsx'), 'utf8');
+const story = () => readFileSync(join(ROOT, 'video', 'src', 'story.tsx'), 'utf8');
+const mobileSite = () =>
+  readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'lib', 'site.ts'), 'utf8');
 const demoData = () =>
   readFileSync(join(ROOT, 'video', 'capture', 'harness', 'society', 'demo-data.ts'), 'utf8');
 const mcpTools = () =>
@@ -98,6 +102,25 @@ describe('what the drawn scenes claim', () => {
     for (const [amount, what] of figures) {
       expect(drawn, `the drawn screens do not show ${amount} (${what})`).toContain(String(amount));
       expect(data, `the harness no longer has ${amount} (${what})`).toContain(String(amount));
+    }
+  });
+
+  it('sends viewers to the address the product actually lives at', () => {
+    // The first closing card said samudaya.app. That is the app's bundle
+    // identifier (com.samudaya.app), not a site — a video that tells a society
+    // to go somewhere that is not ours is worse than one that says nothing.
+    const site = /'(https:\/\/[^']+)'/.exec(mobileSite());
+    expect(site, 'apps/mobile/src/lib/site.ts has no default site URL').not.toBeNull();
+    const host = new URL(site![1]).host;
+    expect(logo(), `the closing sting does not show ${host}`).toContain(host);
+    for (const [name, source] of [
+      ['logo.tsx', logo()],
+      ['story.tsx', story()],
+      ['screens.tsx', screens()],
+    ] as const) {
+      expect(source, `${name} shows samudaya.app as if it were a site`).not.toMatch(
+        /['">]samudaya\.app\b/,
+      );
     }
   });
 

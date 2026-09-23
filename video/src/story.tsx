@@ -14,6 +14,7 @@ import {
   ReconcileScreen,
   TodoScreen,
 } from './screens';
+import { STING_SECONDS } from './logo';
 import { sec } from './theme';
 
 /**
@@ -26,12 +27,11 @@ import { sec } from './theme';
  * arguments about the same product, which is what happened when the portrait
  * and landscape cuts each owned their own scene list.
  *
- * The cut follows one rupee rather than touring the app. Asha in A 402 pays
- * ₹2,001; it lands on the committee's list; somebody who is not Asha confirms
- * it; it appears on a ledger every resident can read; it is spent against a
- * bill somebody else approved; the bank statement agrees; and what is left at
- * the end is a decision with a name on it. Each screen is one step of that,
- * which is why the same ₹2,001 turns up on four of them.
+ * The screens follow the money in order — plan, collect, spend, prove — so the
+ * same ₹2,001 payment turns up on four of them. The words over them are not a
+ * story about it: each shot is a headline and two specifics, a figure off the
+ * screen or the rule it shows, because what a committee wants from this is
+ * facts it can check rather than a character to follow.
  */
 
 // ---------------------------------------------------------------------------
@@ -49,22 +49,26 @@ export type Chapter = (typeof CHAPTERS)[number];
 
 export type Shot = {
   id: string;
-  hold: number;
   chapter?: Chapter;
-  caption?: string;
+  /**
+   * What the shot is for, in a few words. Not a sentence about a person: the
+   * copy is the product's specifics, not a story told over the screens.
+   */
+  headline?: string;
   screen?: ReactNode;
   bookend?: { headline: string; sub: string; opening?: boolean };
   statement?: { lines: string[]; sub?: string };
+  /** The close: Samudaya's mark flowing into Gnanalytica's. See logo.tsx. */
+  sting?: boolean;
   /** `zoom` runs from its first value to its second; `origin` is what it pushes towards. */
   zoom?: [number, number];
   origin?: number;
   tabs?: string[];
   active?: string;
   /**
-   * The landscape cut has room beside the phone and the portrait one does not,
-   * so these are the two sentences that would otherwise be lost. Every one has
-   * to be true of the product as shipped — they are the part of the video most
-   * likely to age into a lie.
+   * The specifics under the headline — numbers off the screen, or the rule it
+   * shows. Both cuts carry them. Every one has to be true of the product as
+   * shipped: they are the part of the video most likely to age into a lie.
    */
   points?: string[];
 };
@@ -72,30 +76,25 @@ export type Shot = {
 export const SHOTS: Shot[] = [
   {
     id: 'open',
-    hold: sec(2.2),
     bookend: {
       headline: 'Samudaya',
-      sub: 'Your society’s festivals — and its money — in the open.',
+      // The landing page's own line, rather than one written for the video.
+      sub: 'Plan together. Participate together. Spend transparently.',
       opening: true,
     },
   },
   {
     id: 'problem',
-    hold: sec(2.8),
     statement: {
-      lines: ['Every society collects.', 'Few can show where it went.'],
-      sub: 'Follow one ₹2,001.',
+      lines: ['Festival funds,', 'fully accounted for.'],
+      sub: 'Who paid · who approved · where it went',
     },
   },
   {
     id: 'home',
-    points: [
-      'Every event the society is running, in one place',
-      'What the fund holds, and what it still needs',
-    ],
-    hold: sec(3.2),
     chapter: 'Plan',
-    caption: 'September, and the whole festival is on one screen.',
+    headline: 'Every festival, one screen',
+    points: ['₹24,500 of ₹30,000 raised', '18 of 24 flats paid'],
     screen: <HomeScreen />,
     active: 'Home',
     zoom: [1.0, 1.05],
@@ -103,13 +102,9 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'event',
-    points: [
-      'A checklist with an owner against each line',
-      'Volunteer slots that show what is short',
-    ],
-    hold: sec(3.4),
     chapter: 'Plan',
-    caption: 'Six jobs, four done — and one with nobody on it.',
+    headline: 'Readiness you can see',
+    points: ['4 of 6 jobs done · 1 unassigned', 'Volunteer shortfalls shown'],
     screen: <EventScreen />,
     active: 'Events',
     zoom: [1.02, 1.09],
@@ -117,13 +112,9 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'pay',
-    points: [
-      'UPI, or cash handed to a committee member',
-      'The reference is filled in, so the payment can be told apart',
-    ],
-    hold: sec(3.4),
     chapter: 'Collect',
-    caption: 'Asha in A 402 pays. The note fills itself in.',
+    headline: 'Pay in two taps',
+    points: ['UPI or cash', 'Payment note filled in for you'],
     screen: <PayScreen />,
     active: 'Events',
     zoom: [1.02, 1.08],
@@ -131,13 +122,9 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'todo',
-    points: [
-      'Payments, bills, new residents, suggestions',
-      'One queue, ordered by what a delay costs',
-    ],
-    hold: sec(3.2),
     chapter: 'Collect',
-    caption: 'It lands on the committee’s list, not in a memory.',
+    headline: 'One queue for the committee',
+    points: ['Payments · bills · residents · ideas', 'Most costly delays first'],
     screen: <TodoScreen />,
     tabs: COMMITTEE,
     active: 'Manage',
@@ -145,14 +132,14 @@ export const SHOTS: Shot[] = [
     origin: 0.34,
   },
   {
+    // The rule has exactly one hatch in the database: a committee of one, where
+    // there is nobody else to ask (app.sole_committee_member). It is stated
+    // here as a specific rather than left out, because "someone else confirms
+    // it" alone is not true for every society.
     id: 'confirm',
-    points: [
-      'Checked against the screenshot the resident sent',
-      'Correctable, if the screenshot says something else',
-    ],
-    hold: sec(3.4),
     chapter: 'Collect',
-    caption: 'Somebody else checks it. Never your own payment.',
+    headline: 'Someone else confirms it',
+    points: ['Checked against the UPI screenshot', 'Only a one-person committee self-confirms'],
     screen: <ConfirmScreen />,
     tabs: COMMITTEE,
     active: 'Manage',
@@ -161,27 +148,20 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'money',
-    points: [
-      'A name, a flat and a method on every row',
-      'Open to every resident, not only the committee',
-    ],
-    hold: sec(3.4),
     chapter: 'Collect',
-    caption: 'Now it is on a ledger every resident can read.',
+    headline: 'A public ledger',
+    points: ['Name · flat · method on every row', 'Open to every resident'],
     screen: <MoneyScreen />,
     active: 'Money',
     zoom: [1.0, 1.09],
     origin: 0.4,
   },
   {
+    // "Same rule" points back at the confirm shot, which carries the exception.
     id: 'bills',
-    points: [
-      'A bill attached to every rupee that leaves',
-      'Whoever filed it cannot be the one to approve it',
-    ],
-    hold: sec(3.4),
     chapter: 'Spend',
-    caption: 'Money out carries a bill — and a second signature.',
+    headline: 'Every rupee out, on record',
+    points: ['Bill attached · approver named', 'Same rule: the filer can’t approve'],
     screen: <BillsScreen />,
     tabs: COMMITTEE,
     active: 'Events',
@@ -190,10 +170,9 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'budget',
-    points: ['Planned against spent, category by category', 'A line that goes over stays visible'],
-    hold: sec(3.0),
     chapter: 'Spend',
-    caption: 'Against the plan, line by line. Over still shows.',
+    headline: 'Spend vs plan, per line',
+    points: ['₹31,200 of ₹35,000 used', 'Overspends shown, not hidden'],
     screen: <BudgetScreen />,
     tabs: COMMITTEE,
     active: 'Events',
@@ -202,13 +181,9 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'reconcile',
-    points: [
-      'Upload the bank statement and it matches itself',
-      'Anything with no ledger row behind it is flagged',
-    ],
-    hold: sec(3.2),
     chapter: 'Prove',
-    caption: 'Upload the bank statement. It matches itself.',
+    headline: 'Bank statement reconciled',
+    points: ['Auto-matched to the ledger', 'Unmatched credits flagged'],
     screen: <ReconcileScreen />,
     tabs: COMMITTEE,
     active: 'Manage',
@@ -217,13 +192,9 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'closure',
-    points: [
-      'Two answers, and the app offers only two',
-      'The decision keeps the name of whoever made it',
-    ],
-    hold: sec(3.6),
     chapter: 'Prove',
-    caption: 'What is left is still theirs. The decision gets a name.',
+    headline: 'Leftovers, decided openly',
+    points: ['Keep it, or fund another event', 'Decision recorded with a name'],
     screen: <ClosureScreen />,
     tabs: COMMITTEE,
     active: 'Events',
@@ -232,53 +203,90 @@ export const SHOTS: Shot[] = [
   },
   {
     id: 'balance',
-    points: [
-      'What the society holds between events',
-      'Every movement, with its reason and its author',
-    ],
-    hold: sec(3.0),
     chapter: 'Prove',
-    caption: 'It sits on everybody’s home screen until it is spent.',
+    headline: 'Balance on every home screen',
+    points: ['₹5,300 held between events', 'Every move: amount, reason, author'],
     screen: <BalanceScreen />,
     active: 'Home',
     zoom: [1.02, 1.08],
     origin: 0.3,
   },
   {
+    // This used to be a card that said samudaya.app — the app's bundle
+    // identifier, not a site anybody can visit. The sting ends on the real
+    // address, samudaya.gnanalytica.com.
     id: 'close',
-    hold: sec(2.4),
-    bookend: { headline: 'samudaya.app', sub: 'Nothing hidden. Nothing to chase.' },
+    sting: true,
   },
 ];
+
+/**
+ * How long a shot stays up: long enough to read what it says.
+ *
+ * The first timing was by eye, and it was too fast — a viewer could watch the
+ * phone or read the text, not both. Every hold is now derived from the text
+ * the shot actually shows, at a pace set for somebody reading in a second
+ * language while something moves beside the words:
+ *
+ *   lead   the page settles and the eye finds the caption
+ *   cps    characters read per second. Subtitle guidance for native readers
+ *          watching nothing else is 15–17; this audience is doing more.
+ *   tail   a moment to look back at the screen before it goes
+ *
+ * The text simply stays up that long. An earlier version lit each word as a
+ * reading cursor reached it; people can read, and being shown where to look
+ * was not what they asked for.
+ */
+export const READING = { lead: 0.9, cps: 14, tail: 1.4 } as const;
+
+/** Everything a shot puts on screen to be read, in reading order. */
+export function readingOf(shot: Shot): string[] {
+  if (shot.statement)
+    return [...shot.statement.lines, ...(shot.statement.sub ? [shot.statement.sub] : [])];
+  if (shot.bookend) return [shot.bookend.headline, shot.bookend.sub];
+  return [...(shot.headline ? [shot.headline] : []), ...(shot.points ?? [])];
+}
+
+export function holdOf(shot: Shot) {
+  if (shot.sting) return sec(STING_SECONDS);
+  const characters = readingOf(shot).reduce((total, line) => total + line.length, 0);
+  const seconds = READING.lead + characters / READING.cps + READING.tail;
+  // A screen also needs long enough for its own animation to finish.
+  return sec(Math.max(shot.screen ? 4.6 : 3.2, seconds));
+}
 
 /** Shots overlap by this much, which is what makes the push a push. */
 export const OVERLAP = sec(0.28);
 
-/** Where each shot starts on the timeline. */
-export function starts() {
-  let at = 0;
-  return SHOTS.map((shot) => {
-    const from = at;
-    at += shot.hold - OVERLAP;
-    return from;
-  });
-}
+let built: { holds: number[]; starts: number[]; length: number } | undefined;
 
-export function storyLength() {
-  return SHOTS.reduce((total, shot) => total + shot.hold - OVERLAP, OVERLAP);
+/**
+ * Every shot's length and start. Both cuts show the same words, so they share
+ * one timeline, and one score length.
+ */
+export function timeline() {
+  if (built) return built;
+  const holds = SHOTS.map(holdOf);
+  const starts: number[] = [];
+  let at = 0;
+  for (const hold of holds) {
+    starts.push(at);
+    at += hold - OVERLAP;
+  }
+  built = { holds, starts, length: at + OVERLAP };
+  return built;
 }
 
 /** Which shot is on screen, and how far through it we are. */
 export function at(frame: number) {
-  const marks = starts();
+  const { holds, starts } = timeline();
   let index = 0;
-  for (let i = 0; i < SHOTS.length; i += 1) if (frame >= marks[i]) index = i;
-  const shot = SHOTS[index];
-  const through = interpolate(frame, [marks[index], marks[index] + shot.hold], [0, 1], {
+  for (let i = 0; i < SHOTS.length; i += 1) if (frame >= starts[i]) index = i;
+  const through = interpolate(frame, [starts[index], starts[index] + holds[index]], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  return { shot, index, through };
+  return { shot: SHOTS[index], index, through };
 }
 
 /**

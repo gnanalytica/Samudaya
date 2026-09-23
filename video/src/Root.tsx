@@ -70,10 +70,10 @@ export function Root() {
         height={HEIGHT}
         defaultProps={{ order: LAUNCH, score: 'score-launch.wav' }}
       />
-      {/* The two animated cuts, from one script in src/story.tsx: fourteen
-          beats following a single ₹2,001 from a resident's phone to a signed
-          decision. Explain uses the width beside the handset for the points
-          the portrait cut has no room for; Phone is the fast one. */}
+      {/* The two animated cuts, from one script in src/story.tsx. Each shot
+          lasts as long as its headline and specifics take to read, and both
+          cuts show the same words, so they share one timeline and one score.
+          Only the layout around the handset differs. */}
       <Composition
         id="Explain"
         component={ExplainReel}
@@ -81,7 +81,7 @@ export function Root() {
         fps={FPS}
         width={EXPLAIN_SIZE.width}
         height={EXPLAIN_SIZE.height}
-        defaultProps={{ score: 'score-phone.wav' }}
+        defaultProps={{ score: 'score-story.wav' }}
       />
       <Composition
         id="Phone"
@@ -90,7 +90,7 @@ export function Root() {
         fps={FPS}
         width={PORTRAIT_SIZE.width}
         height={PORTRAIT_SIZE.height}
-        defaultProps={{ score: 'score-phone.wav' }}
+        defaultProps={{ score: 'score-story.wav' }}
       />
     </>
   );

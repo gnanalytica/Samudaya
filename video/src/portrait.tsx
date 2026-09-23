@@ -10,8 +10,9 @@ import {
   useVideoConfig,
 } from 'remotion';
 import { Diya, Petals, Rangoli, Toran, festive } from './festive';
+import { LogoSting } from './logo';
 import { BAR_H, BottomBar, RESIDENT, SCREEN, STATUS_H, StatusBar, ramp, settle } from './screens';
-import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, starts, storyLength } from './story';
+import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, timeline } from './story';
 import { color, fontFamily, sec } from './theme';
 
 /**
@@ -21,12 +22,8 @@ import { color, fontFamily, sec } from './theme';
  * lift, and drawn rather than recorded because a recording moves at the speed
  * a browser navigates — every shot used to open on a page settling into place.
  *
- * The cut follows one rupee rather than touring the app. Asha in A 402 pays
- * ₹2,001; it lands on the committee's list; somebody who is not Asha confirms
- * it; it appears on a ledger every resident can read; it is spent against a
- * bill somebody else approved; the bank statement agrees; and what is left at
- * the end is a decision with a name on it. Each screen is one step of that,
- * which is why the same ₹2,001 shows up on four of them.
+ * The screens and the words come from story.tsx; this file is only where they
+ * sit in a tall frame.
  *
  * Structurally the phone never cuts. The ground, the bezel, the chrome and the
  * camera are rendered once for the whole video and each shot supplies only the
@@ -199,8 +196,8 @@ function Chrome({ tabs, active }: { tabs: string[]; active: string }) {
  * about 1595. Anything laid out flush against the phone's resting edge ends up
  * behind it, which is how the rail spent its first render hidden by a tab bar.
  */
-const CAPTION_TOP = 1608;
-const RAIL_TOP = 1814;
+const CAPTION_TOP = 1606;
+const RAIL_TOP = 1852;
 
 /** The rail: where in the argument this shot sits. */
 function Rail({ chapter, progress }: { chapter: Chapter; progress: number }) {
@@ -259,19 +256,28 @@ function Rail({ chapter, progress }: { chapter: Chapter; progress: number }) {
   );
 }
 
-/** Under the phone, in the band the phone deliberately does not fill. */
-function Caption({ text, hold }: { text: string; hold: number }) {
+/**
+ * The text: a headline and its specifics, on a card under the phone.
+ *
+ * Everything appears at once and stays up for as long as `holdOf()` in
+ * story.tsx says it takes to read. It used to be a sentence lit word by word
+ * as a reading cursor reached it; people can read, and what they asked for was
+ * time and clarity, not to be shown where to look. The card is for contrast:
+ * bare type straight on the festive ground was tiring to read, and at its
+ * worst where a petal drifted behind a letter.
+ */
+function Caption({ headline, points, hold }: { headline: string; points: string[]; hold: number }) {
   const frame = useCurrentFrame();
-  const entered = ramp(frame, sec(0.18), sec(0.62));
+  const entered = ramp(frame, sec(0.12), sec(0.5));
   const leaving = 1 - ramp(frame, hold - sec(0.3), hold);
   return (
     <div
       style={{
         position: 'absolute',
-        left: 62,
-        right: 62,
+        left: 44,
+        right: 44,
         top: CAPTION_TOP,
-        height: RAIL_TOP - CAPTION_TOP - 16,
+        height: RAIL_TOP - CAPTION_TOP - 18,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -279,29 +285,59 @@ function Caption({ text, hold }: { text: string; hold: number }) {
     >
       <div
         style={{
-          color: 'white',
+          width: '100%',
+          padding: '24px 36px 26px',
+          borderRadius: 30,
+          backgroundColor: 'rgba(16, 8, 2, 0.78)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 18px 44px rgba(0,0,0,0.35)',
           fontFamily,
-          fontSize: 44,
-          lineHeight: 1.22,
-          textAlign: 'center',
-          fontWeight: 600,
-          letterSpacing: '-0.015em',
-          textShadow: '0 4px 20px rgba(0,0,0,0.55)',
+          color: 'white',
           opacity: Math.min(entered, leaving),
-          transform: `translateY(${(1 - entered) * 12}px)`,
+          transform: `translateY(${(1 - entered) * 14}px)`,
         }}
       >
-        {text}
+        <div style={{ fontSize: 46, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.02em' }}>
+          {headline}
+        </div>
+        {points.map((point) => (
+          <div
+            key={point}
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 16,
+              marginTop: 12,
+              fontSize: 32,
+              fontWeight: 500,
+              lineHeight: 1.3,
+              color: 'rgba(255,255,255,0.86)',
+            }}
+          >
+            <span
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: 999,
+                flexShrink: 0,
+                backgroundColor: festive.accent,
+                transform: 'translateY(-5px)',
+              }}
+            />
+            {point}
+          </div>
+        ))}
       </div>
     </div>
   );
 }
 
-/** A full-frame sentence, for the parts no screenshot can argue. */
+/** A full-frame statement, for what no single screen can say. */
 function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: number }) {
   const frame = useCurrentFrame();
   const edge = sec(0.4);
   const cover = Math.min(ramp(frame, 0, edge), 1 - ramp(frame, hold - edge, hold));
+  const shown = ramp(frame, sec(0.2), sec(0.7));
   return (
     <AbsoluteFill style={{ backgroundColor: festive.deep, opacity: cover }}>
       <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
@@ -321,36 +357,30 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
       <AbsoluteFill
         style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: '0 84px' }}
       >
-        <div style={{ textAlign: 'center' }}>
-          {lines.map((line, index) => {
-            const shown = ramp(frame, sec(0.25 + index * 0.5), sec(0.95 + index * 0.5));
-            return (
-              <div
-                key={line}
-                style={{
-                  color: 'white',
-                  fontSize: 68,
-                  fontWeight: 600,
-                  lineHeight: 1.18,
-                  letterSpacing: '-0.03em',
-                  marginBottom: 10,
-                  opacity: shown,
-                  transform: `translateY(${(1 - shown) * 18}px)`,
-                }}
-              >
-                {line}
-              </div>
-            );
-          })}
+        <div
+          style={{
+            textAlign: 'center',
+            color: 'white',
+            opacity: shown,
+            transform: `translateY(${(1 - shown) * 16}px)`,
+          }}
+        >
+          {lines.map((line) => (
+            <div
+              key={line}
+              style={{ fontSize: 76, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.03em' }}
+            >
+              {line}
+            </div>
+          ))}
           {sub ? (
             <div
               style={{
-                color: festive.accent,
-                fontSize: 44,
-                marginTop: 26,
+                fontSize: 42,
+                marginTop: 34,
                 lineHeight: 1.3,
-                fontWeight: 600,
-                opacity: ramp(frame, sec(0.25 + lines.length * 0.5), sec(1.0 + lines.length * 0.5)),
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.84)',
               }}
             >
               {sub}
@@ -436,7 +466,7 @@ function Bookend({
 export function PortraitReel({ score }: { score?: string }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  const marks = starts();
+  const { holds, starts: marks } = timeline();
   const { zoom, origin } = camera(frame);
   const rail = chapterNow(frame);
 
@@ -463,8 +493,8 @@ export function PortraitReel({ score }: { score?: string }) {
         <Shell />
         {SHOTS.map((shot, index) =>
           shot.screen ? (
-            <Sequence key={shot.id} from={marks[index]} durationInFrames={shot.hold}>
-              <Slot hold={shot.hold}>{shot.screen}</Slot>
+            <Sequence key={shot.id} from={marks[index]} durationInFrames={holds[index]}>
+              <Slot hold={holds[index]}>{shot.screen}</Slot>
               <Chrome tabs={shot.tabs ?? RESIDENT} active={shot.active ?? 'Home'} />
             </Sequence>
           ) : null,
@@ -474,24 +504,31 @@ export function PortraitReel({ score }: { score?: string }) {
       {/* The rail and the captions stay put while the camera moves. */}
       {rail ? <Rail chapter={rail.chapter} progress={rail.progress} /> : null}
       {SHOTS.map((shot, index) =>
-        shot.caption ? (
-          <Sequence key={`${shot.id}-cap`} from={marks[index]} durationInFrames={shot.hold}>
-            <Caption text={shot.caption} hold={shot.hold} />
+        shot.headline ? (
+          <Sequence key={`${shot.id}-cap`} from={marks[index]} durationInFrames={holds[index]}>
+            <Caption headline={shot.headline} points={shot.points ?? []} hold={holds[index]} />
           </Sequence>
         ) : null,
       )}
 
       {SHOTS.map((shot, index) =>
         shot.statement ? (
-          <Sequence key={`${shot.id}-say`} from={marks[index]} durationInFrames={shot.hold}>
-            <Statement {...shot.statement} hold={shot.hold} />
+          <Sequence key={`${shot.id}-say`} from={marks[index]} durationInFrames={holds[index]}>
+            <Statement {...shot.statement} hold={holds[index]} />
           </Sequence>
         ) : null,
       )}
       {SHOTS.map((shot, index) =>
         shot.bookend ? (
-          <Sequence key={`${shot.id}-end`} from={marks[index]} durationInFrames={shot.hold}>
-            <Bookend {...shot.bookend} hold={shot.hold} />
+          <Sequence key={`${shot.id}-end`} from={marks[index]} durationInFrames={holds[index]}>
+            <Bookend {...shot.bookend} hold={holds[index]} />
+          </Sequence>
+        ) : null,
+      )}
+      {SHOTS.map((shot, index) =>
+        shot.sting ? (
+          <Sequence key={`${shot.id}-sting`} from={marks[index]} durationInFrames={holds[index]}>
+            <LogoSting layout="portrait" />
           </Sequence>
         ) : null,
       )}
@@ -501,4 +538,4 @@ export function PortraitReel({ score }: { score?: string }) {
 
 export const PORTRAIT_SIZE = SIZE;
 
-export { storyLength as portraitLength };
+export const portraitLength = () => timeline().length;

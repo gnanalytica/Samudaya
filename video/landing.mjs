@@ -2,17 +2,21 @@
  * Makes the copy of the video that the landing page serves.
  *
  * The render is 1920×1080 at CRF 18, which is right for anything anybody
- * downloads and wrong for a hero that autoplays: sixteen megabytes before a
- * visitor has read the headline. This is the same cut at 720p, encoded to fit
- * a byte budget rather than to a quality target.
+ * downloads and wrong for a hero that autoplays. This is the same cut at 720p,
+ * encoded to a fixed bitrate rather than to a quality target.
  *
- * The budget is the point. `apps/web/test/landing-demo.test.ts` fails if this
- * file passes two megabytes, because past that it stops being something a
- * phone on mobile data will autoplay. A fixed CRF does not respect that: when
- * the cut went from twenty-five seconds to forty, the same settings produced
- * three megabytes and the test caught it. Two passes at a bitrate derived from
- * the source's own duration means the next change in length is absorbed here
- * instead of breaking CI.
+ * The bitrate is the point, and it used to be a total size. The page streams
+ * this file as it plays — faststart puts the index up front, and preload is
+ * "metadata" — so what decides whether a phone on mobile data can keep up is
+ * how many bytes arrive per second of playback, not how many there are in all.
+ * A two-megabyte cap stood in for that while the cut was twenty-five seconds.
+ * Once every shot was paced to be readable, `Explain` ran past two minutes, and
+ * two megabytes over two minutes is about thirty kilobits a second of video:
+ * the captions the pacing exists for would have smeared into illegibility.
+ *
+ * So the rate is fixed and the size follows the length.
+ * `apps/web/test/landing-demo.test.ts` caps the rate, and caps the size too,
+ * loosely, so a cut that doubled again would still be a decision.
  *
  * The poster matters as much as the video. Without one the hero is a black
  * rectangle until enough has buffered to paint, which on a phone on mobile
@@ -73,13 +77,16 @@ async function seconds(file) {
   return Number(found[1]) * 3600 + Number(found[2]) * 60 + Number(found[3]);
 }
 
-/** Under the two megabytes the test enforces, with room for container overhead. */
-const BUDGET = 1.88 * 1024 * 1024;
+/**
+ * Legible at this rate: at forty seconds, 316k kept every amount on the ledger
+ * readable, and the paced cut is mostly still frames, which cost almost
+ * nothing. The test allows 450k in all.
+ */
+const VIDEO_KBPS = 300;
 const AUDIO_KBPS = 64;
 
 const length = await seconds(SOURCE);
-const videoKbps = Math.floor((BUDGET * 8) / length / 1000 - AUDIO_KBPS - 12);
-log(`budget → ${videoKbps}k video + ${AUDIO_KBPS}k audio over ${length.toFixed(1)}s`);
+log(`rate → ${VIDEO_KBPS}k video + ${AUDIO_KBPS}k audio over ${length.toFixed(1)}s`);
 
 const shared = [
   '-loglevel',
@@ -97,7 +104,7 @@ const shared = [
   '-pix_fmt',
   'yuv420p',
   '-b:v',
-  `${videoKbps}k`,
+  `${VIDEO_KBPS}k`,
   '-preset',
   'slow',
 ];

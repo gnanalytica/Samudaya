@@ -10,8 +10,9 @@ import {
   useVideoConfig,
 } from 'remotion';
 import { Diya, Petals, Rangoli, Toran, festive } from './festive';
+import { LogoSting } from './logo';
 import { BAR_H, BottomBar, RESIDENT, SCREEN, STATUS_H, StatusBar, ramp, settle } from './screens';
-import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, starts, storyLength } from './story';
+import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, timeline } from './story';
 import { color, fontFamily, sec } from './theme';
 
 /**
@@ -161,25 +162,30 @@ function Chrome({ tabs, active }: { tabs: string[]; active: string }) {
 // The panel
 // ---------------------------------------------------------------------------
 
-/** Chapter, headline, and the two points the portrait cut has no room for. */
+/**
+ * Chapter, headline, specifics — all at once, held for as long as they take
+ * to read. No cursor and no lit words: people can read, and what they needed
+ * was the time to.
+ */
 function Panel({
   chapter,
   step,
   of,
-  caption,
+  headline,
   points,
   hold,
 }: {
   chapter: Chapter;
   step: number;
   of: number;
-  caption: string;
+  headline: string;
   points: string[];
   hold: number;
 }) {
   const frame = useCurrentFrame();
   const leaving = 1 - ramp(frame, hold - sec(0.3), hold);
-  const head = ramp(frame, sec(0.15), sec(0.6));
+  const head = ramp(frame, sec(0.1), sec(0.5));
+  const body = ramp(frame, sec(0.25), sec(0.65));
   return (
     <div
       style={{
@@ -192,17 +198,12 @@ function Panel({
         flexDirection: 'column',
         justifyContent: 'center',
         fontFamily,
+        color: 'white',
         opacity: leaving,
       }}
     >
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 16,
-          marginBottom: 26,
-          opacity: head,
-        }}
+        style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 28, opacity: head }}
       >
         <span
           style={{
@@ -228,54 +229,44 @@ function Panel({
       </div>
       <div
         style={{
-          color: 'white',
-          fontSize: 62,
-          lineHeight: 1.16,
-          fontWeight: 600,
-          letterSpacing: '-0.028em',
+          fontSize: 72,
+          lineHeight: 1.08,
+          fontWeight: 700,
+          letterSpacing: '-0.03em',
           opacity: head,
-          transform: `translateY(${(1 - settle(frame, 0.15)) * 14}px)`,
+          transform: `translateY(${(1 - settle(frame, 0.1)) * 14}px)`,
         }}
       >
-        {caption}
+        {headline}
       </div>
-      <div style={{ marginTop: 38 }}>
-        {points.map((point, index) => {
-          const shown = ramp(frame, sec(0.7 + index * 0.28), sec(1.2 + index * 0.28));
-          return (
-            <div
-              key={point}
+      <div style={{ marginTop: 42, opacity: body, transform: `translateY(${(1 - body) * 10}px)` }}>
+        {points.map((point) => (
+          <div
+            key={point}
+            style={{ display: 'flex', gap: 20, alignItems: 'baseline', marginBottom: 18 }}
+          >
+            <span
               style={{
-                display: 'flex',
-                gap: 18,
-                alignItems: 'flex-start',
-                marginBottom: 18,
-                opacity: shown,
-                transform: `translateX(${(1 - shown) * 16}px)`,
+                width: 12,
+                height: 12,
+                borderRadius: 999,
+                flexShrink: 0,
+                backgroundColor: festive.accent,
+                transform: 'translateY(-6px)',
+              }}
+            />
+            <span
+              style={{
+                fontSize: 38,
+                fontWeight: 500,
+                lineHeight: 1.3,
+                color: 'rgba(255,255,255,0.88)',
               }}
             >
-              <span
-                style={{
-                  marginTop: 14,
-                  width: 10,
-                  height: 10,
-                  borderRadius: 999,
-                  flexShrink: 0,
-                  backgroundColor: festive.accent,
-                }}
-              />
-              <span
-                style={{
-                  color: 'rgba(255,255,255,0.84)',
-                  fontSize: 30,
-                  lineHeight: 1.42,
-                }}
-              >
-                {point}
-              </span>
-            </div>
-          );
-        })}
+              {point}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -341,6 +332,7 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
   const frame = useCurrentFrame();
   const edge = sec(0.4);
   const cover = Math.min(ramp(frame, 0, edge), 1 - ramp(frame, hold - edge, hold));
+  const shown = ramp(frame, sec(0.2), sec(0.7));
   return (
     <AbsoluteFill style={{ backgroundColor: festive.deep, opacity: cover }}>
       <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
@@ -360,35 +352,29 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
       <AbsoluteFill
         style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: '0 180px' }}
       >
-        <div style={{ textAlign: 'center' }}>
-          {lines.map((line, index) => {
-            const shown = ramp(frame, sec(0.25 + index * 0.5), sec(0.95 + index * 0.5));
-            return (
-              <div
-                key={line}
-                style={{
-                  color: 'white',
-                  fontSize: 88,
-                  fontWeight: 600,
-                  lineHeight: 1.16,
-                  letterSpacing: '-0.03em',
-                  marginBottom: 8,
-                  opacity: shown,
-                  transform: `translateY(${(1 - shown) * 18}px)`,
-                }}
-              >
-                {line}
-              </div>
-            );
-          })}
+        <div
+          style={{
+            textAlign: 'center',
+            color: 'white',
+            opacity: shown,
+            transform: `translateY(${(1 - shown) * 16}px)`,
+          }}
+        >
+          {lines.map((line) => (
+            <div
+              key={line}
+              style={{ fontSize: 96, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em' }}
+            >
+              {line}
+            </div>
+          ))}
           {sub ? (
             <div
               style={{
-                color: festive.accent,
-                fontSize: 52,
-                marginTop: 28,
-                fontWeight: 600,
-                opacity: ramp(frame, sec(0.25 + lines.length * 0.5), sec(1.0 + lines.length * 0.5)),
+                fontSize: 48,
+                marginTop: 36,
+                fontWeight: 500,
+                color: 'rgba(255,255,255,0.84)',
               }}
             >
               {sub}
@@ -468,7 +454,7 @@ function Bookend({
 export function ExplainReel({ score }: { score?: string }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  const marks = starts();
+  const { holds, starts: marks } = timeline();
   const { zoom } = camera(frame);
   const rail = chapterNow(frame);
   const numbered = SHOTS.filter((shot) => shot.screen);
@@ -502,8 +488,8 @@ export function ExplainReel({ score }: { score?: string }) {
         <Shell />
         {SHOTS.map((shot, index) =>
           shot.screen ? (
-            <Sequence key={shot.id} from={marks[index]} durationInFrames={shot.hold}>
-              <Slot hold={shot.hold}>{shot.screen}</Slot>
+            <Sequence key={shot.id} from={marks[index]} durationInFrames={holds[index]}>
+              <Slot hold={holds[index]}>{shot.screen}</Slot>
               <Chrome tabs={shot.tabs ?? RESIDENT} active={shot.active ?? 'Home'} />
             </Sequence>
           ) : null,
@@ -511,15 +497,15 @@ export function ExplainReel({ score }: { score?: string }) {
       </AbsoluteFill>
 
       {SHOTS.map((shot, index) =>
-        shot.caption && shot.chapter ? (
-          <Sequence key={`${shot.id}-panel`} from={marks[index]} durationInFrames={shot.hold}>
+        shot.headline && shot.chapter ? (
+          <Sequence key={`${shot.id}-panel`} from={marks[index]} durationInFrames={holds[index]}>
             <Panel
               chapter={shot.chapter}
               step={numbered.indexOf(shot) + 1}
               of={numbered.length}
-              caption={shot.caption}
+              headline={shot.headline}
               points={shot.points ?? []}
-              hold={shot.hold}
+              hold={holds[index]}
             />
           </Sequence>
         ) : null,
@@ -528,15 +514,22 @@ export function ExplainReel({ score }: { score?: string }) {
 
       {SHOTS.map((shot, index) =>
         shot.statement ? (
-          <Sequence key={`${shot.id}-say`} from={marks[index]} durationInFrames={shot.hold}>
-            <Statement {...shot.statement} hold={shot.hold} />
+          <Sequence key={`${shot.id}-say`} from={marks[index]} durationInFrames={holds[index]}>
+            <Statement {...shot.statement} hold={holds[index]} />
           </Sequence>
         ) : null,
       )}
       {SHOTS.map((shot, index) =>
         shot.bookend ? (
-          <Sequence key={`${shot.id}-end`} from={marks[index]} durationInFrames={shot.hold}>
-            <Bookend {...shot.bookend} hold={shot.hold} />
+          <Sequence key={`${shot.id}-end`} from={marks[index]} durationInFrames={holds[index]}>
+            <Bookend {...shot.bookend} hold={holds[index]} />
+          </Sequence>
+        ) : null,
+      )}
+      {SHOTS.map((shot, index) =>
+        shot.sting ? (
+          <Sequence key={`${shot.id}-sting`} from={marks[index]} durationInFrames={holds[index]}>
+            <LogoSting layout="landscape" />
           </Sequence>
         ) : null,
       )}
@@ -545,4 +538,4 @@ export function ExplainReel({ score }: { score?: string }) {
 }
 
 export const EXPLAIN_SIZE = SIZE;
-export { storyLength as explainLength };
+export const explainLength = () => timeline().length;

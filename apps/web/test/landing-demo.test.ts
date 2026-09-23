@@ -7,20 +7,37 @@ import { describe, expect, it } from 'vitest';
  *
  * A committee is being asked to put the society's money somewhere, and six
  * feature cards do not answer the question they actually have — what this
- * looks like when their neighbours use it. So forty seconds of the ledger runs
- * on the landing page before anybody signs in.
+ * looks like when their neighbours use it. So the explainer runs on the
+ * landing page before anybody signs in.
  *
  * What is pinned here is what would break it quietly. A hero that autoplays
  * for somebody who asked their system for less motion is a bug nobody reports.
- * A file that has crept up to eight megabytes is a landing page nobody waits
- * for, and the number only moves when someone re-encodes it, which is exactly
- * when a test should object.
+ * A file that streams faster than a phone on mobile data can fetch it is a
+ * landing page that stalls, and the number only moves when someone re-encodes
+ * it, which is exactly when a test should object.
  */
 const ROOT = join(import.meta.dirname, '..');
 const page = () => readFileSync(join(ROOT, 'src', 'app', 'page.tsx'), 'utf8');
 const player = () => readFileSync(join(ROOT, 'src', 'app', 'demo-video.tsx'), 'utf8');
 const proxy = () => readFileSync(join(ROOT, 'src', 'proxy.ts'), 'utf8');
 const asset = (name: string) => join(ROOT, 'public', name);
+
+/**
+ * How long an MP4 plays, from its own movie header.
+ *
+ * `mvhd` holds a timescale and a duration in those units; version 1 widens the
+ * times to 64 bits. Read straight off the bytes so the test needs no ffprobe.
+ */
+function mp4Seconds(file: string) {
+  const bytes = readFileSync(file);
+  const at = bytes.indexOf('mvhd');
+  if (at < 0) throw new Error(`${file} has no movie header`);
+  const version = bytes[at + 4];
+  const body = at + 8;
+  return version === 1
+    ? Number(bytes.readBigUInt64BE(body + 20)) / bytes.readUInt32BE(body + 16)
+    : bytes.readUInt32BE(body + 12) / bytes.readUInt32BE(body + 8);
+}
 
 describe('the demo video on the landing page', () => {
   it('is on the page, above the feature cards', () => {
@@ -81,12 +98,24 @@ describe('the demo video on the landing page', () => {
     expect(matches('/app/shanti-nivas/money')).toBe(true);
   });
 
-  it('is small enough to autoplay on mobile data', () => {
-    // video/landing.mjs makes this file. If a re-encode pushes it past two
-    // megabytes, that was a decision, and it should be made on purpose.
+  it('streams slowly enough to autoplay on mobile data', () => {
+    // video/landing.mjs makes this file. This used to be a two-megabyte cap on
+    // the whole file, which was a stand-in for the real limit while the video
+    // was twenty-five seconds long. The page streams it — faststart, preload
+    // "metadata" — so what a phone on mobile data has to keep up with is the
+    // rate, not the total. When every shot was paced to be readable the cut
+    // passed two minutes, and two megabytes across two minutes is about thirty
+    // kilobits a second of video: the captions would have smeared. So the rate
+    // is what is capped now, deliberately, and the size loosely behind it.
     const file = asset('samudaya-demo.mp4');
     expect(existsSync(file)).toBe(true);
-    expect(statSync(file).size).toBeLessThan(2 * 1024 * 1024);
+    const seconds = mp4Seconds(file);
+    expect(seconds).toBeGreaterThan(5);
+    const kbps = (statSync(file).size * 8) / seconds / 1000;
+    expect(kbps, `the landing video streams at ${kbps.toFixed(0)} kbps`).toBeLessThan(450);
+    // Twice what the paced cut needs. Past this, the length itself changed and
+    // somebody should decide whether a video that long belongs on the front page.
+    expect(statSync(file).size).toBeLessThan(12 * 1024 * 1024);
     expect(statSync(asset('samudaya-demo-poster.jpg')).size).toBeLessThan(200 * 1024);
   });
 });

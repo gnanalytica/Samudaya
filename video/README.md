@@ -2,12 +2,12 @@
 
 Four cuts, from two sources:
 
-| Composition   | Length | Built from       | For                                                        |
-| ------------- | ------ | ---------------- | ---------------------------------------------------------- |
-| `Explain`     | ~0:40  | animation        | The landing page. The argument at length, with the detail. |
-| `Phone`       | ~0:40  | animation        | Portrait — a status, a Reel, anywhere held upright.        |
-| `Walkthrough` | ~1:28  | screen recording | A committee that wants to watch the real thing move.       |
-| `Launch`      | ~0:25  | screen recording | A short forward into a group chat.                         |
+| Composition   | Length | Built from       | For                                                  |
+| ------------- | ------ | ---------------- | ---------------------------------------------------- |
+| `Explain`     | ~1:46  | animation        | The landing page, in 16:9.                           |
+| `Phone`       | ~1:46  | animation        | Portrait — a status, a Reel, anywhere held upright.  |
+| `Walkthrough` | ~1:28  | screen recording | A committee that wants to watch the real thing move. |
+| `Launch`      | ~0:25  | screen recording | A short forward into a group chat.                   |
 
 `Explain` and `Phone` are the same fourteen beats in two shapes. The script
 lives once, in `src/story.tsx`, so the two cannot drift into two different
@@ -56,9 +56,10 @@ npm install
 npm run record        # one continuous take at a desktop window → take.webm
 npm run record:phone  # the same society through the mobile layout → phone.webm
 npm run capture   # the stills and the one-control clips
+npm run brand     # splits the Gnanalytica logo into the layers the close animates
 npm run score     # synthesises the music bed for each cut
 npm run render    # all four cuts into out/
-npm run landing   # the 720p copy the landing page serves, from Explain
+npm run landing   # the 720p copy the landing page serves, from Explain, at a fixed bitrate
 ```
 
 `npm run studio` opens Remotion's editor for scrubbing a scene while you
@@ -79,12 +80,13 @@ for the five screens the filmed cuts never had time for: the committee's To do
 queue, confirming a payment, the budget, closing an event, and the society
 balance.
 
-**The cut follows one rupee rather than touring the app.** Asha in A 402 pays
-₹2,001; it lands on the committee's list; somebody who is not Asha confirms it;
-it appears on a ledger every resident can read; it is spent against a bill
-somebody else approved; the bank statement agrees; and what is left at the end
-is a decision with a name on it. That is why the same ₹2,001 turns up on four
-screens, and why the video has four chapters rather than a feature list.
+**The screens follow the money, in order** — plan, collect, spend, prove: a
+payment made, queued for the committee, confirmed by someone other than the
+payer, on the public ledger, spent against a bill, reconciled against the bank,
+and what is left decided on the record. The text over them does not narrate
+that as a story. Each shot has a headline and two specifics — a figure off the
+screen, or the rule it shows — because what a committee wants from a video like
+this is facts it can check, not a character to follow.
 
 What stops a drawing being a lie is that nothing in it is invented. Every
 figure, label and rule comes from `capture/harness/society/demo-data.ts`, which
@@ -115,7 +117,58 @@ making a promise on its behalf. The test above also fails if it comes back.
 `capture/record-phone.mjs` is still there and still runs: the landscape filmed
 cuts use its footage for the one scene that shows the app on a phone.
 
-Two things that bit it, in case they bite again:
+### Every shot lasts as long as it takes to read
+
+The first animated cuts were timed by eye, and they were too fast: a viewer
+could watch the phone or read the text, not both. Now nothing in `story.tsx`
+declares a length. `holdOf()` derives each one from the text the shot puts on
+screen — a lead for the eye to find it, then 14 characters a second, then a
+tail to look back at the phone. Subtitle guidance for native readers watching
+nothing else is 15–17; this audience is often reading in a second language
+while something moves beside the words.
+
+Both cuts show the same words — a headline and two specifics per shot — so they
+share one timeline and one score, and only the layout differs: a card under
+the phone in portrait, a panel beside it in landscape. Everything appears at
+once. An earlier version lit each word as a reading cursor reached it and
+coloured key terms marigold; people can read, and being shown where to look
+was not what anybody asked for. It was taken out.
+
+### The close: Samudaya's mark flows into Gnanalytica's
+
+Gnanalytica's logo is an infinity: a navy loop with a red arrow and three bars
+rising out of its right lobe. It lives in `brand/gnanalytica-logo.png`, exactly
+as supplied, and `npm run brand` splits it into the navy loop and the red rise
+on transparent ground (`public/brand/`), cropped to the same box so they stack
+into the original. Alpha is each pixel's coverage of its ink, read on the
+channel where that ink is furthest from white; a generic colour-to-alpha leaves
+the navy at 95% and the festive ground shows through it.
+
+**Samudaya had no logo.** The mobile app's icon is still Expo's template, and
+the landing page sets the name in plain type. So the mark in `logo.tsx` is
+built from the product's own motif — a kolam, one line drawn around dots. The
+simplest kolam is a single line looped around two dots; half of that loop, stood
+on end, is an S. If Samudaya gets a real logo, `logo.tsx` is the one place to
+change.
+
+The sting is that one line doing three things. It draws as Samudaya's S on the
+festive ground; it turns flat and closes, and the two dots it was drawn around
+become the lobes of an infinity; then it _is_ Gnanalytica's loop. The ground
+goes to white on the way, because the navy was designed for white and all but
+disappears on the festive dark, and the red rise grows out of the crossing.
+
+For that to work the drawn loop has to land _on_ the supplied artwork, not near
+it, or the crossfade shows two loops. It is Bernoulli's lemniscate, scaled in y,
+fitted to seventeen centreline points measured off the logo: 4.2 px RMS and
+8.6 px at worst, on a stroke 33 px wide, so the line never leaves the stroke it
+is about to become.
+
+It ends on `samudaya.gnanalytica.com`. The card it replaced said `samudaya.app`,
+which is the app's bundle identifier and not a site anybody can visit; the
+claims test now fails if the video shows an address the product does not live
+at.
+
+### Two things the recorder bit on
 
 - **Playwright records at the viewport's CSS pixels.** Asking for a phone's 3x
   device pixels does not render sharper, it pads: a 390-wide page ends up in the
