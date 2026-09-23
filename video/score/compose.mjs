@@ -7,10 +7,12 @@
  * audio. This synthesises it from scratch, so the only licence involved is
  * this repository's.
  *
- * What it is trying to sound like: a room where the accounts are being read
- * out and nobody is worried. Warm, slow, no percussion — a drum loop would
- * make a public ledger feel like a sneaker advertisement. It stays out of the
- * way of the captions, which is the actual job.
+ * What it is trying to sound like: a courtyard the evening before the
+ * festival — warm, unhurried, somebody lighting lamps. Pentatonic pads under a
+ * plucked line, a bell on each chord change, and a hand drum so far down in the
+ * mix it reads as a pulse rather than a beat. That restraint is deliberate: a
+ * proper drum loop would make a public ledger feel like a sneaker advert, and
+ * the bed's actual job is to stay out of the way of the captions.
  *
  *   node score/compose.mjs [seconds] [out.wav]
  */
@@ -102,10 +104,59 @@ function pad(buffer, atSample, freq, gain, lengthSeconds) {
   }
 }
 
+/**
+ * A bell. Its partials are deliberately not whole-number multiples — that
+ * inharmonicity is the whole difference between a struck metal bowl and an
+ * organ note, and it is what makes this read as festive rather than churchy.
+ */
+function bell(buffer, atSample, freq, gain) {
+  const partials = [
+    { ratio: 1, level: 1, decay: 1 },
+    { ratio: 2.76, level: 0.42, decay: 1.6 },
+    { ratio: 5.4, level: 0.18, decay: 2.4 },
+    { ratio: 8.93, level: 0.07, decay: 3.2 },
+  ];
+  const decay = 2.4;
+  const length = Math.floor(decay * 2.6 * RATE);
+
+  for (let i = 0; i < length; i += 1) {
+    const at = atSample + i;
+    if (at >= buffer.length / CHANNELS) break;
+    const t = i / RATE;
+    const attack = Math.min(1, t / 0.004);
+    let sample = 0;
+    for (const p of partials) {
+      sample +=
+        p.level * Math.sin(2 * Math.PI * freq * p.ratio * t) * Math.exp(-t / (decay / p.decay));
+    }
+    const value = sample * gain * attack;
+    // Bells sit wide, one either side, so the middle stays clear for captions.
+    buffer[at * CHANNELS] += value * 1.1;
+    buffer[at * CHANNELS + 1] += value * 0.9;
+  }
+}
+
+/**
+ * A hand drum, mixed low enough to be felt rather than counted. A pitched
+ * sine falling fast, which is roughly what a tabla's bass stroke does.
+ */
+function thump(buffer, atSample, gain) {
+  const length = Math.floor(0.42 * RATE);
+  for (let i = 0; i < length; i += 1) {
+    const at = atSample + i;
+    if (at >= buffer.length / CHANNELS) break;
+    const t = i / RATE;
+    const pitch = 92 * Math.exp(-t * 11) + 54;
+    const value = Math.sin(2 * Math.PI * pitch * t) * Math.exp(-t / 0.13) * gain;
+    buffer[at * CHANNELS] += value;
+    buffer[at * CHANNELS + 1] += value;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Arrangement
 // ---------------------------------------------------------------------------
-const BPM = 68;
+const BPM = 76;
 const beat = 60 / BPM;
 
 function arrange(totalSeconds) {
@@ -128,6 +179,22 @@ function arrange(totalSeconds) {
     for (const [voice, semitone] of chord.entries()) {
       pad(buffer, at, hz(D2 + 12 + semitone), voice === 0 ? 0.052 : 0.032, chordLength + 1.6);
     }
+    // One bell as each chord arrives, two octaves up, and a quieter one
+    // halfway through so eight slow bars do not feel like a held breath.
+    bell(buffer, at, hz(D2 + 36 + chord[0]), 0.05);
+    const half = Math.floor((index * chordLength + chordLength / 2) * RATE);
+    if (half < frames) bell(buffer, half, hz(D2 + 36 + chord[2]), 0.022);
+  }
+
+  // The pulse: beats one and three of every bar, fading in with the arpeggio
+  // and out with it, and never loud enough to count along to.
+  for (let beatIndex = 0; ; beatIndex += 1) {
+    const when = beatIndex * beat * 2;
+    if (when > totalSeconds - 2.5) break;
+    const rampIn = Math.min(1, Math.max(0, (when - 6) / 5));
+    const rampOut = Math.min(1, (totalSeconds - 2.5 - when) / 7);
+    const gain = 0.05 * rampIn * rampOut;
+    if (gain > 0.002) thump(buffer, Math.floor(when * RATE), gain);
   }
 
   // The arpeggio waits eight seconds, so the opening card is nearly bare and
@@ -157,8 +224,9 @@ function arrange(totalSeconds) {
     if (n % 6 === 3) pluck(buffer, at, hz(note + 12), gain * 0.35, 0.4);
   }
 
-  // A last root note, left to ring under the closing card.
+  // A last note and a last bell, left to ring under the closing card.
   pluck(buffer, Math.floor((totalSeconds - 2.4) * RATE), hz(D2 + 12), 0.1, 1.5);
+  bell(buffer, Math.floor((totalSeconds - 2.5) * RATE), hz(D2 + 36), 0.06);
   pad(buffer, Math.floor((totalSeconds - 2.6) * RATE), hz(D2 + 12), 0.05, 2.6);
 
   return buffer;

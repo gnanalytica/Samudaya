@@ -4,8 +4,8 @@ Two cuts of one video, filmed from the app itself:
 
 | Composition   | Length | For                                                           |
 | ------------- | ------ | ------------------------------------------------------------- |
-| `Walkthrough` | ~2:22  | A committee deciding whether to put their money in this.      |
-| `Launch`      | ~0:51  | A landing page, or a forward into a society's WhatsApp group. |
+| `Walkthrough` | ~1:27  | A committee deciding whether to put their money in this.      |
+| `Launch`      | ~0:30  | A landing page, or a forward into a society's WhatsApp group. |
 
 Captions and a score, no voiceover — most of the people this reaches will
 watch it on mute, and the ones who don't get something under it.
@@ -66,8 +66,24 @@ beside it, which is.
 - **The script** is `src/scenes.tsx` — one entry per scene, each with the
   length it wants. `src/Root.tsx` picks which scenes each cut uses and how long
   to hold them, so re-cutting is a list edit rather than a new timeline.
-- **The look** is `src/theme.ts`, which is the app's palette copied verbatim
-  from `apps/web/src/app/globals.css`. Retune it there and here together.
+- **The look** is `src/theme.ts`, the app's palette copied verbatim from
+  `apps/web/src/app/globals.css`, and `src/festive.tsx`, which ports the kolam
+  and the toran out of `apps/web/src/components/festival.tsx` along with Ganesh
+  Chaturthi's colours from `packages/core/src/festivals.ts`. Retune them
+  together.
+
+  That festival dressing is the app's, not the video's. Samudaya re-points its
+  whole palette per festival — `festivalVars` makes `--accent` marigold on a
+  Ganesh page — and draws a kolam and a toran on Home, the events list and
+  every event page. The first cut of this video used plain headers in the
+  harness and so filmed the entire product in its default green, which is the
+  app with its clothes off. Contribute, Money and Reconcile are _not_ dressed
+  in the real app, so they are not dressed here either.
+
+- **The words** are captions in `src/scenes.tsx`. They are marketing copy, not
+  documentation: what it does for a committee, not how it is implemented. "Every
+  rupee out, with the bill attached" rather than a sentence about approval
+  trails.
 - **The journey** is `capture/record.mjs` — where the cursor goes, what it
   clicks, how long it reads. Every stop is a named beat.
 - **The society** is `capture/harness/society/demo-data.ts`. One file, so the

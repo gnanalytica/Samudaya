@@ -12,10 +12,11 @@
 // StatTiles, AuditTrail, Card — with the numbers the real page would have
 // fetched handed to it directly.
 import { CalendarDays, Check, FileText, Users } from 'lucide-react';
-import { formatDate, formatMoney } from '@samudaya/core';
+import { festivalFor, formatDate, formatMoney } from '@samudaya/core';
 import { FundBar, ReadinessBar, StatTile, StatTiles } from '@/components/badges';
 import { AuditTrail } from '@/components/audit-trail';
-import { PageBody, PageHeader } from '@/components/page-header';
+import { PageBody } from '@/components/page-header';
+import { FestivalHeader, festivalVars } from '@/components/festival';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -54,11 +55,18 @@ function BillButton() {
 }
 
 export default function DemoEvent() {
+  // The whole page takes the festival's colour, exactly as the app does:
+  // festivalVars re-points --accent, so every chip, bar and button below turns
+  // marigold without knowing which festival it is in. Filming this with the
+  // plain header was filming the app with its dressing taken off.
+  const festival = festivalFor('Ganesh Chaturthi 2026');
+
   return (
-    <>
-      <PageHeader
+    <div style={festivalVars(festival)}>
+      <FestivalHeader
+        festival={festival}
         title="🪔 Ganesh Chaturthi 2026"
-        description="15–17 September · Shanti Nivas clubhouse and podium"
+        description="15–17 September · Shanti Nivas clubhouse and podium · in 3 days"
         action={<Badge tone="success">Collecting</Badge>}
       />
       <PageBody>
@@ -300,6 +308,6 @@ export default function DemoEvent() {
           </div>
         </div>
       </PageBody>
-    </>
+    </div>
   );
 }

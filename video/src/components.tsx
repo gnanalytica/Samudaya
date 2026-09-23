@@ -10,6 +10,7 @@ import {
   Easing,
 } from 'remotion';
 import { color, fontFamily, sec } from './theme';
+import { Diya, Petals, Rangoli, Toran, festive } from './festive';
 
 /**
  * The parts every scene is built from.
@@ -57,8 +58,19 @@ export function Statement({
 }) {
   const frame = useCurrentFrame();
   return (
-    <AbsoluteFill style={{ backgroundColor: color.accentDeeper }}>
+    <AbsoluteFill style={{ backgroundColor: festive.deep }}>
       <Fade hold={hold}>
+        <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
+          <Rangoli
+            size={1250}
+            opacity={0.075}
+            spin={-frame * 0.04}
+            accent={festive.accent}
+            ribbon={festive.accent}
+            strokeWidth={0.6}
+          />
+        </AbsoluteFill>
+        <Petals hold={hold} count={10} />
         <AbsoluteFill
           style={{
             justifyContent: 'center',
@@ -398,7 +410,7 @@ export function Caption({ text, hold }: { text: string; hold: number }) {
           maxWidth: width - 420,
           padding: '18px 34px',
           borderRadius: 16,
-          backgroundColor: color.accentDeeper,
+          backgroundColor: festive.deep,
           color: 'white',
           fontFamily,
           fontSize: 34,
@@ -419,18 +431,39 @@ export function Caption({ text, hold }: { text: string; hold: number }) {
 /** The opening and closing card: the name, and what it is for. */
 export function Bookend({ headline, sub, hold }: { headline: string; sub: string; hold: number }) {
   const frame = useCurrentFrame();
+  const { width } = useVideoConfig();
   const entered = ramp(frame, sec(0.2), sec(1.2));
   return (
-    <AbsoluteFill style={{ backgroundColor: color.accentDeeper }}>
+    <AbsoluteFill style={{ backgroundColor: festive.deep }}>
       <Fade hold={hold}>
+        {/* The kolam from the app's own event header, turning slowly enough
+            that you notice it only if you look for it. */}
+        <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
+          <Rangoli
+            size={1500}
+            opacity={0.1 * entered}
+            spin={frame * 0.05}
+            accent={festive.accent}
+            ribbon={festive.accent}
+            strokeWidth={0.55}
+          />
+        </AbsoluteFill>
+        <Petals hold={hold} count={14} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, opacity: 0.85 }}>
+          <Toran width={width} />
+        </div>
+
         <AbsoluteFill
           style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: 120 }}
         >
           <div style={{ textAlign: 'center' }}>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+              <Diya size={150} lit={sec(0.35)} />
+            </div>
             <div
               style={{
                 color: 'white',
-                fontSize: 128,
+                fontSize: 132,
                 fontWeight: 600,
                 letterSpacing: '-0.035em',
                 opacity: entered,
@@ -441,9 +474,9 @@ export function Bookend({ headline, sub, hold }: { headline: string; sub: string
             </div>
             <div
               style={{
-                color: 'rgba(255,255,255,0.75)',
-                fontSize: 42,
-                marginTop: 26,
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: 44,
+                marginTop: 22,
                 opacity: ramp(frame, sec(0.9), sec(1.8)),
               }}
             >

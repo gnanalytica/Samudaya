@@ -3,84 +3,84 @@
     "width": 1440,
     "height": 900
   },
-  "lead": 4.89,
-  "duration": 74.96,
+  "lead": 4.96,
+  "duration": 75.64,
   "beats": [
     {
       "name": "landing:top",
-      "at": 8.08
+      "at": 8.24
     },
     {
       "name": "landing:cta",
-      "at": 12.43
+      "at": 12.8
     },
     {
       "name": "landing:features",
-      "at": 15.04
+      "at": 15.42
     },
     {
       "name": "app:home",
-      "at": 18.37
+      "at": 18.73
     },
     {
       "name": "app:money",
-      "at": 24.82
+      "at": 25.18
     },
     {
       "name": "app:ledger",
-      "at": 28.64
+      "at": 28.99
     },
     {
       "name": "app:flat-gap",
-      "at": 31.53
+      "at": 31.83
     },
     {
       "name": "app:ledger-end",
-      "at": 34.94
+      "at": 35.26
     },
     {
       "name": "app:events",
-      "at": 38.18
+      "at": 38.43
     },
     {
       "name": "app:event",
-      "at": 43.82
+      "at": 43.98
     },
     {
       "name": "app:readiness",
-      "at": 46.56
+      "at": 46.74
     },
     {
       "name": "app:bills",
-      "at": 50.48
+      "at": 50.65
     },
     {
       "name": "app:ownMoney",
-      "at": 54.49
+      "at": 54.67
     },
     {
       "name": "app:contribute",
-      "at": 60.18
+      "at": 60.47
     },
     {
       "name": "app:flat-named",
-      "at": 63.58
+      "at": 63.86
     },
     {
       "name": "app:note",
-      "at": 67.19
+      "at": 67.47
     },
     {
       "name": "app:reconcile",
-      "at": 70.77
+      "at": 71.41
     },
     {
       "name": "app:matched",
-      "at": 74.16
+      "at": 74.84
     },
     {
       "name": "end",
-      "at": 74.16
+      "at": 74.84
     }
   ]
 }
