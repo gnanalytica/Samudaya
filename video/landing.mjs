@@ -24,24 +24,28 @@ const run = promisify(execFile);
 const ffmpeg = createRequire(import.meta.url)('ffmpeg-static');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SOURCE = join(HERE, 'out', 'samudaya-launch.mp4');
+const SOURCE = join(HERE, 'out', 'samudaya-explain.mp4');
 const PUBLIC = join(HERE, '..', 'apps', 'web', 'public');
 const VIDEO = join(PUBLIC, 'samudaya-demo.mp4');
 const POSTER = join(PUBLIC, 'samudaya-demo-poster.jpg');
 
 /**
- * The festival's own page: marigold, a toran, the fund and the checklist. The
- * poster is what most visitors actually see — on a slow connection, and for
- * anybody who has asked their system for less motion, it is the whole video —
- * so it gets the most inviting frame rather than the most informative one.
+ * Home, with the fund counted up and the panel beside it filled in.
+ *
+ * The poster is what most visitors actually see — on a slow connection, and
+ * for anybody who has asked their system for less motion, it is the whole
+ * video — so it wants a frame that is both inviting and legible. The opening
+ * card and the statement after it are neither: one is a logo and the other is
+ * a sentence about a problem, and a still of either says nothing about what
+ * the product is.
  */
-const POSTER_AT = '7.5';
+const POSTER_AT = '6.2';
 
 const log = (message) => console.log(`\x1b[36m▸\x1b[0m ${message}`);
 const mb = (bytes) => `${(bytes / 1_048_576).toFixed(2)} MB`;
 
 await stat(SOURCE).catch(() => {
-  throw new Error(`${SOURCE} is missing — run: npm run render:launch`);
+  throw new Error(`${SOURCE} is missing — run: npm run render:explain`);
 });
 await mkdir(PUBLIC, { recursive: true });
 

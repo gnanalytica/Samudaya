@@ -1,5 +1,6 @@
 import { Composition } from 'remotion';
 import { Reel, reelLength } from './scenes';
+import { EXPLAIN_SIZE, ExplainReel, explainLength } from './landscape';
 import { PORTRAIT_SIZE, PortraitReel, portraitLength } from './portrait';
 import { FPS, HEIGHT, WIDTH } from './theme';
 
@@ -8,9 +9,9 @@ import { FPS, HEIGHT, WIDTH } from './theme';
  *
  * Walkthrough is what a committee watches once, before deciding whether to
  * put their society's money in an app. Launch is what gets forwarded into a
- * WhatsApp group, where nobody has decided to watch anything: same scenes,
- * fewer of them, held for less time, and the argument made in the first ten
- * seconds rather than the last.
+ * group chat, where nobody has decided to watch anything: same scenes, fewer
+ * of them, held for less time, and the argument made in the first ten seconds
+ * rather than the last.
  */
 
 const WALKTHROUGH = [
@@ -33,7 +34,6 @@ const WALKTHROUGH = [
   { id: 'closure' as const },
   { id: 'closureChosen' as const },
   { id: 'fourSurfaces' as const },
-  { id: 'whatsapp' as const },
   { id: 'mcp' as const },
   { id: 'phone' as const },
   { id: 'close' as const },
@@ -45,7 +45,6 @@ const LAUNCH = [
   { id: 'eventLive' as const, hold: 120 },
   { id: 'contributeLive' as const, hold: 150 },
   { id: 'ledgerLive' as const, hold: 150 },
-  { id: 'whatsapp' as const, hold: 165 },
   { id: 'phone' as const, hold: 105 },
   { id: 'close' as const, hold: 105 },
 ];
@@ -71,9 +70,19 @@ export function Root() {
         height={HEIGHT}
         defaultProps={{ order: LAUNCH, score: 'score-launch.wav' }}
       />
-      {/* Portrait, and animated rather than filmed: the screens are drawn in
-          src/screens.tsx from the same data the recorded cuts use, so a shot
-          costs a third of a second instead of a page load. */}
+      {/* The two animated cuts, from one script in src/story.tsx: fourteen
+          beats following a single ₹2,001 from a resident's phone to a signed
+          decision. Explain uses the width beside the handset for the points
+          the portrait cut has no room for; Phone is the fast one. */}
+      <Composition
+        id="Explain"
+        component={ExplainReel}
+        durationInFrames={explainLength()}
+        fps={FPS}
+        width={EXPLAIN_SIZE.width}
+        height={EXPLAIN_SIZE.height}
+        defaultProps={{ score: 'score-phone.wav' }}
+      />
       <Composition
         id="Phone"
         component={PortraitReel}

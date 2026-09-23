@@ -15,82 +15,68 @@ import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, starts, storyLength 
 import { color, fontFamily, sec } from './theme';
 
 /**
- * The portrait cut: one phone, one argument, no footage.
+ * The same fourteen beats, in 16:9.
  *
- * It is vertical because a residents' society reads its ledger standing in a
- * lift, and drawn rather than recorded because a recording moves at the speed
- * a browser navigates — every shot used to open on a page settling into place.
+ * A phone held in the middle of a landscape frame wastes two thirds of it, and
+ * the portrait cut pays for that width by dropping everything it cannot fit
+ * under the handset. Here the handset sits on the right and the space it frees
+ * carries what the captions had to leave out: which chapter this is, the
+ * sentence itself, and the two supporting points from `story.tsx`.
  *
- * The cut follows one rupee rather than touring the app. Asha in A 402 pays
- * ₹2,001; it lands on the committee's list; somebody who is not Asha confirms
- * it; it appears on a ledger every resident can read; it is spent against a
- * bill somebody else approved; the bank statement agrees; and what is left at
- * the end is a decision with a name on it. Each screen is one step of that,
- * which is why the same ₹2,001 shows up on four of them.
- *
- * Structurally the phone never cuts. The ground, the bezel, the chrome and the
- * camera are rendered once for the whole video and each shot supplies only the
- * page inside them, so pages push through a handset that stays put.
+ * So this is the explanatory cut and `Phone` is the fast one, from one script.
  */
 
-const SIZE = { width: 1080, height: 1920 };
+const SIZE = { width: 1920, height: 1080 };
 
-/** Logical phone pixels → canvas pixels. */
-const SCALE = 1.72;
-const BEZEL = 14;
-const TOP = 40;
-
+/** The handset, to the right, at a size that leaves the page legible. */
+const SCALE = 1.06;
+const BEZEL = 12;
 const SCREEN_W = SCREEN.width * SCALE;
 const SCREEN_H = SCREEN.height * SCALE;
 const PHONE_W = SCREEN_W + BEZEL * 2;
-const PHONE_L = (SIZE.width - PHONE_W) / 2;
-/** Where a page sits on the canvas. The shell, every slot and the chrome share it. */
-const RECT = { left: PHONE_L + BEZEL, top: TOP + BEZEL, width: SCREEN_W, height: SCREEN_H };
-const RADIUS = 44;
+const PHONE_H = SCREEN_H + BEZEL * 2;
+const PHONE_L = SIZE.width - PHONE_W - 150;
+const PHONE_T = (SIZE.height - PHONE_H) / 2;
+const RECT = { left: PHONE_L + BEZEL, top: PHONE_T + BEZEL, width: SCREEN_W, height: SCREEN_H };
+const RADIUS = 30;
 
-// ---------------------------------------------------------------------------
-// The parts that never cut
-// ---------------------------------------------------------------------------
+/** The panel, to the left. */
+const PANEL = { left: 132, width: PHONE_L - 132 - 96 };
 
-/** Festive ground: kolam, toran, petals. Rendered once, so it never restarts. */
 function Ground({ frame, length }: { frame: number; length: number }) {
   return (
     <AbsoluteFill style={{ backgroundColor: festive.deep }}>
       <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
         <Rangoli
-          size={1560}
-          opacity={0.06}
+          size={1500}
+          opacity={0.055}
           spin={-frame * 0.025}
           accent={festive.accent}
           ribbon={festive.accent}
           strokeWidth={0.6}
         />
       </AbsoluteFill>
-      <div style={{ position: 'absolute', inset: '0 0 auto 0', opacity: 0.72 }}>
+      <div style={{ position: 'absolute', inset: '0 0 auto 0', opacity: 0.7 }}>
         <Toran width={SIZE.width} />
       </div>
-      <Petals hold={length} count={11} />
+      <Petals hold={length} count={10} />
     </AbsoluteFill>
   );
 }
 
-/**
- * The handset. Its screen is filled with the app's own surface colour, which
- * is what shows through in the gap while one page pushes the next along.
- */
 function Shell() {
   return (
     <div
       style={{
         position: 'absolute',
         left: PHONE_L,
-        top: TOP,
+        top: PHONE_T,
         width: PHONE_W,
-        height: SCREEN_H + BEZEL * 2,
+        height: PHONE_H,
         backgroundColor: festive.deep,
         borderRadius: RADIUS + BEZEL,
         padding: BEZEL,
-        boxShadow: '0 44px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)',
+        boxShadow: '0 38px 90px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)',
       }}
     >
       <div
@@ -105,7 +91,6 @@ function Shell() {
   );
 }
 
-/** Anything drawn at phone scale, clipped to the phone's screen. */
 function InScreen({ children, opacity = 1 }: { children: ReactNode; opacity?: number }) {
   return (
     <div
@@ -125,13 +110,6 @@ function InScreen({ children, opacity = 1 }: { children: ReactNode; opacity?: nu
   );
 }
 
-/**
- * One page, pushing the last one out of the way.
- *
- * Slots stack at the same rect in shot order, so the arriving page paints over
- * the leaving one. It slides in from the right while the leaving page slides
- * left — a navigation push, which is the transition the app itself makes.
- */
 function Slot({ hold, children }: { hold: number; children: ReactNode }) {
   const frame = useCurrentFrame();
   const enter = ramp(frame, 0, sec(0.36), Easing.out(Easing.cubic));
@@ -152,14 +130,6 @@ function Slot({ hold, children }: { hold: number; children: ReactNode }) {
   );
 }
 
-/**
- * The chrome that does not move: the clock at the top, the tabs at the bottom.
- *
- * Drawn per shot rather than once, because which four tabs there are depends on
- * who is holding the phone — residents get Money, the committee trades it for
- * Manage. Where two shots agree, which is most of them, the cross-fade is
- * between two identical bars and invisible.
- */
 function Chrome({ tabs, active }: { tabs: string[]; active: string }) {
   const frame = useCurrentFrame();
   return (
@@ -188,31 +158,140 @@ function Chrome({ tabs, active }: { tabs: string[]; active: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Captions, chapters and bookends
+// The panel
 // ---------------------------------------------------------------------------
 
-/**
- * Where the caption and the rail live.
- *
- * Fixed rather than derived from the phone, because the camera pushes in and
- * the phone's drawn bottom moves with it — at the deepest zoom it reaches
- * about 1595. Anything laid out flush against the phone's resting edge ends up
- * behind it, which is how the rail spent its first render hidden by a tab bar.
- */
-const CAPTION_TOP = 1608;
-const RAIL_TOP = 1814;
+/** Chapter, headline, and the two points the portrait cut has no room for. */
+function Panel({
+  chapter,
+  step,
+  of,
+  caption,
+  points,
+  hold,
+}: {
+  chapter: Chapter;
+  step: number;
+  of: number;
+  caption: string;
+  points: string[];
+  hold: number;
+}) {
+  const frame = useCurrentFrame();
+  const leaving = 1 - ramp(frame, hold - sec(0.3), hold);
+  const head = ramp(frame, sec(0.15), sec(0.6));
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: PANEL.left,
+        top: 0,
+        bottom: 0,
+        width: PANEL.width,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        fontFamily,
+        opacity: leaving,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          marginBottom: 26,
+          opacity: head,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+            color: festive.accent,
+          }}
+        >
+          {chapter}
+        </span>
+        <span style={{ flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.18)' }} />
+        <span
+          style={{
+            fontSize: 20,
+            color: 'rgba(255,255,255,0.45)',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {String(step).padStart(2, '0')} / {String(of).padStart(2, '0')}
+        </span>
+      </div>
+      <div
+        style={{
+          color: 'white',
+          fontSize: 62,
+          lineHeight: 1.16,
+          fontWeight: 600,
+          letterSpacing: '-0.028em',
+          opacity: head,
+          transform: `translateY(${(1 - settle(frame, 0.15)) * 14}px)`,
+        }}
+      >
+        {caption}
+      </div>
+      <div style={{ marginTop: 38 }}>
+        {points.map((point, index) => {
+          const shown = ramp(frame, sec(0.7 + index * 0.28), sec(1.2 + index * 0.28));
+          return (
+            <div
+              key={point}
+              style={{
+                display: 'flex',
+                gap: 18,
+                alignItems: 'flex-start',
+                marginBottom: 18,
+                opacity: shown,
+                transform: `translateX(${(1 - shown) * 16}px)`,
+              }}
+            >
+              <span
+                style={{
+                  marginTop: 14,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 999,
+                  flexShrink: 0,
+                  backgroundColor: festive.accent,
+                }}
+              />
+              <span
+                style={{
+                  color: 'rgba(255,255,255,0.84)',
+                  fontSize: 30,
+                  lineHeight: 1.42,
+                }}
+              >
+                {point}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-/** The rail: where in the argument this shot sits. */
+/** The rail, along the foot of the panel rather than the foot of the frame. */
 function Rail({ chapter, progress }: { chapter: Chapter; progress: number }) {
   return (
     <div
       style={{
         position: 'absolute',
-        left: 96,
-        right: 96,
-        top: RAIL_TOP,
+        left: PANEL.left,
+        width: PANEL.width,
+        bottom: 74,
         display: 'flex',
-        gap: 12,
+        gap: 14,
         fontFamily,
       }}
     >
@@ -225,22 +304,21 @@ function Rail({ chapter, progress }: { chapter: Chapter; progress: number }) {
           <div key={name} style={{ flex: 1 }}>
             <div
               style={{
-                marginBottom: 10,
-                fontSize: 23,
+                marginBottom: 9,
+                fontSize: 17,
                 fontWeight: 600,
-                letterSpacing: '0.07em',
+                letterSpacing: '0.09em',
                 textTransform: 'uppercase',
-                textAlign: 'center',
-                color: now ? 'white' : 'rgba(255,255,255,0.38)',
+                color: now ? 'white' : 'rgba(255,255,255,0.34)',
               }}
             >
               {name}
             </div>
             <div
               style={{
-                height: 5,
+                height: 4,
                 borderRadius: 999,
-                backgroundColor: 'rgba(255,255,255,0.16)',
+                backgroundColor: 'rgba(255,255,255,0.15)',
                 overflow: 'hidden',
               }}
             >
@@ -259,45 +337,6 @@ function Rail({ chapter, progress }: { chapter: Chapter; progress: number }) {
   );
 }
 
-/** Under the phone, in the band the phone deliberately does not fill. */
-function Caption({ text, hold }: { text: string; hold: number }) {
-  const frame = useCurrentFrame();
-  const entered = ramp(frame, sec(0.18), sec(0.62));
-  const leaving = 1 - ramp(frame, hold - sec(0.3), hold);
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 62,
-        right: 62,
-        top: CAPTION_TOP,
-        height: RAIL_TOP - CAPTION_TOP - 16,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <div
-        style={{
-          color: 'white',
-          fontFamily,
-          fontSize: 44,
-          lineHeight: 1.22,
-          textAlign: 'center',
-          fontWeight: 600,
-          letterSpacing: '-0.015em',
-          textShadow: '0 4px 20px rgba(0,0,0,0.55)',
-          opacity: Math.min(entered, leaving),
-          transform: `translateY(${(1 - entered) * 12}px)`,
-        }}
-      >
-        {text}
-      </div>
-    </div>
-  );
-}
-
-/** A full-frame sentence, for the parts no screenshot can argue. */
 function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: number }) {
   const frame = useCurrentFrame();
   const edge = sec(0.4);
@@ -306,7 +345,7 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
     <AbsoluteFill style={{ backgroundColor: festive.deep, opacity: cover }}>
       <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
         <Rangoli
-          size={1400}
+          size={1180}
           opacity={0.08}
           spin={-frame * 0.04}
           accent={festive.accent}
@@ -319,7 +358,7 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
         <Toran width={SIZE.width} />
       </div>
       <AbsoluteFill
-        style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: '0 84px' }}
+        style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: '0 180px' }}
       >
         <div style={{ textAlign: 'center' }}>
           {lines.map((line, index) => {
@@ -329,11 +368,11 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
                 key={line}
                 style={{
                   color: 'white',
-                  fontSize: 68,
+                  fontSize: 88,
                   fontWeight: 600,
-                  lineHeight: 1.18,
+                  lineHeight: 1.16,
                   letterSpacing: '-0.03em',
-                  marginBottom: 10,
+                  marginBottom: 8,
                   opacity: shown,
                   transform: `translateY(${(1 - shown) * 18}px)`,
                 }}
@@ -346,9 +385,8 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
             <div
               style={{
                 color: festive.accent,
-                fontSize: 44,
-                marginTop: 26,
-                lineHeight: 1.3,
+                fontSize: 52,
+                marginTop: 28,
                 fontWeight: 600,
                 opacity: ramp(frame, sec(0.25 + lines.length * 0.5), sec(1.0 + lines.length * 0.5)),
               }}
@@ -362,7 +400,6 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
   );
 }
 
-/** A full-frame card, over the phone. `opening` dissolves off it; else onto. */
 function Bookend({
   headline,
   sub,
@@ -381,7 +418,7 @@ function Bookend({
     <AbsoluteFill style={{ backgroundColor: festive.deep, opacity: cover }}>
       <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
         <Rangoli
-          size={1320}
+          size={1080}
           opacity={0.11}
           spin={frame * 0.05}
           accent={festive.accent}
@@ -389,21 +426,19 @@ function Bookend({
           strokeWidth={0.6}
         />
       </AbsoluteFill>
-      <Petals hold={hold} count={12} />
+      <Petals hold={hold} count={11} />
       <div style={{ position: 'absolute', inset: '0 0 auto 0', opacity: 0.85 }}>
         <Toran width={SIZE.width} />
       </div>
-      <AbsoluteFill
-        style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: 86 }}
-      >
+      <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center', fontFamily }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-            <Diya size={172} lit={sec(0.2)} />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}>
+            <Diya size={140} lit={sec(0.2)} />
           </div>
           <div
             style={{
               color: 'white',
-              fontSize: 112,
+              fontSize: 120,
               fontWeight: 600,
               letterSpacing: '-0.035em',
               opacity: entered,
@@ -415,9 +450,8 @@ function Bookend({
           <div
             style={{
               color: 'rgba(255,255,255,0.82)',
-              fontSize: 45,
-              marginTop: 22,
-              lineHeight: 1.25,
+              fontSize: 46,
+              marginTop: 20,
               opacity: ramp(frame, sec(0.6), sec(1.4)),
             }}
           >
@@ -430,15 +464,14 @@ function Bookend({
 }
 
 // ---------------------------------------------------------------------------
-// The cut
-// ---------------------------------------------------------------------------
 
-export function PortraitReel({ score }: { score?: string }) {
+export function ExplainReel({ score }: { score?: string }) {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
   const marks = starts();
-  const { zoom, origin } = camera(frame);
+  const { zoom } = camera(frame);
   const rail = chapterNow(frame);
+  const numbered = SHOTS.filter((shot) => shot.screen);
 
   return (
     <AbsoluteFill style={{ backgroundColor: festive.deep }}>
@@ -458,8 +491,14 @@ export function PortraitReel({ score }: { score?: string }) {
 
       <Ground frame={frame} length={durationInFrames} />
 
-      {/* Shell, pages and chrome under one transform, so they move as one. */}
-      <AbsoluteFill style={{ transform: `scale(${zoom})`, transformOrigin: `50% ${origin}%` }}>
+      {/* Far less push than the portrait cut: here the panel carries the
+          emphasis, and a phone that grows while text sits beside it wobbles. */}
+      <AbsoluteFill
+        style={{
+          transform: `scale(${1 + (zoom - 1) * 0.45})`,
+          transformOrigin: `${((PHONE_L + PHONE_W / 2) / SIZE.width) * 100}% 50%`,
+        }}
+      >
         <Shell />
         {SHOTS.map((shot, index) =>
           shot.screen ? (
@@ -471,15 +510,21 @@ export function PortraitReel({ score }: { score?: string }) {
         )}
       </AbsoluteFill>
 
-      {/* The rail and the captions stay put while the camera moves. */}
-      {rail ? <Rail chapter={rail.chapter} progress={rail.progress} /> : null}
       {SHOTS.map((shot, index) =>
-        shot.caption ? (
-          <Sequence key={`${shot.id}-cap`} from={marks[index]} durationInFrames={shot.hold}>
-            <Caption text={shot.caption} hold={shot.hold} />
+        shot.caption && shot.chapter ? (
+          <Sequence key={`${shot.id}-panel`} from={marks[index]} durationInFrames={shot.hold}>
+            <Panel
+              chapter={shot.chapter}
+              step={numbered.indexOf(shot) + 1}
+              of={numbered.length}
+              caption={shot.caption}
+              points={shot.points ?? []}
+              hold={shot.hold}
+            />
           </Sequence>
         ) : null,
       )}
+      {rail ? <Rail chapter={rail.chapter} progress={rail.progress} /> : null}
 
       {SHOTS.map((shot, index) =>
         shot.statement ? (
@@ -499,6 +544,5 @@ export function PortraitReel({ score }: { score?: string }) {
   );
 }
 
-export const PORTRAIT_SIZE = SIZE;
-
-export { storyLength as portraitLength };
+export const EXPLAIN_SIZE = SIZE;
+export { storyLength as explainLength };

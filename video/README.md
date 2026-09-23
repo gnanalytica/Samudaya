@@ -1,12 +1,17 @@
 # The Samudaya demo video
 
-Three cuts of one video:
+Four cuts, from two sources:
 
-| Composition   | Length | Built from       | For                                                           |
-| ------------- | ------ | ---------------- | ------------------------------------------------------------- |
-| `Walkthrough` | ~1:34  | screen recording | A committee deciding whether to put their money in this.      |
-| `Launch`      | ~0:30  | screen recording | A landing page, or a forward into a society's WhatsApp group. |
-| `Phone`       | ~0:22  | animation        | Portrait, for a status, a Reel, or anywhere held upright.     |
+| Composition   | Length | Built from       | For                                                        |
+| ------------- | ------ | ---------------- | ---------------------------------------------------------- |
+| `Explain`     | ~0:40  | animation        | The landing page. The argument at length, with the detail. |
+| `Phone`       | ~0:40  | animation        | Portrait — a status, a Reel, anywhere held upright.        |
+| `Walkthrough` | ~1:28  | screen recording | A committee that wants to watch the real thing move.       |
+| `Launch`      | ~0:25  | screen recording | A short forward into a group chat.                         |
+
+`Explain` and `Phone` are the same fourteen beats in two shapes. The script
+lives once, in `src/story.tsx`, so the two cannot drift into two different
+arguments about the same product.
 
 Captions and a score, no voiceover — most of the people this reaches will
 watch it on mute, and the ones who don't get something under it.
@@ -52,43 +57,63 @@ npm run record        # one continuous take at a desktop window → take.webm
 npm run record:phone  # the same society through the mobile layout → phone.webm
 npm run capture   # the stills and the one-control clips
 npm run score     # synthesises the music bed for each cut
-npm run render    # all three cuts into out/
-npm run landing   # the 720p copy the landing page serves
+npm run render    # all four cuts into out/
+npm run landing   # the 720p copy the landing page serves, from Explain
 ```
 
 `npm run studio` opens Remotion's editor for scrubbing a scene while you
 change it.
 
-### The portrait cut is drawn, not filmed
+### The two animated cuts are drawn, not filmed
 
-Most of a society reads its ledger standing in a lift, so `Phone` is vertical —
-a landscape video cropped to a phone is a landscape video with its sides cut
-off. It used to be a second screen recording, at a phone's viewport. It is now
-`src/screens.tsx`: the same screens, redrawn as React.
+`src/screens.tsx` redraws the app's screens as React, and `src/story.tsx` puts
+fourteen of them in an order. `Phone` lays that out vertically, because most of
+a society reads its ledger standing in a lift; `Explain` lays the same thing
+out in 16:9 with a panel beside the handset.
 
 A recording is the most honest way to show a product and the worst way to show
-it quickly. It moves at the speed a browser navigates, so every shot opened on
-a page settling into place, and the cut ran a third longer than the thing it
-was saying. Redrawn, a screen arrives in a third of a second and spends its
-whole life doing what its caption is about: 34 seconds became 22 with more in
-it.
+it _quickly_. It moves at the speed a browser navigates, so every shot opened
+on a page settling into place. Redrawn, a screen arrives in a third of a second
+and spends its whole life doing what its caption is about — which buys the room
+for the five screens the filmed cuts never had time for: the committee's To do
+queue, confirming a payment, the budget, closing an event, and the society
+balance.
 
-What stops that being a lie is that nothing in `screens.tsx` is invented. Every
-figure, label and rule is the one in `capture/harness/society/demo-data.ts`,
-which is the data the filmed cuts use, so ₹24,500 of ₹30,000 is the same number
-in all three. The layout is the app's mobile layout, tab bar included — and
-which four tabs depends on the role, because the app is specific about it:
-residents get Home, Events, Money, Me, while the committee trades Money for
-Manage. The Reconcile screen draws the committee's bar; the Money screen draws
-a resident's.
+**The cut follows one rupee rather than touring the app.** Asha in A 402 pays
+₹2,001; it lands on the committee's list; somebody who is not Asha confirms it;
+it appears on a ledger every resident can read; it is spent against a bill
+somebody else approved; the bank statement agrees; and what is left at the end
+is a decision with a name on it. That is why the same ₹2,001 turns up on four
+screens, and why the video has four chapters rather than a feature list.
 
-The phone itself never cuts. The ground, the bezel and the camera are rendered
-once for the whole video and each shot supplies only the screen inside them, so
-the screens push through a handset that stays put — which is what using an app
-looks like — instead of nine shots of a phone being re-established.
+What stops a drawing being a lie is that nothing in it is invented. Every
+figure, label and rule comes from `capture/harness/society/demo-data.ts`, which
+is the data the filmed cuts use, and `apps/web/test/demo-video-claims.test.ts`
+checks ten of those figures appear in both. The two closure answers are the
+strings in `packages/core/src/funds.ts`; the To do sections and their order are
+`TODO_ORDER` in `packages/core/src/copy.ts`; the tab bar is the app's, including
+that residents get Home/Events/Money/Me while the committee trades Money for
+Manage.
 
-`capture/record-phone.mjs` is still there and still runs: the landscape cuts
-use its footage for the one scene that shows the app on a phone.
+Three things about the drawing that took a render each to find:
+
+- **The phone must not cut.** Ground, bezel, chrome and camera render once for
+  the whole video and each shot supplies only the page inside them, so pages
+  push through a handset that stays put.
+- **Chrome that slides is chrome that lies.** Built first with the status bar
+  and tab bar inside each page, every transition slid two clocks and two Home
+  tabs past each other. They are drawn over the pages instead.
+- **Nothing may be laid out flush against the phone's resting edge.** The
+  camera pushes in, so the drawn phone's bottom moves with it — the chapter
+  rail spent its first render hidden behind a tab bar. `CAPTION_TOP` and
+  `RAIL_TOP` are fixed numbers with the deepest zoom already allowed for.
+
+A WhatsApp scene used to sit in all of these. It came out because the bot is
+still in beta, and a demo that shows a beta surface beside shipped ones is
+making a promise on its behalf. The test above also fails if it comes back.
+
+`capture/record-phone.mjs` is still there and still runs: the landscape filmed
+cuts use its footage for the one scene that shows the app on a phone.
 
 Two things that bit it, in case they bite again:
 

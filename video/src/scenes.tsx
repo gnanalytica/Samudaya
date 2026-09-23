@@ -1,7 +1,7 @@
 import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useVideoConfig } from 'remotion';
 import { Bookend, Caption, Clip, PhoneClip, Shot, Statement } from './components';
 import type { Framing, Marker } from './components';
-import { McpScene, WhatsAppScene } from './surfaces';
+import { McpScene } from './surfaces';
 import { sec } from './theme';
 import clips from './clips.json';
 import shots from './shots.json';
@@ -372,20 +372,10 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(3),
     node: (hold) => (
       <Statement
-        lines={['Not everyone will open an app.']}
-        sub="So the society answers wherever they already are."
+        lines={['A ledger nobody can read is not a ledger.']}
+        sub="So it is open to whatever the society already uses."
         hold={hold}
       />
-    ),
-  },
-
-  whatsapp: {
-    id: 'whatsapp',
-    hold: sec(7),
-    node: (hold) => (
-      <Scene hold={hold} caption="So just ask on WhatsApp.">
-        <WhatsAppScene hold={hold} />
-      </Scene>
     ),
   },
 

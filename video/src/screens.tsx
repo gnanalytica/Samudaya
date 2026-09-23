@@ -37,6 +37,21 @@ export function ramp(frame: number, from: number, to: number, easing = Easing.ou
   });
 }
 
+/**
+ * A spring, for things that arrive rather than fade.
+ *
+ * Remotion ships one, but it needs the fps out of context and returns a value
+ * that overshoots past 1 — which is the point, and also means it cannot be
+ * used as an opacity. This is the same curve written so it can drive a
+ * transform while `ramp` drives the opacity beside it.
+ */
+export function settle(frame: number, at: number, stiffness = 9, damping = 0.62) {
+  const t = Math.max(0, (frame - sec(at)) / sec(1));
+  if (t <= 0) return 0;
+  const decay = Math.exp(-damping * stiffness * t);
+  return 1 - decay * Math.cos(stiffness * Math.sqrt(1 - damping * damping) * t);
+}
+
 /** A row that rises into place, staggered by its index. */
 function rise(frame: number, index: number, at = 0.25, step = 0.07) {
   return ramp(frame, sec(at + index * step), sec(at + index * step + 0.42));
@@ -59,6 +74,71 @@ export function rupees(value: number) {
 /** A number that counts up to its value, so a total lands rather than appears. */
 function counted(frame: number, to: number, from = 0, at = 0.2, over = 1.1) {
   return from + (to - from) * ramp(frame, sec(at), sec(at + over));
+}
+
+/**
+ * A finger, pressing.
+ *
+ * Without one, every screen in this cut changes by itself: a bill approves, a
+ * payment confirms, a decision records, and nothing visible caused any of it.
+ * A demo of a product people use should show it being used, and on a phone
+ * that means a thumb rather than a cursor.
+ */
+export function Tap({ x, y, at, label }: { x: number; y: number; at: number; label?: string }) {
+  const frame = useCurrentFrame();
+  const approach = ramp(frame, sec(at - 0.34), sec(at), Easing.out(Easing.quad));
+  const press = ramp(frame, sec(at), sec(at + 0.1));
+  const lift = ramp(frame, sec(at + 0.16), sec(at + 0.42));
+  const ripple = ramp(frame, sec(at), sec(at + 0.55), Easing.out(Easing.quad));
+  if (frame < sec(at - 0.34)) return null;
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, pointerEvents: 'none' }}>
+      {/* The ring the press throws off, which is what reads as a tap. */}
+      <div
+        style={{
+          position: 'absolute',
+          left: -34,
+          top: -34,
+          width: 68,
+          height: 68,
+          borderRadius: 999,
+          border: `2px solid ${festive.accent}`,
+          opacity: (1 - ripple) * press,
+          transform: `scale(${0.35 + ripple * 1.05})`,
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: -17,
+          top: -17,
+          width: 34,
+          height: 34,
+          borderRadius: 999,
+          backgroundColor: 'oklch(0.26 0.06 58 / 0.24)',
+          border: '2px solid rgba(255,255,255,0.75)',
+          opacity: approach * (1 - lift * 0.85),
+          transform: `scale(${(0.8 + approach * 0.2) * (1 - press * 0.18)})`,
+        }}
+      />
+      {label ? (
+        <div
+          style={{
+            position: 'absolute',
+            left: 26,
+            top: -9,
+            whiteSpace: 'nowrap',
+            fontSize: 12,
+            fontWeight: 600,
+            color: festive.ribbon,
+            opacity: press * (1 - lift),
+          }}
+        >
+          {label}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -238,6 +318,7 @@ function Page({ top, children }: { top: ReactNode; children: ReactNode }) {
   return (
     <div
       style={{
+        position: 'relative',
         width: SCREEN.width,
         height: SCREEN.height,
         display: 'flex',
@@ -1094,134 +1175,531 @@ export function ReconcileScreen() {
   );
 }
 
-const THREAD = [
-  { mine: true, text: 'fund', at: 0.25 },
-  {
-    mine: false,
-    text: 'Ganesh Chaturthi 2026\n₹24,500 raised of ₹30,000 · 18 households\n₹31,200 spent, every bill on the ledger',
-    at: 0.85,
-  },
-  { mine: true, text: 'tasks', at: 1.7 },
-  { mine: false, text: 'Waiting on you:\n• Print the programme — due 12 Sept', at: 2.15 },
+// ---------------------------------------------------------------------------
+// The committee's half
+// ---------------------------------------------------------------------------
+// Everything above is what a resident sees. The product's actual argument is
+// about what happens next — somebody has to confirm the payment, somebody
+// else has to approve the bill, and the rules about who may do which are the
+// reason a society would move its money here rather than keep a notebook. A
+// cut that stops at "you can see the ledger" is a cut about a spreadsheet.
+
+/** The queue, exactly as `TODO_ORDER` in packages/core/src/copy.ts orders it. */
+const QUEUE = [
+  { emoji: '💰', section: 'Payments to confirm', count: 1, action: 'Confirm' },
+  { emoji: '🙋', section: 'New residents', count: 2, action: 'Review' },
+  { emoji: '🧾', section: 'Bills to approve', count: 1, action: 'Approve' },
+  { emoji: '💡', section: 'Suggestions to review', count: 1, action: 'Review' },
+  { emoji: '🏠', section: 'Residents who moved', count: 1, action: 'Approve' },
 ];
 
 /**
- * WhatsApp, drawn.
+ * To do: everything waiting on the committee, in one list.
  *
- * Both commands are in `packages/core/src/whatsapp/commands.ts`; the figures
- * are the ones every other screen in this cut shows. Filming this would mean
- * photographing somebody else's product.
+ * The payment made two screens earlier lands at the top of it while the shot
+ * runs — which is the only way to show that the two things are the same event
+ * seen from two sides.
  */
-export function ChatScreen() {
+export function TodoScreen() {
   const frame = useCurrentFrame();
+  const lands = ramp(frame, sec(0.9), sec(1.3));
   return (
-    <div
-      style={{
-        width: SCREEN.width,
-        height: SCREEN.height,
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: '#ece5dd',
-        fontFamily,
-        overflow: 'hidden',
-      }}
-    >
-      <div style={{ backgroundColor: '#075e54' }}>
-        <div style={{ filter: 'invert(1) grayscale(1) brightness(2)' }}>
-          <StatusBar />
+    <Page top={<PlainTop title="To do" sub="Waiting on the committee" />}>
+      <Card style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: 13, color: muted }}>Waiting on you</div>
+        <div style={{ fontSize: 26, fontWeight: 700 }}>
+          {Math.round(counted(frame, 6, 5, 0.9, 0.4))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 16px 13px' }}>
-          <div
+      </Card>
+      {QUEUE.map((row, index) => {
+        const shown = rise(frame, index, 0.2, 0.08);
+        const first = index === 0;
+        return (
+          <Card
+            key={row.section}
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 999,
-              backgroundColor: festive.accent,
-              display: 'grid',
-              placeItems: 'center',
-              color: 'white',
-              fontWeight: 700,
-              fontSize: 15,
+              opacity: shown,
+              transform: `translateY(${(1 - shown) * 12}px)`,
+              padding: 12,
+              borderColor: first && lands > 0.4 ? festive.accent : color.border,
+              backgroundColor: first ? `oklch(0.97 0.05 68 / ${lands})` : color.surfaceRaised,
             }}
           >
-            SN
-          </div>
-          <div>
-            <div style={{ color: 'white', fontSize: 15, fontWeight: 600 }}>Shanti Nivas</div>
-            <div style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11.5 }}>Samudaya · online</div>
-          </div>
-        </div>
-      </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+              <span style={{ fontSize: 20 }}>{row.emoji}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 550 }}>{row.section}</div>
+                <div style={{ fontSize: 11.5, color: subtle, marginTop: 2 }}>
+                  {first ? (
+                    <span style={{ opacity: lands }}>Asha Menon · A 402 · {rupees(2001)}</span>
+                  ) : (
+                    `${row.count} waiting`
+                  )}
+                </div>
+              </div>
+              <span
+                style={{
+                  fontSize: 12,
+                  fontWeight: 650,
+                  color: festive.accent,
+                  border: `1px solid ${festive.accent}`,
+                  borderRadius: 7,
+                  padding: '4px 10px',
+                }}
+              >
+                {row.action}
+              </span>
+            </div>
+          </Card>
+        );
+      })}
       <div
         style={{
-          flex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 9,
-          padding: '16px 13px',
+          marginTop: 6,
+          padding: '0 4px',
+          fontSize: 12.5,
+          color: subtle,
+          lineHeight: 1.45,
+          opacity: ramp(frame, sec(1.6), sec(2.1)),
         }}
       >
-        {THREAD.map((turn) => {
-          const shown = ramp(frame, sec(turn.at), sec(turn.at + 0.3));
+        Payments to confirm, new residents, bills and suggestions show up here when they need you.
+      </div>
+      {/* On the Confirm pill of the top row: page padding 14, card padding 12,
+          and the pill is about 74 wide, so its centre sits at 390-14-12-37. */}
+      <Tap x={327} y={236} at={2.0} />
+    </Page>
+  );
+}
+
+/**
+ * Confirming a payment — and the one nobody may confirm.
+ *
+ * The rule is enforced in the database, and the only way to show a rule is to
+ * show it refusing. Same shape as the bill that cannot be approved by the
+ * person who filed it, deliberately: it is one principle, applied twice.
+ */
+export function ConfirmScreen() {
+  const frame = useCurrentFrame();
+  const tapped = ramp(frame, sec(1.15), sec(1.35));
+  const confirmed = ramp(frame, sec(1.35), sec(1.8));
+  return (
+    <Page top={<PlainTop title="Payments" sub="Ganesh Chaturthi 2026" />}>
+      <Card
+        style={{ borderColor: confirmed > 0.5 ? color.accent : festive.accent, borderWidth: 1.5 }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Asha Menon</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 5 }}>
+              <Flat label="A 402" />
+              <span style={{ fontSize: 11.5, color: subtle }}>UPI · reported 2 min ago</span>
+            </div>
+          </div>
+          <div style={{ fontSize: 19, fontWeight: 700 }}>{rupees(2001)}</div>
+        </div>
+        <div
+          style={{
+            marginTop: 11,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 9,
+            border: `1px solid ${color.border}`,
+            borderRadius: 9,
+            padding: '9px 11px',
+            fontSize: 12.5,
+            color: muted,
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="4" width="18" height="16" rx="2.5" stroke={muted} strokeWidth="1.9" />
+            <path
+              d="M3 16l5-5 4 4 3-3 6 6"
+              stroke={muted}
+              strokeWidth="1.9"
+              strokeLinecap="round"
+            />
+          </svg>
+          View the screenshot they sent
+        </div>
+        {/* The button becomes the receipt, in place, rather than vanishing. */}
+        <div
+          style={{
+            marginTop: 10,
+            borderRadius: 10,
+            padding: '12px 0',
+            textAlign: 'center',
+            fontSize: 15,
+            fontWeight: 650,
+            color: 'white',
+            backgroundColor: confirmed > 0.5 ? color.accent : festive.accent,
+            transform: `scale(${1 - tapped * 0.03 + confirmed * 0.03})`,
+          }}
+        >
+          {confirmed > 0.5 ? 'Confirmed by you · on the ledger' : 'Confirm'}
+        </div>
+        <div style={{ fontSize: 11.5, color: subtle, marginTop: 8, lineHeight: 1.4 }}>
+          They reported {rupees(2001)}. If the screenshot says otherwise, correct it here — the
+          corrected figure is the one the ledger keeps.
+        </div>
+      </Card>
+      <Card style={{ backgroundColor: color.surfaceSunken }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Chitra Rao</div>
+            <div style={{ fontSize: 11.5, color: subtle, marginTop: 4 }}>you · UPI · yesterday</div>
+          </div>
+          <div style={{ fontSize: 19, fontWeight: 700 }}>{rupees(1001)}</div>
+        </div>
+        <div
+          style={{
+            marginTop: 11,
+            borderRadius: 9,
+            padding: '9px 11px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            backgroundColor: color.surfaceRaised,
+            border: `1px solid ${color.border}`,
+          }}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <rect x="4" y="10" width="16" height="11" rx="2.5" stroke={muted} strokeWidth="1.9" />
+            <path
+              d="M8 10V7a4 4 0 018 0v3"
+              stroke={muted}
+              strokeWidth="1.9"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span style={{ fontSize: 12.5, color: muted, lineHeight: 1.35 }}>
+            Your own payment. Another committee member confirms it.
+          </span>
+        </div>
+      </Card>
+      <div style={{ fontSize: 12, fontWeight: 600, color: muted, margin: '4px 4px 8px' }}>
+        ALREADY CONFIRMED
+      </div>
+      <Card style={{ padding: '6px 14px' }}>
+        {[
+          { who: 'Dev Sharma', flat: 'B 1104', amount: 1001, by: 'Bala Krishnan' },
+          { who: 'Esha Patil', flat: 'B 306', amount: 3001, by: 'Bala Krishnan' },
+        ].map((row, index) => (
+          <div
+            key={row.who}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 0',
+              borderBottom: index === 0 ? `1px solid ${color.border}` : 'none',
+              opacity: rise(frame, index, 0.5, 0.1),
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <Tick on={1} size={15} />
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 550 }}>{row.who}</div>
+                <div style={{ fontSize: 11, color: subtle, marginTop: 2 }}>
+                  {row.flat} · by {row.by}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 650 }}>{rupees(row.amount)}</div>
+          </div>
+        ))}
+      </Card>
+      {/* The Confirm button sits below the screenshot row; see the card above. */}
+      <Tap x={195} y={300} at={1.15} />
+    </Page>
+  );
+}
+
+/** What the bills were spent against. Production is over, and says so. */
+export function BudgetScreen() {
+  const frame = useCurrentFrame();
+  return (
+    <Page top={<PlainTop title="Budget" sub="Ganesh Chaturthi 2026" />}>
+      <Card>
+        <div style={{ fontSize: 13, color: muted }}>Planned</div>
+        <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: '-0.03em', marginTop: 2 }}>
+          {rupees(counted(frame, 35000))}
+        </div>
+        <div style={{ fontSize: 12.5, color: muted, marginTop: 7 }}>
+          {rupees(31200)} spent · {rupees(3800)} still to go
+        </div>
+      </Card>
+      <Card>
+        {BUDGET.map((line, index) => {
+          const filled = ramp(frame, sec(0.3 + index * 0.1), sec(1.1 + index * 0.1));
+          const over = line.spent > line.planned;
           return (
-            <div
-              key={turn.text}
-              style={{
-                alignSelf: turn.mine ? 'flex-end' : 'flex-start',
-                maxWidth: '82%',
-                backgroundColor: turn.mine ? '#d9fdd3' : 'white',
-                color: ink,
-                borderRadius: 11,
-                [turn.mine ? 'borderTopRightRadius' : 'borderTopLeftRadius']: 3,
-                padding: '9px 12px',
-                fontSize: 13.5,
-                lineHeight: 1.45,
-                whiteSpace: 'pre-line',
-                boxShadow: '0 1px 1.5px rgba(22,33,30,0.15)',
-                opacity: shown,
-                transform: `translateY(${(1 - shown) * 9}px)`,
-              }}
-            >
-              {turn.text}
+            <div key={line.category} style={{ padding: '8px 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+                <span style={{ fontWeight: 550 }}>{line.category}</span>
+                <span
+                  style={{ color: over ? festive.ribbon : muted, fontWeight: over ? 650 : 400 }}
+                >
+                  {rupees(line.spent)} of {rupees(line.planned)}
+                </span>
+              </div>
+              <div style={{ marginTop: 6 }}>
+                <Bar
+                  fraction={Math.min(1, line.spent / line.planned) * filled}
+                  tone={over ? festive.ribbon : color.accent}
+                />
+              </div>
+              {over ? (
+                <div
+                  style={{
+                    fontSize: 11.5,
+                    color: festive.ribbon,
+                    marginTop: 5,
+                    fontWeight: 600,
+                    opacity: ramp(frame, sec(1.3), sec(1.7)),
+                  }}
+                >
+                  {rupees(line.spent - line.planned)} over — and on the record
+                </div>
+              ) : null}
             </div>
           );
         })}
-      </div>
+      </Card>
+      <Card style={{ opacity: ramp(frame, sec(1.6), sec(2.1)) }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: muted, marginBottom: 6 }}>
+          NOT BILLED YET
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14 }}>
+          <span>Printing — the programme</span>
+          <span style={{ color: muted }}>{rupees(2000)} set aside</span>
+        </div>
+        <div style={{ fontSize: 11.5, color: subtle, marginTop: 5, lineHeight: 1.4 }}>
+          Still on the checklist, still unspent, and already visible to everyone.
+        </div>
+      </Card>
+    </Page>
+  );
+}
+
+/**
+ * Closure: the two answers, from `SURPLUS_ANSWER_LABEL` in core.
+ *
+ * There are exactly two, and the copy under each is the app's own. This is
+ * the beat the rest of the video exists for: the money left at the end is
+ * still residents' money, and where it goes is a decision somebody signs.
+ */
+export function ClosureScreen() {
+  const frame = useCurrentFrame();
+  const picked = ramp(frame, sec(1.2), sec(1.45));
+  const recorded = ramp(frame, sec(2.0), sec(2.4));
+  const answers = [
+    {
+      label: 'Keep it for the society',
+      detail:
+        'It sits with the society, on everybody’s home screen, until the committee puts it behind an event.',
+    },
+    {
+      label: 'Put it behind another event',
+      detail:
+        'It shows on that event’s bar as money already received, so residents are asked only for the difference.',
+    },
+  ];
+  return (
+    <Page top={<PlainTop title="Closing the event" sub="Ganesh Chaturthi 2026" />}>
+      <Card
+        style={{ borderColor: festive.accent, borderWidth: 1.5, backgroundColor: festive.wash }}
+      >
+        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.03em' }}>
+          {rupees(counted(frame, 1100))} left over
+        </div>
+        <div style={{ fontSize: 12.5, color: muted, marginTop: 5, lineHeight: 1.4 }}>
+          Residents’ money the event did not spend. The committee decides where it goes, and
+          everybody sees the decision.
+        </div>
+      </Card>
+      {answers.map((answer, index) => {
+        const chosen = index === 0 ? picked : 0;
+        const shown = rise(frame, index, 0.35, 0.12);
+        return (
+          <Card
+            key={answer.label}
+            style={{
+              opacity: shown,
+              transform: `translateY(${(1 - shown) * 12}px)`,
+              display: 'flex',
+              gap: 11,
+              padding: 12,
+              borderWidth: chosen > 0.5 ? 2 : 1,
+              borderColor: chosen > 0.5 ? festive.accent : color.border,
+            }}
+          >
+            <span
+              style={{
+                width: 18,
+                height: 18,
+                borderRadius: 999,
+                flexShrink: 0,
+                marginTop: 2,
+                border: `2px solid ${chosen > 0.5 ? festive.accent : color.borderStrong}`,
+                display: 'grid',
+                placeItems: 'center',
+              }}
+            >
+              <span
+                style={{
+                  width: 9,
+                  height: 9,
+                  borderRadius: 999,
+                  backgroundColor: festive.accent,
+                  transform: `scale(${chosen})`,
+                }}
+              />
+            </span>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>
+                {answer.label}
+              </span>
+              <span
+                style={{
+                  display: 'block',
+                  fontSize: 11.5,
+                  color: subtle,
+                  marginTop: 3,
+                  lineHeight: 1.4,
+                }}
+              >
+                {answer.detail}
+              </span>
+            </span>
+          </Card>
+        );
+      })}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 9,
-          padding: '9px 13px 22px',
+          marginTop: 2,
+          borderRadius: 11,
+          padding: '13px 0',
+          textAlign: 'center',
+          fontSize: 15,
+          fontWeight: 650,
+          color: 'white',
+          backgroundColor: recorded > 0.5 ? color.accent : festive.accent,
+          opacity: 0.45 + picked * 0.55,
         }}
       >
-        <div
-          style={{
-            flex: 1,
-            backgroundColor: 'white',
-            borderRadius: 999,
-            padding: '10px 15px',
-            fontSize: 13.5,
-            color: subtle,
-          }}
-        >
-          Message
-        </div>
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 999,
-            backgroundColor: '#00a884',
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white">
-            <path d="M3 20l19-8L3 4v6l12 2-12 2z" />
-          </svg>
-        </div>
+        {recorded > 0.5 ? 'Decision recorded' : 'Record the decision'}
       </div>
-    </div>
+      <Card
+        style={{
+          marginTop: 12,
+          opacity: recorded,
+          transform: `translateY(${(1 - recorded) * 14}px)`,
+          borderColor: color.accent,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Tick on={recorded} size={20} />
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 600 }}>{rupees(1100)} → the society</div>
+            <div style={{ fontSize: 11.5, color: muted, marginTop: 1 }}>
+              Recorded by Chitra Rao · visible to all 24 flats
+            </div>
+          </div>
+        </div>
+      </Card>
+      <Tap x={40} y={186} at={1.2} />
+      <Tap x={195} y={470} at={2.0} />
+    </Page>
+  );
+}
+
+/** Where the leftover went, and every move before it. */
+export function BalanceScreen() {
+  const frame = useCurrentFrame();
+  const arrives = ramp(frame, sec(0.55), sec(1.05));
+  const moves = [
+    {
+      from: 'Ganesh Chaturthi 2026',
+      to: 'the society',
+      amount: 1100,
+      who: 'Chitra Rao',
+      when: 'just now',
+      fresh: true,
+    },
+    {
+      from: 'Independence Day 2026',
+      to: 'the society',
+      amount: 4200,
+      who: 'Bala Krishnan',
+      when: '20 Aug',
+    },
+    {
+      from: 'Summer Camp 2026',
+      to: 'Ganesh Chaturthi 2026',
+      amount: 7800,
+      who: 'Chitra Rao',
+      when: '2 Jul',
+    },
+  ];
+  return (
+    <Page top={<PlainTop title="Society balance" sub="Every move, and who made it" />}>
+      <Card style={{ borderColor: color.accent }}>
+        <div style={{ fontSize: 13, color: muted }}>Held by the society</div>
+        <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.03em', marginTop: 2 }}>
+          {rupees(4200 + 1100 * arrives)}
+        </div>
+        <div style={{ fontSize: 12.5, color: muted, marginTop: 6 }}>
+          Not in anybody’s account. On everybody’s home screen.
+        </div>
+      </Card>
+      <Card style={{ padding: '6px 14px' }}>
+        {moves.map((move, index) => {
+          const shown = move.fresh ? arrives : rise(frame, index, 0.25, 0.09);
+          return (
+            <div
+              key={move.from}
+              style={{
+                padding: '11px 8px',
+                margin: '0 -8px',
+                borderRadius: 9,
+                borderBottom: index < moves.length - 1 ? `1px solid ${color.border}` : 'none',
+                opacity: shown,
+                transform: `translateY(${(1 - shown) * 14}px)`,
+                backgroundColor: move.fresh ? `oklch(0.97 0.05 68 / ${arrives})` : 'transparent',
+              }}
+            >
+              <div
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              >
+                <div style={{ fontSize: 13.5, minWidth: 0 }}>
+                  {move.from}
+                  <span style={{ color: subtle }}> → </span>
+                  {move.to}
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 650, marginLeft: 8 }}>
+                  {rupees(move.amount)}
+                </div>
+              </div>
+              <div style={{ fontSize: 11.5, color: subtle, marginTop: 3 }}>
+                {move.who} · {move.when}
+              </div>
+            </div>
+          );
+        })}
+      </Card>
+      <div
+        style={{
+          padding: '2px 4px',
+          fontSize: 12.5,
+          color: subtle,
+          lineHeight: 1.45,
+          opacity: ramp(frame, sec(1.3), sec(1.8)),
+        }}
+      >
+        Money only moves between an event and the society, and every move keeps the name of whoever
+        decided it.
+      </div>
+    </Page>
   );
 }
