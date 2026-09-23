@@ -3,76 +3,76 @@
     "width": 1440,
     "height": 900
   },
-  "lead": 4.96,
+  "lead": 5.16,
   "duration": 75.64,
   "beats": [
     {
       "name": "landing:top",
-      "at": 8.24
+      "at": 8.54
     },
     {
       "name": "landing:cta",
-      "at": 12.8
+      "at": 13.15
     },
     {
       "name": "landing:features",
-      "at": 15.42
+      "at": 15.76
     },
     {
       "name": "app:home",
-      "at": 18.73
+      "at": 19.06
     },
     {
       "name": "app:money",
-      "at": 25.18
+      "at": 25.45
     },
     {
       "name": "app:ledger",
-      "at": 28.99
+      "at": 29.26
     },
     {
       "name": "app:flat-gap",
-      "at": 31.83
+      "at": 32.15
     },
     {
       "name": "app:ledger-end",
-      "at": 35.26
+      "at": 35.56
     },
     {
       "name": "app:events",
-      "at": 38.43
+      "at": 38.82
     },
     {
       "name": "app:event",
-      "at": 43.98
+      "at": 44.38
     },
     {
       "name": "app:readiness",
-      "at": 46.74
+      "at": 47.13
     },
     {
       "name": "app:bills",
-      "at": 50.65
+      "at": 51.06
     },
     {
       "name": "app:ownMoney",
-      "at": 54.67
+      "at": 55.07
     },
     {
       "name": "app:contribute",
-      "at": 60.47
+      "at": 60.81
     },
     {
       "name": "app:flat-named",
-      "at": 63.86
+      "at": 64.2
     },
     {
       "name": "app:note",
-      "at": 67.47
+      "at": 67.82
     },
     {
       "name": "app:reconcile",
-      "at": 71.41
+      "at": 71.47
     },
     {
       "name": "app:matched",
@@ -82,5 +82,43 @@
       "name": "end",
       "at": 74.84
     }
-  ]
+  ],
+  "boxes": {
+    "flatGap": {
+      "x": 450,
+      "y": 728,
+      "width": 117,
+      "height": 22
+    },
+    "readiness": {
+      "x": 301,
+      "y": 138,
+      "width": 474,
+      "height": 20
+    },
+    "bills": {
+      "x": 301,
+      "y": -17,
+      "width": 203,
+      "height": 20
+    },
+    "ownMoney": {
+      "x": 301,
+      "y": 414,
+      "width": 555,
+      "height": 20
+    },
+    "note": {
+      "x": 358,
+      "y": 492,
+      "width": 181,
+      "height": 20
+    },
+    "matched": {
+      "x": 314,
+      "y": 400,
+      "width": 1068,
+      "height": 16
+    }
+  }
 }

@@ -4,7 +4,7 @@ Two cuts of one video, filmed from the app itself:
 
 | Composition   | Length | For                                                           |
 | ------------- | ------ | ------------------------------------------------------------- |
-| `Walkthrough` | ~1:27  | A committee deciding whether to put their money in this.      |
+| `Walkthrough` | ~1:34  | A committee deciding whether to put their money in this.      |
 | `Launch`      | ~0:30  | A landing page, or a forward into a society's WhatsApp group. |
 | `Phone`       | ~0:34  | Portrait, for a status, a Reel, or anywhere held upright.     |
 
@@ -112,7 +112,14 @@ beside it, which is.
   rupee out, with the bill attached" rather than a sentence about approval
   trails.
 - **The journey** is `capture/record.mjs` — where the cursor goes, what it
-  clicks, how long it reads. Every stop is a named beat.
+  clicks, how long it reads. Every stop is a named beat, and a beat can also
+  record _where on screen_ the thing it is about sits, into `boxes` in
+  beats.json. The edit pushes in on those coordinates and draws its highlight
+  rings from them, so "zoom to the row that says Flat not recorded" is measured
+  by the browser that drew the row rather than read off a paused frame. The row
+  in question was at y = -17 when measured, having just scrolled above the
+  fold; `look()` clamps a framing so that is harmless instead of a grey band
+  across the shot.
 - **The society** is `capture/harness/society/demo-data.ts`. One file, so the
   total on Home is the total on Money, the event the ledger credits is the event
   the Events page lists, and the figures the WhatsApp bot quotes are the ones on
@@ -128,11 +135,21 @@ beside it, which is.
   checks both against those files. The first draft of the MCP scene invented
   four scope names that read perfectly and matched nothing.
 
-- **The music** is `score/compose.mjs`: plucked notes with harmonics that decay
-  at different rates, two detuned sines per pad voice, D major pentatonic at
-  68bpm, no percussion. Written rather than licensed, because every other way
-  of getting a bed ends in a licence nobody on a committee can produce two
-  years later. It normalises to half scale, leaving about seven decibels for a
+- **The music** is `score/compose.mjs`, written rather than licensed — every
+  other way of getting a bed ends in a licence nobody on a committee can
+  produce two years later.
+
+  The first version was a D major pentatonic pad. Pleasant, and the wrong
+  continent: a video about a Ganesh Chaturthi fund should not sound like a
+  Scandinavian banking advert. It is now built from the things that actually
+  make music sound Indian rather than from a scale that happens to have five
+  notes — **Raga Hamsadhwani**, the raga of Ganesh invocation; **just
+  intonation**, so Re is exactly 9/8 of Sa rather than a twelfth-root
+  approximation; a **tanpura** underneath whose partials are stretched the way
+  a jawari bridge stretches them, which is why it buzzes instead of humming;
+  **meend**, so the bansuri line slides into its notes instead of stepping onto
+  them; and **Keherwa**, the eight-beat cycle, on a tabla rather than a drum
+  kit. It normalises to half scale, leaving about seven decibels for a
   voiceover to sit on top of without a remix.
 
 `public/captures/`, `public/score-*.wav` and `out/` are generated and

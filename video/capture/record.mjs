@@ -138,6 +138,31 @@ async function main() {
   let browser;
   const beats = [];
   let opened = 0;
+  /**
+   * Where a thing was on screen, in the take's own pixels.
+   *
+   * The edit wants to push in on the row that says "Flat not recorded", and
+   * the only honest source for where that row is, is the browser that drew it.
+   * Typed in by hand from a paused frame, the number is wrong the first time a
+   * ledger row is added above it — the same failure mode as the shot heights,
+   * and just as silent, because a push-in that lands on the wrong row still
+   * looks deliberate.
+   */
+  const boxes = {};
+  const mark = async (name, locator) => {
+    const box = await locator
+      .first()
+      .boundingBox()
+      .catch(() => null);
+    if (!box) return;
+    boxes[name] = {
+      x: Math.round(box.x),
+      y: Math.round(box.y),
+      width: Math.round(box.width),
+      height: Math.round(box.height),
+    };
+  };
+
   const beat = (name) => {
     const atSeconds = (Date.now() - opened) / 1000;
     beats.push({ name, at: Number(atSeconds.toFixed(2)) });
@@ -212,6 +237,7 @@ async function main() {
     if (await gap.count()) {
       await glideTo(page, gap, 900);
       await page.waitForTimeout(1500);
+      await mark('flatGap', gap);
       beat('app:flat-gap');
     }
 
@@ -235,16 +261,19 @@ async function main() {
     // The checklist, and the readiness figure it computes.
     await glide(page, 600, 300, 900);
     await page.waitForTimeout(1600);
+    await mark('readiness', page.getByText('Readiness').first());
     beat('app:readiness');
 
     // Down to the bills: vendor, amount, who approved it, and the bill itself.
     await readDown(page, 470, 2400);
     await page.waitForTimeout(1500);
+    await mark('bills', page.getByText('Where the money went').first());
     beat('app:bills');
 
     // And the one nobody may approve, because they filed it.
     await readDown(page, 520, 2200);
     await page.waitForTimeout(1800);
+    await mark('ownMoney', page.getByText('Waiting for the committee').first());
     beat('app:ownMoney');
 
     // Back up to the fund, and through the door a resident walks.
@@ -267,6 +296,7 @@ async function main() {
 
     await readDown(page, 420, 2000);
     await page.waitForTimeout(1600);
+    await mark('note', page.getByText('SMDA402').first());
     beat('app:note');
 
     // A reported payment is a claim until the bank agrees with it.
@@ -276,6 +306,7 @@ async function main() {
     beat('app:reconcile');
     await glide(page, 700, 430, 900);
     await page.waitForTimeout(2200);
+    await mark('matched', page.getByText('Reported payments this could be').first());
     beat('app:matched');
 
     beat('end');
@@ -305,6 +336,7 @@ async function main() {
           lead: Number(lead.toFixed(2)),
           duration: duration ? Number(duration.toFixed(2)) : null,
           beats: beats.map((entry) => ({ ...entry, at: Number((entry.at + lead).toFixed(2)) })),
+          boxes,
         },
         null,
         2,

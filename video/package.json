@@ -9,7 +9,7 @@
     "render:walkthrough": "remotion render src/index.ts Walkthrough out/samudaya-walkthrough.mp4 --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell",
     "render:launch": "remotion render src/index.ts Launch out/samudaya-launch.mp4 --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell",
     "render": "npm run render:walkthrough && npm run render:launch && npm run render:phone",
-    "score": "node score/compose.mjs 51 public/score-launch.wav && node score/compose.mjs 143 public/score-walkthrough.wav && node score/compose.mjs 35 public/score-phone.wav",
+    "score": "node score/compose.mjs 31 public/score-launch.wav && node score/compose.mjs 95 public/score-walkthrough.wav && node score/compose.mjs 35 public/score-phone.wav",
     "record": "node capture/record.mjs",
     "landing": "node landing.mjs",
     "record:phone": "node capture/record-phone.mjs",
