@@ -1,342 +1,523 @@
+import type { ReactNode } from 'react';
 import {
   AbsoluteFill,
   Audio,
-  OffthreadVideo,
+  Easing,
   Sequence,
   interpolate,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
-import { Fade } from './components';
 import { Diya, Petals, Rangoli, Toran, festive } from './festive';
-import { fontFamily, sec } from './theme';
-import take from './phone-beats.json';
+import {
+  BAR_H,
+  BillsScreen,
+  BottomBar,
+  COMMITTEE,
+  ChatScreen,
+  EventScreen,
+  HomeScreen,
+  MoneyScreen,
+  PayScreen,
+  RESIDENT,
+  ReconcileScreen,
+  SCREEN,
+  STATUS_H,
+  StatusBar,
+  ramp,
+} from './screens';
+import { color, fontFamily, sec } from './theme';
 
 /**
- * The portrait cut.
+ * The portrait cut: one phone, nine beats, no footage.
  *
- * Most of a residents' society reads its ledger standing in a lift, and a
- * landscape video cropped to a phone is a landscape video with its sides cut
- * off. So this is built from its own recording — `capture/record-phone.mjs`,
- * at a phone's viewport, through the app's own mobile layout, where the
- * sidebar becomes a sheet and a four-slot bar appears along the bottom.
+ * Two things shape it. It is vertical because a residents' society reads its
+ * ledger standing in a lift, and a landscape video cropped to a phone is a
+ * landscape video with its sides cut off. And it is drawn rather than
+ * recorded, because a recording moves at the speed a browser navigates —
+ * every shot opened with a page settling, and the cut ran a third longer than
+ * the thing it was saying.
  *
- * Captions are larger and shorter than the landscape ones. A phone is held at
- * arm's length on a bus, usually on mute, and anything that needs two lines at
- * this size needs to be a different sentence.
+ * Structurally that buys the one trick this file is built around: the phone
+ * never cuts. The ground, the bezel and the camera are rendered once, for the
+ * whole video, and each shot supplies only the screen inside them. So the
+ * screens push through a phone that stays put — which is what using an app
+ * looks like — instead of nine shots of a phone being re-established.
  */
 
 const SIZE = { width: 1080, height: 1920 };
-/** The recording's own pixels; see record-phone.mjs on why it is 1:1. */
-const TAKE = { src: 'captures/phone.webm', width: 390, height: 844 };
-/** Big enough to read, small enough to leave the caption its own air. */
-const SCALE = 1.86;
-const BEZEL = 13;
 
-function beatAt(name: string) {
-  const found = take.beats.find((entry) => entry.name === name);
-  // Better to fail the render than to publish a cut that opens on the wrong
-  // screen because a beat was renamed in the recorder and not here.
-  if (!found) throw new Error(`phone-beats.json has no beat named "${name}"`);
-  return found.at;
-}
+/** Logical phone pixels → canvas pixels. */
+const SCALE = 1.88;
+const BEZEL = 14;
+const TOP = 54;
 
-/** The phone itself: the take, in a slim dark bezel, on the festive ground. */
-function PhoneTake({ at, lead = 1.4, hold }: { at: string; lead?: number; hold: number }) {
-  const width = TAKE.width * SCALE;
-  const height = TAKE.height * SCALE;
+const SCREEN_W = SCREEN.width * SCALE;
+const SCREEN_H = SCREEN.height * SCALE;
+const PHONE_W = SCREEN_W + BEZEL * 2;
+const PHONE_L = (SIZE.width - PHONE_W) / 2;
+/** Where a screen sits on the canvas. The shell and every slot share this. */
+const RECT = { left: PHONE_L + BEZEL, top: TOP + BEZEL, width: SCREEN_W, height: SCREEN_H };
+const RADIUS = 46;
+
+// ---------------------------------------------------------------------------
+// The parts that never cut
+// ---------------------------------------------------------------------------
+
+/** Festive ground: kolam, toran, petals. Rendered once, so it never restarts. */
+function Ground({ frame, length }: { frame: number; length: number }) {
   return (
-    <AbsoluteFill style={{ alignItems: 'center', paddingTop: 92 }}>
-      <div
-        style={{
-          width: width + BEZEL * 2,
-          height: height + BEZEL * 2,
-          backgroundColor: festive.deep,
-          borderRadius: 54,
-          padding: BEZEL,
-          boxShadow: '0 40px 90px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.09)',
-        }}
-      >
-        <div style={{ width, height, borderRadius: 42, overflow: 'hidden' }}>
-          <OffthreadVideo
-            src={staticFile(TAKE.src)}
-            startFrom={sec(Math.max(0, beatAt(at) - lead))}
-            muted
-            style={{ width, height, objectFit: 'cover' }}
-          />
-        </div>
+    <AbsoluteFill style={{ backgroundColor: festive.deep }}>
+      <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <Rangoli
+          size={1560}
+          opacity={0.06}
+          spin={-frame * 0.025}
+          accent={festive.accent}
+          ribbon={festive.accent}
+          strokeWidth={0.6}
+        />
+      </AbsoluteFill>
+      <div style={{ position: 'absolute', inset: '0 0 auto 0', opacity: 0.72 }}>
+        <Toran width={SIZE.width} />
       </div>
+      <Petals hold={length} count={11} />
     </AbsoluteFill>
   );
 }
 
-/** Bigger than the landscape caption, and sitting under the phone. */
-function PortraitCaption({ text, hold }: { text: string; hold: number }) {
-  const frame = useCurrentFrame();
-  const entered = interpolate(frame, [sec(0.2), sec(0.8)], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const leaving =
-    1 -
-    interpolate(frame, [hold - sec(0.4), hold], [0, 1], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
+/**
+ * The handset. Its screen is filled with the app's own surface colour, which
+ * is what shows through in the gap while one screen pushes the next along.
+ */
+function Shell() {
   return (
-    <AbsoluteFill style={{ justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 56 }}>
+    <div
+      style={{
+        position: 'absolute',
+        left: PHONE_L,
+        top: TOP,
+        width: PHONE_W,
+        height: SCREEN_H + BEZEL * 2,
+        backgroundColor: festive.deep,
+        borderRadius: RADIUS + BEZEL,
+        padding: BEZEL,
+        boxShadow: '0 44px 100px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.1)',
+      }}
+    >
       <div
         style={{
-          maxWidth: 940,
+          width: SCREEN_W,
+          height: SCREEN_H,
+          borderRadius: RADIUS,
+          backgroundColor: color.surface,
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The chrome that does not move: the clock at the top, the tabs at the bottom.
+ *
+ * Drawn per shot rather than once, because which four tabs there are depends on
+ * who is holding the phone — residents get Money, the committee trades it for
+ * Manage — and because a shot that carries its own bar cross-fades into the
+ * next one's instead of snapping. Where two shots agree, which is most of them,
+ * the fade is between two identical bars and invisible.
+ *
+ * It sits above the sliding pages, so a page passes underneath the clock and
+ * stops at the tab bar, which is what a real navigation push looks like.
+ */
+function Chrome({ tabs, active }: { tabs: string[]; active: string }) {
+  const frame = useCurrentFrame();
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: RECT.left,
+        top: RECT.top,
+        width: RECT.width,
+        height: RECT.height,
+        borderRadius: RADIUS,
+        overflow: 'hidden',
+        opacity: ramp(frame, 0, sec(0.25)),
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          width: SCREEN.width,
+          height: SCREEN.height,
+          transform: `scale(${SCALE})`,
+          transformOrigin: 'top left',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
+        <div style={{ height: STATUS_H }}>
+          <StatusBar />
+        </div>
+        <div style={{ height: BAR_H }}>
+          <BottomBar tabs={tabs} active={active} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One screen, in the phone, pushing the last one out of the way.
+ *
+ * Slots stack at the same rect in shot order, so the arriving screen paints
+ * over the leaving one. It slides in from the right while the leaving screen
+ * slides left — a navigation push, which is the transition the app itself
+ * makes, rather than a dissolve, which is the transition a slideshow makes.
+ */
+function Slot({ hold, children }: { hold: number; children: ReactNode }) {
+  const frame = useCurrentFrame();
+  const enter = ramp(frame, 0, sec(0.36), Easing.out(Easing.cubic));
+  const leave = ramp(frame, hold - sec(0.32), hold, Easing.in(Easing.cubic));
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: RECT.left,
+        top: RECT.top,
+        width: RECT.width,
+        height: RECT.height,
+        borderRadius: RADIUS,
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        style={{
+          width: SCREEN.width,
+          height: SCREEN.height,
+          transform: `scale(${SCALE}) translateX(${(1 - enter) * SCREEN.width - leave * SCREEN.width * 0.34}px)`,
+          transformOrigin: 'top left',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Captions and bookends
+// ---------------------------------------------------------------------------
+
+/** Under the phone, in the band the phone deliberately does not fill. */
+function Caption({ text, hold }: { text: string; hold: number }) {
+  const frame = useCurrentFrame();
+  const entered = ramp(frame, sec(0.18), sec(0.62));
+  const leaving = 1 - ramp(frame, hold - sec(0.3), hold);
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 60,
+        right: 60,
+        top: RECT.top + RECT.height + BEZEL,
+        bottom: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        style={{
           color: 'white',
           fontFamily,
-          fontSize: 52,
-          lineHeight: 1.22,
+          fontSize: 50,
+          lineHeight: 1.2,
           textAlign: 'center',
           fontWeight: 600,
-          letterSpacing: '-0.01em',
-          textShadow: '0 4px 18px rgba(0,0,0,0.5)',
+          letterSpacing: '-0.015em',
+          textShadow: '0 4px 20px rgba(0,0,0,0.55)',
           opacity: Math.min(entered, leaving),
-          transform: `translateY(${(1 - entered) * 16}px)`,
+          transform: `translateY(${(1 - entered) * 14}px)`,
         }}
       >
         {text}
       </div>
-    </AbsoluteFill>
+    </div>
   );
 }
 
-function PortraitBookend({ headline, sub, hold }: { headline: string; sub: string; hold: number }) {
-  const frame = useCurrentFrame();
-  const entered = interpolate(frame, [sec(0.2), sec(1.2)], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  return (
-    <AbsoluteFill style={{ backgroundColor: festive.deep }}>
-      <Fade hold={hold}>
-        <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <Rangoli
-            size={1300}
-            opacity={0.1 * entered}
-            spin={frame * 0.05}
-            accent={festive.accent}
-            ribbon={festive.accent}
-            strokeWidth={0.6}
-          />
-        </AbsoluteFill>
-        <Petals hold={hold} count={12} />
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, opacity: 0.85 }}>
-          <Toran width={SIZE.width} />
-        </div>
-        <AbsoluteFill
-          style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: 90 }}
-        >
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
-              <Diya size={180} lit={sec(0.35)} />
-            </div>
-            <div
-              style={{
-                color: 'white',
-                fontSize: 116,
-                fontWeight: 600,
-                letterSpacing: '-0.035em',
-                opacity: entered,
-              }}
-            >
-              {headline}
-            </div>
-            <div
-              style={{
-                color: 'rgba(255,255,255,0.8)',
-                fontSize: 46,
-                marginTop: 24,
-                lineHeight: 1.25,
-                opacity: interpolate(frame, [sec(0.9), sec(1.8)], [0, 1], {
-                  extrapolateLeft: 'clamp',
-                  extrapolateRight: 'clamp',
-                }),
-              }}
-            >
-              {sub}
-            </div>
-          </div>
-        </AbsoluteFill>
-      </Fade>
-    </AbsoluteFill>
-  );
-}
-
-/** A screen from the take, dressed, with its caption. */
-function PortraitScene({
-  at,
-  caption,
+/** A full-frame card, over the phone. `enter` opens on it; otherwise it lands. */
+function Bookend({
+  headline,
+  sub,
   hold,
-  lead,
+  opening,
 }: {
-  at: string;
-  caption: string;
+  headline: string;
+  sub: string;
   hold: number;
-  /** How long before the beat to open, when the scroll into it is the point. */
-  lead?: number;
+  opening?: boolean;
 }) {
   const frame = useCurrentFrame();
+  const cover = opening ? 1 - ramp(frame, hold - sec(0.42), hold) : ramp(frame, 0, sec(0.42));
+  const entered = ramp(frame, sec(opening ? 0.1 : 0.3), sec(opening ? 0.9 : 1.1));
   return (
-    <AbsoluteFill style={{ backgroundColor: festive.deep }}>
-      <Fade hold={hold}>
-        <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <Rangoli
-            size={1500}
-            opacity={0.06}
-            spin={-frame * 0.03}
-            accent={festive.accent}
-            ribbon={festive.accent}
-            strokeWidth={0.6}
-          />
-        </AbsoluteFill>
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, opacity: 0.7 }}>
-          <Toran width={SIZE.width} />
+    <AbsoluteFill style={{ backgroundColor: festive.deep, opacity: cover }}>
+      <AbsoluteFill style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <Rangoli
+          size={1320}
+          opacity={0.11}
+          spin={frame * 0.05}
+          accent={festive.accent}
+          ribbon={festive.accent}
+          strokeWidth={0.6}
+        />
+      </AbsoluteFill>
+      <Petals hold={hold} count={12} />
+      <div style={{ position: 'absolute', inset: '0 0 auto 0', opacity: 0.85 }}>
+        <Toran width={SIZE.width} />
+      </div>
+      <AbsoluteFill
+        style={{ justifyContent: 'center', alignItems: 'center', fontFamily, padding: 86 }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+            <Diya size={172} lit={sec(0.2)} />
+          </div>
+          <div
+            style={{
+              color: 'white',
+              fontSize: 112,
+              fontWeight: 600,
+              letterSpacing: '-0.035em',
+              opacity: entered,
+            }}
+          >
+            {headline}
+          </div>
+          <div
+            style={{
+              color: 'rgba(255,255,255,0.82)',
+              fontSize: 45,
+              marginTop: 22,
+              lineHeight: 1.25,
+              opacity: ramp(frame, sec(0.6), sec(1.4)),
+            }}
+          >
+            {sub}
+          </div>
         </div>
-        <PhoneTake at={at} lead={lead} hold={hold} />
-        <PortraitCaption text={caption} hold={hold} />
-      </Fade>
+      </AbsoluteFill>
     </AbsoluteFill>
   );
 }
 
-type Shot = { id: string; hold: number; node: (hold: number) => React.ReactNode };
+// ---------------------------------------------------------------------------
+// The cut
+// ---------------------------------------------------------------------------
 
-export const PORTRAIT_SHOTS: Record<string, Shot> = {
-  open: {
-    id: 'open',
-    hold: sec(3.5),
-    node: (hold) => (
-      <PortraitBookend
-        headline="Samudaya"
-        sub="Your society's festivals, in your pocket."
-        hold={hold}
-      />
-    ),
-  },
-  home: {
-    id: 'home',
-    hold: sec(4.5),
-    node: (hold) => (
-      <PortraitScene
-        at="home"
-        caption="Open it in September and it looks like September."
-        hold={hold}
-      />
-    ),
-  },
-  event: {
-    id: 'event',
-    hold: sec(5),
-    node: (hold) => (
-      <PortraitScene at="event" caption="One page for the whole festival." hold={hold} />
-    ),
-  },
-  bills: {
-    id: 'bills',
-    hold: sec(5),
-    node: (hold) => (
-      <PortraitScene
-        at="event:bills"
-        // Opens during the scroll rather than at the end of it, so the approved
-        // bills go past before the one nobody may approve arrives.
-        lead={3.4}
-        caption="Every bill on the record — and nobody signs off their own."
-        hold={hold}
-      />
-    ),
-  },
-  pay: {
-    id: 'pay',
-    hold: sec(5.5),
-    node: (hold) => (
-      <PortraitScene
-        at="contribute:flat"
-        caption="Two taps to pay, straight into the society's account."
-        hold={hold}
-      />
-    ),
-  },
-  sheet: {
-    id: 'sheet',
-    hold: sec(3.5),
-    node: (hold) => (
-      <PortraitScene at="sheet" caption="Everything the society has, one tap away." hold={hold} />
-    ),
-  },
-  ledger: {
-    id: 'ledger',
-    hold: sec(6),
-    node: (hold) => (
-      <PortraitScene
-        at="money:ledger"
-        caption="Every rupee in, with a name beside it."
-        hold={hold}
-      />
-    ),
-  },
-  close: {
-    id: 'close',
-    hold: sec(3.5),
-    node: (hold) => (
-      <PortraitBookend headline="Samudaya" sub="Nothing hidden. Nothing to chase." hold={hold} />
-    ),
-  },
+/**
+ * A shot is a screen, a caption, and where the camera is looking.
+ *
+ * `zoom` runs from its first value to its second across the shot, and `origin`
+ * is the height it pushes towards as a fraction of the frame — so the caption
+ * about a locked bill is shown over a slow move down onto the locked bill,
+ * rather than over the whole phone from the same distance as everything else.
+ */
+type Shot = {
+  id: string;
+  hold: number;
+  caption?: string;
+  screen?: ReactNode;
+  bookend?: { headline: string; sub: string; opening?: boolean };
+  zoom?: [number, number];
+  origin?: number;
+  /** Which tab bar rides over this screen, and which slot is lit. */
+  tabs?: string[];
+  active?: string;
+  /** WhatsApp is a different app: it draws its own chrome, over ours. */
+  fullBleed?: boolean;
 };
 
-export const PORTRAIT_ORDER = [
-  'open',
-  'home',
-  'event',
-  'bills',
-  'pay',
-  'sheet',
-  'ledger',
-  'close',
-] as const;
+const SHOTS: Shot[] = [
+  {
+    id: 'open',
+    hold: sec(2.0),
+    bookend: {
+      headline: 'Samudaya',
+      sub: 'Your society’s festivals — and its money — in the open.',
+      opening: true,
+    },
+  },
+  {
+    id: 'home',
+    hold: sec(2.7),
+    caption: 'Open it, and the whole festival is on one screen.',
+    screen: <HomeScreen />,
+    active: 'Home',
+    zoom: [1.0, 1.06],
+    origin: 0.34,
+  },
+  {
+    id: 'event',
+    hold: sec(2.8),
+    caption: 'Six jobs. Four done. One with nobody on it.',
+    screen: <EventScreen />,
+    active: 'Events',
+    zoom: [1.03, 1.1],
+    origin: 0.52,
+  },
+  {
+    id: 'pay',
+    hold: sec(2.9),
+    caption: 'Two taps to pay — the note fills itself in.',
+    screen: <PayScreen />,
+    active: 'Events',
+    zoom: [1.02, 1.09],
+    origin: 0.36,
+  },
+  {
+    id: 'money',
+    hold: sec(2.9),
+    caption: 'Every rupee in, with a name and a flat beside it.',
+    screen: <MoneyScreen />,
+    active: 'Money',
+    zoom: [1.0, 1.1],
+    origin: 0.5,
+  },
+  {
+    id: 'bills',
+    hold: sec(3.0),
+    caption: 'Every rupee out, too — and nobody approves their own bill.',
+    screen: <BillsScreen />,
+    tabs: COMMITTEE,
+    active: 'Events',
+    zoom: [1.0, 1.11],
+    origin: 0.7,
+  },
+  {
+    id: 'reconcile',
+    hold: sec(2.8),
+    caption: 'Upload the bank statement. It matches itself.',
+    screen: <ReconcileScreen />,
+    tabs: COMMITTEE,
+    active: 'Manage',
+    zoom: [1.04, 1.09],
+    origin: 0.44,
+  },
+  {
+    id: 'chat',
+    hold: sec(2.8),
+    caption: 'Or just ask the group. No app to install.',
+    screen: <ChatScreen />,
+    fullBleed: true,
+    zoom: [1.02, 1.07],
+    origin: 0.42,
+  },
+  {
+    id: 'close',
+    hold: sec(2.3),
+    bookend: { headline: 'samudaya.app', sub: 'Nothing hidden. Nothing to chase.' },
+  },
+];
 
-const OVERLAP = sec(0.3);
+/** Shots overlap by this much, which is what makes the push a push. */
+const OVERLAP = sec(0.28);
+
+/** Where each shot starts on the timeline. */
+function starts() {
+  let at = 0;
+  return SHOTS.map((shot) => {
+    const from = at;
+    at += shot.hold - OVERLAP;
+    return from;
+  });
+}
+
+export function portraitLength() {
+  return SHOTS.reduce((total, shot) => total + shot.hold - OVERLAP, OVERLAP);
+}
+
+/**
+ * The camera, for the whole video.
+ *
+ * It has to live out here rather than inside a shot, because the bezel and the
+ * screen have to move together — a zoom applied to the screen alone is a phone
+ * whose display grows out of its case.
+ */
+function camera(frame: number) {
+  const at = starts();
+  let index = 0;
+  for (let i = 0; i < SHOTS.length; i += 1) if (frame >= at[i]) index = i;
+  const shot = SHOTS[index];
+  const [from, to] = shot.zoom ?? [1, 1.04];
+  const progress = interpolate(frame, [at[index], at[index] + shot.hold], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.inOut(Easing.quad),
+  });
+  return { zoom: from + (to - from) * progress, origin: (shot.origin ?? 0.45) * 100 };
+}
 
 export function PortraitReel({ score }: { score?: string }) {
+  const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
-  let at = 0;
+  const at = starts();
+  const { zoom, origin } = camera(frame);
+
   return (
     <AbsoluteFill style={{ backgroundColor: festive.deep }}>
       {score ? (
         <Audio
           src={staticFile(score)}
-          volume={(frame) =>
+          volume={(f) =>
             Math.min(
-              interpolate(frame, [0, sec(0.5)], [0, 1], { extrapolateRight: 'clamp' }),
-              interpolate(frame, [durationInFrames - sec(2), durationInFrames], [1, 0], {
+              interpolate(f, [0, sec(0.5)], [0, 1], { extrapolateRight: 'clamp' }),
+              interpolate(f, [durationInFrames - sec(1.6), durationInFrames], [1, 0], {
                 extrapolateLeft: 'clamp',
               }),
             )
           }
         />
       ) : null}
-      {PORTRAIT_ORDER.map((id) => {
-        const shot = PORTRAIT_SHOTS[id];
-        const from = at;
-        at += shot.hold - OVERLAP;
-        return (
-          <Sequence key={id} from={from} durationInFrames={shot.hold}>
-            {shot.node(shot.hold)}
+
+      <Ground frame={frame} length={durationInFrames} />
+
+      {/* Shell and screens, under one transform, so they move as one object. */}
+      <AbsoluteFill style={{ transform: `scale(${zoom})`, transformOrigin: `50% ${origin}%` }}>
+        <Shell />
+        {SHOTS.map((shot, index) =>
+          shot.screen ? (
+            <Sequence key={shot.id} from={at[index]} durationInFrames={shot.hold}>
+              <Slot hold={shot.hold}>{shot.screen}</Slot>
+              {shot.fullBleed ? null : (
+                <Chrome tabs={shot.tabs ?? RESIDENT} active={shot.active ?? 'Home'} />
+              )}
+            </Sequence>
+          ) : null,
+        )}
+      </AbsoluteFill>
+
+      {/* Captions stay put while the camera moves, so the text never drifts. */}
+      {SHOTS.map((shot, index) =>
+        shot.caption ? (
+          <Sequence key={`${shot.id}-cap`} from={at[index]} durationInFrames={shot.hold}>
+            <Caption text={shot.caption} hold={shot.hold} />
           </Sequence>
-        );
-      })}
+        ) : null,
+      )}
+
+      {SHOTS.map((shot, index) =>
+        shot.bookend ? (
+          <Sequence key={`${shot.id}-end`} from={at[index]} durationInFrames={shot.hold}>
+            <Bookend {...shot.bookend} hold={shot.hold} />
+          </Sequence>
+        ) : null,
+      )}
     </AbsoluteFill>
   );
-}
-
-export function portraitLength() {
-  return PORTRAIT_ORDER.reduce((total, id) => total + PORTRAIT_SHOTS[id].hold - OVERLAP, OVERLAP);
 }
 
 export const PORTRAIT_SIZE = SIZE;

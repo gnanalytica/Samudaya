@@ -18,8 +18,9 @@
  *
  *   A tanpura underneath, all the way through. Four strings — Pa, Sa, Sa, Sa
  *   an octave down — plucked in a slow rotation, each ringing for six seconds
- *   over the next. Its harmonics are stretched slightly, which is what the
- *   jawari bridge does and why a tanpura buzzes rather than hums.
+ *   over the next. The jawari bridge holds its high partials up long after the
+ *   fundamental has faded, which is the shimmer; it is not a buzz, and an
+ *   earlier cut of this file mistook the two.
  *
  *   Meend on the melody. An Indian phrase slides into its notes rather than
  *   stepping onto them; a bansuri line quantised to note boundaries is a
@@ -68,21 +69,26 @@ function note(degree) {
 // Voices
 // ---------------------------------------------------------------------------
 /**
- * One tanpura string. The partials are stretched a little sharp of whole
- * numbers, which is roughly what the jawari bridge does to a plucked string
- * and is the entire difference between a tanpura and an organ.
+ * One tanpura string.
+ *
+ * What makes a tanpura a tanpura is the jawari bridge, which holds the high
+ * partials up long after the fundamental has gone — so the levels and decay
+ * rates below matter more than the tuning. The partials are a few cents sharp
+ * of whole numbers, which is what a real stiff string does; an earlier cut
+ * stretched them far harder on the theory that the buzz was the point, and
+ * that overstated it.
  */
 function tanpura(buffer, atSample, freq, gain) {
   const decay = 3.4;
   const length = Math.floor(6.2 * RATE);
   const partials = [
     { ratio: 1, level: 1, decay: 1 },
-    { ratio: 2.002, level: 0.62, decay: 1.25 },
-    { ratio: 3.008, level: 0.4, decay: 1.55 },
-    { ratio: 4.02, level: 0.26, decay: 1.9 },
-    { ratio: 5.04, level: 0.17, decay: 2.3 },
-    { ratio: 6.07, level: 0.1, decay: 2.8 },
-    { ratio: 7.1, level: 0.06, decay: 3.3 },
+    { ratio: 2.001, level: 0.62, decay: 1.25 },
+    { ratio: 3.003, level: 0.4, decay: 1.55 },
+    { ratio: 4.006, level: 0.26, decay: 1.9 },
+    { ratio: 5.01, level: 0.15, decay: 2.3 },
+    { ratio: 6.015, level: 0.08, decay: 2.8 },
+    { ratio: 7.02, level: 0.04, decay: 3.3 },
   ];
 
   for (let i = 0; i < length; i += 1) {
@@ -102,6 +108,35 @@ function tanpura(buffer, atSample, freq, gain) {
 }
 
 /**
+ * Deterministic noise, for the bansuri's breath.
+ *
+ * The first version of this reached for the GLSL hash `fract(sin(x) * 43758.5)`
+ * and fed it the sample index. That is not noise. A hash needs unrelated inputs
+ * to look random; given a smoothly increasing one it comes back as a structured
+ * full-scale signal — measurably periodic (autocorrelation 0.55 one sample out,
+ * -0.66 seven samples out, where noise is ~0) and concentrated around 3.2 kHz,
+ * which is close to where human hearing is most sensitive. It was audible as a
+ * metallic buzz under the whole piece.
+ *
+ * So: an actual generator with state, low-passed to about 1.9 kHz so it reads
+ * as air moving over an edge rather than as hiss. Seeded per note, so a note
+ * rendered twice is the same note twice.
+ */
+function breathing(seed) {
+  // xorshift32 needs a non-zero state; sample 0 would otherwise stay silent.
+  let state = (seed | 1) >>> 0;
+  let low = 0;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    low += 0.22 * (state / 2 ** 31 - 1 - low);
+    return low;
+  };
+}
+
+/**
  * A bansuri phrase: one breathy tone that slides into pitch rather than
  * arriving on it. `from` is the degree it glides out of — that meend is what
  * makes a line sound played rather than typed.
@@ -112,6 +147,7 @@ function bansuri(buffer, atSample, fromDegree, toDegree, lengthSeconds, gain) {
   const start = note(fromDegree);
   const end = note(toDegree);
   let phase = 0;
+  const air = breathing(atSample);
 
   for (let i = 0; i < length; i += 1) {
     const at = atSample + i;
@@ -129,8 +165,7 @@ function bansuri(buffer, atSample, fromDegree, toDegree, lengthSeconds, gain) {
       Math.min(1, t / 0.05) * Math.min(1, (lengthSeconds - t) / 0.22) * Math.exp(-t * 0.12);
     // A flute is nearly a sine with a little second harmonic and some air.
     const tone = Math.sin(phase) + 0.14 * Math.sin(phase * 2) + 0.05 * Math.sin(phase * 3);
-    const breath = (Math.sin(i * 12.9898) * 43758.5453) % 1;
-    const value = (tone + breath * 0.035) * gain * envelope;
+    const value = (tone + air() * 0.06) * gain * envelope;
     buffer[at * CHANNELS] += value;
     buffer[at * CHANNELS + 1] += value;
   }

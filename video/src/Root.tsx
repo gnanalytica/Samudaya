@@ -71,8 +71,9 @@ export function Root() {
         height={HEIGHT}
         defaultProps={{ order: LAUNCH, score: 'score-launch.wav' }}
       />
-      {/* Portrait, from its own recording through the app's mobile layout —
-          not the landscape cut with its sides trimmed off. */}
+      {/* Portrait, and animated rather than filmed: the screens are drawn in
+          src/screens.tsx from the same data the recorded cuts use, so a shot
+          costs a third of a second instead of a page load. */}
       <Composition
         id="Phone"
         component={PortraitReel}

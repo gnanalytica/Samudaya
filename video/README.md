@@ -1,12 +1,12 @@
 # The Samudaya demo video
 
-Two cuts of one video, filmed from the app itself:
+Three cuts of one video:
 
-| Composition   | Length | For                                                           |
-| ------------- | ------ | ------------------------------------------------------------- |
-| `Walkthrough` | ~1:34  | A committee deciding whether to put their money in this.      |
-| `Launch`      | ~0:30  | A landing page, or a forward into a society's WhatsApp group. |
-| `Phone`       | ~0:34  | Portrait, for a status, a Reel, or anywhere held upright.     |
+| Composition   | Length | Built from       | For                                                           |
+| ------------- | ------ | ---------------- | ------------------------------------------------------------- |
+| `Walkthrough` | ~1:34  | screen recording | A committee deciding whether to put their money in this.      |
+| `Launch`      | ~0:30  | screen recording | A landing page, or a forward into a society's WhatsApp group. |
+| `Phone`       | ~0:22  | animation        | Portrait, for a status, a Reel, or anywhere held upright.     |
 
 Captions and a score, no voiceover — most of the people this reaches will
 watch it on mute, and the ones who don't get something under it.
@@ -52,28 +52,45 @@ npm run record        # one continuous take at a desktop window → take.webm
 npm run record:phone  # the same society through the mobile layout → phone.webm
 npm run capture   # the stills and the one-control clips
 npm run score     # synthesises the music bed for each cut
-npm run render    # both cuts into out/
+npm run render    # all three cuts into out/
 npm run landing   # the 720p copy the landing page serves
 ```
 
 `npm run studio` opens Remotion's editor for scrubbing a scene while you
 change it.
 
-### The portrait cut is a second recording, not a crop
+### The portrait cut is drawn, not filmed
 
-Most of a society reads its ledger standing in a lift, and a landscape video
-cropped to a phone is a landscape video with its sides cut off. So `Phone` is
-built from `capture/record-phone.mjs`, which drives the app at a phone's
-viewport — where the sidebar becomes a sheet behind the society's name, a
-four-slot bar appears along the bottom, and Money gives up its slot to Manage
-for anybody on the committee, so the ledger is reached through the sheet. None
-of that layout exists in the landscape take.
+Most of a society reads its ledger standing in a lift, so `Phone` is vertical —
+a landscape video cropped to a phone is a landscape video with its sides cut
+off. It used to be a second screen recording, at a phone's viewport. It is now
+`src/screens.tsx`: the same screens, redrawn as React.
 
-Its pointer is a finger rather than an arrow. `capture/drive.mjs` holds both,
-along with the eased moves and the scroll-to-target both recorders use; a phone
-has no cursor and drawing one would be a small lie about how the app is used.
+A recording is the most honest way to show a product and the worst way to show
+it quickly. It moves at the speed a browser navigates, so every shot opened on
+a page settling into place, and the cut ran a third longer than the thing it
+was saying. Redrawn, a screen arrives in a third of a second and spends its
+whole life doing what its caption is about: 34 seconds became 22 with more in
+it.
 
-Two things that bit, in case they bite again:
+What stops that being a lie is that nothing in `screens.tsx` is invented. Every
+figure, label and rule is the one in `capture/harness/society/demo-data.ts`,
+which is the data the filmed cuts use, so ₹24,500 of ₹30,000 is the same number
+in all three. The layout is the app's mobile layout, tab bar included — and
+which four tabs depends on the role, because the app is specific about it:
+residents get Home, Events, Money, Me, while the committee trades Money for
+Manage. The Reconcile screen draws the committee's bar; the Money screen draws
+a resident's.
+
+The phone itself never cuts. The ground, the bezel and the camera are rendered
+once for the whole video and each shot supplies only the screen inside them, so
+the screens push through a handset that stays put — which is what using an app
+looks like — instead of nine shots of a phone being re-established.
+
+`capture/record-phone.mjs` is still there and still runs: the landscape cuts
+use its footage for the one scene that shows the app on a phone.
+
+Two things that bit it, in case they bite again:
 
 - **Playwright records at the viewport's CSS pixels.** Asking for a phone's 3x
   device pixels does not render sharper, it pads: a 390-wide page ends up in the
@@ -151,6 +168,18 @@ beside it, which is.
   them; and **Keherwa**, the eight-beat cycle, on a tabla rather than a drum
   kit. It normalises to half scale, leaving about seven decibels for a
   voiceover to sit on top of without a remix.
+
+  It also had an audible buzz under it for a while, and the cause is worth
+  writing down. The bansuri's breath was `fract(sin(i) * 43758.5)` — the GLSL
+  hash — fed the sample index. A hash needs unrelated inputs to look random;
+  given a smoothly increasing one it returns a structured full-scale signal,
+  measurably periodic (autocorrelation 0.55 one sample out, where noise is ~0)
+  and piled up around 3.2 kHz, which is roughly where hearing is sharpest. A
+  Goertzel probe across the mix put that one frequency 45 dB above its own
+  neighbours. It is now an xorshift generator, low-passed to about 1.9 kHz, and
+  that probe reads level. If the bed ever sounds metallic again, measure before
+  adjusting: the tanpura's shimmer and a synthesis bug sound nothing alike on
+  paper and quite similar through a laptop speaker.
 
 `public/captures/`, `public/score-*.wav` and `out/` are generated and
 git-ignored; the commands above rebuild all of them.
