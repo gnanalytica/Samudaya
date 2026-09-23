@@ -3,7 +3,10 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Forty seconds of the app, on the front page.
+ * Under two minutes of the app, on the front page.
+ *
+ * Animated rather than filmed since `video/src/story.tsx` — what plays here is
+ * the `Explain` cut, drawn from the app's own screens and data.
  *
  * A society's committee is being asked to put the society's money somewhere,
  * and six feature cards do not answer the question they actually have, which
@@ -40,9 +43,12 @@ export function DemoVideo() {
       playsInline
       preload="metadata"
     >
-      A short tour of Samudaya: a festival&rsquo;s own page with its checklist and fund, a bill
-      naming the committee member who approved it, the society ledger with a name and a flat on
-      every row, and the same accounts answering on WhatsApp.
+      Samudaya, following one contribution the whole way: a resident pays ₹2,001 towards Ganesh
+      Chaturthi, it arrives on the committee&rsquo;s list, somebody who did not pay it confirms it
+      against the screenshot, and it lands on a ledger every resident can read with a name and a
+      flat beside it. Then the money out — a bill the person who filed it may not approve, the
+      spending against budget, the bank statement reconciled, and the ₹1,100 left at the end going
+      to the society by a recorded decision.
     </video>
   );
 }

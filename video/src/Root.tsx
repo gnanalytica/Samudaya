@@ -1,5 +1,7 @@
 import { Composition } from 'remotion';
 import { Reel, reelLength } from './scenes';
+import { EXPLAIN_SIZE, ExplainReel, explainLength } from './landscape';
+import { PORTRAIT_SIZE, PortraitReel, portraitLength } from './portrait';
 import { FPS, HEIGHT, WIDTH } from './theme';
 
 /**
@@ -7,9 +9,9 @@ import { FPS, HEIGHT, WIDTH } from './theme';
  *
  * Walkthrough is what a committee watches once, before deciding whether to
  * put their society's money in an app. Launch is what gets forwarded into a
- * WhatsApp group, where nobody has decided to watch anything: same scenes,
- * fewer of them, held for less time, and the argument made in the first ten
- * seconds rather than the last.
+ * group chat, where nobody has decided to watch anything: same scenes, fewer
+ * of them, held for less time, and the argument made in the first ten seconds
+ * rather than the last.
  */
 
 const WALKTHROUGH = [
@@ -24,13 +26,14 @@ const WALKTHROUGH = [
   { id: 'contributeLive' as const },
   { id: 'oneLedger' as const },
   { id: 'ledgerLive' as const },
+  { id: 'flatGap' as const },
   { id: 'billTrail' as const },
   { id: 'ownMoney' as const },
   { id: 'reconcileLive' as const },
   { id: 'whenItCloses' as const },
   { id: 'closure' as const },
+  { id: 'closureChosen' as const },
   { id: 'fourSurfaces' as const },
-  { id: 'whatsapp' as const },
   { id: 'mcp' as const },
   { id: 'phone' as const },
   { id: 'close' as const },
@@ -42,7 +45,6 @@ const LAUNCH = [
   { id: 'eventLive' as const, hold: 120 },
   { id: 'contributeLive' as const, hold: 150 },
   { id: 'ledgerLive' as const, hold: 150 },
-  { id: 'whatsapp' as const, hold: 165 },
   { id: 'phone' as const, hold: 105 },
   { id: 'close' as const, hold: 105 },
 ];
@@ -67,6 +69,28 @@ export function Root() {
         width={WIDTH}
         height={HEIGHT}
         defaultProps={{ order: LAUNCH, score: 'score-launch.wav' }}
+      />
+      {/* The two animated cuts, from one script in src/story.tsx. Each shot
+          lasts as long as its headline and specifics take to read, and both
+          cuts show the same words, so they share one timeline and one score.
+          Only the layout around the handset differs. */}
+      <Composition
+        id="Explain"
+        component={ExplainReel}
+        durationInFrames={explainLength()}
+        fps={FPS}
+        width={EXPLAIN_SIZE.width}
+        height={EXPLAIN_SIZE.height}
+        defaultProps={{ score: 'score-story.wav' }}
+      />
+      <Composition
+        id="Phone"
+        component={PortraitReel}
+        durationInFrames={portraitLength()}
+        fps={FPS}
+        width={PORTRAIT_SIZE.width}
+        height={PORTRAIT_SIZE.height}
+        defaultProps={{ score: 'score-story.wav' }}
       />
     </>
   );

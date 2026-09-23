@@ -1,18 +1,34 @@
 /**
- * The score, written rather than licensed.
+ * The score, written rather than licensed — and Indian rather than merely warm.
  *
- * A demo video needs a bed under it, and every other way of getting one ends
- * badly: a "royalty free" download whose licence nobody on the committee can
- * produce two years later, or a library subscription for ninety seconds of
- * audio. This synthesises it from scratch, so the only licence involved is
- * this repository's.
+ * The first version was a D major pentatonic pad with a bell on it. Pleasant,
+ * and the wrong continent: a video about a Ganesh Chaturthi fund should not
+ * sound like a Scandinavian banking advert. This one is built from the things
+ * that actually make music sound Indian, rather than from a scale that happens
+ * to have five notes.
  *
- * What it is trying to sound like: a courtyard the evening before the
- * festival — warm, unhurried, somebody lighting lamps. Pentatonic pads under a
- * plucked line, a bell on each chord change, and a hand drum so far down in the
- * mix it reads as a pulse rather than a beat. That restraint is deliberate: a
- * proper drum loop would make a public ledger feel like a sneaker advert, and
- * the bed's actual job is to stay out of the way of the captions.
+ *   Raga Hamsadhwani — Sa Re Ga Pa Ni, the same five notes up and down. It is
+ *   the raga of Ganesh invocation (Vatapi Ganapatim is in it), which is the
+ *   festival this video is about, and it is bright rather than plaintive.
+ *
+ *   Just intonation, not equal temperament. Re is 9/8 of Sa and Ga is 5/4,
+ *   exact small-number ratios rather than twelfth-roots of two. It is why a
+ *   tanpura rings instead of beating, and it is audible even when nobody can
+ *   say what they are hearing.
+ *
+ *   A tanpura underneath, all the way through. Four strings — Pa, Sa, Sa, Sa
+ *   an octave down — plucked in a slow rotation, each ringing for six seconds
+ *   over the next. The jawari bridge holds its high partials up long after the
+ *   fundamental has faded, which is the shimmer; it is not a buzz, and an
+ *   earlier cut of this file mistook the two.
+ *
+ *   Meend on the melody. An Indian phrase slides into its notes rather than
+ *   stepping onto them; a bansuri line quantised to note boundaries is a
+ *   flute playing a Western tune.
+ *
+ *   Keherwa, the eight-beat cycle, on a tabla rather than a drum kit — bass
+ *   strokes that bend in pitch, treble strokes that ring. Mixed low, because
+ *   the bed's job is still to stay out of the way of the captions.
  *
  *   node score/compose.mjs [seconds] [out.wav]
  */
@@ -28,206 +44,262 @@ const seconds = Number(process.argv[2] ?? 100);
 const outPath = process.argv[3] ?? join(HERE, '..', 'public', 'score.wav');
 
 // ---------------------------------------------------------------------------
-// Notes
+// The raga
 // ---------------------------------------------------------------------------
-/** Equal temperament from A4, which is the only tuning anybody expects. */
-const hz = (semitonesFromA4) => 440 * 2 ** (semitonesFromA4 / 12);
+/** Sa, low enough to sit under speech. Everything else is a ratio of it. */
+const SA = 146.83;
 
 /**
- * D major pentatonic. Pentatonic because every pair of notes in it consents to
- * being played together — an arpeggio can wander without ever landing on the
- * clash that would pull an ear off the screen.
+ * Hamsadhwani, in just intonation: Sa, Re (9/8), Ga (5/4), Pa (3/2), Ni (15/8).
+ *
+ * Equal temperament would put Ga 14 cents flat and Ni 12 cents sharp of these,
+ * which over a six-second tanpura note is a slow beating the ear reads as
+ * out-of-tune rather than as a different tuning system.
  */
-const D2 = -31;
-const SCALE = [0, 2, 4, 7, 9]; // D E F# A B
-const degree = (step) => {
-  const octave = Math.floor(step / SCALE.length);
-  return D2 + 12 * octave + SCALE[((step % SCALE.length) + SCALE.length) % SCALE.length];
-};
+const RATIO = [1, 9 / 8, 5 / 4, 3 / 2, 15 / 8];
+
+/** Degree 0 is Sa; 5 is Sa an octave up; -1 is Ni below. */
+function note(degree) {
+  const octave = Math.floor(degree / RATIO.length);
+  const step = ((degree % RATIO.length) + RATIO.length) % RATIO.length;
+  return SA * RATIO[step] * 2 ** octave;
+}
 
 // ---------------------------------------------------------------------------
 // Voices
 // ---------------------------------------------------------------------------
 /**
- * A plucked note: a few harmonics, each decaying faster than the one below it,
- * which is roughly what a string does and entirely unlike what a raw sine
- * does. The slight detune keeps it from sounding like a test tone.
+ * One tanpura string.
+ *
+ * What makes a tanpura a tanpura is the jawari bridge, which holds the high
+ * partials up long after the fundamental has gone — so the levels and decay
+ * rates below matter more than the tuning. The partials are a few cents sharp
+ * of whole numbers, which is what a real stiff string does; an earlier cut
+ * stretched them far harder on the theory that the buzz was the point, and
+ * that overstated it.
  */
-function pluck(buffer, atSample, freq, gain, decay) {
+function tanpura(buffer, atSample, freq, gain) {
+  const decay = 3.4;
+  const length = Math.floor(6.2 * RATE);
   const partials = [
     { ratio: 1, level: 1, decay: 1 },
-    { ratio: 2.0, level: 0.34, decay: 1.7 },
-    { ratio: 3.01, level: 0.12, decay: 2.6 },
-    { ratio: 4.02, level: 0.05, decay: 3.4 },
+    { ratio: 2.001, level: 0.62, decay: 1.25 },
+    { ratio: 3.003, level: 0.4, decay: 1.55 },
+    { ratio: 4.006, level: 0.26, decay: 1.9 },
+    { ratio: 5.01, level: 0.15, decay: 2.3 },
+    { ratio: 6.015, level: 0.08, decay: 2.8 },
+    { ratio: 7.02, level: 0.04, decay: 3.3 },
   ];
-  const length = Math.floor(decay * 4 * RATE);
 
   for (let i = 0; i < length; i += 1) {
     const at = atSample + i;
     if (at >= buffer.length / CHANNELS) break;
     const t = i / RATE;
-    // A short attack, so the note arrives rather than clicks.
-    const attack = Math.min(1, t / 0.006);
+    const attack = Math.min(1, t / 0.012);
     let sample = 0;
     for (const p of partials) {
       sample +=
         p.level * Math.sin(2 * Math.PI * freq * p.ratio * t) * Math.exp(-t / (decay / p.decay));
     }
     const value = sample * gain * attack;
-    // Gently wider with pitch: high notes drift right, low ones sit centre.
-    const pan = Math.max(-0.4, Math.min(0.4, (freq - 200) / 1400));
-    buffer[at * CHANNELS] += value * (1 - Math.max(0, pan));
-    buffer[at * CHANNELS + 1] += value * (1 + Math.min(0, pan));
+    buffer[at * CHANNELS] += value * 0.97;
+    buffer[at * CHANNELS + 1] += value * 1.03;
   }
 }
 
 /**
- * A pad: two slightly detuned sines per note, which beat against each other
- * slowly enough to read as warmth rather than as wobble.
+ * Deterministic noise, for the bansuri's breath.
+ *
+ * The first version of this reached for the GLSL hash `fract(sin(x) * 43758.5)`
+ * and fed it the sample index. That is not noise. A hash needs unrelated inputs
+ * to look random; given a smoothly increasing one it comes back as a structured
+ * full-scale signal — measurably periodic (autocorrelation 0.55 one sample out,
+ * -0.66 seven samples out, where noise is ~0) and concentrated around 3.2 kHz,
+ * which is close to where human hearing is most sensitive. It was audible as a
+ * metallic buzz under the whole piece.
+ *
+ * So: an actual generator with state, low-passed to about 1.9 kHz so it reads
+ * as air moving over an edge rather than as hiss. Seeded per note, so a note
+ * rendered twice is the same note twice.
  */
-function pad(buffer, atSample, freq, gain, lengthSeconds) {
+function breathing(seed) {
+  // xorshift32 needs a non-zero state; sample 0 would otherwise stay silent.
+  let state = (seed | 1) >>> 0;
+  let low = 0;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    state >>>= 0;
+    low += 0.22 * (state / 2 ** 31 - 1 - low);
+    return low;
+  };
+}
+
+/**
+ * A bansuri phrase: one breathy tone that slides into pitch rather than
+ * arriving on it. `from` is the degree it glides out of — that meend is what
+ * makes a line sound played rather than typed.
+ */
+function bansuri(buffer, atSample, fromDegree, toDegree, lengthSeconds, gain) {
   const length = Math.floor(lengthSeconds * RATE);
-  const rise = 1.2 * RATE;
-  const fall = 2.2 * RATE;
+  const glide = Math.min(0.18, lengthSeconds * 0.35);
+  const start = note(fromDegree);
+  const end = note(toDegree);
+  let phase = 0;
+  const air = breathing(atSample);
 
   for (let i = 0; i < length; i += 1) {
     const at = atSample + i;
     if (at >= buffer.length / CHANNELS) break;
     const t = i / RATE;
-    const envelope = Math.min(1, i / rise) * Math.min(1, (length - i) / fall);
-    const a = Math.sin(2 * Math.PI * freq * t);
-    const b = Math.sin(2 * Math.PI * freq * 1.003 * t);
-    const c = 0.28 * Math.sin(2 * Math.PI * freq * 2 * t);
-    const value = ((a + b) / 2 + c) * gain * envelope;
-    buffer[at * CHANNELS] += value * 0.98;
-    buffer[at * CHANNELS + 1] += value * 1.02;
-  }
-}
+    // Ease the slide, so it leaves quickly and settles slowly.
+    const slide = Math.min(1, t / glide);
+    const eased = 1 - (1 - slide) ** 3;
+    // Vibrato only once the note has arrived; a wobbling glide sounds seasick.
+    const vibrato = 1 + Math.sin(2 * Math.PI * 5.4 * t) * 0.004 * eased;
+    const freq = (start + (end - start) * eased) * vibrato;
+    phase += (2 * Math.PI * freq) / RATE;
 
-/**
- * A bell. Its partials are deliberately not whole-number multiples — that
- * inharmonicity is the whole difference between a struck metal bowl and an
- * organ note, and it is what makes this read as festive rather than churchy.
- */
-function bell(buffer, atSample, freq, gain) {
-  const partials = [
-    { ratio: 1, level: 1, decay: 1 },
-    { ratio: 2.76, level: 0.42, decay: 1.6 },
-    { ratio: 5.4, level: 0.18, decay: 2.4 },
-    { ratio: 8.93, level: 0.07, decay: 3.2 },
-  ];
-  const decay = 2.4;
-  const length = Math.floor(decay * 2.6 * RATE);
-
-  for (let i = 0; i < length; i += 1) {
-    const at = atSample + i;
-    if (at >= buffer.length / CHANNELS) break;
-    const t = i / RATE;
-    const attack = Math.min(1, t / 0.004);
-    let sample = 0;
-    for (const p of partials) {
-      sample +=
-        p.level * Math.sin(2 * Math.PI * freq * p.ratio * t) * Math.exp(-t / (decay / p.decay));
-    }
-    const value = sample * gain * attack;
-    // Bells sit wide, one either side, so the middle stays clear for captions.
-    buffer[at * CHANNELS] += value * 1.1;
-    buffer[at * CHANNELS + 1] += value * 0.9;
-  }
-}
-
-/**
- * A hand drum, mixed low enough to be felt rather than counted. A pitched
- * sine falling fast, which is roughly what a tabla's bass stroke does.
- */
-function thump(buffer, atSample, gain) {
-  const length = Math.floor(0.42 * RATE);
-  for (let i = 0; i < length; i += 1) {
-    const at = atSample + i;
-    if (at >= buffer.length / CHANNELS) break;
-    const t = i / RATE;
-    const pitch = 92 * Math.exp(-t * 11) + 54;
-    const value = Math.sin(2 * Math.PI * pitch * t) * Math.exp(-t / 0.13) * gain;
+    const envelope =
+      Math.min(1, t / 0.05) * Math.min(1, (lengthSeconds - t) / 0.22) * Math.exp(-t * 0.12);
+    // A flute is nearly a sine with a little second harmonic and some air.
+    const tone = Math.sin(phase) + 0.14 * Math.sin(phase * 2) + 0.05 * Math.sin(phase * 3);
+    const value = (tone + air() * 0.06) * gain * envelope;
     buffer[at * CHANNELS] += value;
     buffer[at * CHANNELS + 1] += value;
+  }
+}
+
+/** The baya: the tabla's bass, whose pitch bends down as the hand slides. */
+function baya(buffer, atSample, gain) {
+  const length = Math.floor(0.55 * RATE);
+  for (let i = 0; i < length; i += 1) {
+    const at = atSample + i;
+    if (at >= buffer.length / CHANNELS) break;
+    const t = i / RATE;
+    const pitch = 104 * Math.exp(-t * 9) + 58;
+    const value = Math.sin(2 * Math.PI * pitch * t) * Math.exp(-t / 0.16) * gain;
+    buffer[at * CHANNELS] += value * 1.04;
+    buffer[at * CHANNELS + 1] += value * 0.96;
+  }
+}
+
+/** The dayan: the treble drum, tuned to Sa and ringing rather than thudding. */
+function dayan(buffer, atSample, gain, open = false) {
+  const length = Math.floor((open ? 0.4 : 0.14) * RATE);
+  const decay = open ? 0.13 : 0.035;
+  for (let i = 0; i < length; i += 1) {
+    const at = atSample + i;
+    if (at >= buffer.length / CHANNELS) break;
+    const t = i / RATE;
+    // A tabla's treble head is tuned, and its overtones are close to harmonic
+    // — which is why it carries pitch where a snare does not.
+    const value =
+      (Math.sin(2 * Math.PI * SA * 2 * t) +
+        0.5 * Math.sin(2 * Math.PI * SA * 3.01 * t) +
+        0.3 * Math.sin(2 * Math.PI * SA * 4.02 * t)) *
+      Math.exp(-t / decay) *
+      gain;
+    buffer[at * CHANNELS] += value * 0.94;
+    buffer[at * CHANNELS + 1] += value * 1.06;
   }
 }
 
 // ---------------------------------------------------------------------------
 // Arrangement
 // ---------------------------------------------------------------------------
-const BPM = 76;
+/** Slow enough to read a ledger over. Keherwa is eight of these. */
+const BPM = 82;
 const beat = 60 / BPM;
+const CYCLE = beat * 8;
+
+/**
+ * Keherwa: dha ge na ti / na ke dhi na. Bass on 1 and 5, treble through the
+ * rest, and the two together on the sam — the first beat, which is the one
+ * everything resolves onto.
+ */
+const KEHERWA = [
+  { at: 0, bass: true, treble: true, open: true },
+  { at: 1, treble: true },
+  { at: 2, treble: true, open: true },
+  { at: 3, treble: true },
+  { at: 4, bass: true, treble: true, open: true },
+  { at: 5, treble: true },
+  { at: 6, bass: true, treble: true },
+  { at: 7, treble: true },
+];
+
+/** A phrase is a run of degrees; the melody walks the raga rather than jumps. */
+const PHRASES = [
+  [0, 1, 2, 3],
+  [4, 3, 2, 1],
+  [2, 3, 4, 5],
+  [4, 3, 1, 0],
+  [0, 2, 3, 4],
+  [3, 2, 1, 0],
+];
 
 function arrange(totalSeconds) {
   const frames = Math.ceil(totalSeconds * RATE);
   const buffer = new Float64Array(frames * CHANNELS);
 
-  // Four chords, each two bars long, cycling. I – V – vi – IV in feel, voiced
-  // low and wide so the captions have the whole midrange to themselves.
-  const chords = [
-    [0, 4, 7],
-    [7, 11, 14],
-    [9, 12, 16],
-    [5, 9, 12],
-  ];
-  const chordLength = beat * 8;
-
-  for (let index = 0; index * chordLength < totalSeconds; index += 1) {
-    const chord = chords[index % chords.length];
-    const at = Math.floor(index * chordLength * RATE);
-    for (const [voice, semitone] of chord.entries()) {
-      pad(buffer, at, hz(D2 + 12 + semitone), voice === 0 ? 0.052 : 0.032, chordLength + 1.6);
-    }
-    // One bell as each chord arrives, two octaves up, and a quieter one
-    // halfway through so eight slow bars do not feel like a held breath.
-    bell(buffer, at, hz(D2 + 36 + chord[0]), 0.05);
-    const half = Math.floor((index * chordLength + chordLength / 2) * RATE);
-    if (half < frames) bell(buffer, half, hz(D2 + 36 + chord[2]), 0.022);
-  }
-
-  // The pulse: beats one and three of every bar, fading in with the arpeggio
-  // and out with it, and never loud enough to count along to.
-  for (let beatIndex = 0; ; beatIndex += 1) {
-    const when = beatIndex * beat * 2;
-    if (when > totalSeconds - 2.5) break;
-    const rampIn = Math.min(1, Math.max(0, (when - 6) / 5));
-    const rampOut = Math.min(1, (totalSeconds - 2.5 - when) / 7);
+  // ---- tanpura, all the way through -------------------------------------
+  // Pa, Sa, Sa, and Sa an octave down: the standard four, in that rotation.
+  const strings = [note(3) / 2, SA, SA, SA / 2];
+  const pluck = CYCLE / 4;
+  for (let index = 0; index * pluck < totalSeconds; index += 1) {
+    const when = index * pluck;
+    // Fades in over the first bar and away under the last, so the drone is
+    // there before anything else and outlasts everything else.
+    const rampIn = Math.min(1, when / 3.5);
+    const rampOut = Math.min(1, (totalSeconds - when) / 4);
     const gain = 0.05 * rampIn * rampOut;
-    if (gain > 0.002) thump(buffer, Math.floor(when * RATE), gain);
+    if (gain > 0.002) tanpura(buffer, Math.floor(when * RATE), strings[index % 4], gain);
   }
 
-  // The arpeggio waits eight seconds, so the opening card is nearly bare and
-  // the video has somewhere to go.
-  const arpStart = 8;
-  const step = beat / 2;
-  const pattern = [0, 2, 4, 6, 4, 2];
-
-  for (let n = 0; ; n += 1) {
-    const when = arpStart + n * step;
-    if (when > totalSeconds - 2.5) break;
-    const at = Math.floor(when * RATE);
-
-    // Fades in over four seconds and thins out over the last eight, so the
-    // end feels like a decision rather than a power cut.
-    const rampIn = Math.min(1, (when - arpStart) / 4);
-    const rampOut = Math.min(1, (totalSeconds - 2.5 - when) / 8);
-    const gain = 0.085 * rampIn * rampOut;
-    if (gain <= 0.0015) continue;
-
-    const chordIndex = Math.floor(when / chordLength) % chords.length;
-    const root = chords[chordIndex][0];
-    const note = degree(pattern[n % pattern.length]) + 24 + root;
-    pluck(buffer, at, hz(note), gain, 0.55);
-
-    // A sparse note an octave up, on the off-beats only, for a little light.
-    if (n % 6 === 3) pluck(buffer, at, hz(note + 12), gain * 0.35, 0.4);
+  // ---- tabla, once the piece has settled --------------------------------
+  const tablaFrom = 7.5;
+  for (let cycle = 0; cycle * CYCLE < totalSeconds; cycle += 1) {
+    for (const stroke of KEHERWA) {
+      const when = cycle * CYCLE + stroke.at * beat;
+      if (when < tablaFrom || when > totalSeconds - 2.5) continue;
+      const rampIn = Math.min(1, (when - tablaFrom) / 4);
+      const rampOut = Math.min(1, (totalSeconds - 2.5 - when) / 6);
+      const level = rampIn * rampOut;
+      if (level <= 0.02) continue;
+      if (stroke.bass) baya(buffer, Math.floor(when * RATE), 0.05 * level);
+      if (stroke.treble) dayan(buffer, Math.floor(when * RATE), 0.026 * level, stroke.open);
+    }
   }
 
-  // A last note and a last bell, left to ring under the closing card.
-  pluck(buffer, Math.floor((totalSeconds - 2.4) * RATE), hz(D2 + 12), 0.1, 1.5);
-  bell(buffer, Math.floor((totalSeconds - 2.5) * RATE), hz(D2 + 36), 0.06);
-  pad(buffer, Math.floor((totalSeconds - 2.6) * RATE), hz(D2 + 12), 0.05, 2.6);
+  // ---- bansuri, after the drone has established the tonic ---------------
+  const melodyFrom = 4;
+  let when = melodyFrom;
+  let phraseIndex = 0;
+  let previous = 0;
+  while (when < totalSeconds - 3) {
+    const phrase = PHRASES[phraseIndex % PHRASES.length];
+    phraseIndex += 1;
+    for (const degree of phrase) {
+      if (when > totalSeconds - 3) break;
+      const length = beat * (degree === phrase[phrase.length - 1] ? 2.2 : 1.1);
+      const rampIn = Math.min(1, (when - melodyFrom) / 4);
+      const rampOut = Math.min(1, (totalSeconds - 3 - when) / 7);
+      const gain = 0.11 * rampIn * rampOut;
+      if (gain > 0.004) {
+        bansuri(buffer, Math.floor(when * RATE), previous, degree, length * 0.96, gain);
+      }
+      previous = degree;
+      when += length;
+    }
+    // A breath between phrases, which is also how a bansuri player works.
+    when += beat * 0.9;
+  }
+
+  // ---- the close: back to Sa, left to ring -------------------------------
+  bansuri(buffer, Math.floor((totalSeconds - 2.9) * RATE), previous, 0, 2.6, 0.1);
+  tanpura(buffer, Math.floor((totalSeconds - 2.8) * RATE), SA, 0.06);
 
   return buffer;
 }
@@ -235,7 +307,7 @@ function arrange(totalSeconds) {
 // ---------------------------------------------------------------------------
 // Mix and write
 // ---------------------------------------------------------------------------
-/** One-pole low pass, run twice: takes the glassiness off the plucks. */
+/** One-pole low pass, run twice: takes the glassiness off the synthesis. */
 function soften(buffer, cutoff) {
   const alpha = 1 - Math.exp((-2 * Math.PI * cutoff) / RATE);
   for (let pass = 0; pass < 2; pass += 1) {
@@ -282,9 +354,9 @@ function toWav(buffer) {
 }
 
 const mix = arrange(seconds);
-soften(mix, 2600);
+soften(mix, 3200);
 const { wav, frames } = toWav(mix);
 await writeFile(outPath, wav);
 console.log(
-  `\x1b[36m▸\x1b[0m scored ${(frames / RATE).toFixed(1)}s → ${outPath} (${(wav.length / 1_048_576).toFixed(1)} MB)`,
+  `\x1b[36m▸\x1b[0m scored ${(frames / RATE).toFixed(1)}s of Hamsadhwani → ${outPath} (${(wav.length / 1_048_576).toFixed(1)} MB)`,
 );

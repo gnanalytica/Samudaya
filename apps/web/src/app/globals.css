@@ -25,6 +25,30 @@
   --color-brand-800: oklch(0.37 0.086 168);
   --color-brand-900: oklch(0.31 0.07 169);
   --color-brand-950: oklch(0.2 0.048 170);
+
+  /* The front page's festive motion: sparkles that come and go, and a kolam
+     turning slowly enough to notice only on a second look. Used behind
+     motion-safe:, and stopped by the reduced-motion rule below as well. */
+  --animate-twinkle: twinkle 3.6s ease-in-out infinite;
+  --animate-rangoli: rangoli-turn 180s linear infinite;
+
+  @keyframes twinkle {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.25;
+      transform: scale(0.65);
+    }
+  }
+
+  @keyframes rangoli-turn {
+    to {
+      transform: rotate(1turn);
+    }
+  }
 }
 
 :root {
@@ -106,6 +130,29 @@ body {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   border-radius: 0.375rem;
+}
+
+/*
+ * The fallback festivalVars() (components/festival.tsx) relies on. Its inline
+ * light-dark() is invalid in a browser that predates it, which leaves --accent
+ * empty; there, the halves it also sets are picked by hand. !important because
+ * a stylesheet otherwise loses to an inline style, and the attribute selector
+ * because an inline style is the only place those halves are ever set.
+ */
+@supports not (color: light-dark(white, black)) {
+  [style*='--accent-light'] {
+    --accent: var(--accent-light) !important;
+    --ribbon: var(--ribbon-light) !important;
+    --festival-wash: var(--festival-wash-light) !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    [style*='--accent-light'] {
+      --accent: var(--accent-dark) !important;
+      --ribbon: var(--ribbon-dark) !important;
+      --festival-wash: var(--festival-wash-dark) !important;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

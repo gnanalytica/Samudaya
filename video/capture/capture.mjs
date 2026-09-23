@@ -171,20 +171,6 @@ async function main() {
     await waitForServer(probe);
     await probe.close();
 
-    // ---- the ledger, which is the whole argument for the product ----------
-    await still(browser, {
-      name: 'ledger',
-      path: `${DEMO_BASE}/money`,
-      width: 1100,
-      height: 900,
-    });
-    await still(browser, {
-      name: 'ledger-phone',
-      path: `${DEMO_BASE}/money`,
-      width: 390,
-      height: 844,
-    });
-
     // ---- closing an event: two answers, not three ------------------------
     await still(browser, {
       name: 'closure',

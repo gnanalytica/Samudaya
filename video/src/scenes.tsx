@@ -1,10 +1,12 @@
 import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useVideoConfig } from 'remotion';
-import { Bookend, Caption, Clip, PhoneShot, Shot, Statement } from './components';
-import { McpScene, WhatsAppScene } from './surfaces';
+import { Bookend, Caption, Clip, PhoneClip, Shot, Statement } from './components';
+import type { Framing, Marker } from './components';
+import { McpScene } from './surfaces';
 import { sec } from './theme';
 import clips from './clips.json';
 import shots from './shots.json';
 import take from './beats.json';
+import phoneTake from './phone-beats.json';
 
 /**
  * The script.
@@ -55,16 +57,72 @@ function Take({
   lead = 1.8,
   hold,
   label,
+  from,
+  to,
+  marker,
 }: {
   at: string;
   lead?: number;
   hold: number;
   label: string;
+  /** Where the shot opens and where it ends up; see Framing in components. */
+  from?: Framing;
+  to?: Framing;
+  marker?: Marker;
 }) {
   return (
-    <Clip {...TAKE} hold={hold} label={label} startFrom={sec(Math.max(0, beatAt(at) - lead))} />
+    <Clip
+      {...TAKE}
+      hold={hold}
+      label={label}
+      startFrom={sec(Math.max(0, beatAt(at) - lead))}
+      from={from}
+      to={to}
+      marker={marker}
+    />
   );
 }
+
+/**
+ * Where to look, in the take's own 1440x900 pixels.
+ *
+ * A framing is written as the point to centre on and how close to get, because
+ * that is what you can read off a paused frame. `look` turns it into the
+ * offsets Clip wants, so nobody has to do the subtraction in their head and
+ * get it wrong by half a window.
+ */
+function look(centreX: number, centreY: number, zoom: number): Framing {
+  // Past this the framed region would show outside the recording, which draws
+  // the window's background where the app should be. Clamping is what lets a
+  // measured coordinate be used raw: the ledger row the edit points at had
+  // scrolled to y = -17 at the moment it was measured, and this is the
+  // difference between that being fine and being a grey band across the shot.
+  const limitX = (TAKE.width / 2) * (1 - 1 / zoom);
+  const limitY = (TAKE.height / 2) * (1 - 1 / zoom);
+  const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value));
+  return {
+    zoom,
+    x: clamp(centreX - TAKE.width / 2, limitX),
+    y: clamp(centreY - TAKE.height / 2, limitY),
+  };
+}
+
+/** Where the recorder found something, turned into a framing centred on it. */
+function onto(name: keyof typeof take.boxes, zoom: number): Framing {
+  const box = take.boxes[name];
+  // A beat whose element moved out of the page is better shown whole than
+  // shown somewhere arbitrary.
+  if (!box) return WHOLE_WINDOW;
+  return look(box.x + box.width / 2, box.y + box.height / 2, zoom);
+}
+
+/** The same box, as something to draw a ring around. */
+function ring(name: keyof typeof take.boxes, at?: number): Marker | undefined {
+  const box = take.boxes[name];
+  return box ? { ...box, at } : undefined;
+}
+
+const WHOLE_WINDOW: Framing = { zoom: 1, x: 0, y: 0 };
 
 /**
  * Where to start each of the short recordings.
@@ -124,16 +182,6 @@ export const SCENES: Record<string, SceneSpec> = {
     ),
   },
 
-  landing: {
-    id: 'landing',
-    hold: sec(5),
-    node: (hold) => (
-      <Scene hold={hold} caption="One place, instead of a group chat and a notebook.">
-        <Take at="landing:top" lead={1.2} hold={hold} label="samudaya.app" />
-      </Scene>
-    ),
-  },
-
   startEvent: {
     id: 'startEvent',
     hold: sec(2.5),
@@ -185,7 +233,16 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(6.5),
     node: (hold) => (
       <Scene hold={hold} caption="Every rupee in, with a name and a flat beside it.">
-        <Take at="app:money" lead={2.2} hold={hold} label="Shanti Nivas · Money" />
+        <Take
+          at="app:money"
+          lead={2.2}
+          hold={hold}
+          label="Shanti Nivas · Money"
+          // Opens on the whole page and settles into the rows, so the ledger
+          // arrives as a page and then becomes readable.
+          from={WHOLE_WINDOW}
+          to={look(760, 520, 1.3)}
+        />
       </Scene>
     ),
   },
@@ -195,17 +252,15 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(4),
     node: (hold) => (
       <Scene hold={hold} caption="Nothing quietly goes missing.">
-        <Take at="app:flat-gap" lead={1} hold={hold} label="Shanti Nivas · Money" />
-      </Scene>
-    ),
-  },
-
-  eventsLive: {
-    id: 'eventsLive',
-    hold: sec(3.5),
-    node: (hold) => (
-      <Scene hold={hold} caption="Every festival you have run, and the next one.">
-        <Take at="app:events" lead={2} hold={hold} label="Shanti Nivas · Events" />
+        <Take
+          at="app:flat-gap"
+          lead={1}
+          hold={hold}
+          label="Shanti Nivas · Money"
+          from={onto('flatGap', 1.5)}
+          to={onto('flatGap', 2.4)}
+          marker={ring('flatGap', 1.1)}
+        />
       </Scene>
     ),
   },
@@ -215,20 +270,17 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(6.5),
     node: (hold) => (
       <Scene hold={hold} caption="Two taps to pay, straight into the society's own account.">
-        <Take at="app:contribute" lead={2.6} hold={hold} label="Shanti Nivas · Contribute" />
+        <Take
+          at="app:contribute"
+          lead={2.6}
+          hold={hold}
+          label="Shanti Nivas · Contribute"
+          // Ends on the note, because the note carrying the flat is the point.
+          from={WHOLE_WINDOW}
+          to={onto('note', 1.9)}
+          marker={ring('note', 4.2)}
+        />
       </Scene>
-    ),
-  },
-
-  eventIsTheUnit: {
-    id: 'eventIsTheUnit',
-    hold: sec(3),
-    node: (hold) => (
-      <Statement
-        lines={['Everything hangs off one festival.']}
-        sub="The checklist, the fund, the performances, the bills."
-        hold={hold}
-      />
     ),
   },
 
@@ -250,7 +302,14 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(4),
     node: (hold) => (
       <Scene hold={hold} caption="Everyone can see how ready you are.">
-        <Take at="app:readiness" lead={1.4} hold={hold} label="Ganesh Chaturthi 2026" />
+        <Take
+          at="app:readiness"
+          lead={1.4}
+          hold={hold}
+          label="Ganesh Chaturthi 2026"
+          from={WHOLE_WINDOW}
+          to={onto('readiness', 1.75)}
+        />
       </Scene>
     ),
   },
@@ -260,7 +319,14 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(5),
     node: (hold) => (
       <Scene hold={hold} caption="Every rupee out, with the bill attached.">
-        <Take at="app:bills" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
+        <Take
+          at="app:bills"
+          lead={1.8}
+          hold={hold}
+          label="Ganesh Chaturthi 2026"
+          from={WHOLE_WINDOW}
+          to={onto('bills', 1.7)}
+        />
       </Scene>
     ),
   },
@@ -270,16 +336,16 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(4.5),
     node: (hold) => (
       <Scene hold={hold} caption="And nobody signs off their own money.">
-        <Take at="app:ownMoney" lead={1.8} hold={hold} label="Ganesh Chaturthi 2026" />
+        <Take
+          at="app:ownMoney"
+          lead={1.8}
+          hold={hold}
+          label="Ganesh Chaturthi 2026"
+          from={onto('ownMoney', 1.4)}
+          to={onto('ownMoney', 1.95)}
+          marker={ring('ownMoney', 1.3)}
+        />
       </Scene>
-    ),
-  },
-
-  aClaim: {
-    id: 'aClaim',
-    hold: sec(3),
-    node: (hold) => (
-      <Statement lines={['Nothing counts', 'until the bank agrees.']} hold={hold} size={72} />
     ),
   },
 
@@ -288,7 +354,15 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(4.5),
     node: (hold) => (
       <Scene hold={hold} caption="Checked against the bank, line by line.">
-        <Take at="app:reconcile" lead={2} hold={hold} label="Shanti Nivas · Reconcile" />
+        <Take
+          at="app:reconcile"
+          lead={2}
+          hold={hold}
+          label="Shanti Nivas · Reconcile"
+          from={WHOLE_WINDOW}
+          to={onto('matched', 1.55)}
+          marker={ring('matched', 2.4)}
+        />
       </Scene>
     ),
   },
@@ -298,20 +372,10 @@ export const SCENES: Record<string, SceneSpec> = {
     hold: sec(3),
     node: (hold) => (
       <Statement
-        lines={['Not everyone will open an app.']}
-        sub="So the society answers wherever they already are."
+        lines={['A ledger nobody can read is not a ledger.']}
+        sub="So it is open to whatever the society already uses."
         hold={hold}
       />
-    ),
-  },
-
-  whatsapp: {
-    id: 'whatsapp',
-    hold: sec(7),
-    node: (hold) => (
-      <Scene hold={hold} caption="So just ask on WhatsApp.">
-        <WhatsAppScene hold={hold} />
-      </Scene>
     ),
   },
 
@@ -367,31 +431,20 @@ export const SCENES: Record<string, SceneSpec> = {
     ),
   },
 
-  movements: {
-    id: 'movements',
-    hold: sec(4.5),
-    node: (hold) => (
-      <Scene hold={hold} caption="And that decision is on the record too.">
-        <Shot
-          {...SHOTS.ledger}
-          viewport={{ width: 1180, height: 520 }}
-          from={{ scale: 1.32, x: 0, y: 150 }}
-          to={{ scale: 1.32, x: 0, y: 235 }}
-          hold={hold}
-          label="Money"
-        />
-      </Scene>
-    ),
-  },
-
   phone: {
     id: 'phone',
     hold: sec(5),
     node: (hold) => {
-      const phone = SHOTS['ledger-phone'];
+      // The ledger, on the phone recording rather than a screenshot of one.
+      const beat = phoneTake.beats.find((entry) => entry.name === 'money:ledger');
+      if (!beat) throw new Error('phone-beats.json has no beat named "money:ledger"');
       return (
         <Scene hold={hold} caption="All of it, in everybody's pocket.">
-          <PhoneShot {...phone} from={0} to={Math.max(0, phone.height - 844)} hold={hold} />
+          <PhoneClip
+            src="captures/phone.webm"
+            startFrom={sec(Math.max(0, beat.at - 2.2))}
+            hold={hold}
+          />
         </Scene>
       );
     },

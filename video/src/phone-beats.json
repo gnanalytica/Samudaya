@@ -1,0 +1,62 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "lead": 3.21,
+  "duration": 45.72,
+  "beats": [
+    {
+      "name": "home",
+      "at": 5.6
+    },
+    {
+      "name": "home:money",
+      "at": 8.13
+    },
+    {
+      "name": "events",
+      "at": 11.33
+    },
+    {
+      "name": "event",
+      "at": 14.8
+    },
+    {
+      "name": "event:readiness",
+      "at": 18.42
+    },
+    {
+      "name": "event:bills",
+      "at": 22.33
+    },
+    {
+      "name": "contribute",
+      "at": 27.73
+    },
+    {
+      "name": "contribute:flat",
+      "at": 29.55
+    },
+    {
+      "name": "contribute:note",
+      "at": 32.87
+    },
+    {
+      "name": "sheet",
+      "at": 37.22
+    },
+    {
+      "name": "money",
+      "at": 40.41
+    },
+    {
+      "name": "money:ledger",
+      "at": 44.81
+    },
+    {
+      "name": "end",
+      "at": 44.81
+    }
+  ]
+}
