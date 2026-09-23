@@ -498,9 +498,11 @@ export function HomeScreen() {
         <div style={{ fontSize: 12.5, fontWeight: 600, color: muted, marginBottom: 8 }}>
           COMING UP
         </div>
+        {/* After 15 September, in order. Independence Day sat here once: on the
+            Home screen of a society in mid-September, that is a month gone. */}
         {[
           { name: 'Deepavali 2026', when: '8 November' },
-          { name: 'Independence Day 2026', when: '15 August' },
+          { name: 'Christmas 2026', when: '25 December' },
         ].map((event) => (
           <div
             key={event.name}
