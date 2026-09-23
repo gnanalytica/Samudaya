@@ -1,8 +1,9 @@
 import { Composition } from 'remotion';
+import { LandscapeCover, PortraitCover } from './cover';
 import { Reel, reelLength } from './scenes';
 import { EXPLAIN_SIZE, ExplainReel, explainLength } from './landscape';
 import { PORTRAIT_SIZE, PortraitReel, portraitLength } from './portrait';
-import { FPS, HEIGHT, WIDTH } from './theme';
+import { FPS, HEIGHT, WIDTH, sec } from './theme';
 
 /**
  * Two cuts of one video.
@@ -91,6 +92,38 @@ export function Root() {
         width={PORTRAIT_SIZE.width}
         height={PORTRAIT_SIZE.height}
         defaultProps={{ score: 'score-story.wav' }}
+      />
+      {/* Their covers: the frame each video opens on when it is shared, and
+          the thumbnails and link preview, which carry a play button. See
+          src/cover.tsx and share.mjs. Stills in all but name: four seconds
+          long only so the phone inside can be frozen three seconds into its
+          shot, with its rows risen and its totals counted up. */}
+      <Composition
+        id="CoverPhone"
+        component={PortraitCover}
+        width={PORTRAIT_SIZE.width}
+        height={PORTRAIT_SIZE.height}
+        durationInFrames={sec(4)}
+        fps={FPS}
+        defaultProps={{ play: true }}
+      />
+      <Composition
+        id="CoverWide"
+        component={LandscapeCover}
+        width={EXPLAIN_SIZE.width}
+        height={EXPLAIN_SIZE.height}
+        durationInFrames={sec(4)}
+        fps={FPS}
+        defaultProps={{ play: true }}
+      />
+      <Composition
+        id="CoverLink"
+        component={LandscapeCover}
+        width={1200}
+        height={630}
+        durationInFrames={sec(4)}
+        fps={FPS}
+        defaultProps={{ play: true }}
       />
     </>
   );

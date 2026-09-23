@@ -60,6 +60,7 @@ npm run brand     # splits the Gnanalytica logo into the layers the close animat
 npm run score     # synthesises the music bed for each cut
 npm run render    # all four cuts into out/
 npm run landing   # the 720p copy the landing page serves, from Explain, at a fixed bitrate
+npm run share     # covers, thumbnails, the site's link preview, and the WhatsApp copies
 ```
 
 `npm run studio` opens Remotion's editor for scrubbing a scene while you
@@ -167,6 +168,33 @@ It ends on `samudaya.gnanalytica.com`. The card it replaced said `samudaya.app`,
 which is the app's bundle identifier and not a site anybody can visit; the
 claims test now fails if the video shows an address the product does not live
 at.
+
+### Sharing: a cover, and a file WhatsApp takes as a video
+
+WhatsApp settles two things about a forwarded video before anybody plays it,
+and the renders got both wrong. Past 16 MB it will not send a file as a video
+at all: it goes as a document, a file icon with no picture and no play button,
+and the full renders are 28 and 46 MB. And the thumbnail is the first frame,
+which for both cuts was the empty ground before the title fades up.
+
+`src/cover.tsx` draws the cover instead: the video's opening line, the Money
+screen on a phone, and the name, in the video's own colours. `npm run share`
+renders it and makes, in `out/`:
+
+- **`samudaya-phone-whatsapp.mp4`** and **`samudaya-explain-whatsapp.mp4`** —
+  each opens on its cover for a moment, dissolves into the cut, and is encoded
+  at 720p to about 13 MB, H.264 Main and AAC. WhatsApp draws its own play
+  button and length over the thumbnail, so these covers carry neither.
+- **`samudaya-thumbnail.jpg`** (1280×720) and
+  **`samudaya-thumbnail-portrait.jpg`** — the covers with a play button and the
+  length, for anywhere that does not draw its own.
+- **`apps/web/src/app/opengraph-image.jpg`** — the same at 1200×630, which Next
+  serves as the site's link preview. It is committed; WhatsApp drops a preview
+  image over about 300 KB, and `apps/web/test/link-preview.test.ts` holds it
+  under that.
+
+The portrait cover keeps its name and headline inside the middle 4:5 of the
+frame, because that is roughly what WhatsApp shows of a tall video in a chat.
 
 ### Two things the recorder bit on
 
