@@ -6,6 +6,7 @@ Two cuts of one video, filmed from the app itself:
 | ------------- | ------ | ------------------------------------------------------------- |
 | `Walkthrough` | ~1:27  | A committee deciding whether to put their money in this.      |
 | `Launch`      | ~0:30  | A landing page, or a forward into a society's WhatsApp group. |
+| `Phone`       | ~0:34  | Portrait, for a status, a Reel, or anywhere held upright.     |
 
 Captions and a score, no voiceover — most of the people this reaches will
 watch it on mute, and the ones who don't get something under it.
@@ -47,7 +48,8 @@ covered by the repo-wide `pnpm format:check`.
 cd video
 npm install
 
-npm run record    # one continuous take of the app being used → take.webm
+npm run record        # one continuous take at a desktop window → take.webm
+npm run record:phone  # the same society through the mobile layout → phone.webm
 npm run capture   # the stills and the one-control clips
 npm run score     # synthesises the music bed for each cut
 npm run render    # both cuts into out/
@@ -56,6 +58,31 @@ npm run landing   # the 720p copy the landing page serves
 
 `npm run studio` opens Remotion's editor for scrubbing a scene while you
 change it.
+
+### The portrait cut is a second recording, not a crop
+
+Most of a society reads its ledger standing in a lift, and a landscape video
+cropped to a phone is a landscape video with its sides cut off. So `Phone` is
+built from `capture/record-phone.mjs`, which drives the app at a phone's
+viewport — where the sidebar becomes a sheet behind the society's name, a
+four-slot bar appears along the bottom, and Money gives up its slot to Manage
+for anybody on the committee, so the ledger is reached through the sheet. None
+of that layout exists in the landscape take.
+
+Its pointer is a finger rather than an arrow. `capture/drive.mjs` holds both,
+along with the eased moves and the scroll-to-target both recorders use; a phone
+has no cursor and drawing one would be a small lie about how the app is used.
+
+Two things that bit, in case they bite again:
+
+- **Playwright records at the viewport's CSS pixels.** Asking for a phone's 3x
+  device pixels does not render sharper, it pads: a 390-wide page ends up in the
+  corner of a 1170-wide grey frame. The take is captured 1:1 and the composition
+  scales it, which is what a screen recording looks like anyway.
+- **A phone stacks the two-column pages**, so a control beside the fold on a
+  desktop is a long way below it here. `reachAndPress` scrolls to a thing before
+  pressing it; a fixed offset lands on whatever moved into that space, which is
+  how a take ends in a twenty-second timeout.
 
 Rendering needs a Chromium that still supports old headless mode; Playwright's
 `chromium` is not one. The render scripts already point at the headless shell

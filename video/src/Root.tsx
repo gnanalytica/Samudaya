@@ -1,5 +1,6 @@
 import { Composition } from 'remotion';
 import { Reel, reelLength } from './scenes';
+import { PORTRAIT_SIZE, PortraitReel, portraitLength } from './portrait';
 import { FPS, HEIGHT, WIDTH } from './theme';
 
 /**
@@ -67,6 +68,17 @@ export function Root() {
         width={WIDTH}
         height={HEIGHT}
         defaultProps={{ order: LAUNCH, score: 'score-launch.wav' }}
+      />
+      {/* Portrait, from its own recording through the app's mobile layout —
+          not the landscape cut with its sides trimmed off. */}
+      <Composition
+        id="Phone"
+        component={PortraitReel}
+        durationInFrames={portraitLength()}
+        fps={FPS}
+        width={PORTRAIT_SIZE.width}
+        height={PORTRAIT_SIZE.height}
+        defaultProps={{ score: 'score-phone.wav' }}
       />
     </>
   );
