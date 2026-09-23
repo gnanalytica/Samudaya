@@ -1,13 +1,14 @@
 # The Samudaya demo video
 
-Two cuts of one video, built from the app's own components:
+Two cuts of one video, filmed from the app itself:
 
 | Composition   | Length | For                                                           |
 | ------------- | ------ | ------------------------------------------------------------- |
-| `Walkthrough` | ~1:32  | A committee deciding whether to put their money in this.      |
+| `Walkthrough` | ~1:35  | A committee deciding whether to put their money in this.      |
 | `Launch`      | ~0:41  | A landing page, or a forward into a society's WhatsApp group. |
 
-Captions, no voiceover — most of the people this reaches will watch it on mute.
+Captions and a score, no voiceover — most of the people this reaches will
+watch it on mute, and the ones who don't get something under it.
 
 ## Why it is built this way
 
@@ -19,15 +20,22 @@ that awkward, and the pipeline exists to get around both:
 - **The data is real neighbours and real payments.** The Money page names who
   paid and how much, which is the one thing that must never be in a video.
 
-So `capture/` mounts the real components — `LedgerRow`, `ContributeForm`,
-`FestivalNameField`, `AllocateSurplusForm` — on throwaway routes with an
-invented society, films those, and deletes the routes again in the same run.
-Real components, real CSS, real layout, invented people. Nothing is mocked up
-in a design tool, and nothing that ships was touched: the staged routes never
-reach a commit, and `apps/web` is byte-identical when the script finishes.
+So `capture/stage.mjs` writes an invented society into `apps/web` — Shanti
+Nivas, twenty-four flats, a Ganesh Chaturthi fund — and patches the proxy to
+serve it at `/app/shanti-nivas`, which is the path the app's own navigation
+builds. That last part is the whole trick: `SidebarNav` makes every href from
+the slug and lights the active one from `usePathname()`, so a demo served at
+its own path would have a sidebar that navigates nowhere. Served where the app
+expects it, clicking Money loads the real Money page through a real client-side
+transition. The shell, the switcher, the profile menu, the bottom bar and every
+row are the app's own components. Only the residents are made up.
+
+Both scripts remove everything they wrote before they exit, so no page that
+exists only to be filmed can reach a commit or a build.
 
 This directory is deliberately outside the pnpm workspace (`apps/*`,
-`packages/*`), so CI never builds, lints or typechecks a video.
+`packages/*`), so CI never builds, lints or typechecks a video. It is still
+covered by the repo-wide `pnpm format:check`.
 
 ## Making it
 
@@ -35,39 +43,64 @@ This directory is deliberately outside the pnpm workspace (`apps/*`,
 cd video
 npm install
 
-npm run capture   # films the app; needs apps/web's deps installed at the repo root
+npm run record    # one continuous take of the app being used → take.webm
+npm run capture   # the stills and the one-control clips
+npm run score     # synthesises the music bed for each cut
 npm run render    # both cuts into out/
+npm run landing   # the 720p copy the landing page serves
 ```
 
 `npm run studio` opens Remotion's editor for scrubbing a scene while you
 change it.
 
-Rendering needs a Chromium that still supports old headless mode. In CI-ish
-environments where Playwright's browsers are already on disk, point Remotion at
-its headless shell:
-
-```bash
-npx remotion render src/index.ts Launch out/samudaya-launch.mp4 \
-  --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell
-```
+Rendering needs a Chromium that still supports old headless mode; Playwright's
+`chromium` is not one. The render scripts already point at the headless shell
+beside it, which is.
 
 ## Changing it
 
 - **The script** is `src/scenes.tsx` — one entry per scene, each with the
-  length it wants. `src/Root.tsx` picks which scenes each cut uses and how
-  long to hold them, so re-cutting is a list edit rather than a new timeline.
+  length it wants. `src/Root.tsx` picks which scenes each cut uses and how long
+  to hold them, so re-cutting is a list edit rather than a new timeline.
 - **The look** is `src/theme.ts`, which is the app's palette copied verbatim
   from `apps/web/src/app/globals.css`. Retune it there and here together.
-- **The shots** are `capture/harness/*/page.tsx`. Change the fabricated society
-  there, re-run `npm run capture`, and every scene updates.
+- **The journey** is `capture/record.mjs` — where the cursor goes, what it
+  clicks, how long it reads. Every stop is a named beat.
+- **The society** is `capture/harness/society/demo-data.ts`. One file, so the
+  total on Home is the total on Money and the event the ledger credits is the
+  event the Events page lists.
+- **The music** is `score/compose.mjs`: plucked notes with harmonics that decay
+  at different rates, two detuned sines per pad voice, D major pentatonic at
+  68bpm, no percussion. Written rather than licensed, because every other way
+  of getting a bed ends in a licence nobody on a committee can produce two
+  years later. It normalises to half scale, leaving about seven decibels for a
+  voiceover to sit on top of without a remix.
 
-`public/captures/` and `out/` are generated and git-ignored; both are rebuilt
-by the two commands above.
+`public/captures/`, `public/score-*.wav` and `out/` are generated and
+git-ignored; the commands above rebuild all of them.
 
-### A note on the recordings
+### The three files that are generated and committed
 
-`clips.json` is written by the capture and read by `scenes.tsx`. A Playwright
-recording opens on a blank page and a navigation — around two and a half
-seconds of nothing on the festival clip — so the capture times the interaction
-with the wall clock and writes down where it starts. Re-recording on a slower
-day cannot quietly push the interaction past the end of its scene.
+`scenes.tsx` imports them, so a clean clone has to typecheck before anybody has
+run a capture.
+
+- **`src/beats.json`** — every moment in the take, in seconds. The edit says
+  "two seconds before Money opened" rather than a frame number that the next
+  recording would invalidate. It also carries `lead`: Playwright starts
+  recording when the browser context opens, which is about three seconds before
+  the first navigation, so every beat is that much later in the file than in
+  the log. Measured from the file's own duration against the wall clock, not
+  guessed — guess it and the whole cut runs early.
+- **`src/clips.json`** — the same idea for the short single-control clips.
+- **`src/shots.json`** — what each still actually came out as. Shots are taken
+  `fullPage`, so their height is whatever the content needed that day; Remotion
+  pans by subtracting the viewport from it. Typed in by hand, that number goes
+  wrong silently the first time a ledger row is added.
+
+### What is not here yet
+
+Filming the real production app, signed in. That needs a session, which needs
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` and a way to mint a
+token, none of which belong in a repository. The staged society is the honest
+substitute: the same components and the same navigation, with residents who do
+not exist.

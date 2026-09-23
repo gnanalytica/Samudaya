@@ -3,27 +3,60 @@
     "width": 1440,
     "height": 900
   },
-  "signedIn": false,
+  "lead": 3.07,
+  "duration": 49.48,
   "beats": [
     {
       "name": "landing:top",
-      "at": 3.31
+      "at": 6.14
     },
     {
       "name": "landing:cta",
-      "at": 7.01
+      "at": 10.6
     },
     {
       "name": "landing:features",
-      "at": 9.63
+      "at": 13.2
     },
     {
-      "name": "landing:bottom",
-      "at": 13.44
+      "name": "app:home",
+      "at": 16.57
+    },
+    {
+      "name": "app:money",
+      "at": 23.07
+    },
+    {
+      "name": "app:ledger",
+      "at": 26.89
+    },
+    {
+      "name": "app:flat-gap",
+      "at": 29.7
+    },
+    {
+      "name": "app:ledger-end",
+      "at": 33.12
+    },
+    {
+      "name": "app:events",
+      "at": 36.44
+    },
+    {
+      "name": "app:contribute",
+      "at": 41.75
+    },
+    {
+      "name": "app:flat-named",
+      "at": 45.06
+    },
+    {
+      "name": "app:note",
+      "at": 48.68
     },
     {
       "name": "end",
-      "at": 14.64
+      "at": 48.68
     }
   ]
 }

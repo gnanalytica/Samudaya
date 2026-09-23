@@ -1,46 +1,79 @@
 import { AbsoluteFill, Audio, Sequence, interpolate, staticFile, useVideoConfig } from 'remotion';
 import { Bookend, Caption, Clip, PhoneShot, Shot, Statement } from './components';
 import { sec } from './theme';
-import timing from './clips.json';
+import clips from './clips.json';
+import shots from './shots.json';
+import take from './beats.json';
 
 /**
  * The script.
  *
  * One argument, told in the order a committee meets it: the problem everybody
- * already has, then the four screens that answer it, then what is left when
- * the event is over. Each scene knows its own length, so the two cuts are the
- * same scenes picked differently rather than two timelines to keep in step.
+ * already has, then the product answering it, then what is left when the event
+ * is over. Each scene knows its own length, so the two cuts are the same scenes
+ * picked differently rather than two timelines to keep in step.
  *
- * Captured sizes are the screenshots' CSS pixels — half the file's pixels,
- * because the capture runs at deviceScaleFactor 2 so text stays sharp when a
- * shot is scaled up.
+ * Most of it is one continuous recording of somebody using the app — landing
+ * page, home, the ledger, an event, paying for it — cut into scenes by the
+ * beats the recorder timestamped. A few shots are stills, where the scene wants
+ * a slow pan across something taller than a screen, or a phone.
  */
 
-const SHOTS = {
-  landing: { src: 'captures/landing.png', width: 1280, height: 1141 },
-  ledger: { src: 'captures/ledger.png', width: 1100, height: 1126 },
-  ledgerPhone: { src: 'captures/ledger-phone.png', width: 390, height: 1622 },
-  contribute: { src: 'captures/contribute.png', width: 1100, height: 900 },
-  closure: { src: 'captures/closure.png', width: 900, height: 700 },
-  closureChosen: { src: 'captures/closure-chosen.png', width: 900, height: 700 },
-} as const;
+/**
+ * Every still's real size, measured when it was taken.
+ *
+ * Shots are captured fullPage, so their height is whatever the content needed
+ * that day. Remotion pans by subtracting the viewport from that height, so a
+ * number typed in here by hand goes wrong the first time a ledger row is added:
+ * the pan stops early, or runs off the image into background. Imported instead.
+ */
+const SHOTS = shots;
 
 const WINDOW = { width: 1200, height: 700 };
 
-/**
- * Where to start each recording.
- *
- * A Playwright recording opens on a blank page and a navigation — two and a
- * half seconds of nothing, on the festival clip, before a key is pressed. The
- * capture measures it rather than anybody eyeballing it, so re-recording on a
- * slower day cannot quietly push the interaction past the end of its scene.
- */
-const startOf = (name: keyof typeof timing) => sec(timing[name].startSeconds);
+/** The continuous take, and where in it each moment happened. */
+const TAKE = { src: 'captures/take.webm', width: 1440, height: 900, scale: 0.94 };
 
-/** How far a shot can travel before it runs out of screenshot. */
-function travel(shot: { width: number; height: number }, scale: number, viewportHeight: number) {
-  return Math.max(0, shot.height - viewportHeight / scale);
+function beatAt(name: string) {
+  const found = take.beats.find((entry) => entry.name === name);
+  // Better to fail the render than to publish a cut that silently opens on the
+  // wrong page because a beat was renamed in the recorder and not here.
+  if (!found) throw new Error(`beats.json has no beat named "${name}"`);
+  return found.at;
 }
+
+/**
+ * A slice of the take.
+ *
+ * `lead` is how long before the beat to start, because a beat marks the moment
+ * something arrived — the Money page, the chosen flat — and a scene that opens
+ * there has already missed the click that caused it.
+ */
+function Take({
+  at,
+  lead = 1.8,
+  hold,
+  label,
+}: {
+  at: string;
+  lead?: number;
+  hold: number;
+  label: string;
+}) {
+  return (
+    <Clip {...TAKE} hold={hold} label={label} startFrom={sec(Math.max(0, beatAt(at) - lead))} />
+  );
+}
+
+/**
+ * Where to start each of the short recordings.
+ *
+ * A Playwright recording opens on a blank page and a navigation — a couple of
+ * seconds of nothing before a key is pressed. The capture measures it rather
+ * than anybody eyeballing it, so re-recording on a slower day cannot quietly
+ * push the interaction past the end of its scene.
+ */
+const startOf = (name: keyof typeof clips) => sec(clips[name].startSeconds);
 
 /** A framed shot with its caption, which is how every screen scene is built. */
 function Scene({
@@ -96,25 +129,15 @@ export const SCENES: Record<string, SceneSpec> = {
 
   landing: {
     id: 'landing',
-    hold: sec(7),
-    node: (hold) => {
-      const scale = WINDOW.width / SHOTS.landing.width;
-      return (
-        <Scene
-          hold={hold}
-          caption="One place for the whole society — not a group chat and a notebook."
-        >
-          <Shot
-            {...SHOTS.landing}
-            viewport={WINDOW}
-            from={{ scale, x: 0, y: 0 }}
-            to={{ scale, x: 0, y: travel(SHOTS.landing, scale, WINDOW.height) }}
-            hold={hold}
-            label="samudaya.app"
-          />
-        </Scene>
-      );
-    },
+    hold: sec(8),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="One place for the whole society — not a group chat and a notebook."
+      >
+        <Take at="landing:top" lead={1.2} hold={hold} label="samudaya.app" />
+      </Scene>
+    ),
   },
 
   startEvent: {
@@ -150,46 +173,15 @@ export const SCENES: Record<string, SceneSpec> = {
     node: (hold) => <Statement lines={['Then the flats pay.']} hold={hold} />,
   },
 
-  contribute: {
-    id: 'contribute',
-    hold: sec(8),
-    node: (hold) => {
-      const scale = WINDOW.width / SHOTS.contribute.width;
-      return (
-        <Scene
-          hold={hold}
-          caption="The society's own UPI ID, and a note that names the flat. Samudaya never touches the money."
-        >
-          <Shot
-            {...SHOTS.contribute}
-            viewport={WINDOW}
-            from={{ scale, x: 0, y: 0 }}
-            to={{ scale, x: 0, y: travel(SHOTS.contribute, scale, WINDOW.height) }}
-            hold={hold}
-            label="Contribute"
-          />
-        </Scene>
-      );
-    },
-  },
-
-  flat: {
-    id: 'flat',
-    hold: sec(8),
+  openApp: {
+    id: 'openApp',
+    hold: sec(5.5),
     node: (hold) => (
       <Scene
         hold={hold}
-        caption="No flat on record? It asks — before the note is copied, not after the money has gone."
+        caption="What the society is running, and what its money looks like, on the way in."
       >
-        <Clip
-          src="captures/flat.webm"
-          width={900}
-          height={760}
-          scale={0.96}
-          hold={hold}
-          label="Contribute"
-          startFrom={startOf('flat')}
-        />
+        <Take at="app:home" lead={2} hold={hold} label="Shanti Nivas · Home" />
       </Scene>
     ),
   },
@@ -200,27 +192,53 @@ export const SCENES: Record<string, SceneSpec> = {
     node: (hold) => <Statement lines={['Every rupee lands in one ledger.']} hold={hold} />,
   },
 
-  ledger: {
-    id: 'ledger',
-    hold: sec(14),
-    node: (hold) => {
-      const scale = WINDOW.width / SHOTS.ledger.width;
-      return (
-        <Scene
-          hold={hold}
-          caption="Who paid, which flat, how it arrived — and which committee member confirmed it."
-        >
-          <Shot
-            {...SHOTS.ledger}
-            viewport={WINDOW}
-            from={{ scale, x: 0, y: 0 }}
-            to={{ scale, x: 0, y: travel(SHOTS.ledger, scale, WINDOW.height) }}
-            hold={hold}
-            label="Money"
-          />
-        </Scene>
-      );
-    },
+  ledgerLive: {
+    id: 'ledgerLive',
+    hold: sec(9),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Who paid, which flat, how it arrived — and which committee member confirmed it."
+      >
+        <Take at="app:money" lead={2.2} hold={hold} label="Shanti Nivas · Money" />
+      </Scene>
+    ),
+  },
+
+  flatGap: {
+    id: 'flatGap',
+    hold: sec(4.5),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Nobody listed this neighbour at a door. The ledger says so, rather than leaving a blank."
+      >
+        <Take at="app:flat-gap" lead={1} hold={hold} label="Shanti Nivas · Money" />
+      </Scene>
+    ),
+  },
+
+  eventsLive: {
+    id: 'eventsLive',
+    hold: sec(4),
+    node: (hold) => (
+      <Scene hold={hold} caption="Every event the society has run, is running, and has planned.">
+        <Take at="app:events" lead={2} hold={hold} label="Shanti Nivas · Events" />
+      </Scene>
+    ),
+  },
+
+  contributeLive: {
+    id: 'contributeLive',
+    hold: sec(9.5),
+    node: (hold) => (
+      <Scene
+        hold={hold}
+        caption="Name your flat and the payment note writes itself. Samudaya never touches the money."
+      >
+        <Take at="app:contribute" lead={2.6} hold={hold} label="Shanti Nivas · Contribute" />
+      </Scene>
+    ),
   },
 
   whenItCloses: {
@@ -256,7 +274,7 @@ export const SCENES: Record<string, SceneSpec> = {
         caption="Keep it for the society, or put it behind the next event — and say which."
       >
         <Shot
-          {...SHOTS.closureChosen}
+          {...SHOTS['closure-chosen']}
           viewport={{ width: 900, height: 700 }}
           from={{ scale: 1, x: 0, y: 0 }}
           to={{ scale: 1, x: 0, y: 0 }}
@@ -291,14 +309,17 @@ export const SCENES: Record<string, SceneSpec> = {
   phone: {
     id: 'phone',
     hold: sec(8),
-    node: (hold) => (
-      <Scene
-        hold={hold}
-        caption="The same ledger on the phone, which is where most of the society will read it."
-      >
-        <PhoneShot {...SHOTS.ledgerPhone} from={0} to={740} hold={hold} />
-      </Scene>
-    ),
+    node: (hold) => {
+      const phone = SHOTS['ledger-phone'];
+      return (
+        <Scene
+          hold={hold}
+          caption="The same ledger on the phone, which is where most of the society will read it."
+        >
+          <PhoneShot {...phone} from={0} to={Math.max(0, phone.height - 844)} hold={hold} />
+        </Scene>
+      );
+    },
   },
 
   close: {

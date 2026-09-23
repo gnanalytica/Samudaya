@@ -1,0 +1,22 @@
+{
+  "ledger": {
+    "src": "captures/ledger.png",
+    "width": 1100,
+    "height": 1275
+  },
+  "ledger-phone": {
+    "src": "captures/ledger-phone.png",
+    "width": 390,
+    "height": 1964
+  },
+  "closure": {
+    "src": "captures/closure.png",
+    "width": 900,
+    "height": 700
+  },
+  "closure-chosen": {
+    "src": "captures/closure-chosen.png",
+    "width": 900,
+    "height": 700
+  }
+}

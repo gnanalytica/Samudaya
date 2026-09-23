@@ -20,9 +20,10 @@
  */
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { cp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEMO_BASE, HIDE_DEV_BADGE, stageRoutes, unstageRoutes } from './stage.mjs';
 
 // Playwright is installed globally in this environment rather than as a
 // dependency of this package, which is also why the browser is never
@@ -33,8 +34,6 @@ const { chromium } = require('playwright');
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
 const WEB = join(REPO, 'apps', 'web');
-const STAGE = join(WEB, 'src', 'app', 'zz-demo');
-const PROXY = join(WEB, 'src', 'proxy.ts');
 const OUT = join(HERE, '..', 'public', 'captures');
 const PORT = 3123;
 // Next only hydrates its dev chunks over `localhost`; on 127.0.0.1 it treats
@@ -53,41 +52,18 @@ const env = {
 /** Where the interaction actually begins inside each recording. */
 const clipTiming = {};
 
-const log = (message) => console.log(`\x1b[36m▸\x1b[0m ${message}`);
-
 /**
- * next dev paints a floating badge over the bottom-left corner of every page.
- * It is invisible to everyone who works on the app and glaring in a still.
+ * What each still actually came out as.
+ *
+ * Every shot is taken fullPage, so its height is whatever the content needed
+ * that day — add a ledger row and it grows. Remotion pans by subtracting the
+ * viewport from that height, so a number typed into the scenes by hand goes
+ * wrong silently: the pan stops early, or runs off the bottom of the image
+ * into background. Measured here instead, at the moment the file is written.
  */
-const HIDE_DEV_BADGE = 'nextjs-portal { display: none !important; }';
+const shotSizes = {};
 
-async function stageRoutes() {
-  log('writing the throwaway routes');
-  await rm(STAGE, { recursive: true, force: true });
-  await cp(join(HERE, 'harness'), STAGE, { recursive: true });
-  // The proxy sends a signed-out visitor to /login, which would photograph
-  // very well and show nothing.
-  const proxy = await readFile(PROXY, 'utf8');
-  await writeFile(`${PROXY}.demo-backup`, proxy);
-  await writeFile(
-    PROXY,
-    proxy.replace('const PUBLIC_PATHS = [', "const PUBLIC_PATHS = [\n  '/zz-demo',"),
-  );
-}
-
-async function unstageRoutes() {
-  log('removing the throwaway routes');
-  await rm(STAGE, { recursive: true, force: true });
-  const backup = `${PROXY}.demo-backup`;
-  await cp(backup, PROXY).catch(() => {});
-  await rm(backup, { force: true });
-  // next dev leaves generated types behind that name routes which no longer
-  // exist, and tsc fails on them long after this script has forgotten it ran.
-  await rm(join(WEB, '.next', 'dev'), { recursive: true, force: true });
-  await rm(join(WEB, '.next', 'types'), { recursive: true, force: true });
-  // next dev also rewrites next-env.d.ts to point into .next/dev.
-  spawn('git', ['checkout', '--', 'apps/web/next-env.d.ts'], { cwd: REPO, stdio: 'ignore' });
-}
+const log = (message) => console.log(`\x1b[36m▸\x1b[0m ${message}`);
 
 function startServer() {
   log(`starting next dev on ${PORT}`);
@@ -104,7 +80,7 @@ function startServer() {
 async function waitForServer(page) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
     try {
-      const response = await page.goto(`${BASE}/zz-demo/ledger`, { timeout: 4000 });
+      const response = await page.goto(`${BASE}${DEMO_BASE}/money`, { timeout: 4000 });
       if (response && response.status() < 400) return;
     } catch {
       /* not up yet */
@@ -129,7 +105,15 @@ async function still(browser, { name, path, width, height, before }) {
   // leaves dead space at the bottom, and dead space in a still is dead space
   // in the frame once Remotion pans across it.
   await page.screenshot({ path: join(OUT, `${name}.png`), fullPage: true });
-  log(`shot ${name} (${width}×${height})`);
+  // Its own CSS pixels, not the file's: the capture runs at deviceScaleFactor
+  // 2 so text stays sharp when a shot is scaled up, and the scenes lay out in
+  // CSS pixels. Read from the page rather than the PNG header for that reason.
+  const size = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
+  }));
+  shotSizes[name] = { src: `captures/${name}.png`, ...size };
+  log(`shot ${name} (${size.width}×${size.height})`);
   await page.close();
 }
 
@@ -177,7 +161,7 @@ async function clip(browser, { name, path, width, height, act }) {
 
 async function main() {
   await mkdir(OUT, { recursive: true });
-  await stageRoutes();
+  await stageRoutes(log);
   const server = startServer();
   let browser;
 
@@ -190,30 +174,15 @@ async function main() {
     // ---- the ledger, which is the whole argument for the product ----------
     await still(browser, {
       name: 'ledger',
-      path: '/zz-demo/ledger',
+      path: `${DEMO_BASE}/money`,
       width: 1100,
       height: 900,
     });
     await still(browser, {
       name: 'ledger-phone',
-      path: '/zz-demo/ledger',
+      path: `${DEMO_BASE}/money`,
       width: 390,
       height: 844,
-    });
-
-    // ---- the landing page, which is real and needs no set at all ---------
-    await still(browser, { name: 'landing', path: '/', width: 1280, height: 800 });
-
-    // ---- contributing, before and after the flat is answered -------------
-    await still(browser, {
-      name: 'contribute',
-      path: '/zz-demo/contribute',
-      width: 1100,
-      height: 900,
-      before: async (page) => {
-        await page.locator('select').first().selectOption({ index: 2 });
-        await page.waitForTimeout(300);
-      },
     });
 
     // ---- closing an event: two answers, not three ------------------------
@@ -256,28 +225,20 @@ async function main() {
       },
     });
 
-    // ---- the flat question, and the note answering it --------------------
-    await clip(browser, {
-      name: 'flat',
-      path: '/zz-demo/contribute',
-      width: 900,
-      height: 760,
-      act: async (page) => {
-        await page.waitForTimeout(500);
-        await page.locator('select').first().selectOption({ index: 1 });
-        await page.waitForTimeout(1600);
-      },
-    });
     // Beside the source, not with the captures: scenes.tsx imports it, so a
     // clean clone has to typecheck before anybody has run a capture.
     await writeFile(
       join(HERE, '..', 'src', 'clips.json'),
       `${JSON.stringify(clipTiming, null, 2)}\n`,
     );
+    await writeFile(
+      join(HERE, '..', 'src', 'shots.json'),
+      `${JSON.stringify(shotSizes, null, 2)}\n`,
+    );
   } finally {
     if (browser) await browser.close();
     server.kill('SIGTERM');
-    await unstageRoutes();
+    await unstageRoutes(log);
   }
 
   log('done — captures are in video/public/captures');

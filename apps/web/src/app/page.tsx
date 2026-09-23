@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { CalendarDays, ClipboardList, MessageCircle, Receipt, Vote, Wallet } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button';
+import { DemoVideo } from './demo-video';
 import { getCurrentUser } from '@/lib/auth';
 
 const FEATURES = [
@@ -86,7 +87,7 @@ export default async function LandingPage(props: PageProps<'/'>) {
           </div>
         ) : null}
 
-        <section className="mx-auto max-w-5xl px-6 pt-12 pb-16 sm:pt-20">
+        <section className="mx-auto max-w-5xl px-6 pt-12 pb-10 sm:pt-20">
           <p className="text-accent text-sm font-medium">समुदाय · community</p>
           <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
             Plan together. Participate together. Spend transparently.
@@ -108,6 +109,16 @@ export default async function LandingPage(props: PageProps<'/'>) {
             Residents join with the code their committee shares, and staff approve each one. Setting
             your society up for the first time? You don’t need a code.
           </p>
+        </section>
+
+        <section className="mx-auto max-w-5xl px-6 pb-16">
+          <figure className="border-border-base overflow-hidden rounded-2xl border shadow-sm">
+            <DemoVideo />
+            <figcaption className="text-ink-subtle border-border-base bg-surface-raised border-t px-5 py-3 text-sm">
+              Forty seconds, captioned. Every screen is the app&rsquo;s own — the society, the
+              neighbours and the amounts are invented.
+            </figcaption>
+          </figure>
         </section>
 
         <section className="border-border-base bg-surface-sunken border-t">

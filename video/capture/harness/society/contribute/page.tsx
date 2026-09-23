@@ -1,5 +1,12 @@
 /* eslint-disable */
-// Generated set for the demo video — see video/capture/capture.mjs.
+// Generated set for the demo video. Copied into apps/web/src/app/zz-demo/ by
+// video/capture/stage.mjs and deleted again when the capture finishes.
+//
+// The real Contribute form, with an event's worth of props handed to it. The
+// flat question at the top of it is the app's own: it appears because this
+// society has no flat on record for the payer, which is exactly when a
+// resident sees it.
+import { PageBody, PageHeader } from '@/components/page-header';
 import { ContributeForm } from '@/app/app/[community]/events/[event]/contribute/contribute-form';
 
 const flats = [
@@ -9,17 +16,15 @@ const flats = [
   { id: 'u4', block: 'B', number: '1104' },
 ];
 
-export default function Harness() {
+export default function DemoContribute() {
   return (
-    <div className="bg-surface min-h-screen p-8">
-      <div className="mx-auto max-w-3xl">
-        <h1 className="text-ink text-3xl font-semibold tracking-tight">
-          Support Ganesh Chaturthi 2026
-        </h1>
-        <p className="text-ink-muted mt-1 text-sm">
-          Your contribution goes to the Ganesh Chaturthi 2026 fund and nowhere else.
-        </p>
-        <div className="mt-6">
+    <>
+      <PageHeader
+        title="Support Ganesh Chaturthi 2026"
+        description="Your contribution goes to the Ganesh Chaturthi 2026 fund and nowhere else."
+      />
+      <PageBody>
+        <div className="max-w-3xl">
           <ContributeForm
             slug="shanti-nivas"
             eventSlug="ganesh-chaturthi-2026"
@@ -33,7 +38,7 @@ export default function Harness() {
             proofFolder="demo/demo"
           />
         </div>
-      </div>
-    </div>
+      </PageBody>
+    </>
   );
 }

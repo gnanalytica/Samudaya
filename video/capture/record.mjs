@@ -2,11 +2,16 @@
  * Films the app being used, rather than photographed.
  *
  * capture.mjs takes stills of components and Remotion pans across them. That
- * reads as a brochure. This drives the real app with a real cursor — moves
- * that accelerate and settle, clicks that land visibly, pages that actually
+ * reads as a brochure. This drives the app with a real cursor — moves that
+ * accelerate and settle, clicks that land visibly, pages that actually
  * transition — and records the whole journey as one continuous take. Remotion
- * then cuts it, which is the right order: the footage is a recording of the
- * product working, and the edit is an edit.
+ * then cuts it, which is the right order round: the footage is a recording of
+ * the product working, and the edit is an edit.
+ *
+ * What it films is the demo society, staged by stage.mjs and served at
+ * /app/shanti-nivas, so the sidebar, the switcher, the profile menu and the
+ * bottom bar are the app's own and the navigation between pages is the app's
+ * own too. Invented residents, real product.
  *
  * Playwright draws no cursor of its own (its mouse is synthetic, so there is
  * nothing for the compositor to capture), which is why every screen recording
@@ -18,19 +23,20 @@
  * frame number that a re-record would invalidate.
  *
  *   node capture/record.mjs
- *
- * Signed-in flows need NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY
- * and SUPABASE_SERVICE_ROLE_KEY in the environment. Without them this records
- * only what a signed-out visitor can reach, and says so.
  */
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { promisify } from 'node:util';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { DEMO_BASE, stageRoutes, unstageRoutes } from './stage.mjs';
 
 const require = createRequire('/opt/node22/lib/node_modules/');
 const { chromium } = require('playwright');
+// ffmpeg is a dependency of this package, not a global one like Playwright.
+const ffmpeg = createRequire(import.meta.url)('ffmpeg-static');
+const run = promisify(execFile);
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = join(HERE, '..', '..');
@@ -41,10 +47,6 @@ const PORT = 3124;
 // them as cross-origin and blocks them, so nothing on the page would work.
 const BASE = `http://localhost:${PORT}`;
 const VIEW = { width: 1440, height: 900 };
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const signedIn = Boolean(supabaseUrl && anonKey && !supabaseUrl.includes('placeholder'));
 
 const log = (message) => console.log(`\x1b[36m▸\x1b[0m ${message}`);
 
@@ -164,6 +166,20 @@ async function press(page, locator, { settle = 420 } = {}) {
 }
 
 /**
+ * Waits for the page you actually asked for.
+ *
+ * waitForLoadState('networkidle') answers as soon as nothing is in flight,
+ * which on a client-side transition can be before the new page exists at all —
+ * and in dev, where the route is compiled on first request, several seconds
+ * before. The take then films the old page and misses the interaction. Waiting
+ * for something only the destination has cannot resolve early.
+ */
+async function arrived(page, locator, timeout = 20_000) {
+  await locator.first().waitFor({ state: 'visible', timeout });
+  await page.waitForTimeout(500);
+}
+
+/**
  * Scrolling the way a reader does: eased, and slow enough that the text is
  * legible on the way past. A wheel event jumps, which in a video about a
  * ledger means the evidence goes by unread.
@@ -191,9 +207,7 @@ async function readDown(page, distance, ms = 2200) {
 // The dev server
 // ---------------------------------------------------------------------------
 function startServer() {
-  log(
-    `starting next dev on ${PORT}${signedIn ? ' against the real project' : ' (signed-out only)'}`,
-  );
+  log(`starting next dev on ${PORT}`);
   return spawn(
     'node',
     [join(REPO, 'node_modules', 'next', 'dist', 'bin', 'next'), 'dev', '-p', String(PORT)],
@@ -201,9 +215,11 @@ function startServer() {
       cwd: WEB,
       env: {
         ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: supabaseUrl ?? 'https://placeholder.supabase.co',
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: anonKey ?? 'placeholder-anon-key',
-        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? 'placeholder',
+        // The demo society is rendered from a file, not from a project, so
+        // these only have to be present. Nothing here reads a real row.
+        NEXT_PUBLIC_SUPABASE_URL: 'https://placeholder.supabase.co',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: 'placeholder-anon-key',
+        SUPABASE_SERVICE_ROLE_KEY: 'placeholder-service-role-key',
         NEXT_PUBLIC_SITE_URL: BASE,
       },
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -214,7 +230,7 @@ function startServer() {
 async function waitForServer(page) {
   for (let attempt = 0; attempt < 90; attempt += 1) {
     try {
-      const response = await page.goto(BASE, { timeout: 4000 });
+      const response = await page.goto(`${BASE}${DEMO_BASE}`, { timeout: 4000 });
       if (response && response.status() < 400) return;
     } catch {
       /* not up yet */
@@ -224,11 +240,44 @@ async function waitForServer(page) {
   throw new Error('next dev never came up');
 }
 
+/**
+ * Visits every page the take will visit, before the camera is on.
+ *
+ * next dev compiles a route the first time it is asked for, which takes
+ * seconds. Inside a recording that is a freeze in the middle of a click, and
+ * no amount of waiting afterwards gets the time back. Paid for here instead,
+ * where nothing is being filmed.
+ */
+async function warm(page) {
+  const routes = [
+    '/',
+    DEMO_BASE,
+    `${DEMO_BASE}/money`,
+    `${DEMO_BASE}/events`,
+    `${DEMO_BASE}/contribute`,
+  ];
+  for (const route of routes) {
+    await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle' });
+  }
+  log(`warmed ${routes.length} routes`);
+}
+
+/** How long the recording ran, read from the file rather than guessed. */
+async function videoSeconds(file) {
+  // ffmpeg-static ships no ffprobe, and -i alone exits non-zero after printing
+  // the header, which is where the duration is.
+  const { stderr } = await run(ffmpeg, ['-i', file]).catch((error) => error);
+  const match = /Duration:\s*(\d+):(\d+):(\d+\.\d+)/.exec(stderr ?? '');
+  if (!match) return null;
+  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+}
+
 // ---------------------------------------------------------------------------
 // The take
 // ---------------------------------------------------------------------------
 async function main() {
   await mkdir(OUT, { recursive: true });
+  await stageRoutes(log);
   const server = startServer();
   let browser;
   const beats = [];
@@ -243,6 +292,7 @@ async function main() {
     browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
     const probe = await browser.newPage();
     await waitForServer(probe);
+    await warm(probe);
     await probe.close();
 
     const context = await browser.newContext({
@@ -279,35 +329,103 @@ async function main() {
     beat('landing:features');
     await page.waitForTimeout(1400);
 
-    await readDown(page, 620, 2400);
-    beat('landing:bottom');
-    await page.waitForTimeout(1200);
+    // ---- inside the society ----------------------------------------------
+    await page.goto(`${BASE}${DEMO_BASE}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1100);
+    beat('app:home');
+    // Across the three figures, left to right, the way anybody reads them.
+    await glide(page, 480, 300, 800);
+    await page.waitForTimeout(500);
+    await glide(page, 900, 300, 700);
+    await page.waitForTimeout(900);
 
-    if (!signedIn) {
-      log('no Supabase credentials in the environment — stopping after the public pages');
-      beat('end');
-    } else {
-      // The signed-in journey goes here once the environment carries the keys.
-      beat('end');
+    // The sidebar is the app's own, so this is the app's own navigation.
+    await press(page, page.getByRole('link', { name: 'Money', exact: true }).first());
+    await arrived(page, page.getByText('Every transaction'));
+    await page.waitForTimeout(900);
+    beat('app:money');
+
+    await readDown(page, 520, 2600);
+    await page.waitForTimeout(1200);
+    beat('app:ledger');
+
+    // The row the flat question exists for: a neighbour nobody had listed at
+    // a door. It says so, rather than leaving a space that reads as a bug.
+    const gap = page.getByText('Flat not recorded').first();
+    if (await gap.count()) {
+      await glideTo(page, gap, 900);
+      await page.waitForTimeout(1500);
+      beat('app:flat-gap');
     }
 
+    await readDown(page, 520, 2400);
+    await page.waitForTimeout(1000);
+    beat('app:ledger-end');
+
+    await press(page, page.getByRole('link', { name: 'Events', exact: true }).first());
+    await arrived(page, page.getByText('All events'));
+    await page.waitForTimeout(1000);
+    beat('app:events');
+    await glide(page, 760, 360, 800);
+    await page.waitForTimeout(1200);
+
+    // Into the event that is collecting, which is where a resident pays.
+    await press(page, page.getByRole('link', { name: /Ganesh Chaturthi 2026/i }).first());
+    await arrived(page, page.getByText('Which flat is this payment for?'));
+    await page.waitForTimeout(1000);
+    beat('app:contribute');
+
+    // Naming the flat, before the note that carries it is copied.
+    const flat = page.locator('select').first();
+    if (await flat.count()) {
+      await glideTo(page, flat, 800);
+      await page.waitForTimeout(500);
+      await flat.selectOption({ index: 1 });
+      await page.waitForTimeout(1800);
+      beat('app:flat-named');
+    }
+
+    await readDown(page, 420, 2000);
+    await page.waitForTimeout(1600);
+    beat('app:note');
+
+    beat('end');
     await page.waitForTimeout(800);
+
     const video = page.video();
+    const closedAt = Date.now();
     await context.close();
-    await video.saveAs(join(OUT, 'take.webm'));
+    const file = join(OUT, 'take.webm');
+    await video.saveAs(file);
     await rm(join(OUT, 'take-raw'), { recursive: true, force: true });
+
+    // Recording starts when the context opens, which is before the clock the
+    // beats are measured against — a blank page and a navigation, and in this
+    // container about two and a half seconds of it. Every beat is that much
+    // later in the file than it is in the log, so the edit would cut early
+    // all the way through. Measured, not guessed: the file knows how long it
+    // is, and the wall clock knows how long the take was.
+    const duration = await videoSeconds(file);
+    const lead = duration ? Math.max(0, duration - (closedAt - opened) / 1000) : 0;
 
     await writeFile(
       join(HERE, '..', 'src', 'beats.json'),
-      `${JSON.stringify({ viewport: VIEW, signedIn, beats }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          viewport: VIEW,
+          lead: Number(lead.toFixed(2)),
+          duration: duration ? Number(duration.toFixed(2)) : null,
+          beats: beats.map((entry) => ({ ...entry, at: Number((entry.at + lead).toFixed(2)) })),
+        },
+        null,
+        2,
+      )}\n`,
     );
-    log(`take saved — ${beats.length} beats`);
+    log(`take saved — ${beats.length} beats, ${lead.toFixed(2)}s lead-in`);
   } finally {
     if (browser) await browser.close();
     server.kill('SIGTERM');
-    await rm(join(WEB, '.next', 'dev'), { recursive: true, force: true });
-    await rm(join(WEB, '.next', 'types'), { recursive: true, force: true });
-    spawn('git', ['checkout', '--', 'apps/web/next-env.d.ts'], { cwd: REPO, stdio: 'ignore' });
+    await unstageRoutes(log);
   }
 }
 
