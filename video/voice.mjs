@@ -35,8 +35,14 @@ const SPEED = 0.95;
  */
 const PRONOUNCE = [['sˈæmjuːdˌeɪə', 'səmʊdˈɑːjə']];
 
-/** Loudness the clips are levelled to: the music bed sits at about −19 dB and ducks under this. */
-const TARGET_DB = -17;
+/**
+ * Loudness the clips are levelled to, before the mix: about −16 dB, with the
+ * music ducked to about −33 under it — some 15 dB of room, enough for a phone
+ * speaker in a noisy room. The clips are written in stereo, because a mono
+ * clip comes out of Remotion's stereo mix 3 dB down, and they are compressed
+ * first, because otherwise the loudest consonant sets the level of the voice.
+ */
+const TARGET_DB = -16;
 const PEAK = 0.89; // −1 dBFS
 
 const lines = JSON.parse(await readFile(SCRIPT, 'utf8'));
@@ -66,6 +72,30 @@ function trim(samples, rate) {
   return samples.slice(Math.max(0, start - pad), Math.min(samples.length, end + pad));
 }
 
+/**
+ * A gentle compressor: 3:1 above −20 dBFS, 5 ms attack, 120 ms release, on a
+ * clip already peaking at −1 dBFS. It takes the edge off plosives so the
+ * levelling below can bring the whole voice up, rather than stopping as soon
+ * as the loudest "p" reaches the ceiling.
+ */
+function compress(samples, rate) {
+  const threshold = 10 ** (-20 / 20);
+  const ratio = 3;
+  const attack = Math.exp(-1 / (0.005 * rate));
+  const release = Math.exp(-1 / (0.12 * rate));
+  const peak = samples.reduce((top, value) => Math.max(top, Math.abs(value)), 0);
+  let envelope = 0;
+  return samples.map((raw) => {
+    const value = (raw / peak) * PEAK;
+    const level = Math.abs(value);
+    const k = level > envelope ? attack : release;
+    envelope = k * envelope + (1 - k) * level;
+    const gain =
+      envelope > threshold ? (threshold * (envelope / threshold) ** (1 / ratio)) / envelope : 1;
+    return value * gain;
+  });
+}
+
 /** Level to TARGET_DB RMS, then hold the peaks under −1 dBFS. */
 function level(samples) {
   const rms = Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length);
@@ -75,11 +105,13 @@ function level(samples) {
   return samples.map((value) => value * gain);
 }
 
-/** 16-bit PCM mono WAV, which every decoder in the pipeline reads. */
+/** 16-bit PCM stereo WAV, the same on both sides, which every decoder in the pipeline reads. */
 function wav(samples, rate) {
-  const data = Buffer.alloc(samples.length * 2);
+  const data = Buffer.alloc(samples.length * 4);
   samples.forEach((value, index) => {
-    data.writeInt16LE(Math.round(Math.max(-1, Math.min(1, value)) * 32767), index * 2);
+    const sample = Math.round(Math.max(-1, Math.min(1, value)) * 32767);
+    data.writeInt16LE(sample, index * 4);
+    data.writeInt16LE(sample, index * 4 + 2);
   });
   const header = Buffer.alloc(44);
   header.write('RIFF', 0);
@@ -88,10 +120,10 @@ function wav(samples, rate) {
   header.write('fmt ', 12);
   header.writeUInt32LE(16, 16);
   header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
+  header.writeUInt16LE(2, 22);
   header.writeUInt32LE(rate, 24);
-  header.writeUInt32LE(rate * 2, 28);
-  header.writeUInt16LE(2, 32);
+  header.writeUInt32LE(rate * 4, 28);
+  header.writeUInt16LE(4, 32);
   header.writeUInt16LE(16, 34);
   header.write('data', 36);
   header.writeUInt32LE(data.length, 40);
@@ -104,7 +136,7 @@ for (const [id, text] of Object.entries(lines)) {
   const phonemes = await phonemesOf(text);
   const { input_ids } = tts.tokenizer(phonemes, { truncation: true });
   const audio = await tts.generate_from_ids(input_ids, { voice: VOICE, speed: SPEED });
-  const samples = level(trim(audio.audio, audio.sampling_rate));
+  const samples = level(compress(trim(audio.audio, audio.sampling_rate), audio.sampling_rate));
   await writeFile(join(OUT, `${id}.wav`), wav(samples, audio.sampling_rate));
   const seconds = Math.round((samples.length / audio.sampling_rate) * 100) / 100;
   timings[id] = { text, seconds };

@@ -379,12 +379,13 @@ export function Narration() {
 }
 
 /**
- * How loud the music is under the voice: 0.28, about 11 dB down, which puts
- * the bed near −30 dB under a voice levelled to −17. It dips just before a
- * line and comes back up gently after, so the music breathes between lines
- * rather than pumping.
+ * How loud the music is under the voice: 0.2, about 14 dB down, which puts
+ * the bed near −33 dB under a voice at about −17 — some 15 dB of room, enough
+ * for a phone speaker. At 0.28 it measured 6 dB, which is a voice fighting
+ * its music. It dips just before a line and comes back up gently after, so
+ * the music breathes between lines rather than pumping.
  */
-const DUCKED = 0.28;
+const DUCKED = 0.2;
 export function duck(frame: number) {
   let depth = 0;
   for (const { from, to } of spoken()) {

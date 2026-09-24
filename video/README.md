@@ -146,13 +146,14 @@ standard as captions. They have to be true of the product as shipped,
 exceptions included, and `apps/web/test/demo-video-claims.test.ts` checks the
 own-money rule never loses its one-person-committee exception.
 
-`npm run voice` records them with [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M)
-(Apache-2.0), run locally through `kokoro-js`: no API key, and nothing leaves
-the machine. The voice is "Heart", the one Kokoro's authors grade highest, at
-0.95 of its natural pace. The phonemiser says Samudaya as "SAM-you-day-uh", so
-`voice.mjs` swaps in the right sounds (sa-mu-DAA-ya) before the model reads the
-line. Clips are trimmed and levelled to about −17 dB. The music ducks about
-11 dB under each line and comes back up between lines.
+`npm run voice` records them with
+[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), run locally
+through `kokoro-js`: no API key, and nothing leaves the machine. The voice is
+"Heart", the one Kokoro's authors grade highest, at 0.95 of its natural pace.
+The phonemiser says Samudaya as "SAM-you-day-uh", so `voice.mjs` swaps in the
+right sounds (sa-mu-DAA-ya) before the model reads the line. Clips are trimmed
+and levelled so the voice sits near −17 dB in the finished mix, and the music
+ducks about 14 dB under each line, giving the voice some 15 dB of room.
 
 It writes `public/voice/*.wav` (git-ignored) and `src/voice.json` (committed),
 which records each clip's words and length. The timeline gives every shot long
