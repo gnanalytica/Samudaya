@@ -7,6 +7,7 @@ import {
   countdown,
   formatDate,
   formatMoney,
+  fundAsk,
   fundBarSegments,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
@@ -168,17 +169,28 @@ export default function Events() {
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Caption>
                         {formatMoney(item.stats?.fundRaised ?? 0, currency)} of{' '}
-                        {formatMoney(item.stats?.fundTarget ?? item.fund_target, currency)}
+                        {formatMoney(
+                          fundAsk(
+                            item.stats?.fundTarget ?? item.fund_target,
+                            item.stats?.fundCarried ?? 0,
+                          ),
+                          currency,
+                        )}
                       </Caption>
                       <Caption>{funded}%</Caption>
                     </View>
                     <Meter
                       percent={funded}
                       pendingPercent={fundBar.pending}
-                      carriedPercent={fundBar.carried}
                       tone="success"
                       label="Fund progress"
                     />
+                    {(item.stats?.fundCarried ?? 0) > 0 ? (
+                      <Caption>
+                        After {formatMoney(item.stats?.fundCarried ?? 0, currency)} carried across
+                        by the committee
+                      </Caption>
+                    ) : null}
                   </View>
                 ) : item.status === 'proposed' ? (
                   <Caption>Target {formatMoney(item.fund_target, currency)}</Caption>

@@ -4,12 +4,15 @@ import {
   SURPLUS_ANSWERS,
   SURPLUS_CHOICES,
   surplusKindFor,
+  UNPUBLISHED_EVENT,
   addsToBalance,
   allocateSurplusSchema,
   fundMovementLine,
+  holdingNote,
   nextEditionDate,
   nextEditionName,
   spendBalanceSchema,
+  whereTheBalanceIs,
 } from '../src/funds';
 
 const EVENT = '11111111-1111-4111-8111-111111111111';
@@ -44,7 +47,7 @@ describe('the log behind the society balance', () => {
         amount: 500,
         to_event: { name: 'Pongal 2027' },
       }),
-    ).toBe('₹500 from the society balance, put behind Pongal 2027');
+    ).toBe('₹500 the society had kept, put behind Pongal 2027');
   });
 
   it('still reads as a sentence when an event has been deleted under it', () => {
@@ -157,5 +160,76 @@ describe('spending the balance', () => {
   it('refuses zero and below', () => {
     expect(spendBalanceSchema.safeParse({ to_event_id: EVENT, amount: 0 }).success).toBe(false);
     expect(spendBalanceSchema.safeParse({ to_event_id: EVENT, amount: -5 }).success).toBe(false);
+  });
+});
+
+describe('where the balance is', () => {
+  // Shaped like the society that asked: ₹7,830 collected, a ₹10 bill, and the
+  // ₹6,990 Challenge had left carried to Velocity vipers. Challenge then holds
+  // nothing, and the other ₹830 is with the event it was collected for.
+  const CHALLENGE = '33333333-3333-4333-8333-333333333333';
+  const VIPERS = '44444444-4444-4444-8444-444444444444';
+  const DIWALI = '55555555-5555-4555-8555-555555555555';
+  const stats = [
+    { event_id: CHALLENGE, available: '0.00', fund_carried: '-6990.00' },
+    { event_id: VIPERS, available: '6990.00', fund_carried: '6990.00' },
+    { event_id: DIWALI, available: '830.00', fund_carried: '0.00' },
+  ];
+  const events = [
+    { id: CHALLENGE, name: 'Challenge', emoji: '🏆', slug: 'challenge', status: 'completed' },
+    {
+      id: VIPERS,
+      name: 'Velocity vipers',
+      emoji: '🏍️',
+      slug: 'velocity-vipers',
+      status: 'published',
+    },
+    { id: DIWALI, name: 'Diwali 2026', emoji: '🪔', slug: 'diwali-2026', status: 'published' },
+  ];
+
+  it('lists every event still holding money, largest first, and none that is not', () => {
+    const rows = whereTheBalanceIs(stats, events);
+    expect(rows.map((row) => [row.name, row.amount])).toEqual([
+      ['Velocity vipers', 6_990],
+      ['Diwali 2026', 830],
+    ]);
+  });
+
+  it('adds up, with what the society kept, to the balance', () => {
+    const kept = 0;
+    const balance = 7_830 - 10;
+    const rows = whereTheBalanceIs(stats, events);
+    expect(rows.reduce((sum, row) => sum + row.amount, kept)).toBe(balance);
+  });
+
+  it('says where carried money came into an event', () => {
+    const [vipers] = whereTheBalanceIs(stats, events);
+    expect(holdingNote(vipers!)).toBe('₹6,990 carried across by the committee');
+  });
+
+  it('flags a closed event still holding money nobody has decided about', () => {
+    const [row] = whereTheBalanceIs(
+      [{ event_id: CHALLENGE, available: 830, fund_carried: -6_990 }],
+      events,
+    );
+    expect(holdingNote(row!)).toBe('Closed, and the committee has not yet decided where this goes');
+  });
+
+  it('flags an event that has spent more than it holds, and lists it last', () => {
+    const rows = whereTheBalanceIs(
+      [...stats, { event_id: CHALLENGE, available: -500, fund_carried: 0 }],
+      events,
+    );
+    expect(rows.at(-1)?.amount).toBe(-500);
+    expect(holdingNote(rows.at(-1)!)).toBe('Has spent more than it holds');
+  });
+
+  it('keeps an event the viewer cannot see in the sum, without its name', () => {
+    // A resident reads event_stats for every event, drafts included, but the
+    // events table leaves drafts out — and money can be carried into a draft.
+    const rows = whereTheBalanceIs(stats, events.slice(0, 1));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.name === null)).toBe(true);
+    expect(UNPUBLISHED_EVENT).toMatch(/not published/);
   });
 });

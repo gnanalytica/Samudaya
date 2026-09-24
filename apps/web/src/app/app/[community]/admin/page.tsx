@@ -9,7 +9,7 @@ import {
   Settings2,
   Users,
 } from 'lucide-react';
-import { COPY, can, formatDate, formatMoney, fundBarSegments } from '@samudaya/core';
+import { COPY, can, formatDate, formatMoney, fundAsk, fundBarSegments } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { listEvents, getStatsFor } from '@/lib/events';
@@ -137,16 +137,22 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                   <div className="mt-4">
                     <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
                       <span>
-                        {formatMoney(s?.fundRaised ?? 0, community.currency)} raised ·{' '}
-                        {formatMoney(s?.spent ?? 0, community.currency)} spent
+                        {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
+                        {formatMoney(
+                          fundAsk(s?.fundTarget ?? 0, s?.fundCarried ?? 0),
+                          community.currency,
+                        )}{' '}
+                        raised · {formatMoney(s?.spent ?? 0, community.currency)} spent
                       </span>
                       <span>{funded}%</span>
                     </div>
-                    <FundBar
-                      percent={funded}
-                      pendingPercent={bar.pending}
-                      carriedPercent={bar.carried}
-                    />
+                    <FundBar percent={funded} pendingPercent={bar.pending} />
+                    {(s?.fundCarried ?? 0) > 0 ? (
+                      <p className="text-ink-subtle mt-2 text-xs">
+                        After {formatMoney(s?.fundCarried ?? 0, community.currency)} carried across
+                        by the committee
+                      </p>
+                    ) : null}
                   </div>
                 </Link>
               );

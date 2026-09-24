@@ -16,14 +16,15 @@ import {
   COPY,
   FUND_RULE_LABEL,
   can,
+  carriedInLine,
   correctionNote,
   countdown,
   formatDate,
   festivalFor,
   formatMoney,
+  fundAsk,
   fundBarSegments,
   receiptRef,
-  stillNeeded,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import {
@@ -103,6 +104,10 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
     stats.fundCarried,
   );
   const funded = bar.confirmed;
+  // What residents are asked for, which is what the fund cards lead with: the
+  // target less anything the committee carried across (see fundAsk).
+  const ask = fundAsk(stats.fundTarget, stats.fundCarried);
+  const carried = carriedInLine(stats.fundTarget, stats.fundCarried, community.currency);
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
@@ -264,17 +269,14 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               <div className="text-ink-muted flex justify-between text-sm font-medium">
                 <span>
                   {formatMoney(stats.fundRaised, community.currency)} of{' '}
-                  {formatMoney(stats.fundTarget, community.currency)} raised
+                  {formatMoney(ask, community.currency)} raised
                 </span>
                 <span>{funded}%</span>
               </div>
               <div className="mt-2">
-                <FundBar
-                  percent={funded}
-                  pendingPercent={bar.pending}
-                  carriedPercent={bar.carried}
-                />
+                <FundBar percent={funded} pendingPercent={bar.pending} />
               </div>
+              {carried ? <p className="text-ink-subtle mt-2 text-xs">{carried}</p> : null}
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
 
@@ -330,8 +332,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                       {formatMoney(stats.fundRaised, community.currency)}
                     </p>
                     <p className="text-ink-muted text-sm">
-                      of {formatMoney(stats.fundTarget, community.currency)} target ·{' '}
-                      {stats.contributors}{' '}
+                      raised of {formatMoney(ask, community.currency)} · {stats.contributors}{' '}
                       {stats.contributors === 1 ? 'household' : COPY.households.toLowerCase()} gave
                     </p>
                   </div>
@@ -346,11 +347,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                   ) : null}
                 </div>
                 <div className="mt-3">
-                  <FundBar
-                    percent={funded}
-                    pendingPercent={bar.pending}
-                    carriedPercent={bar.carried}
-                  />
+                  <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
                 {stats.fundPending > 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
@@ -363,17 +360,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                     Said out loud rather than folded into the raised figure:
                     "sixty flats gave ₹30,000" and "the committee moved ₹10,000
                     across from last year" are different sentences. */}
-                {stats.fundCarried > 0 ? (
-                  <p className="text-ink-subtle mt-2 text-xs">
-                    {formatMoney(stats.fundCarried, community.currency)} was carried across by the
-                    committee from a closed event, so only{' '}
-                    {formatMoney(
-                      stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
-                      community.currency,
-                    )}{' '}
-                    is still to raise.
-                  </p>
-                ) : null}
+                {carried ? <p className="text-ink-subtle mt-2 text-xs">{carried}</p> : null}
                 <StatTiles className="mt-4 gap-2">
                   <StatTile
                     label="Raised"

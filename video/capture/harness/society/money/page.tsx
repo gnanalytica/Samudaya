@@ -41,7 +41,7 @@ export default function DemoMoney() {
                 {formatMoney(TOTALS.society, currency)}
               </p>
               <p className="text-ink-subtle text-xs">
-                Society balance · what is left after all of this, behind no event
+                Kept for the society · behind no event, until the committee puts it behind one
               </p>
             </div>
           </CardBody>

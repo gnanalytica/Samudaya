@@ -196,36 +196,50 @@ export function fundedPercent(raised: number, target: number): number {
 }
 
 /**
- * The three widths a fund bar draws: money the society moved across, money
- * confirmed, and money on its way.
+ * What an event asks its residents for: the target, less whatever the
+ * committee has already carried across into it from a closed event.
  *
- * They stack, so each segment is what is left of the bar after the ones before
- * it — never its own share of the target. Without that clamp an event at 90%
- * confirmed with another 30% reported would draw 120% of a bar that is 100%
- * wide, and the overflow would land on whichever segment the layout happened
- * to put last.
+ * This, not the target, is the figure a fund card leads with. A card that read
+ * "Target ₹2,00,000" over an event already holding ₹6,990 of it told sixty
+ * flats they owed the whole ₹2,00,000, when the money was carried across
+ * precisely so that they would not. The target is still the event's — the sum
+ * it was planned against — and every card that leads with this figure says in
+ * words how the two differ.
  *
- * Carried money goes first because it is the most settled thing on the bar:
- * it is already in the society's account and already decided. Confirmed comes
- * next. Pending is the guest.
+ * Money carried out of an event (a negative net figure, on an event that gave
+ * its surplus away) never raises what the event asked for.
+ */
+export function fundAsk(target: number, carriedIn = 0): number {
+  return Math.max(0, target - Math.max(0, carriedIn));
+}
+
+/**
+ * The two widths a fund bar draws — money confirmed and money on its way — as
+ * shares of what residents are asked for (fundAsk), not of the target.
  *
- * A negative carried figure — an event that gave its surplus away — draws
- * nothing rather than a negative width; what it did is on the event's own
- * record, not on a bar about reaching a target.
+ * Measured that way, the bar, the percentage beside it and the "₹X of ₹Y" line
+ * all describe the same thing. They used to disagree: the bar drew money
+ * carried across as a first segment of the target while the percentage beside
+ * it counted contributions only, so an event holding ₹6,990 of ₹2,00,000
+ * showed a sliver of colour over "0%".
+ *
+ * The two stack, so pending is whatever the bar has left after confirmed —
+ * never its own share. Without that clamp an event at 90% confirmed with
+ * another 30% reported would draw 120% of a bar that is 100% wide.
+ *
+ * When money carried across covers the whole target there is nothing left to
+ * ask for, and the bar is full before anybody has paid.
  */
 export function fundBarSegments(
   raised: number,
   pending: number,
   target: number,
   carriedIn = 0,
-): { carried: number; confirmed: number; pending: number } {
-  const carried = fundedPercent(Math.max(0, carriedIn), target);
-  const confirmed = Math.min(100 - carried, fundedPercent(raised, target));
-  return {
-    carried,
-    confirmed,
-    pending: Math.min(100 - carried - confirmed, fundedPercent(pending, target)),
-  };
+): { confirmed: number; pending: number } {
+  const ask = fundAsk(target, carriedIn);
+  if (target > 0 && ask === 0) return { confirmed: 100, pending: 0 };
+  const confirmed = fundedPercent(raised, ask);
+  return { confirmed, pending: Math.min(100 - confirmed, fundedPercent(pending, ask)) };
 }
 
 /**
@@ -236,7 +250,7 @@ export function fundBarSegments(
  * for the full ₹50,000 and then sit on the difference.
  */
 export function stillNeeded(target: number, raised: number, carriedIn = 0): number {
-  return Math.max(0, target - raised - Math.max(0, carriedIn));
+  return Math.max(0, fundAsk(target, carriedIn) - raised);
 }
 
 /**

@@ -12,7 +12,14 @@
 // StatTiles, AuditTrail, Card — with the numbers the real page would have
 // fetched handed to it directly.
 import { CalendarDays, Check, FileText, Users } from 'lucide-react';
-import { festivalFor, formatDate, formatMoney } from '@samudaya/core';
+import {
+  carriedInLine,
+  festivalFor,
+  formatDate,
+  formatMoney,
+  fundAsk,
+  fundBarSegments,
+} from '@samudaya/core';
 import { FundBar, ReadinessBar, StatTile, StatTiles } from '@/components/badges';
 import { AuditTrail } from '@/components/audit-trail';
 import { PageBody } from '@/components/page-header';
@@ -37,7 +44,10 @@ const pct = (part: number, whole: number) => Math.round((part / whole) * 100);
 
 const done = CHECKLIST.filter((task) => task.done).length;
 const readiness = pct(done, CHECKLIST.length);
-const funded = pct(FUND.raised, FUND.target);
+// The same arithmetic the real page does: measured against what residents
+// are asked for, which the committee's carry has already come off.
+const bar = fundBarSegments(FUND.raised, FUND.pending, FUND.target, FUND.carried);
+const funded = bar.confirmed;
 
 /**
  * The real page renders BillLink, which signs a Storage URL. This capture runs
@@ -181,8 +191,8 @@ export default function DemoEvent() {
                       {formatMoney(FUND.raised, currency)}
                     </p>
                     <p className="text-ink-muted text-sm">
-                      of {formatMoney(FUND.target, currency)} target · {FUND.contributors}{' '}
-                      households gave
+                      raised of {formatMoney(fundAsk(FUND.target, FUND.carried), currency)} ·{' '}
+                      {FUND.contributors} households gave
                     </p>
                   </div>
                   <ButtonLink href={`/app/${SOCIETY.slug}/contribute`} size="sm">
@@ -190,19 +200,14 @@ export default function DemoEvent() {
                   </ButtonLink>
                 </div>
                 <div className="mt-3">
-                  <FundBar
-                    percent={funded}
-                    pendingPercent={pct(FUND.pending, FUND.target)}
-                    carriedPercent={pct(FUND.carried, FUND.target)}
-                  />
+                  <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
                 <p className="text-ink-subtle mt-2 text-xs">
                   {formatMoney(FUND.pending, currency)} more has been reported and is waiting to be
                   matched against the bank. It counts towards the total once it is confirmed.
                 </p>
                 <p className="text-ink-subtle mt-2 text-xs">
-                  {formatMoney(FUND.carried, currency)} was carried across by the committee from a
-                  closed event.
+                  {carriedInLine(FUND.target, FUND.carried, currency)}
                 </p>
                 <StatTiles className="mt-4 gap-2">
                   <StatTile label="Raised" value={formatMoney(FUND.raised, currency)} />
@@ -299,8 +304,8 @@ export default function DemoEvent() {
             </Card>
 
             <div className="border-border-base bg-surface-sunken text-ink-muted rounded-lg border px-4 py-3 text-sm">
-              🔒 <span className="text-ink font-medium">If money is left over:</span> keep it as
-              society balance.
+              🔒 <span className="text-ink font-medium">If money is left over:</span> keep it for
+              the society.
               <p className="text-ink-subtle mt-1 text-xs">
                 Fixed when the event was created, before any money was collected.
               </p>

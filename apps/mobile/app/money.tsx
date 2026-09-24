@@ -3,16 +3,19 @@ import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   LEDGER_FILTERS,
+  UNPUBLISHED_EVENT,
   filterLedger,
   formatDate,
   formatMoney,
   fundMovementLine,
+  holdingNote,
   ledgerEvidence,
   ledgerFilterFrom,
   ledgerMeta,
   ledgerFlat,
   ledgerTitle,
   relativeTime,
+  whereTheBalanceIs,
 } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
@@ -55,7 +58,7 @@ export default function Money() {
   const { data, loading, refreshing, refresh, error } = useCommunityData(
     'money',
     async (communityId) => {
-      const [ledger, totals, society, movements] = await Promise.all([
+      const [ledger, totals, society, movements, eventStats, eventNames] = await Promise.all([
         // One string literal, not a concatenation: supabase-js reads the row type
         // off the literal itself, and `'a, b' + 'c'` widens it to string, which
         // hands every row back as GenericStringError.
@@ -81,6 +84,17 @@ export default function Money() {
           .eq('community_id', communityId)
           .order('decided_at', { ascending: false })
           .limit(100),
+        // Every event, drafts included: event_stats answers for any member.
+        // The names come from events, which leaves drafts out for a resident.
+        supabase
+          .from('event_stats')
+          .select('event_id, available, fund_carried')
+          .eq('community_id', communityId),
+        supabase
+          .from('events')
+          .select('id, name, emoji, slug, status')
+          .eq('community_id', communityId)
+          .limit(500),
       ]);
       // A read that fails must not arrive here as an empty ledger. The web app
       // learned this the expensive way — an ambiguous embed answered 300 for two
@@ -103,6 +117,12 @@ export default function Money() {
         totals: totals.data ?? null,
         society: society.data ?? null,
         movements: movements.data ?? [],
+        // A split missing a row would not add up to the balance, and adding up
+        // is the only thing it is for — so a failed read shows no split at all.
+        holdings:
+          eventStats.error || eventNames.error
+            ? null
+            : whereTheBalanceIs(eventStats.data ?? [], eventNames.data ?? []),
       };
     },
   );
@@ -132,6 +152,7 @@ export default function Money() {
   const balance = Number(totals?.balance ?? 0);
   const heldBySociety = Number(data?.society?.balance ?? 0);
   const movements = data?.movements ?? [];
+  const holdings = data?.holdings ?? null;
 
   // Built from the ledger rather than from events, so the filter only offers an
   // event that has something in it.
@@ -159,19 +180,80 @@ export default function Money() {
               tone={balance < 0 ? 'danger' : 'success'}
             />
 
+            {/* Where the balance is: each event still holding money, and what
+                the society kept outside any event, adding up to the balance
+                above. Without it, "Balance ₹7,820" beside "₹0 kept for the
+                society" read as a contradiction after a carry, with nowhere to
+                find the rest. Same rows as the web, from the same function. */}
+            {holdings && (holdings.length || heldBySociety !== 0 || movements.length) ? (
+              <Card style={{ gap: spacing.sm }}>
+                <Body>Where the {formatMoney(balance, currency)} is</Body>
+                <Caption>
+                  Every rupee the society holds is behind an event, or kept for the society until
+                  the committee puts it behind one.
+                </Caption>
+                {holdings.map((holding) => {
+                  const note = holdingNote(holding, currency);
+                  const row = (
+                    <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Body>
+                          {holding.emoji ? `${holding.emoji} ` : ''}
+                          {holding.name ?? UNPUBLISHED_EVENT}
+                        </Body>
+                        {note ? <Caption>{note}</Caption> : null}
+                      </View>
+                      <Text
+                        style={{
+                          color: holding.amount < 0 ? colors.danger : colors.ink,
+                          fontSize: 14,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {formatMoney(holding.amount, currency)}
+                      </Text>
+                    </View>
+                  );
+                  return holding.name && holding.slug ? (
+                    <Pressable
+                      key={holding.eventId}
+                      accessibilityRole="link"
+                      onPress={() => router.push(`/event/${holding.slug}`)}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                    >
+                      {row}
+                    </Pressable>
+                  ) : (
+                    <View key={holding.eventId}>{row}</View>
+                  );
+                })}
+                <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Body>Kept for the society</Body>
+                    <Caption>Behind no event, until the committee puts it behind one</Caption>
+                  </View>
+                  <Text style={{ color: colors.ink, fontSize: 14, fontWeight: '600' }}>
+                    {formatMoney(heldBySociety, currency)}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: colors.ink, fontSize: 14, fontWeight: '700' }}>
+                    Balance
+                  </Text>
+                  <Text style={{ color: colors.ink, fontSize: 14, fontWeight: '700' }}>
+                    {formatMoney(balance, currency)}
+                  </Text>
+                </View>
+              </Card>
+            ) : null}
+
             {/* What was left when an event closed, and what the committee
                 decided to do with it — carry it to another event, or keep it.
-                Only the second kind touches the balance, so the card is titled
-                for the movements rather than for the figure. "The society is
-                holding ₹12,000" is only worth saying if the next question —
-                from what, and decided by whom — is answered here too. */}
+                The history behind the split above: from what, and decided by
+                whom. */}
             {movements.length ? (
               <Card style={{ gap: spacing.sm }}>
                 <Body>Where money has moved</Body>
-                <Caption>
-                  Society balance · {formatMoney(heldBySociety, currency)} — what is left after all
-                  of this, behind no event.
-                </Caption>
                 {movements.map((movement) => (
                   <View key={movement.id} style={{ gap: 2 }}>
                     <Body>{fundMovementLine(movement, currency)}</Body>

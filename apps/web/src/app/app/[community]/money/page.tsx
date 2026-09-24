@@ -1,12 +1,16 @@
+import Link from 'next/link';
 import { PiggyBank, Scale, Wallet } from 'lucide-react';
 import {
   LEDGER_FILTERS,
+  UNPUBLISHED_EVENT,
   filterLedger,
   formatDate,
   formatMoney,
   fundMovementLine,
+  holdingNote,
   ledgerFilterFrom,
   relativeTime,
+  whereTheBalanceIs,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getFundMovements, getSocietyBalance } from '@/lib/events';
@@ -18,6 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile, StatTiles } from '@/components/badges';
 import { LedgerRow } from '@/components/ledger-row';
+import { cn } from '@/lib/utils';
 
 export const metadata = { title: 'Money' };
 
@@ -44,7 +49,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
   const { community } = await requireCommunity(slug);
   const supabase = await getSupabase();
 
-  const [ledger, totals, society, movements] = await Promise.all([
+  const [ledger, totals, society, movements, eventStats, eventNames] = await Promise.all([
     supabase
       .from('society_ledger')
       .select(
@@ -56,6 +61,18 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
     supabase.from('society_money').select('*').eq('community_id', community.id).maybeSingle(),
     getSocietyBalance(community.id),
     getFundMovements(community.id),
+    // Every event, drafts included: event_stats answers for any member. The
+    // names come from events, which leaves drafts out for a resident — hence
+    // UNPUBLISHED_EVENT rather than a row that silently goes missing.
+    supabase
+      .from('event_stats')
+      .select('event_id, available, fund_carried')
+      .eq('community_id', community.id),
+    supabase
+      .from('events')
+      .select('id, name, emoji, slug, status')
+      .eq('community_id', community.id)
+      .limit(500),
   ]);
 
   const rows = rowsOf(ledger, 'the society ledger');
@@ -70,6 +87,13 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
     .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
 
   const balance = Number(totals.data?.balance ?? 0);
+  const holdings = whereTheBalanceIs(
+    rowsOf(eventStats, 'what each event holds'),
+    rowsOf(eventNames, 'event names for the money page'),
+  );
+  // A split that is missing a row is worse than no split: it would not add up
+  // to the balance above it, and adding up is the only thing it is for.
+  const splitReadable = !eventStats.error && !eventNames.error;
 
   return (
     <>
@@ -94,31 +118,89 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
           />
         </StatTiles>
 
-        {/* Where the money left in a closed event went — into the society's
-            own balance, or straight behind another event, which never touches
-            the balance at all. The card was titled for the balance alone, and
-            a carry from Ganesh to Diwali read as if it were part of a figure
-            it has nothing to do with. The home screen links here, because
-            "the society is holding ₹12,000" is only worth saying if the next
-            question — from what, and decided by whom — is answered on the
-            same screen. */}
-        {movements.length ? (
+        {/* Where the balance is: each event still holding money, and what the
+            society kept outside any event, adding up to the Balance tile. It
+            answers the question the tiles raise the moment money has been
+            carried across. A committee member carried ₹6,990 from one event
+            to another and then read "Balance ₹7,820" over "Society balance
+            ₹0" with nothing to say where the other ₹830 was; both figures
+            were right and the page made them look like a contradiction. The
+            home screen links here. */}
+        {splitReadable && (holdings.length || society.balance !== 0 || movements.length) ? (
           <Card className="mt-5 scroll-mt-20" id="society-balance">
+            <CardHeader
+              title={`Where the ${formatMoney(balance, community.currency)} is`}
+              description="Every rupee the society holds is behind an event, or kept for the society until the committee puts it behind one. Together they make the balance above."
+            />
+            <ul className="divide-border-base divide-y">
+              {holdings.map((holding) => {
+                const note = holdingNote(holding, community.currency);
+                return (
+                  <li
+                    key={holding.eventId}
+                    className="flex items-start justify-between gap-3 px-5 py-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-ink text-sm font-medium">
+                        {holding.name && holding.slug ? (
+                          <Link
+                            href={`/app/${slug}/events/${holding.slug}`}
+                            className="hover:underline"
+                          >
+                            {holding.emoji ? `${holding.emoji} ` : ''}
+                            {holding.name}
+                          </Link>
+                        ) : (
+                          (holding.name ?? UNPUBLISHED_EVENT)
+                        )}
+                      </p>
+                      {note ? <p className="text-ink-subtle mt-0.5 text-xs">{note}</p> : null}
+                    </div>
+                    <p
+                      className={cn(
+                        'shrink-0 text-sm font-semibold tabular-nums',
+                        holding.amount < 0 ? 'text-danger' : 'text-ink',
+                      )}
+                    >
+                      {formatMoney(holding.amount, community.currency)}
+                    </p>
+                  </li>
+                );
+              })}
+              <li className="flex items-start justify-between gap-3 px-5 py-3">
+                <div className="flex min-w-0 items-start gap-2">
+                  <PiggyBank className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <div>
+                    <p className="text-ink text-sm font-medium">Kept for the society</p>
+                    <p className="text-ink-subtle mt-0.5 text-xs">
+                      Behind no event, until the committee puts it behind one
+                    </p>
+                  </div>
+                </div>
+                <p className="text-ink shrink-0 text-sm font-semibold tabular-nums">
+                  {formatMoney(society.balance, community.currency)}
+                </p>
+              </li>
+              <li className="bg-surface-sunken flex justify-between gap-3 px-5 py-3 text-sm font-semibold">
+                <span className="text-ink">Balance</span>
+                <span className="text-ink tabular-nums">
+                  {formatMoney(balance, community.currency)}
+                </span>
+              </li>
+            </ul>
+          </Card>
+        ) : null}
+
+        {/* Where the money left in a closed event went — kept for the society,
+            or straight behind another event. The home screen used to link
+            here for the society's own pot; the split above is that figure's
+            home now, and this is the history of how it got there. */}
+        {movements.length ? (
+          <Card className="mt-5">
             <CardHeader
               title="Where money has moved"
               description="What was left over when an event closed, and what the committee decided to do with it — carry it to another event, or keep it for the society."
             />
-            <CardBody className="border-border-base flex items-center gap-3 border-b">
-              <PiggyBank className="text-accent size-6 shrink-0" aria-hidden="true" />
-              <div>
-                <p className="text-ink text-lg font-semibold">
-                  {formatMoney(society.balance, community.currency)}
-                </p>
-                <p className="text-ink-subtle text-xs">
-                  Society balance · what is left after all of this, behind no event
-                </p>
-              </div>
-            </CardBody>
             <ul className="divide-border-base divide-y">
               {movements.map((movement) => (
                 <li key={movement.id} className="px-5 py-3">

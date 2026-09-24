@@ -10,32 +10,32 @@ import { useTheme } from '../lib/use-theme';
  * bar that is money reported and not yet confirmed. Same hue at lower opacity
  * rather than a colour of its own — it is the same money one step earlier, and
  * the value announced stays the confirmed figure.
+ *
+ * Money the committee carried across is not a segment: a fund bar is measured
+ * against what residents are asked for, which that money has already been
+ * taken off (see fundBarSegments).
  */
 export function Meter({
   percent,
   pendingPercent = 0,
-  carriedPercent = 0,
   tone = 'accent',
   label,
 }: {
   percent: number;
   /** Clamped to whatever the bar has left after the confirmed segment. */
   pendingPercent?: number;
-  /** Carried across from another event or the society balance; drawn first. */
-  carriedPercent?: number;
   tone?: 'accent' | 'success';
   label: string;
 }) {
   const { colors } = useTheme();
-  const carried = Math.min(100, Math.max(0, carriedPercent));
-  const clamped = Math.min(100 - carried, Math.max(0, percent));
-  const pending = Math.min(100 - carried - clamped, Math.max(0, pendingPercent));
+  const clamped = Math.min(100, Math.max(0, percent));
+  const pending = Math.min(100 - clamped, Math.max(0, pendingPercent));
   const fill = tone === 'success' ? colors.success : colors.accent;
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityLabel={label}
-      accessibilityValue={{ min: 0, max: 100, now: carried + clamped }}
+      accessibilityValue={{ min: 0, max: 100, now: clamped }}
       style={{
         height: 8,
         flexDirection: 'row',
@@ -44,18 +44,6 @@ export function Meter({
         overflow: 'hidden',
       }}
     >
-      {/* Carried money first: already in the society's account, already
-          decided, and the one segment nobody is waiting on. */}
-      {carried > 0 ? (
-        <View
-          style={{
-            width: `${carried}%`,
-            height: '100%',
-            backgroundColor: colors.ink,
-            opacity: 0.5,
-          }}
-        />
-      ) : null}
       <View style={{ width: `${clamped}%`, height: '100%', backgroundColor: fill }} />
       {pending > 0 ? (
         <View

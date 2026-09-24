@@ -91,7 +91,7 @@ describe('contributing', () => {
 });
 
 /**
- * The society balance, on both home screens and on both money screens.
+ * What the society kept, on both home screens and on both money screens.
  *
  * An event that closed with money left used to report a surplus forever while
  * the next event opened at zero and asked sixty flats for money the society
@@ -99,13 +99,42 @@ describe('contributing', () => {
  * that it lives in the same places on both apps: a figure a resident can see
  * on the phone and not on the web is a figure two neighbours will disagree
  * about.
+ *
+ * It was called the "society balance", beside a Balance tile that meant all
+ * the money the society holds; a committee member read "Balance ₹7,820" over
+ * "Society balance ₹0" as a contradiction. It is "kept for the society" now,
+ * which is also what the committee chose at closure to put it there.
  */
-describe('the society balance', () => {
+describe('what the society kept', () => {
   it('is on the home screen of both apps, not just the one', () => {
     expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain(
-      'Society balance',
+      'Kept for the society',
     );
-    expect(read('mobile', 'app', '(tabs)', 'index.tsx')).toContain('Society balance');
+    expect(read('mobile', 'app', '(tabs)', 'index.tsx')).toContain('Kept for the society');
+  });
+
+  it('is never called a balance beside the Balance tile', () => {
+    for (const parts of [
+      ['web', 'src', 'app', 'app', '[community]', 'page.tsx'],
+      ['web', 'src', 'app', 'app', '[community]', 'money', 'page.tsx'],
+      ['mobile', 'app', '(tabs)', 'index.tsx'],
+      ['mobile', 'app', 'money.tsx'],
+    ]) {
+      // Comments may still tell the story; the words on screen may not.
+      const code = read(...parts).replace(/\{\/\*[\s\S]*?\*\/\}|\/\*[\s\S]*?\*\//g, '');
+      expect(code, parts.join('/')).not.toMatch(/Society balance/);
+    }
+  });
+
+  it('is shown on both money screens as part of where the balance is', () => {
+    for (const parts of [
+      ['web', 'src', 'app', 'app', '[community]', 'money', 'page.tsx'],
+      ['mobile', 'app', 'money.tsx'],
+    ]) {
+      const screen = read(...parts);
+      expect(screen, parts.join('/')).toContain('whereTheBalanceIs');
+      expect(screen, parts.join('/')).toContain('Kept for the society');
+    }
   });
 
   it('opens the log of where every rupee of it came from', () => {
@@ -138,9 +167,10 @@ describe('the society balance', () => {
 
 describe('the fund bar', () => {
   /**
-   * Nine screens draw this bar between them. A carried segment on eight of
-   * them is a bar that means one thing on the events list and another on the
-   * event itself, which is how two residents come away with different numbers.
+   * Nine screens draw this bar between them. A bar measured against the target
+   * on one and against what residents are asked for on another means one thing
+   * on the events list and another on the event itself, which is how two
+   * residents come away with different numbers.
    */
   const CALLERS = [
     ['web', 'src', 'app', 'app', '[community]', 'page.tsx'],
@@ -159,8 +189,16 @@ describe('the fund bar', () => {
     expect(missing.map((parts) => parts.join('/'))).toEqual([]);
   });
 
-  it('draws it as its own segment rather than folding it into the raised figure', () => {
-    expect(read('web', 'src', 'components', 'badges.tsx')).toContain('carriedPercent');
-    expect(read('mobile', 'src', 'components', 'event-ui.tsx')).toContain('carriedPercent');
+  it('leads with what residents are asked for, not the target, everywhere it is drawn', () => {
+    // An event holding ₹6,990 of a ₹2,00,000 target read "Target ₹2,00,000 ·
+    // 0%" over a bar with a sliver in it. The figure is fundAsk: the target
+    // less the carry, with the carry said in words beside it.
+    const missing = CALLERS.filter((parts) => !read(...parts).includes('fundAsk'));
+    expect(missing.map((parts) => parts.join('/'))).toEqual([]);
+  });
+
+  it('draws only what residents gave, never the carry as a segment of its own', () => {
+    expect(read('web', 'src', 'components', 'badges.tsx')).not.toContain('carriedPercent');
+    expect(read('mobile', 'src', 'components', 'event-ui.tsx')).not.toContain('carriedPercent');
   });
 });

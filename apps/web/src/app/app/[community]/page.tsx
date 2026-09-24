@@ -18,8 +18,8 @@ import {
   festivalFor,
   formatDate,
   formatMoney,
+  fundAsk,
   fundBarSegments,
-  fundedPercent,
   todayIn,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
@@ -148,7 +148,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
             <span className="min-w-0">
               <span className="text-ink flex items-center gap-2 text-sm font-medium">
                 <PiggyBank className="text-accent size-5 shrink-0" aria-hidden="true" />
-                Society balance: {formatMoney(balance.balance, community.currency)}
+                Kept for the society: {formatMoney(balance.balance, community.currency)}
               </span>
               <span className="text-ink-subtle mt-0.5 block text-xs">
                 Left over from {balance.movements} closed{' '}
@@ -209,7 +209,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 <div className="relative mt-4 flex justify-between text-xs font-medium text-white/80">
                   <span>
                     {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
-                    {formatMoney(s?.fundTarget ?? 0, community.currency)} raised
+                    {formatMoney(
+                      fundAsk(s?.fundTarget ?? 0, s?.fundCarried ?? 0),
+                      community.currency,
+                    )}{' '}
+                    raised
                   </span>
                   <span>{funded}%</span>
                 </div>
@@ -226,6 +230,12 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                     style={{ width: `${funded}%` }}
                   />
                 </div>
+                {(s?.fundCarried ?? 0) > 0 ? (
+                  <p className="relative mt-1.5 text-xs text-white/75">
+                    After {formatMoney(s?.fundCarried ?? 0, community.currency)} carried across by
+                    the committee
+                  </p>
+                ) : null}
                 <div className="relative mt-4 flex flex-wrap gap-2">
                   <ButtonLink
                     href={`${base}/events/${next.slug}`}
@@ -304,7 +314,12 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
             <div className="space-y-3">
               {campaigns.map((campaign) => {
                 const cs = stats.get(campaign.id);
-                const pct = fundedPercent(cs?.fundRaised ?? 0, cs?.fundTarget ?? 0);
+                const pct = fundBarSegments(
+                  cs?.fundRaised ?? 0,
+                  0,
+                  cs?.fundTarget ?? 0,
+                  cs?.fundCarried ?? 0,
+                ).confirmed;
                 return (
                   <Link
                     key={campaign.id}
@@ -319,7 +334,10 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                     </div>
                     <p className="text-ink-subtle mt-1 text-xs">
                       {formatMoney(cs?.fundRaised ?? 0, community.currency)} of{' '}
-                      {formatMoney(cs?.fundTarget ?? 0, community.currency)}
+                      {formatMoney(
+                        fundAsk(cs?.fundTarget ?? 0, cs?.fundCarried ?? 0),
+                        community.currency,
+                      )}
                     </p>
                   </Link>
                 );

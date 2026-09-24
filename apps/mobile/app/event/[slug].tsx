@@ -7,12 +7,13 @@ import {
   EVENT_STATUS_LABEL,
   EVENT_TABS,
   can,
+  carriedInLine,
   correctionNote,
   countdown,
   formatDate,
   formatMoney,
+  fundAsk,
   fundBarSegments,
-  stillNeeded,
   type EventTab,
   type FundRule,
 } from '@samudaya/core';
@@ -81,6 +82,10 @@ export default function EventDetail() {
     stats.fundCarried,
   );
   const funded = fundBar.confirmed;
+  // What residents are asked for, which is what the fund card leads with: the
+  // target less anything the committee carried across (see fundAsk).
+  const target = stats.fundTarget || event.fund_target;
+  const carried = carriedInLine(target, stats.fundCarried, currency);
   const open = event.status === 'published';
 
   const changed = () => {
@@ -135,15 +140,15 @@ export default function EventDetail() {
               <Heading>Fund</Heading>
               <Title>{formatMoney(stats.fundRaised, currency)}</Title>
               <Caption>
-                of {formatMoney(stats.fundTarget || event.fund_target, currency)} target
+                raised of {formatMoney(fundAsk(target, stats.fundCarried), currency)}
               </Caption>
               <Meter
                 percent={funded}
                 pendingPercent={fundBar.pending}
-                carriedPercent={fundBar.carried}
                 tone="success"
                 label="Fund progress"
               />
+              {carried ? <Caption>{carried}</Caption> : null}
               <View style={{ gap: spacing.xs }}>
                 <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
                 <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
@@ -210,6 +215,8 @@ function About({
     stats.fundTarget,
     stats.fundCarried,
   );
+  const target = stats.fundTarget || event.fund_target;
+  const carried = carriedInLine(target, stats.fundCarried, currency);
   const dates =
     event.ends_on && event.ends_on !== event.starts_on
       ? `${formatDate(event.starts_on)} – ${formatDate(event.ends_on)}`
@@ -252,12 +259,11 @@ function About({
           </View>
           <Caption>
             {formatMoney(stats.fundRaised, currency)} raised of{' '}
-            {formatMoney(stats.fundTarget || event.fund_target, currency)}
+            {formatMoney(fundAsk(target, stats.fundCarried), currency)}
           </Caption>
           <Meter
             percent={fundBar.confirmed}
             pendingPercent={fundBar.pending}
-            carriedPercent={fundBar.carried}
             tone="success"
             label="Fund progress"
           />
@@ -271,17 +277,7 @@ function About({
               out loud rather than folded into the raised figure: "sixty flats
               gave ₹30,000" and "the committee moved ₹10,000 across from last
               year" are different sentences. */}
-          {stats.fundCarried > 0 ? (
-            <Caption>
-              {formatMoney(stats.fundCarried, currency)} was carried across by the committee from a
-              closed event, so only{' '}
-              {formatMoney(
-                stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
-                currency,
-              )}{' '}
-              is still to raise.
-            </Caption>
-          ) : null}
+          {carried ? <Caption>{carried}</Caption> : null}
         </Card>
       </Pressable>
     </>

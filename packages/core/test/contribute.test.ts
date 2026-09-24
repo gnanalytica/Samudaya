@@ -9,7 +9,14 @@ import {
   reportPaymentSchema,
   upiNote,
 } from '../src/payments';
-import { fundBarSegments, fundedPercent, normalizeStats, stillNeeded } from '../src/events';
+import {
+  fundAsk,
+  fundBarSegments,
+  fundedPercent,
+  normalizeStats,
+  stillNeeded,
+} from '../src/events';
+import { carriedInLine } from '../src/funds';
 
 /**
  * Two things a resident sees on the way to paying: what the bar says has been
@@ -20,7 +27,7 @@ import { fundBarSegments, fundedPercent, normalizeStats, stillNeeded } from '../
 describe('fundBarSegments', () => {
   it('draws confirmed money and money on its way as two stacked widths', () => {
     const bar = fundBarSegments(60_000, 20_000, 100_000);
-    expect(bar).toEqual({ carried: 0, confirmed: 60, pending: 20 });
+    expect(bar).toEqual({ confirmed: 60, pending: 20 });
   });
 
   it('never lets the two together overflow the bar', () => {
@@ -34,35 +41,42 @@ describe('fundBarSegments', () => {
 
   it('gives confirmed money the whole bar when it has already filled it', () => {
     const bar = fundBarSegments(150_000, 20_000, 100_000);
-    expect(bar).toEqual({ carried: 0, confirmed: 100, pending: 0 });
+    expect(bar).toEqual({ confirmed: 100, pending: 0 });
   });
 
   it('draws nothing for an event with no target', () => {
-    expect(fundBarSegments(5_000, 1_000, 0)).toEqual({
-      carried: 0,
-      confirmed: 0,
-      pending: 0,
-    });
+    expect(fundBarSegments(5_000, 1_000, 0)).toEqual({ confirmed: 0, pending: 0 });
   });
 
-  it('draws money carried across first, and never counts it as a contribution', () => {
+  it('agrees with its own percentage when money has been carried in', () => {
+    // The event Arkala's committee reported: ₹6,990 carried into a ₹2,00,000
+    // target and nothing contributed yet. The bar used to draw the carry as a
+    // sliver over a "0%"; measured against what residents are asked for, the
+    // bar and the percentage are the same number.
+    expect(fundBarSegments(0, 0, 200_000, 6_990)).toEqual({ confirmed: 0, pending: 0 });
+  });
+
+  it('measures contributions against what residents are asked for, not the target', () => {
+    // ₹10,000 carried into ₹1,00,000 leaves ₹90,000 to ask for; ₹30,000 of
+    // that is a third, not 30%. The carry itself is never a contribution.
     const bar = fundBarSegments(30_000, 0, 100_000, 10_000);
-    expect(bar).toEqual({ carried: 10, confirmed: 30, pending: 0 });
+    expect(bar).toEqual({ confirmed: 33, pending: 0 });
   });
 
-  it('keeps all three inside the bar when the fund is over-subscribed', () => {
+  it('keeps both inside the bar when carried money and contributions pass the target', () => {
     const bar = fundBarSegments(90_000, 30_000, 100_000, 40_000);
-    expect(bar.carried).toBe(40);
-    expect(bar.confirmed).toBe(60);
-    expect(bar.pending).toBe(0);
-    expect(bar.carried + bar.confirmed + bar.pending).toBe(100);
+    expect(bar).toEqual({ confirmed: 100, pending: 0 });
   });
 
-  it('draws nothing for an event that gave its surplus away', () => {
+  it('fills the bar when money carried across covers the whole target', () => {
+    expect(fundBarSegments(0, 0, 5_000, 10_000)).toEqual({ confirmed: 100, pending: 0 });
+  });
+
+  it('measures an event that gave its surplus away against its own target', () => {
     // fund_carried is net, so an event that carried money out reads negative.
-    // What it did belongs on its own record, not as a negative width here.
+    // What it did belongs on its own record, and it asked for what it asked for.
     const bar = fundBarSegments(30_000, 0, 100_000, -10_000);
-    expect(bar).toEqual({ carried: 0, confirmed: 30, pending: 0 });
+    expect(bar).toEqual({ confirmed: 30, pending: 0 });
   });
 
   it('keeps pending out of the raised figure entirely', () => {
@@ -270,5 +284,37 @@ describe('what is still needed', () => {
 
   it('ignores a negative carried figure rather than inflating the ask', () => {
     expect(stillNeeded(50_000, 30_000, -10_000)).toBe(20_000);
+  });
+});
+
+describe('what residents are asked for', () => {
+  it('is the target less the money carried in', () => {
+    expect(fundAsk(200_000, 6_990)).toBe(193_010);
+  });
+
+  it('is the whole target when nothing was carried in, or money was carried out', () => {
+    expect(fundAsk(200_000)).toBe(200_000);
+    expect(fundAsk(50_000, -10_000)).toBe(50_000);
+  });
+
+  it('is nothing rather than negative when the carry covers the target', () => {
+    expect(fundAsk(5_000, 10_000)).toBe(0);
+  });
+
+  it('says in words how the card reached the figure it leads with', () => {
+    expect(carriedInLine(200_000, 6_990)).toBe(
+      '₹6,990 of the ₹2,00,000 target was carried across by the committee, so residents are asked for ₹1,93,010.',
+    );
+  });
+
+  it('says so when the carry covers the whole target', () => {
+    expect(carriedInLine(5_000, 10_000)).toBe(
+      '₹10,000 carried across by the committee covers the whole ₹5,000 target, so residents are not asked for anything.',
+    );
+  });
+
+  it('says nothing about an event that nothing was carried into', () => {
+    expect(carriedInLine(200_000, 0)).toBeNull();
+    expect(carriedInLine(200_000, -6_990)).toBeNull();
   });
 });
