@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fundAsk } from './events';
 import { formatMoney } from './format';
 import { uuid } from './schemas';
 
@@ -134,13 +135,116 @@ export function fundMovementLine(movement: FundMovementRow, currency = 'INR'): s
     case 'society_balance':
       return `${money} left over from ${from}, kept by the society`;
     case 'from_balance':
-      return `${money} from the society balance, put behind ${to}`;
+      return `${money} the society had kept, put behind ${to}`;
     case 'next_edition':
       return `${money} left over from ${from}, carried to ${to}`;
     case 'next_event':
     default:
       return `${money} left over from ${from}, now counting towards ${to}`;
   }
+}
+
+/**
+ * The sentence under a fund card whose event has money carried into it, saying
+ * how the figure the card leads with was reached. Null when nothing was.
+ *
+ * The card leads with what residents are asked for (fundAsk), and somebody who
+ * remembers the event being planned at ₹2,00,000 would otherwise read
+ * ₹1,93,010 as a mistake — or, the old way round, read ₹2,00,000 as what they
+ * are still being asked for.
+ */
+export function carriedInLine(target: number, carriedIn: number, currency = 'INR'): string | null {
+  if (carriedIn <= 0) return null;
+  const carried = formatMoney(carriedIn, currency);
+  if (target <= 0) return `${carried} was carried across by the committee from a closed event.`;
+  const ask = fundAsk(target, carriedIn);
+  if (ask === 0) {
+    return `${carried} carried across by the committee covers the whole ${formatMoney(target, currency)} target, so residents are not asked for anything.`;
+  }
+  return `${carried} of the ${formatMoney(target, currency)} target was carried across by the committee, so residents are asked for ${formatMoney(ask, currency)}.`;
+}
+
+/** One place the society's money is, as the Money page lists it. */
+export type Holding = {
+  eventId: string;
+  /** Null when the viewer cannot see the event: a draft, which only staff can. */
+  name: string | null;
+  emoji: string | null;
+  slug: string | null;
+  status: string | null;
+  /** What the event holds: confirmed money in, plus carried in, less approved bills. */
+  amount: number;
+  /** Carried across into (positive) or out of (negative) the event, net. */
+  carried: number;
+};
+
+/** What a row of the breakdown is called when the viewer cannot see its event. */
+export const UNPUBLISHED_EVENT = 'An event not published yet';
+
+/**
+ * Where the society's balance is: every event still holding money, largest
+ * first. What the society kept outside any event (the society_balance view) is
+ * the one other place, and the page lists it last.
+ *
+ * Together they add up to the Balance figure exactly, not approximately.
+ * Every payment and every bill belongs to an event, so the balance is the sum
+ * of what each event holds; and a carry only ever moves money between two of
+ * those places — one event to another, or an event to the society's own pot
+ * and back — so it changes where the money is and never the total. Without the
+ * split, "Balance ₹7,820" beside "₹0 kept for the society" read as a
+ * contradiction, and a carry of ₹6,990 left ₹830 nobody could find.
+ *
+ * `stats` is event_stats (every event, drafts included, for any member);
+ * `events` is whatever of the events table the viewer may read, which for a
+ * resident leaves drafts out.
+ */
+export function whereTheBalanceIs(
+  stats: {
+    event_id: string | null;
+    available: number | string | null;
+    fund_carried: number | string | null;
+  }[],
+  events: {
+    id: string;
+    name: string;
+    emoji?: string | null;
+    slug?: string | null;
+    status?: string | null;
+  }[],
+): Holding[] {
+  const byId = new Map(events.map((event) => [event.id, event]));
+  return stats
+    .flatMap((row) => {
+      const amount = Number(row.available ?? 0);
+      if (!row.event_id || Math.abs(amount) < 0.005) return [];
+      const event = byId.get(row.event_id);
+      return [
+        {
+          eventId: row.event_id,
+          name: event?.name ?? null,
+          emoji: event?.emoji ?? null,
+          slug: event?.slug ?? null,
+          status: event?.status ?? null,
+          amount,
+          carried: Number(row.fund_carried ?? 0),
+        },
+      ];
+    })
+    .sort((a, b) => b.amount - a.amount);
+}
+
+/** The small print under a row of the breakdown, or null when there is none. */
+export function holdingNote(holding: Holding, currency = 'INR'): string | null {
+  if (holding.amount < 0) return 'Has spent more than it holds';
+  if (holding.status === 'completed') {
+    return 'Closed, and the committee has not yet decided where this goes';
+  }
+  if (holding.status === 'cancelled') return 'Cancelled, and still holding this';
+  if (holding.carried > 0) {
+    // Not "of it": the event may have spent some of what was carried in.
+    return `${formatMoney(holding.carried, currency)} carried across by the committee`;
+  }
+  return null;
 }
 
 /** True when the movement adds to what the society is holding rather than spending it. */

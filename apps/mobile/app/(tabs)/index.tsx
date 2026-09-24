@@ -7,6 +7,7 @@ import {
   countdown,
   formatDate,
   formatMoney,
+  fundAsk,
   fundBarSegments,
   normalizeRole,
   normalizeStats,
@@ -121,7 +122,7 @@ export default function Home() {
         {heldBySociety > 0 ? (
           <Card style={{ gap: spacing.xs }}>
             <LinkRow
-              label={`Society balance · ${formatMoney(heldBySociety, currency)}`}
+              label={`Kept for the society · ${formatMoney(heldBySociety, currency)}`}
               detail={`Left over from ${balanceMovements} closed ${
                 balanceMovements === 1 ? 'event' : 'events'
               }, not yet behind a new one`}
@@ -167,17 +168,21 @@ export default function Home() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Caption>
                     {formatMoney(stats.fundRaised, currency)} of{' '}
-                    {formatMoney(stats.fundTarget, currency)}
+                    {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), currency)}
                   </Caption>
                   <Caption>{funded}%</Caption>
                 </View>
                 <Meter
                   percent={funded}
                   pendingPercent={fundBar.pending}
-                  carriedPercent={fundBar.carried}
                   tone="success"
                   label="Fund progress"
                 />
+                {stats.fundCarried > 0 ? (
+                  <Caption>
+                    After {formatMoney(stats.fundCarried, currency)} carried across by the committee
+                  </Caption>
+                ) : null}
               </View>
 
               <View style={{ flexDirection: 'row', gap: spacing.md }}>

@@ -1,7 +1,15 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
-import { can, formatDate, formatMoney, fundBarSegments, unitLabel } from '@samudaya/core';
+import {
+  can,
+  carriedInLine,
+  formatDate,
+  formatMoney,
+  fundAsk,
+  fundBarSegments,
+  unitLabel,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { getEventStats, requireEvent } from '@/lib/events';
@@ -79,13 +87,18 @@ export default async function ContributePage(
             <div className="text-ink-muted flex justify-between text-sm font-medium">
               <span>
                 {formatMoney(stats.fundRaised, community.currency)} of{' '}
-                {formatMoney(stats.fundTarget, community.currency)}
+                {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), community.currency)}
               </span>
               <span>{funded}%</span>
             </div>
             <div className="mt-2">
-              <FundBar percent={funded} pendingPercent={bar.pending} carriedPercent={bar.carried} />
+              <FundBar percent={funded} pendingPercent={bar.pending} />
             </div>
+            {stats.fundCarried > 0 ? (
+              <p className="text-ink-subtle mt-2 text-xs">
+                {carriedInLine(stats.fundTarget, stats.fundCarried, community.currency)}
+              </p>
+            ) : null}
             <p className="text-ink-subtle mt-2 text-xs">
               Confirmed payments only. {stats.contributors}{' '}
               {stats.contributors === 1 ? 'household has' : 'households have'} contributed so far.

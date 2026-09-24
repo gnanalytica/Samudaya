@@ -78,42 +78,36 @@ export function ReadinessBar({ percent }: { percent: number }) {
  * kind of thing, and a resident who has just paid should be able to find their
  * own contribution on the bar without being told the fund is further along
  * than it is. `aria-valuenow` stays the confirmed figure for the same reason.
+ *
+ * Money the committee carried across is not on the bar: the bar is measured
+ * against what residents are asked for, which that money has already been
+ * taken off (see fundBarSegments).
  */
 export function FundBar({
   percent,
   pendingPercent = 0,
-  carriedPercent = 0,
 }: {
   percent: number;
   /** Reported and not yet confirmed. Clamped to whatever the bar has left. */
   pendingPercent?: number;
-  /** Carried across from another event or the society balance. */
-  carriedPercent?: number;
 }) {
-  const carried = Math.min(100, Math.max(0, carriedPercent));
-  const confirmed = Math.min(100 - carried, Math.max(0, percent));
-  const pending = Math.min(100 - carried - confirmed, Math.max(0, pendingPercent));
+  const confirmed = Math.min(100, Math.max(0, percent));
+  const pending = Math.min(100 - confirmed, Math.max(0, pendingPercent));
   return (
     <div
       className="bg-surface-sunken flex h-2 overflow-hidden rounded-full"
       role="progressbar"
-      aria-valuenow={carried + confirmed}
+      aria-valuenow={confirmed}
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label="Fund progress"
       aria-valuetext={[
-        carried > 0 ? `${carried}% carried forward` : null,
         `${confirmed}% confirmed`,
         pending > 0 ? `${pending}% waiting to be confirmed` : null,
       ]
         .filter(Boolean)
         .join(', ')}
     >
-      {/* Carried money first: it is the most settled thing on the bar, already
-          in the society's account and already decided. */}
-      {carried > 0 ? (
-        <div className="bg-accent h-full transition-[width]" style={{ width: `${carried}%` }} />
-      ) : null}
       <div className="bg-success h-full transition-[width]" style={{ width: `${confirmed}%` }} />
       {pending > 0 ? (
         <div className="bg-success/40 h-full transition-[width]" style={{ width: `${pending}%` }} />

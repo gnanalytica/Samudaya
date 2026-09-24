@@ -3,8 +3,10 @@ import { ArrowLeft, FileText, Receipt, Sparkles, Wallet } from 'lucide-react';
 import {
   COPY,
   can,
+  carriedInLine,
   formatDate,
   formatMoney,
+  fundAsk,
   fundBarSegments,
   nextEditionName,
   receiptRef,
@@ -206,28 +208,32 @@ export default async function ManageEventPage(
             </div>
             <Card>
               <CardBody>
+                {/* Leads with what residents are asked for, not the target:
+                    money the committee carried across has already come off
+                    it. It is never a contribution either, so the line under
+                    the bar says in words where the difference went. */}
                 <div className="text-ink-muted flex justify-between text-sm font-medium">
-                  <span>Target {formatMoney(stats.fundTarget, community.currency)}</span>
+                  <span>
+                    {formatMoney(stats.fundRaised, community.currency)} of{' '}
+                    {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), community.currency)}{' '}
+                    raised
+                  </span>
                   <span>{funded}%</span>
                 </div>
                 <div className="mt-2">
-                  <FundBar
-                    percent={funded}
-                    pendingPercent={bar.pending}
-                    carriedPercent={bar.carried}
-                  />
+                  <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
-                {/* Not a contribution, and never added to the raised figure —
-                    the society moved its own money across. Said out loud so
-                    nobody reads the bar as sixty flats having paid. */}
                 {stats.fundCarried !== 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
                     {stats.fundCarried > 0
-                      ? `Includes ${formatMoney(stats.fundCarried, community.currency)} carried across by the committee.`
+                      ? carriedInLine(stats.fundTarget, stats.fundCarried, community.currency)
                       : `${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
                   </p>
                 ) : null}
-                {!closed ? (
+                {/* With money carried in and nothing raised yet, the line above
+                    has just said what residents are asked for; saying the same
+                    figure again as "still to raise" reads as a second number. */}
+                {!closed && (stats.fundCarried <= 0 || stats.fundRaised > 0) ? (
                   <p className="text-ink-subtle mt-1 text-xs">
                     {formatMoney(
                       stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),

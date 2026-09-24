@@ -954,7 +954,7 @@ export function SpendBalanceForm({
     <form action={action} className="space-y-3">
       <Hidden slug={slug} eventSlug={eventSlug} />
       <Field
-        label="Amount from the society balance (₹)"
+        label="Amount from what the society kept (₹)"
         htmlFor="balance-amount"
         error={state.fieldErrors?.amount}
         hint={`${formatMoney(balance, currency)} available`}
