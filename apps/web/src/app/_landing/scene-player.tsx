@@ -40,6 +40,11 @@ export default function ScenePlayer({
       controls={false}
       clickToPlay={false}
       style={{ width: '100%' }}
+      // The team is small enough for Remotion's free licence, which covers
+      // companies of up to three people (remotion.dev/license). Saying so
+      // silences the note the Player otherwise logs in every visitor's
+      // console. A bigger team needs a company licence, and this should go.
+      acknowledgeRemotionLicense
     />
   );
 }
