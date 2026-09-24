@@ -1,6 +1,6 @@
 import { AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { Petals, Rangoli, Toran, festive } from './festive';
-import { fontFamily, sec } from './theme';
+import { displayFamily, fontFamily, sec } from './theme';
 
 /**
  * The close: Samudaya's mark flows into Gnanalytica's.
@@ -191,9 +191,10 @@ export function LogoSting({ layout }: { layout: 'portrait' | 'landscape' }) {
       >
         <div
           style={{
+            fontFamily: displayFamily,
             fontSize: L.word.size,
             fontWeight: 600,
-            letterSpacing: '-0.035em',
+            letterSpacing: '-0.025em',
             lineHeight: 1,
           }}
         >

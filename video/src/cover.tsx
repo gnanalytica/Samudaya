@@ -3,7 +3,7 @@ import { AbsoluteFill, Freeze, useVideoConfig } from 'remotion';
 import { Diya, Rangoli, Toran, festive } from './festive';
 import { BAR_H, BottomBar, MoneyScreen, RESIDENT, SCREEN, STATUS_H, StatusBar } from './screens';
 import { timeline } from './story';
-import { FPS, color, fontFamily, sec } from './theme';
+import { FPS, color, displayFamily, fontFamily, sec } from './theme';
 
 /**
  * The cover: the frame a video is known by before anybody presses play.
@@ -147,9 +147,10 @@ function Brand({ u, stacked = false }: { u: number; stacked?: boolean }) {
       <Diya size={(stacked ? 150 : 104) * u} lit={-sec(2)} />
       <span
         style={{
+          fontFamily: displayFamily,
           fontSize: 60 * u,
-          fontWeight: 650,
-          letterSpacing: '-0.03em',
+          fontWeight: 600,
+          letterSpacing: '-0.025em',
           color: 'white',
           transform: `translateY(${(stacked ? -6 : 8) * u}px)`,
         }}
@@ -314,10 +315,11 @@ function Headline({ size, align }: { size: number; align: 'center' | 'left' }) {
     <div
       style={{
         textAlign: align,
+        fontFamily: displayFamily,
         fontSize: size,
-        fontWeight: 750,
+        fontWeight: 700,
         lineHeight: 1.08,
-        letterSpacing: '-0.035em',
+        letterSpacing: '-0.025em',
         color: 'white',
       }}
     >

@@ -290,6 +290,12 @@ beside it, which is.
 `public/captures/`, `public/score-*.wav` and `out/` are generated and
 git-ignored; the commands above rebuild all of them.
 
+`public/fonts/` is not generated. It holds Baloo 2, the landing page's display
+face, which the video's own titles, covers and sting are set in (`src/theme.ts`),
+with its licence (SIL OFL) beside it. It is committed rather than fetched from
+Google at render time, so a render needs no network and draws the same letters
+every time.
+
 ### The three files that are generated and committed
 
 `scenes.tsx` imports them, so a clean clone has to typecheck before anybody has

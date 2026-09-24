@@ -189,7 +189,8 @@ export const EVENTS = [
     status: 'Collecting',
     tone: 'success' as const,
     collected: 24500,
-    target: 30000,
+    target: 35000,
+    carried: 7800,
     note: '18 of 24 flats have paid',
   },
   {
@@ -198,9 +199,10 @@ export const EVENTS = [
     starts_on: '2026-11-08',
     status: 'Planned',
     tone: 'neutral' as const,
-    collected: 7800,
+    collected: 0,
     target: 40000,
-    note: 'Carried over from Summer Camp 2026',
+    carried: 0,
+    note: 'Collection opens in October',
   },
   {
     slug: 'independence-day-2026',
@@ -210,6 +212,7 @@ export const EVENTS = [
     tone: 'neutral' as const,
     collected: 14200,
     target: 12000,
+    carried: 0,
     note: '₹4,200 left over, kept for the society',
   },
 ];
@@ -300,7 +303,7 @@ export const BUDGET = [
 ];
 
 export const FUND = {
-  target: 30000,
+  target: 35000,
   raised: 24500,
   pending: 2002,
   carried: 7800,

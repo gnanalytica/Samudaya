@@ -89,7 +89,8 @@ describe('what the drawn scenes claim', () => {
     const data = demoData();
     const figures = [
       [24500, 'raised for Ganesh Chaturthi'],
-      [30000, 'the target'],
+      [35000, 'the target'],
+      [7800, 'carried in from Summer Camp'],
       [31200, 'spent'],
       [46500, 'collected across the year'],
       [15300, 'what that leaves'],
