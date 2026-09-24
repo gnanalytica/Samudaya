@@ -93,6 +93,10 @@
 }
 
 @theme inline {
+  /* The front page's display face (app/_landing/font.ts). Inline, so the
+     variable is read where it is used — it is only defined on the landing
+     page's root — and anywhere else this falls back to a rounded system face. */
+  --font-display: var(--font-baloo, ui-rounded), ui-rounded, system-ui, sans-serif;
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
@@ -162,5 +166,104 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * The front page's motion (app/page.tsx and app/_landing/). Each of these ends
+ * on the state the element is meant to be in, so the reduced-motion rule above
+ * — which cuts every animation to nothing — leaves the page exactly as it
+ * would look once the motion had finished. The burst ends invisible, which is
+ * also where it starts.
+ */
+@keyframes landing-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes landing-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes landing-burst {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1);
+  }
+}
+
+@keyframes landing-shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+@keyframes landing-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.landing-pop {
+  animation: landing-pop 360ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.landing-slide-in {
+  animation: landing-slide-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.landing-burst {
+  animation: landing-burst 1100ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+.landing-shimmer {
+  background-size: 200% auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-shimmer {
+    animation: landing-shimmer 9s linear infinite;
+  }
+
+  /* Anchor links on the front page glide rather than jump. */
+  html:has(#landing) {
+    scroll-behavior: smooth;
+  }
+
+  /* Sections rise into place as they scroll in — where the browser can tie an
+     animation to scrolling. Elsewhere they are simply there. */
+  @supports (animation-timeline: view()) {
+    .landing-reveal {
+      animation: landing-reveal linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 22%;
+    }
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 450ms;
   }
 }
