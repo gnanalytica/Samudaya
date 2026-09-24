@@ -474,7 +474,7 @@ export function HomeScreen() {
       </Card>
       <div style={{ display: 'flex', gap: 10 }}>
         {[
-          { label: 'Society balance', value: 4200 },
+          { label: 'Kept for the society', value: 4200 },
           { label: 'Spent this year', value: 31200 },
         ].map((tile, index) => (
           <Card
@@ -1645,7 +1645,7 @@ export function BalanceScreen() {
     },
   ];
   return (
-    <Page top={<PlainTop title="Society balance" sub="Every move, and who made it" />}>
+    <Page top={<PlainTop title="Kept for the society" sub="Every move, and who made it" />}>
       <Card style={{ borderColor: color.accent }}>
         <div style={{ fontSize: 13, color: muted }}>Held by the society</div>
         <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.03em', marginTop: 2 }}>
