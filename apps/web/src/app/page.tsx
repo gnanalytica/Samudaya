@@ -188,9 +188,9 @@ export default async function LandingPage(props: PageProps<'/'>) {
             <figure className="bg-surface-raised overflow-hidden rounded-2xl">
               <DemoVideo />
               <figcaption className="text-ink-muted border-border-base border-t px-5 py-3 text-sm">
-                Under two minutes, and every point is on screen — no sound needed. The screens are
-                drawn from the app&rsquo;s own; the society, the neighbours and the amounts are
-                invented.
+                Under two minutes, with a voice-over — turn the sound on — and every point is on
+                screen as well, so it works without. The screens are drawn from the app&rsquo;s own;
+                the society, the neighbours and the amounts are invented.
               </figcaption>
             </figure>
           </div>

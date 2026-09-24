@@ -12,7 +12,16 @@ import {
 import { Diya, Petals, Rangoli, Toran, festive } from './festive';
 import { LogoSting } from './logo';
 import { BAR_H, BottomBar, RESIDENT, SCREEN, STATUS_H, StatusBar, ramp, settle } from './screens';
-import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, timeline } from './story';
+import {
+  CHAPTERS,
+  type Chapter,
+  Narration,
+  SHOTS,
+  camera,
+  chapterNow,
+  duck,
+  timeline,
+} from './story';
 import { color, fontFamily, sec } from './theme';
 
 /**
@@ -481,10 +490,11 @@ export function PortraitReel({ score }: { score?: string }) {
               interpolate(f, [durationInFrames - sec(1.8), durationInFrames], [1, 0], {
                 extrapolateLeft: 'clamp',
               }),
-            )
+            ) * duck(f)
           }
         />
       ) : null}
+      <Narration />
 
       <Ground frame={frame} length={durationInFrames} />
 
