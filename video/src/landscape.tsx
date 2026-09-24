@@ -13,7 +13,7 @@ import { Diya, Petals, Rangoli, Toran, festive } from './festive';
 import { LogoSting } from './logo';
 import { BAR_H, BottomBar, RESIDENT, SCREEN, STATUS_H, StatusBar, ramp, settle } from './screens';
 import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, timeline } from './story';
-import { color, fontFamily, sec } from './theme';
+import { color, displayFamily, fontFamily, sec } from './theme';
 
 /**
  * The same fourteen beats, in 16:9.
@@ -229,10 +229,11 @@ function Panel({
       </div>
       <div
         style={{
+          fontFamily: displayFamily,
           fontSize: 72,
           lineHeight: 1.08,
           fontWeight: 700,
-          letterSpacing: '-0.03em',
+          letterSpacing: '-0.02em',
           opacity: head,
           transform: `translateY(${(1 - settle(frame, 0.1)) * 14}px)`,
         }}
@@ -363,7 +364,13 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
           {lines.map((line) => (
             <div
               key={line}
-              style={{ fontSize: 96, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em' }}
+              style={{
+                fontFamily: displayFamily,
+                fontSize: 96,
+                fontWeight: 700,
+                lineHeight: 1.1,
+                letterSpacing: '-0.02em',
+              }}
             >
               {line}
             </div>
@@ -424,9 +431,10 @@ function Bookend({
           <div
             style={{
               color: 'white',
+              fontFamily: displayFamily,
               fontSize: 120,
               fontWeight: 600,
-              letterSpacing: '-0.035em',
+              letterSpacing: '-0.025em',
               opacity: entered,
               transform: `scale(${0.94 + settle(frame, opening ? 0.1 : 0.3) * 0.06})`,
             }}
@@ -436,7 +444,9 @@ function Bookend({
           <div
             style={{
               color: 'rgba(255,255,255,0.82)',
+              fontFamily: displayFamily,
               fontSize: 46,
+              fontWeight: 500,
               marginTop: 20,
               opacity: ramp(frame, sec(0.6), sec(1.4)),
             }}

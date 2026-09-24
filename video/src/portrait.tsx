@@ -13,7 +13,7 @@ import { Diya, Petals, Rangoli, Toran, festive } from './festive';
 import { LogoSting } from './logo';
 import { BAR_H, BottomBar, RESIDENT, SCREEN, STATUS_H, StatusBar, ramp, settle } from './screens';
 import { CHAPTERS, type Chapter, SHOTS, camera, chapterNow, timeline } from './story';
-import { color, fontFamily, sec } from './theme';
+import { color, displayFamily, fontFamily, sec } from './theme';
 
 /**
  * The portrait cut: one phone, one argument, no footage.
@@ -297,7 +297,15 @@ function Caption({ headline, points, hold }: { headline: string; points: string[
           transform: `translateY(${(1 - entered) * 14}px)`,
         }}
       >
-        <div style={{ fontSize: 46, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.02em' }}>
+        <div
+          style={{
+            fontFamily: displayFamily,
+            fontSize: 46,
+            fontWeight: 700,
+            lineHeight: 1.12,
+            letterSpacing: '-0.02em',
+          }}
+        >
           {headline}
         </div>
         {points.map((point) => (
@@ -368,7 +376,13 @@ function Statement({ lines, sub, hold }: { lines: string[]; sub?: string; hold: 
           {lines.map((line) => (
             <div
               key={line}
-              style={{ fontSize: 76, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.03em' }}
+              style={{
+                fontFamily: displayFamily,
+                fontSize: 76,
+                fontWeight: 700,
+                lineHeight: 1.12,
+                letterSpacing: '-0.02em',
+              }}
             >
               {line}
             </div>
@@ -433,9 +447,10 @@ function Bookend({
           <div
             style={{
               color: 'white',
+              fontFamily: displayFamily,
               fontSize: 112,
               fontWeight: 600,
-              letterSpacing: '-0.035em',
+              letterSpacing: '-0.025em',
               opacity: entered,
               transform: `scale(${0.94 + settle(frame, opening ? 0.1 : 0.3) * 0.06})`,
             }}
@@ -445,7 +460,9 @@ function Bookend({
           <div
             style={{
               color: 'rgba(255,255,255,0.82)',
+              fontFamily: displayFamily,
               fontSize: 45,
+              fontWeight: 500,
               marginTop: 22,
               lineHeight: 1.25,
               opacity: ramp(frame, sec(0.6), sec(1.4)),

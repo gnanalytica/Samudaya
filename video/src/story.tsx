@@ -94,7 +94,10 @@ export const SHOTS: Shot[] = [
     id: 'home',
     chapter: 'Plan',
     headline: 'Every festival, one screen',
-    points: ['₹24,500 of ₹30,000 raised', '18 of 24 flats paid'],
+    // Since carried money stopped hiding inside the target, the app asks
+    // residents only for the rest: ₹35,000 less the ₹7,800 moved in from
+    // Summer Camp, which the Balance shot shows arriving.
+    points: ['₹24,500 of ₹27,200 raised', '₹7,800 carried in'],
     screen: <HomeScreen />,
     active: 'Home',
     zoom: [1.0, 1.05],
@@ -114,7 +117,7 @@ export const SHOTS: Shot[] = [
     id: 'pay',
     chapter: 'Collect',
     headline: 'Pay in two taps',
-    points: ['UPI or cash', 'Payment note filled in for you'],
+    points: ['Opens your UPI app', 'Amount and note filled in'],
     screen: <PayScreen />,
     active: 'Events',
     zoom: [1.02, 1.08],
@@ -183,7 +186,7 @@ export const SHOTS: Shot[] = [
     id: 'reconcile',
     chapter: 'Prove',
     headline: 'Bank statement reconciled',
-    points: ['Auto-matched to the ledger', 'Unmatched credits flagged'],
+    points: ['Best match suggested, you confirm', 'Unmatched credits flagged'],
     screen: <ReconcileScreen />,
     tabs: COMMITTEE,
     active: 'Manage',

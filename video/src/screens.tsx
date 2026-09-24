@@ -16,7 +16,7 @@ import { Rangoli, Toran, festive } from './festive';
  *
  * The rule that keeps it from becoming a lie: every figure, label and rule
  * below is the one in `capture/harness/society/demo-data.ts`, which is the
- * data the filmed cut used. ₹24,500 of ₹30,000 here is ₹24,500 of ₹30,000
+ * data the filmed cut used. ₹24,500 of ₹27,200 here is ₹24,500 of ₹27,200
  * there. The layout is the app's mobile layout — a festival header, a scroll,
  * and the four-tab bar from `apps/web/src/components/sidebar-nav.tsx`. Nothing
  * here is a screen the product does not have or a number it would not show.
@@ -462,15 +462,21 @@ export function HomeScreen() {
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
           <span style={{ fontSize: 13, color: muted }}>Collected so far</span>
-          <span style={{ fontSize: 12, color: muted }}>of {rupees(30000)}</span>
+          <span style={{ fontSize: 12, color: muted }}>of {rupees(27200)}</span>
         </div>
         <div
           style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.03em', margin: '2px 0 10px' }}
         >
           {rupees(counted(frame, 24500))}
         </div>
-        <Bar fraction={ramp(frame, sec(0.2), sec(1.3)) * (24500 / 30000)} blend />
+        <Bar fraction={ramp(frame, sec(0.2), sec(1.3)) * (24500 / 27200)} blend />
         <div style={{ fontSize: 12.5, color: muted, marginTop: 9 }}>18 of 24 flats have paid</div>
+        {/* The app's own line (app/app/[community]/page.tsx): the ₹35,000
+            target less the ₹7,800 the Balance shot moves in from Summer Camp,
+            so nobody is asked twice for money that is already there. */}
+        <div style={{ fontSize: 11.5, color: subtle, marginTop: 3 }}>
+          After {rupees(7800)} carried across by the committee
+        </div>
       </Card>
       <div style={{ display: 'flex', gap: 10 }}>
         {[
@@ -1077,11 +1083,20 @@ const SETTLED = [
   { who: 'UPI/9843•••221', amount: 1500, matched: false },
 ];
 
-/** Reconcile: the bank statement on one side, the ledger on the other. */
+/**
+ * Reconcile: the bank statement on one side, the ledger on the other.
+ *
+ * Nothing pairs itself. The page offers the likeliest payment for each line —
+ * here the one with the same UTR — and somebody presses Confirm, which is what
+ * matchLine does ("Matched and confirmed."). An earlier cut said the statement
+ * was auto-matched; it never was.
+ */
 export function ReconcileScreen() {
   const frame = useCurrentFrame();
-  const close = ramp(frame, sec(0.7), sec(1.45), Easing.inOut(Easing.cubic));
-  const matched = ramp(frame, sec(1.45), sec(1.8));
+  const close = ramp(frame, sec(0.7), sec(1.3), Easing.inOut(Easing.cubic));
+  const offered = ramp(frame, sec(1.1), sec(1.35));
+  const pressed = ramp(frame, sec(1.55), sec(1.68)) * (1 - ramp(frame, sec(1.68), sec(1.8)));
+  const matched = ramp(frame, sec(1.68), sec(1.95));
   const line = (label: string, sub: string, amount: number, side: 1 | -1) => (
     <div
       style={{
@@ -1126,20 +1141,21 @@ export function ReconcileScreen() {
             display: 'flex',
             alignItems: 'center',
             gap: 7,
-            backgroundColor: color.accent,
-            color: 'white',
+            backgroundColor: matched > 0.5 ? color.accent : color.surfaceRaised,
+            color: matched > 0.5 ? 'white' : color.accent,
+            border: `1.5px solid ${color.accent}`,
             borderRadius: 999,
             padding: '5px 13px',
             fontSize: 12.5,
             fontWeight: 650,
-            opacity: matched,
-            transform: `scale(${0.8 + matched * 0.2})`,
+            opacity: offered,
+            transform: `scale(${(0.8 + offered * 0.2) * (1 - pressed * 0.06)})`,
           }}
         >
-          <Tick on={matched} size={14} />
-          Matched
+          {matched > 0.5 ? <Tick on={matched} size={14} /> : null}
+          {matched > 0.5 ? 'Matched and confirmed' : 'Confirm'}
         </div>
-        {line('SAMUDAYA LEDGER', 'Asha Menon · A 402', 2001, 1)}
+        {line('SAMUDAYA LEDGER', 'Asha Menon · A 402 · same UTR', 2001, 1)}
       </div>
       <div style={{ marginTop: 14, opacity: ramp(frame, sec(1.75), sec(2.15)) }}>
         {SETTLED.map((row, index) => (
