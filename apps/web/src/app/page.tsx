@@ -1,14 +1,33 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { CalendarDays, ClipboardList, MessageCircle, Receipt, Vote, Wallet } from 'lucide-react';
+import {
+  ArrowRight,
+  CalendarDays,
+  ClipboardList,
+  MessageCircle,
+  ReceiptIndianRupee,
+  Vote,
+  Wallet,
+} from 'lucide-react';
 import { todayIn } from '@samudaya/core';
 import { ButtonLink } from '@/components/ui/button';
-import { Rangoli, festivalVars } from '@/components/festival';
-import { DemoVideo } from './demo-video';
-import { Garland, Sparkles } from './festive';
+import { festivalVars } from '@/components/festival';
 import { getCurrentUser } from '@/lib/auth';
 import { season } from '@/lib/season';
+import { cn } from '@/lib/utils';
+import { DemoVideo } from './demo-video';
+import { Garland, Sparkles } from './festive';
+import { display } from './_landing/font';
+import { FundToy } from './_landing/fund-toy';
+import {
+  FestivalPicker,
+  FestivalTheme,
+  ThemeToast,
+  ThemedRangoli,
+  type ThemeOption,
+} from './_landing/theme';
+import { Tour, type Chapter } from './_landing/tour';
 
 const FEATURES = [
   {
@@ -28,10 +47,10 @@ const FEATURES = [
     // 20260920000500_every_resident_can_see_the_ledger.sql).
     icon: Wallet,
     title: 'A fund with a target',
-    body: 'Residents chip in and the bar fills. Each payment the committee confirms goes on a ledger every resident can read, with the payer’s name and flat.',
+    body: 'Residents chip in and the bar fills. Each confirmed payment goes on a ledger every resident can read, with the payer’s name and flat.',
   },
   {
-    icon: Receipt,
+    icon: ReceiptIndianRupee,
     title: 'Every rupee, with the bill',
     body: 'Staff upload each bill, the committee approves it, and residents see the vendor, amount and invoice.',
   },
@@ -44,6 +63,56 @@ const FEATURES = [
     icon: MessageCircle,
     title: 'Campaigns from residents',
     body: 'Anyone can propose a fundraising campaign. The committee approves it before collection starts.',
+  },
+];
+
+/**
+ * The tour's four chapters — the four the explainer video is cut into. Every
+ * sentence here is held to what the app does, exceptions included: the one
+ * hatch in "nobody signs off their own money" is a committee of one person
+ * (app.sole_committee_member), and payments are confirmed by staff as well as
+ * the committee (review_contribution).
+ */
+const CHAPTERS: Chapter[] = [
+  {
+    id: 'plan',
+    label: 'Plan',
+    title: 'Every festival gets a page of its own',
+    points: [
+      'Activities, a budget and a fund for each event, in its festival’s colours.',
+      'Readiness you can see: which jobs are done, and which have nobody on them yet.',
+      'Volunteer roles with their slots, so a shortfall shows long before the day does.',
+    ],
+  },
+  {
+    id: 'collect',
+    label: 'Collect',
+    title: 'Two taps to pay, and someone else confirms it',
+    points: [
+      'Residents pay by UPI with the amount and a note already filled in, and staff record the cash they are handed.',
+      'Staff or the committee check each payment, and nobody confirms their own — unless the committee is a single person.',
+      'Then it is on a ledger every resident can read: the name, the flat and how they paid.',
+    ],
+  },
+  {
+    id: 'spend',
+    label: 'Spend',
+    title: 'Every rupee out, with the bill beside it',
+    points: [
+      'Each bill is uploaded with the vendor and the amount, and approved by the committee.',
+      'Whoever filed a bill cannot approve it — with the same one-person-committee exception.',
+      'Spending is tracked against the budget line by line, and an overspend is shown, not hidden.',
+    ],
+  },
+  {
+    id: 'prove',
+    label: 'Prove',
+    title: 'Proof, not promises',
+    points: [
+      'Paste in the bank statement and pair each line with the payment it belongs to; the likely ones are suggested. Money nobody can explain is counted, not quietly dropped.',
+      'When a festival closes, the committee decides openly what happens to what is left, and the decision carries a name.',
+      'The Money page shows where every rupee of the balance is, event by event.',
+    ],
   },
 ];
 
@@ -75,6 +144,26 @@ const KOLAM_DOTS: CSSProperties = {
   maskImage: 'linear-gradient(to left, black 0%, transparent 55%)',
 };
 
+/** A section's small heading, in the festival's colour. */
+function Kicker({ children }: { children: ReactNode }) {
+  return <p className="text-accent text-sm font-semibold tracking-wide uppercase">{children}</p>;
+}
+
+/**
+ * A section's heading, and the target of the header's links to it: the scroll
+ * margin clears the sticky header and leaves the kicker above in view.
+ */
+function SectionTitle({ id, children }: { id?: string; children: ReactNode }) {
+  return (
+    <h2
+      id={id}
+      className="font-display text-ink mt-2 scroll-mt-28 text-3xl leading-[1.1] font-semibold tracking-tight text-balance sm:text-4xl"
+    >
+      {children}
+    </h2>
+  );
+}
+
 export default async function LandingPage(props: PageProps<'/'>) {
   // Signed-in visitors have no use for the pitch.
   const user = await getCurrentUser();
@@ -86,189 +175,304 @@ export default async function LandingPage(props: PageProps<'/'>) {
   const { deleted } = await props.searchParams;
 
   // The page wears the colours of whichever festival is next, the way every
-  // event in the app wears its own. See lib/season.ts.
+  // event in the app wears its own. See lib/season.ts. The festivals after it
+  // can be tried on further down (_landing/theme.tsx).
   const { next, palette, upcoming } = season(todayIn(), 6);
+  const options: ThemeOption[] = upcoming.map(({ id, name, emoji, when, palette: colours }) => ({
+    id,
+    name,
+    emoji,
+    when,
+    palette: colours,
+  }));
+  const current: ThemeOption | null = next
+    ? { id: next.id, name: next.name, emoji: next.emoji, when: next.when, palette: next.palette }
+    : null;
 
   return (
-    <div style={festivalVars(palette)} className="min-h-dvh">
-      <div className="bg-[var(--festival-wash)]">
-        <Garland id="garland-top" />
-        <header className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-3 pb-1">
-          <span className="inline-flex items-center gap-2">
-            <span className="from-accent to-ribbon text-accent-ink grid size-8 place-items-center rounded-lg bg-linear-to-br text-sm font-bold shadow-sm">
-              स
-            </span>
-            <span className="text-lg font-semibold tracking-tight">Samudaya</span>
-          </span>
-          <ButtonLink href="/login" variant="secondary" size="sm">
-            Sign in
-          </ButtonLink>
-        </header>
-      </div>
-
-      <main id="main">
-        <section className="relative isolate overflow-hidden bg-[var(--festival-wash)]">
-          <div aria-hidden="true" className="absolute inset-0 -z-10" style={GLOW} />
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 -z-10 hidden lg:block"
-            style={KOLAM_DOTS}
-          />
-          {/* On a phone or a tablet the words are the whole width, so the kolam
-              only peeks in at the corner. From lg there is a column beside the
-              text, and it is placed from the centre so it starts where the
-              headline's 42rem ends at every width. */}
-          <Rangoli
-            petals={palette.petals}
-            strokeWidth={0.6}
-            className="motion-safe:animate-rangoli pointer-events-none absolute -top-36 -right-36 -z-10 size-72 opacity-30 lg:top-[-4.5rem] lg:right-auto lg:left-[calc(50%+12rem)] lg:size-[36rem] lg:opacity-40"
-          />
-          <Rangoli
-            petals={palette.petals}
-            strokeWidth={0.9}
-            className="pointer-events-none absolute -bottom-28 -left-28 -z-10 hidden size-64 opacity-25 sm:block"
-          />
-          <Sparkles className="-z-10" />
-
-          <div className="mx-auto max-w-5xl px-6 pt-8 pb-28 sm:pt-12 sm:pb-36">
-            {deleted ? (
-              <p
-                role="status"
-                className="border-border-base bg-surface-raised text-ink mb-8 rounded-xl border px-5 py-4 text-sm"
-              >
-                Your account has been deleted. Contributions and bills stay in your society&rsquo;s
-                ledger with your name removed, as our{' '}
-                <Link href="/privacy" className="text-accent underline underline-offset-4">
-                  Privacy Policy
-                </Link>{' '}
-                describes.
-              </p>
-            ) : null}
-
-            {next ? (
-              <p className="border-accent/25 bg-surface-raised/80 text-ink inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-full border px-3.5 py-1.5 text-sm shadow-sm backdrop-blur-sm">
-                <span aria-hidden="true">{next.emoji}</span>
-                <span className="font-medium">Getting ready for {next.name},</span>
-                <span className="text-ink-muted">{next.when}</span>
-              </p>
-            ) : null}
-            <p className="text-accent mt-6 text-sm font-medium">समुदाय · community</p>
-            <h1 className="mt-3 max-w-2xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
-              Plan together. Participate together.{' '}
-              <span className="from-accent to-ribbon bg-linear-to-r bg-clip-text text-transparent">
-                Spend transparently.
+    <div
+      id="landing"
+      style={festivalVars(palette)}
+      className={cn(display.variable, 'min-h-dvh overflow-x-clip')}
+    >
+      <FestivalTheme season={current} options={options}>
+        <div className="bg-[var(--festival-wash)]">
+          <Garland id="garland-top" />
+        </div>
+        <header className="border-border-base/60 sticky top-0 z-30 border-b bg-[var(--festival-wash)]/85 backdrop-blur-md">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-2.5">
+            <Link href="/" className="inline-flex items-center gap-2">
+              <span className="from-accent to-ribbon text-accent-ink font-display grid size-9 place-items-center rounded-xl bg-linear-to-br text-lg font-bold shadow-sm">
+                स
               </span>
-            </h1>
-            <p className="text-ink-muted mt-5 max-w-xl text-lg text-pretty">
-              Samudaya gives every community event its own activities, budget, fund and public
-              ledger — so residents can see exactly what is planned, what was spent, and on what. On
-              the web and on your phone.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <ButtonLink
-                href={withIntent('join')}
-                size="lg"
-                className="shadow-accent/30 shadow-md"
-              >
+              <span className="font-display text-xl font-semibold tracking-tight">Samudaya</span>
+            </Link>
+            <nav aria-label="On this page" className="hidden items-center gap-6 text-sm lg:flex">
+              <a href="#try" className="text-ink-muted hover:text-ink">
+                Try it
+              </a>
+              <a href="#how" className="text-ink-muted hover:text-ink">
+                How it works
+              </a>
+              <a href="#festivals" className="text-ink-muted hover:text-ink">
+                Festivals
+              </a>
+            </nav>
+            <div className="flex items-center gap-2">
+              <ButtonLink href="/login" variant="ghost" size="sm">
+                Sign in
+              </ButtonLink>
+              <ButtonLink href={withIntent('join')} size="sm" className="hidden sm:inline-flex">
                 Join your society
               </ButtonLink>
-              <ButtonLink href={withIntent('create')} variant="secondary" size="lg">
-                Start a society
-              </ButtonLink>
             </div>
-            <p className="text-ink-muted mt-4 max-w-md text-sm">
-              Residents join with the code their committee shares, and staff approve each one.
-              Setting your society up for the first time? You don’t need a code.
-            </p>
           </div>
-        </section>
+        </header>
 
-        <section className="relative mx-auto -mt-20 max-w-5xl px-6 pb-20 sm:-mt-24">
-          <div className="from-accent via-ribbon to-accent shadow-accent/20 rounded-[1.15rem] bg-linear-to-br p-[3px] shadow-xl">
-            <figure className="bg-surface-raised overflow-hidden rounded-2xl">
-              <DemoVideo />
-              <figcaption className="text-ink-muted border-border-base border-t px-5 py-3 text-sm">
-                Under two minutes, and every point is on screen — no sound needed. The screens are
-                drawn from the app&rsquo;s own; the society, the neighbours and the amounts are
-                invented.
-              </figcaption>
-            </figure>
-          </div>
-        </section>
+        <main id="main">
+          {/* ---------------------------------------------------------- hero */}
+          <section className="relative isolate overflow-hidden bg-[var(--festival-wash)]">
+            <div aria-hidden="true" className="absolute inset-0 -z-10" style={GLOW} />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 -z-10 hidden lg:block"
+              style={KOLAM_DOTS}
+            />
+            {/* On a phone the kolam only peeks in at the corner; from lg it
+                turns behind the toy fund, clear of the words. */}
+            <ThemedRangoli
+              fallbackPetals={palette.petals}
+              strokeWidth={0.6}
+              className="motion-safe:animate-rangoli pointer-events-none absolute -top-36 -right-36 -z-10 size-72 opacity-30 lg:top-auto lg:right-[-10rem] lg:bottom-[-12rem] lg:size-[44rem] lg:opacity-35"
+            />
+            <Sparkles className="-z-10" />
 
-        <section aria-labelledby="festivals" className="mx-auto max-w-5xl px-6 pb-20">
-          <h2 id="festivals" className="text-2xl font-semibold tracking-tight text-balance">
-            Every festival, in its own colours
-          </h2>
-          <p className="text-ink-muted mt-3 max-w-2xl text-pretty">
-            Start an event and Samudaya suggests the festivals coming up. Pick one and it fills in
-            the name and a date, and the event takes that festival&rsquo;s colours
-            {next ? <> — this page is wearing {next.name}&rsquo;s</> : null}. A festival that
-            follows the moon comes with a reminder to check the date before you publish.
-          </p>
-          <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {upcoming.map((entry) => (
-              <li
-                key={entry.id}
-                style={festivalVars(entry.palette)}
-                className="border-border-base relative isolate overflow-hidden rounded-xl border bg-[var(--festival-wash)] p-4"
-              >
+            <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 pt-10 pb-20 sm:pt-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:pb-28">
+              <div>
+                {deleted ? (
+                  <p
+                    role="status"
+                    className="border-border-base bg-surface-raised text-ink mb-8 rounded-xl border px-5 py-4 text-sm"
+                  >
+                    Your account has been deleted. Contributions and bills stay in your
+                    society&rsquo;s ledger with your name removed, as our{' '}
+                    <Link href="/privacy" className="text-accent underline underline-offset-4">
+                      Privacy Policy
+                    </Link>{' '}
+                    describes.
+                  </p>
+                ) : null}
+
+                {next ? (
+                  <p className="landing-pop border-accent/25 bg-surface-raised/80 text-ink inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border px-3.5 py-1.5 text-sm shadow-sm backdrop-blur-sm sm:rounded-full">
+                    <span aria-hidden="true">{next.emoji}</span>
+                    <span className="font-medium">Getting ready for {next.name},</span>
+                    <span className="text-ink-muted">{next.when}</span>
+                  </p>
+                ) : null}
+                <p className="font-display text-accent mt-7 text-lg font-semibold">
+                  समुदाय · community
+                </p>
+                <h1 className="font-display text-ink mt-2 text-5xl leading-[0.98] font-bold tracking-tight text-balance sm:text-6xl lg:text-7xl">
+                  Plan together. Participate together.{' '}
+                  <span className="landing-shimmer from-accent via-ribbon to-accent bg-linear-to-r bg-clip-text text-transparent">
+                    Spend transparently.
+                  </span>
+                </h1>
+                <p className="text-ink-muted mt-6 max-w-xl text-lg text-pretty">
+                  Samudaya gives every community event its own activities, budget, fund and public
+                  ledger — so residents can see exactly what is planned, what was spent, and on
+                  what. On the web and on your phone.
+                </p>
+                <div className="mt-8 flex flex-wrap gap-3">
+                  <ButtonLink
+                    href={withIntent('join')}
+                    size="lg"
+                    className="shadow-accent/30 group shadow-lg"
+                  >
+                    Join your society
+                    <ArrowRight
+                      className="size-4 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden="true"
+                    />
+                  </ButtonLink>
+                  <ButtonLink href={withIntent('create')} variant="secondary" size="lg">
+                    Start a society
+                  </ButtonLink>
+                </div>
+                <p className="text-ink-muted mt-4 max-w-md text-sm">
+                  Residents join with the code their committee shares, and staff approve each one.
+                  Setting your society up for the first time? You don’t need a code.
+                </p>
+              </div>
+
+              <div className="relative mx-auto w-full max-w-md lg:mx-0 lg:justify-self-end">
                 <div
                   aria-hidden="true"
-                  className="from-accent to-ribbon absolute inset-x-0 top-0 h-1 bg-linear-to-r"
+                  className="from-accent/25 to-ribbon/25 absolute -inset-4 -z-10 rotate-2 rounded-[2.2rem] bg-linear-to-br"
                 />
-                <Rangoli
-                  petals={entry.palette.petals}
-                  strokeWidth={1.6}
-                  className="pointer-events-none absolute -top-8 -right-8 -z-10 size-24 opacity-30"
-                />
-                <span
-                  aria-hidden="true"
-                  className="from-accent to-ribbon block size-11 rounded-full bg-linear-to-br p-[2px] shadow-sm"
-                >
-                  <span className="bg-surface-raised grid size-full place-items-center rounded-full text-xl">
-                    {entry.emoji}
-                  </span>
-                </span>
-                <p className="text-ink mt-3 font-semibold">{entry.name}</p>
-                <p className="text-ink-muted mt-0.5 text-sm">{entry.when}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="border-border-base bg-surface-sunken border-t">
-          <div className="bg-border-base mx-auto grid max-w-5xl gap-px sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map(({ icon: Icon, title, body }) => (
-              <div key={title} className="bg-surface-sunken p-6">
-                <span className="from-accent to-ribbon text-accent-ink grid size-9 place-items-center rounded-lg bg-linear-to-br shadow-sm">
-                  <Icon className="size-[1.1rem]" aria-hidden="true" />
-                </span>
-                <h2 className="mt-4 text-sm font-semibold tracking-tight">{title}</h2>
-                <p className="text-ink-muted mt-1.5 text-sm">{body}</p>
+                <FundToy />
               </div>
-            ))}
-          </div>
-        </section>
-      </main>
+            </div>
+          </section>
 
-      <footer className="bg-[var(--festival-wash)]">
-        <Garland id="garland-foot" />
-        <div className="text-ink-muted mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 px-6 pt-6 pb-10 text-sm">
-          <span>Samudaya</span>
-          <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/privacy" className="underline underline-offset-4">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="underline underline-offset-4">
-              Terms &amp; Conditions
-            </Link>
-            <Link href="/login" className="underline underline-offset-4">
-              Sign in
-            </Link>
-          </nav>
-        </div>
-      </footer>
+          {/* --------------------------------------------------------- video */}
+          <section
+            aria-labelledby="watch"
+            className="relative mx-auto -mt-10 max-w-5xl px-6 pb-20 sm:-mt-14"
+          >
+            <div className="landing-reveal from-accent via-ribbon to-accent shadow-accent/20 rounded-[1.4rem] bg-linear-to-br p-[3px] shadow-xl">
+              <figure className="bg-surface-raised overflow-hidden rounded-[1.25rem]">
+                <div className="border-border-base flex flex-wrap items-baseline justify-between gap-2 border-b px-5 py-3">
+                  <h2 id="watch" className="font-display text-ink text-lg font-semibold">
+                    Watch one payment go all the way
+                  </h2>
+                  <span className="text-ink-subtle text-sm">
+                    From two taps to the bank statement
+                  </span>
+                </div>
+                <DemoVideo />
+                <figcaption className="text-ink-muted border-border-base border-t px-5 py-3 text-sm">
+                  Under two minutes, and every point is on screen — no sound needed. The screens are
+                  drawn from the app&rsquo;s own; the society, the neighbours and the amounts are
+                  invented.
+                </figcaption>
+              </figure>
+            </div>
+          </section>
+
+          {/* ---------------------------------------------------------- tour */}
+          <section aria-labelledby="how" className="mx-auto max-w-6xl px-6 pb-16 sm:pb-24">
+            <div className="landing-reveal">
+              <Kicker>How it works</Kicker>
+              <SectionTitle id="how">From the first plan to the last rupee</SectionTitle>
+              <p className="text-ink-muted mt-3 max-w-2xl text-lg text-pretty">
+                Four steps, the same four for every festival. Pick one and watch it happen.
+              </p>
+            </div>
+            <Tour chapters={CHAPTERS} />
+          </section>
+
+          {/* ----------------------------------------------------- festivals */}
+          <section
+            aria-labelledby="festivals"
+            className="relative isolate overflow-hidden bg-[var(--festival-wash)] py-16 sm:py-20"
+          >
+            <ThemedRangoli
+              fallbackPetals={palette.petals}
+              strokeWidth={0.8}
+              className="motion-safe:animate-rangoli pointer-events-none absolute -bottom-40 -left-40 -z-10 size-96 opacity-20"
+            />
+            <div className="mx-auto max-w-6xl px-6">
+              <div className="landing-reveal">
+                <Kicker>Dressed for the occasion</Kicker>
+                <SectionTitle id="festivals">Every festival, in its own colours</SectionTitle>
+                <p className="text-ink-muted mt-3 max-w-2xl text-pretty">
+                  Start an event and Samudaya suggests the festivals coming up. Pick one and it
+                  fills in the name and a date, and the event takes that festival&rsquo;s colours
+                  {next ? <> — this page is wearing {next.name}&rsquo;s</> : null}. A festival that
+                  follows the moon comes with a reminder to check the date before you publish.
+                </p>
+                <p className="text-ink mt-3 font-medium">
+                  Go on — tap one, and this page puts it on.
+                </p>
+              </div>
+              <FestivalPicker />
+            </div>
+          </section>
+
+          {/* ------------------------------------------------------ features */}
+          <section aria-labelledby="everything" className="mx-auto max-w-6xl px-6 py-16 sm:py-24">
+            <div className="landing-reveal">
+              <Kicker>All of it, in one place</Kicker>
+              <SectionTitle id="everything">What a festival committee juggles</SectionTitle>
+            </div>
+            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map(({ icon: Icon, title, body }) => (
+                <div
+                  key={title}
+                  className="landing-reveal group border-border-base bg-surface-raised relative flex gap-4 overflow-hidden rounded-2xl border p-5 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-xl motion-reduce:hover:translate-y-0 sm:block sm:p-6"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="from-accent to-ribbon absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-linear-to-r transition-transform duration-500 group-hover:scale-x-100"
+                  />
+                  <span className="from-accent to-ribbon text-accent-ink grid size-11 shrink-0 place-items-center rounded-xl bg-linear-to-br shadow-sm transition-transform duration-300 group-hover:-rotate-6">
+                    <Icon className="size-5" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="font-display text-ink text-lg leading-snug font-semibold tracking-tight sm:mt-4">
+                      {title}
+                    </h3>
+                    <p className="text-ink-muted mt-1 text-sm sm:mt-1.5">{body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ----------------------------------------------------------- end */}
+          <section aria-labelledby="start" className="mx-auto max-w-6xl px-6 pb-16 sm:pb-24">
+            <div className="landing-reveal from-accent to-ribbon text-accent-ink relative isolate overflow-hidden rounded-[2rem] bg-linear-to-br px-6 py-14 text-center shadow-2xl sm:px-12">
+              <ThemedRangoli
+                fallbackPetals={palette.petals}
+                mono
+                strokeWidth={0.7}
+                className="motion-safe:animate-rangoli pointer-events-none absolute -top-24 -right-24 -z-10 size-80 opacity-25"
+              />
+              <ThemedRangoli
+                fallbackPetals={palette.petals}
+                mono
+                strokeWidth={0.7}
+                className="motion-safe:animate-rangoli pointer-events-none absolute -bottom-28 -left-20 -z-10 size-72 opacity-20"
+              />
+              <h2
+                id="start"
+                className="font-display mx-auto max-w-2xl text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-5xl"
+              >
+                Your society&rsquo;s next festival, fully accounted for.
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-lg opacity-90">
+                Bring your neighbours in with a code, or set your society up in a few minutes.
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <Link
+                  href={withIntent('join')}
+                  className="bg-surface-raised text-ink inline-flex h-12 items-center gap-2 rounded-lg px-6 font-semibold shadow-lg transition-transform hover:-translate-y-0.5"
+                >
+                  Join your society
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+                <Link
+                  href={withIntent('create')}
+                  className="border-accent-ink/40 inline-flex h-12 items-center rounded-lg border-2 px-6 font-semibold transition-colors hover:bg-black/10"
+                >
+                  Start a society
+                </Link>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <footer className="bg-[var(--festival-wash)]">
+          <Garland id="garland-foot" />
+          <div className="text-ink-muted mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 pt-6 pb-10 text-sm">
+            <span className="font-display text-ink font-semibold">Samudaya</span>
+            <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
+              <Link href="/privacy" className="underline underline-offset-4">
+                Privacy Policy
+              </Link>
+              <Link href="/terms" className="underline underline-offset-4">
+                Terms &amp; Conditions
+              </Link>
+              <Link href="/login" className="underline underline-offset-4">
+                Sign in
+              </Link>
+            </nav>
+          </div>
+        </footer>
+        <ThemeToast />
+      </FestivalTheme>
     </div>
   );
 }
