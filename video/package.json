@@ -16,8 +16,7 @@
     "record:phone": "node capture/record-phone.mjs",
     "render:phone": "remotion render src/index.ts Phone out/samudaya-phone.mp4 --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell",
     "brand": "node brand/split.mjs",
-    "share": "node share.mjs",
-    "voice": "node voice.mjs"
+    "share": "node share.mjs"
   },
   "dependencies": {
     "@remotion/cli": "4.0.527",
@@ -29,7 +28,6 @@
   "devDependencies": {
     "@types/react": "19.2.7",
     "ffmpeg-static": "^5.3.0",
-    "kokoro-js": "1.2.1",
     "typescript": "5.9.3"
   }
 }

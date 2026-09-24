@@ -58,7 +58,6 @@ npm run record:phone  # the same society through the mobile layout → phone.web
 npm run capture   # the stills and the one-control clips
 npm run brand     # splits the Gnanalytica logo into the layers the close animates
 npm run score     # synthesises the music bed for each cut
-npm run voice     # records the voice-over for the two animated cuts, from src/narration.json
 npm run render    # all four cuts into out/
 npm run landing   # the 720p copy the landing page serves, from Explain, at a fixed bitrate
 npm run share     # covers, thumbnails, the site's link preview, and the WhatsApp copies
@@ -135,30 +134,6 @@ the phone in portrait, a panel beside it in landscape. Everything appears at
 once. An earlier version lit each word as a reading cursor reached it and
 coloured key terms marigold; people can read, and being shown where to look
 was not what anybody asked for. It was taken out.
-
-### The voice-over
-
-Every shot in the two animated cuts has one spoken line, in
-`src/narration.json`. A line says the shot's point in a sentence and leaves the
-figures to the screen: read aloud, "₹24,500 of ₹30,000" is eleven words of
-numbers, and the caption already carries them. Lines are held to the same
-standard as captions. They have to be true of the product as shipped,
-exceptions included, and `apps/web/test/demo-video-claims.test.ts` checks the
-own-money rule never loses its one-person-committee exception.
-
-`npm run voice` records them with
-[Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) (Apache-2.0), run locally
-through `kokoro-js`: no API key, and nothing leaves the machine. The voice is
-"Heart", the one Kokoro's authors grade highest, at 0.95 of its natural pace.
-The phonemiser says Samudaya as "SAM-you-day-uh", so `voice.mjs` swaps in the
-right sounds (sa-mu-DAA-ya) before the model reads the line. Clips are trimmed
-and levelled so the voice sits near −17 dB in the finished mix, and the music
-ducks about 14 dB under each line, giving the voice some 15 dB of room.
-
-It writes `public/voice/*.wav` (git-ignored) and `src/voice.json` (committed),
-which records each clip's words and length. The timeline gives every shot long
-enough to say its line as well as to read it. If a line changes and is not
-re-recorded, the build stops rather than play the old words.
 
 ### The close: Samudaya's mark flows into Gnanalytica's
 

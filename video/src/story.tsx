@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Audio, Easing, Sequence, interpolate, staticFile } from 'remotion';
+import { Easing, interpolate } from 'remotion';
 import {
   BalanceScreen,
   BillsScreen,
@@ -15,9 +15,7 @@ import {
   TodoScreen,
 } from './screens';
 import { STING_SECONDS } from './logo';
-import narration from './narration.json';
 import { sec } from './theme';
-import recorded from './voice.json';
 
 /**
  * The script, once, for both shapes it is cut into.
@@ -249,52 +247,12 @@ export function readingOf(shot: Shot): string[] {
   return [...(shot.headline ? [shot.headline] : []), ...(shot.points ?? [])];
 }
 
-// ---------------------------------------------------------------------------
-// The voice-over
-// ---------------------------------------------------------------------------
-/**
- * One spoken line per shot, from narration.json, recorded by `npm run voice`.
- *
- * It says the shot's point in a sentence and leaves the figures to the
- * screen: read aloud, "₹24,500 of ₹30,000" is eleven words of numbers, and
- * the caption already carries them. Every line is held to the same standard
- * as a caption — true of the product as shipped, exceptions included.
- *
- * voice.json holds what each clip says and how long it runs. If a line has
- * been edited since its clip was recorded, the clip says the old words, so
- * the build stops here rather than render them.
- */
-export const VOICE = {
-  /** After the shot starts: the page has pushed in and the caption is up. */
-  lead: 0.5,
-  /** After the line ends, before the next shot may start. */
-  tail: 0.9,
-} as const;
-
-type Clip = { text: string; seconds: number };
-const clips: Record<string, Clip> = recorded.clips;
-const script: Record<string, string> = narration;
-
-for (const [id, text] of Object.entries(script)) {
-  if (clips[id]?.text !== text) {
-    throw new Error(`The voice-over for "${id}" is out of date — run: npm run voice`);
-  }
-}
-
-/** The recorded line a shot carries, if it has one. */
-export function voiceOf(shot: Shot): Clip | undefined {
-  return script[shot.id] ? clips[shot.id] : undefined;
-}
-
 export function holdOf(shot: Shot) {
-  const clip = voiceOf(shot);
-  // Long enough to say, as well as to read.
-  const spoken = clip ? VOICE.lead + clip.seconds + VOICE.tail : 0;
-  if (shot.sting) return sec(Math.max(STING_SECONDS, spoken));
+  if (shot.sting) return sec(STING_SECONDS);
   const characters = readingOf(shot).reduce((total, line) => total + line.length, 0);
   const seconds = READING.lead + characters / READING.cps + READING.tail;
   // A screen also needs long enough for its own animation to finish.
-  return sec(Math.max(shot.screen ? 4.6 : 3.2, seconds, spoken));
+  return sec(Math.max(shot.screen ? 4.6 : 3.2, seconds));
 }
 
 /** Shots overlap by this much, which is what makes the push a push. */
@@ -352,52 +310,4 @@ export function chapterNow(frame: number) {
   const within = SHOTS.filter((entry) => entry.chapter === shot.chapter);
   const place = within.indexOf(SHOTS[index]);
   return { chapter: shot.chapter, progress: (place + through) / within.length };
-}
-
-/** Where each line is heard, in frames: from its shot's start plus the lead. */
-function spoken() {
-  const { starts } = timeline();
-  return SHOTS.flatMap((shot, index) => {
-    const clip = voiceOf(shot);
-    if (!clip) return [];
-    const from = starts[index] + sec(VOICE.lead);
-    return [{ shot, from, to: from + sec(clip.seconds) }];
-  });
-}
-
-/** The voice-over, for either cut: each line at its shot. */
-export function Narration() {
-  return (
-    <>
-      {spoken().map(({ shot, from, to }) => (
-        <Sequence key={`${shot.id}-voice`} from={from} durationInFrames={to - from + sec(0.2)}>
-          <Audio src={staticFile(`voice/${shot.id}.wav`)} />
-        </Sequence>
-      ))}
-    </>
-  );
-}
-
-/**
- * How loud the music is under the voice: 0.2, about 14 dB down, which puts
- * the bed near −33 dB under a voice at about −17 — some 15 dB of room, enough
- * for a phone speaker. At 0.28 it measured 6 dB, which is a voice fighting
- * its music. It dips just before a line and comes back up gently after, so
- * the music breathes between lines rather than pumping.
- */
-const DUCKED = 0.2;
-export function duck(frame: number) {
-  let depth = 0;
-  for (const { from, to } of spoken()) {
-    const into = interpolate(frame, [from - sec(0.25), from], [0, 1], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
-    const out = interpolate(frame, [to, to + sec(0.5)], [1, 0], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
-    depth = Math.max(depth, Math.min(into, out));
-  }
-  return 1 - (1 - DUCKED) * depth;
 }
