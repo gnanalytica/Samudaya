@@ -256,7 +256,7 @@ export function SuggestionBoard({
             description={
               waiting.length
                 ? canApprove
-                  ? `${waiting.length} ${waiting.length === 1 ? 'suggestion is' : 'suggestions are'} waiting on you, just below.`
+                  ? `${waiting.length} ${waiting.length === 1 ? 'suggestion is' : 'suggestions are'} waiting on you below.`
                   : `${waiting.length} ${waiting.length === 1 ? 'suggestion is' : 'suggestions are'} with the committee. Once opened, ${waiting.length === 1 ? 'it lands' : 'they land'} here to vote on.`
                 : emptyDescription
             }
@@ -271,7 +271,7 @@ export function SuggestionBoard({
             description={
               canApprove
                 ? 'Open one for voting and every resident can have their say on it.'
-                : 'Suggested by residents, waiting for the committee to open them for voting.'
+                : 'Waiting for the committee to open them for voting.'
             }
           />
           <ul className="divide-border-base divide-y">

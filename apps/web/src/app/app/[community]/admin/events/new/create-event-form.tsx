@@ -359,7 +359,7 @@ export function CreateEventForm({
                 label="WhatsApp group"
                 htmlFor="ne-whatsapp"
                 error={state.fieldErrors?.whatsapp_group_url}
-                hint="If you made a group for this event, paste its invite link and everyone gets a button to join."
+                hint="WhatsApp → the group → Group info → Invite via link. Members get a button to join."
               >
                 {(control) => (
                   <Input
@@ -375,7 +375,7 @@ export function CreateEventForm({
               <Field
                 label="If money is left over"
                 htmlFor="ne-fund-rule"
-                hint="Decided now, before anyone pays, so nobody argues over a surplus later."
+                hint="Residents see this on the event. Decide it before anyone pays."
               >
                 {(control) => (
                   <Select {...control} name="fund_rule" defaultValue={DEFAULT_FUND_RULE}>
@@ -463,8 +463,8 @@ export function CreateEventForm({
                 error={state.fieldErrors?.suggested_amount}
                 hint={
                   flatCount > 0 && total > 0
-                    ? `The contribute screen offers this figure first. ${formatMoney(total)} across ${flatCount} flats is about ${formatMoney(Math.ceil(total / flatCount))} each. Leave it empty to take whatever people give.`
-                    : 'The contribute screen offers this figure first. Leave it empty to take whatever people give.'
+                    ? `${formatMoney(total)} across ${flatCount} flats is about ${formatMoney(Math.ceil(total / flatCount))} each. Leave empty to take whatever people give.`
+                    : 'Pre-filled on the contribute screen. Leave empty to take whatever people give.'
                 }
               >
                 {(control) => (
@@ -489,7 +489,7 @@ export function CreateEventForm({
         <Card>
           <CardHeader
             title={STEPS[2].title}
-            description="Things residents can register for. You can add more later."
+            description="Things residents can register for. Add more later."
           />
           <CardBody className="space-y-3">
             {activities.map((row) => (

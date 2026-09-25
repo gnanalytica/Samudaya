@@ -256,8 +256,8 @@ function MemberEditor({
             <Heading>Flat</Heading>
             <Body muted>
               {seated
-                ? `Listed at ${seated}. Moving them keeps the old flat as history, so their past payments stay with it.`
-                : 'Not listed at any flat, so their payments show no flat beside their name.'}
+                ? `Listed at ${seated}. Past payments stay with the old flat if you move them.`
+                : 'Not listed at any flat. Their payments show no flat.'}
             </Body>
             <Input
               label="Find a flat"
@@ -283,9 +283,7 @@ function MemberEditor({
                 <Caption>No flat matches that.</Caption>
               )
             ) : (
-              <Caption>
-                {member.flats.length} flats in this society. Type part of one to pick it.
-              </Caption>
+              <Caption>{member.flats.length} flats in this society. Type part of one.</Caption>
             )}
             {matchCount > matches.length ? (
               <Caption>
@@ -299,10 +297,14 @@ function MemberEditor({
                 loading={busy === 'flat'}
                 disabled={busy !== null}
                 onPress={() =>
-                  Alert.alert(`Take ${name} out of ${seated}?`, 'Their past payments keep it.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Take out', onPress: () => void saveFlat(null) },
-                  ])
+                  Alert.alert(
+                    `Take ${name} out of ${seated}?`,
+                    'Past payments stay with this flat.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Take out', onPress: () => void saveFlat(null) },
+                    ],
+                  )
                 }
               />
             ) : null}
@@ -313,8 +315,8 @@ function MemberEditor({
           <Card style={{ gap: spacing.sm }}>
             <Heading>Remove from the society</Heading>
             <Body muted>
-              For someone who has moved out. Their past contributions stay in the accounts; they
-              lose access straight away and would need to ask to join again.
+              For someone who has moved out. They lose access at once and must ask to join again.
+              Past contributions stay in the accounts.
             </Body>
             <Button
               label={`Remove ${name}`}

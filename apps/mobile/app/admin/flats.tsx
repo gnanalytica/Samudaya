@@ -245,7 +245,7 @@ export default function Flats() {
               {towerNames.length
                 ? ` across ${towerNames.length} tower${towerNames.length === 1 ? '' : 's'}`
                 : ''}
-              . Residents pick their flat from this list when they join.
+              . Residents pick from this list when they join.
             </Caption>
           </View>
 
@@ -349,7 +349,7 @@ export default function Flats() {
               </Body>
               {preview.errors.length ? (
                 <View style={{ gap: 2 }}>
-                  <Caption>Problems in the file (these lines are left out):</Caption>
+                  <Caption>These lines have problems and will be skipped:</Caption>
                   {preview.errors.slice(0, 10).map((line) => (
                     <ErrorText key={line} message={line} />
                   ))}

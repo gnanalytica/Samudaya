@@ -73,9 +73,7 @@ export default function SignIn() {
               <Text style={{ color: colors.accentInk, fontSize: 22, fontWeight: '700' }}>स</Text>
             </View>
             <Title>Samudaya</Title>
-            <Body muted>
-              Sign in with Google — you’ll enter your society’s code and pick your flat next.
-            </Body>
+            <Body muted>Sign in, then enter your society code and pick your flat.</Body>
           </View>
 
           {sent ? (

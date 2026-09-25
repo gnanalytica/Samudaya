@@ -99,7 +99,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
     <>
       <PageHeader
         title="Money"
-        description={`Every rupee ${community.name} has taken in and spent, since the day it started.`}
+        description={`Every rupee ${community.name} has taken in and spent.`}
       />
       <PageBody>
         <StatTiles>
@@ -128,10 +128,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
             home screen links here. */}
         {splitReadable && (holdings.length || society.balance !== 0 || movements.length) ? (
           <Card className="mt-5 scroll-mt-20" id="society-balance">
-            <CardHeader
-              title={`Where the ${formatMoney(balance, community.currency)} is`}
-              description="Every rupee the society holds is behind an event, or kept for the society until the committee puts it behind one. Together they make the balance above."
-            />
+            <CardHeader title={`Where the ${formatMoney(balance, community.currency)} is`} />
             <ul className="divide-border-base divide-y">
               {holdings.map((holding) => {
                 const note = holdingNote(holding, community.currency);
@@ -172,9 +169,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                   <PiggyBank className="text-accent mt-0.5 size-4 shrink-0" aria-hidden="true" />
                   <div>
                     <p className="text-ink text-sm font-medium">Kept for the society</p>
-                    <p className="text-ink-subtle mt-0.5 text-xs">
-                      Behind no event, until the committee puts it behind one
-                    </p>
+                    <p className="text-ink-subtle mt-0.5 text-xs">Not behind any event yet</p>
                   </div>
                 </div>
                 <p className="text-ink shrink-0 text-sm font-semibold tabular-nums">
@@ -199,7 +194,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
           <Card className="mt-5">
             <CardHeader
               title="Where money has moved"
-              description="What was left over when an event closed, and what the committee decided to do with it — carry it to another event, or keep it for the society."
+              description="What the committee did with money left over from closed events."
             />
             <ul className="divide-border-base divide-y">
               {movements.map((movement) => (
@@ -223,7 +218,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         <Card className="mt-5">
           <CardHeader
             title="Every transaction"
-            description="Confirmed payments in and approved bills out. A payment waiting to be confirmed is not here yet."
+            description="Confirmed payments in, approved bills out. A payment appears once staff confirm it."
           />
           <CardBody className="border-border-base border-b">
             {/* A GET form, so a filtered ledger is a link somebody can send to
@@ -288,7 +283,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
               description={
                 rows.length
                   ? 'Try a different filter.'
-                  : 'Confirmed payments and approved bills appear here, for every event, for ever.'
+                  : 'Confirmed payments and approved bills appear here.'
               }
             />
           )}
@@ -297,12 +292,10 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         <p className="text-ink-subtle mt-4 flex items-start gap-2 text-xs">
           <Scale className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
           <span>
-            Money in names who paid, their flat and how the money arrived, the way a contribution
-            list always has. Money out names the vendor, the amount and whoever on the committee
-            approved it, with the bill attached for anyone to open. A payment screenshot is not
-            everybody&rsquo;s — it carries the payer&rsquo;s UPI handle — so it opens only for them
-            and for staff. Nothing here is a way to contact anybody: phone numbers and email
-            addresses stay on the People page, for the people entitled to them.{' '}
+            Money in shows who paid, their flat and how they paid. Money out shows the vendor and
+            who approved it, with the bill for anyone to open. A payment screenshot opens only for
+            the payer and staff. Phone numbers and emails stay on the People page, for staff and the
+            committee only.{' '}
             {totals.data?.last_movement_at ? (
               <>Last movement {relativeTime(totals.data.last_movement_at)}.</>
             ) : null}

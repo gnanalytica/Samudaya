@@ -69,9 +69,7 @@ export async function CommentThread({
           ))}
         </ul>
       ) : (
-        <p className="text-ink-subtle text-sm">
-          Nothing said yet. Whatever gets decided here is worth writing down.
-        </p>
+        <p className="text-ink-subtle text-sm">Nothing said yet.</p>
       )}
       <CommentForm slug={slug} subject={subject} eventSlug={eventSlug} />
     </div>

@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Megaphone, Plus } from 'lucide-react';
 import {
+  alreadyInFundLine,
+  awaitingLine,
   can,
   countdown,
   festivalFor,
@@ -54,6 +56,8 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
       s?.fundCarried ?? 0,
     );
     const funded = bar.confirmed;
+    const waiting = awaitingLine(s?.fundPending ?? 0, community.currency);
+    const inFund = alreadyInFundLine(s?.fundCarried ?? 0, null, community.currency);
     // A list of events should look like a year, not like a spreadsheet: each
     // card carries its own festival's colour down its edge.
     const festival = festivalFor(typeLabel.get(event.event_type_id ?? ''), event.name);
@@ -91,12 +95,10 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
               <span>{funded}%</span>
             </div>
             <FundBar percent={funded} pendingPercent={bar.pending} />
-            {(s?.fundCarried ?? 0) > 0 ? (
-              <p className="text-ink-subtle mt-2 text-xs">
-                After {formatMoney(s?.fundCarried ?? 0, community.currency)} carried across by the
-                committee
-              </p>
-            ) : null}
+            {/* The headline counts confirmed money only; say what the paler
+                segment is, and that money carried in is already there. */}
+            {waiting ? <p className="text-ink-subtle mt-2 text-xs">{waiting}</p> : null}
+            {inFund ? <p className="text-ink-subtle mt-2 text-xs">{inFund}</p> : null}
             <p className="text-ink-subtle mt-2 text-xs">
               {s?.contributors ?? 0} households contributed · {s?.participants ?? 0} registered for
               activities
@@ -111,7 +113,6 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
     <>
       <PageHeader
         title="Events"
-        description="Every event and campaign with its budget, spending and activities."
         action={
           <div className="flex flex-wrap gap-2">
             {can(role, 'campaigns:propose') ? (
@@ -134,7 +135,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
           <div className="border-success/30 bg-success/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
             <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink">
-              Campaign sent to the committee. Once they approve it, every resident can see it and
+              Campaign sent to the committee. Once approved, every resident can see it and
               contribute.
             </p>
           </div>
@@ -157,7 +158,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
               description={
                 staff
                   ? 'Create the first one with its budget, then publish it.'
-                  : 'When the society plans something, it will appear here.'
+                  : 'Events the society plans show up here.'
               }
             />
           </Card>

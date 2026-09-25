@@ -113,7 +113,7 @@ export default async function PeoplePage(props: PageProps<'/app/[community]/peop
               committee
                 ? 'The committee assigns roles. Staff run the society; residents take part.'
                 : staff
-                  ? 'Staff can remove residents who have moved out. Roles are set by the committee.'
+                  ? 'Remove residents who have moved out. The committee sets roles.'
                   : 'Your neighbours, and who runs the society. Contact details stay private.'
             }
           />

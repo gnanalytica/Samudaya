@@ -93,7 +93,7 @@ export default function Contribute() {
       <Screen>
         <EmptyState
           title="Staff don’t contribute"
-          description="Record a payment a flat made from Manage → Payments instead."
+          description="Record a flat’s payment from Manage → Payments."
         />
       </Screen>
     );
@@ -120,7 +120,7 @@ export default function Contribute() {
       <Screen>
         <EmptyState
           title="Payments aren’t set up yet"
-          description="The committee hasn’t added the society’s UPI ID. Please pay the committee directly for now; staff will record it against your flat."
+          description="The society has no UPI ID yet. Pay the committee directly and staff will record it against your flat."
         />
       </Screen>
     );
@@ -281,7 +281,7 @@ function PayWithUpi({
       // with whatever id the app did give filled in.
       if (response.reference) setReference(response.reference);
       setNotice(
-        'We couldn’t read the payment details from your UPI app. If you paid, enter the UPI transaction ID from the app’s payment details.',
+        'We couldn’t read the payment from your UPI app. If you paid, add the UPI transaction ID or a screenshot.',
       );
       setStage('report');
     } catch {
@@ -290,7 +290,7 @@ function PayWithUpi({
       // registered); copy the ID so they can pay by hand.
       await Clipboard.setStringAsync(vpa);
       setNotice(
-        `No UPI app opened. We copied the society’s UPI ID (${vpa}); pay ${formatMoney(amount, currency)} from your UPI app with the note “${note}”, then come back here.`,
+        `No UPI app opened. We copied the UPI ID (${vpa}). Pay ${formatMoney(amount, currency)} with the note “${note}”, then come back here.`,
       );
       setStage('report');
     }
@@ -399,11 +399,8 @@ function PayWithUpi({
             </Text>
             <Body muted>Waiting for confirmation</Body>
             <Caption>
-              {captured
-                ? 'We picked up the payment details from your UPI app, so there is nothing to type. '
-                : ''}
-              Staff will match your UPI transaction ID with the society’s bank statement. It counts
-              in the event total once confirmed; you can follow it under Me.
+              {captured ? 'We got the payment details from your UPI app. ' : ''}
+              It counts in the event total once staff confirm it. Follow it under Me.
             </Caption>
           </Card>
           <Button label="Done" onPress={() => router.back()} />
@@ -435,10 +432,7 @@ function PayWithUpi({
         >
           <View style={{ gap: 2 }}>
             <Title>Support {event.name}</Title>
-            <Caption>
-              Pay the society’s UPI ID directly. Your contribution goes to this event’s fund and
-              nowhere else.
-            </Caption>
+            <Caption>Pay the society’s UPI ID directly. It goes to this event’s fund only.</Caption>
           </View>
 
           <Card style={{ gap: spacing.lg }}>
@@ -513,8 +507,7 @@ function PayWithUpi({
               </View>
               {asked ? (
                 <Caption>
-                  {formatMoney(asked, currency)} is what the committee asks each flat for. Pay
-                  whatever you can.
+                  The committee asks {formatMoney(asked, currency)} per flat. Pay what you can.
                 </Caption>
               ) : null}
             </View>
@@ -550,10 +543,7 @@ function PayWithUpi({
                     copied={copied === 'note'}
                     onCopy={() => copy('note', note)}
                   />
-                  <Caption>
-                    Keep the note on the payment. It is how the committee tells your ₹ apart from
-                    everyone else&rsquo;s on the bank statement.
-                  </Caption>
+                  <Caption>Keep this note on the payment so the committee can match it.</Caption>
                 </>
               ) : null}
             </View>
@@ -586,16 +576,14 @@ function PayWithUpi({
               <Heading>Tell us you’ve paid</Heading>
               {notice ? <Body muted>{notice}</Body> : null}
               <Input
-                label={`${COPY.upiReference} — optional`}
+                label={COPY.upiReference}
                 value={reference}
                 onChangeText={setReference}
                 keyboardType="number-pad"
                 placeholder="12-digit number from your UPI app"
                 autoCapitalize="none"
               />
-              <Caption>
-                If you have it to hand it saves staff a step. If not, a screenshot is enough.
-              </Caption>
+              <Caption>No ID to hand? A screenshot is enough.</Caption>
               <FilePickerField
                 label="Payment screenshot"
                 file={proof}

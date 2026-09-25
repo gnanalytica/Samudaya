@@ -29,7 +29,7 @@ export function deleteAccountMessage(status: string, detail?: string | null): st
       return 'Your account has been deleted.';
     case 'last_committee':
       return detail
-        ? `You are the last committee member of ${detail}. Make somebody else a committee member first, then delete your account — otherwise there would be nobody left to run it.`
+        ? `You are the last committee member of ${detail}. Make somebody else a committee member first, then delete your account.`
         : 'You are the last committee member of a society that still has members. Make somebody else a committee member first.';
     case 'unauthenticated':
       return 'Please sign in first.';

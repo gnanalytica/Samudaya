@@ -33,7 +33,7 @@ const FEATURES = [
   {
     icon: CalendarDays,
     title: 'One place per event',
-    body: 'Ganesh Chaturthi, Dussehra, Diwali, Christmas — each carries its own activities, budget, fund and ledger.',
+    body: 'Ganesh Chaturthi, Dussehra, Diwali, Christmas: each has its own activities, budget, fund and ledger.',
   },
   {
     icon: ClipboardList,
@@ -47,7 +47,7 @@ const FEATURES = [
     // 20260920000500_every_resident_can_see_the_ledger.sql).
     icon: Wallet,
     title: 'A fund with a target',
-    body: 'Residents chip in and the bar fills. Each confirmed payment goes on a ledger every resident can read, with the payer’s name and flat.',
+    body: 'Residents chip in and the bar fills. Each confirmed payment goes on a ledger every resident can see, with the payer’s name and flat.',
   },
   {
     icon: ReceiptIndianRupee,
@@ -81,7 +81,7 @@ const CHAPTERS: Chapter[] = [
     points: [
       'Activities, a budget and a fund for each event, in its festival’s colours.',
       'Readiness you can see: which jobs are done, and which have nobody on them yet.',
-      'Volunteer roles with their slots, so a shortfall shows long before the day does.',
+      'Each volunteer role shows how many more people it needs.',
     ],
   },
   {
@@ -89,9 +89,9 @@ const CHAPTERS: Chapter[] = [
     label: 'Collect',
     title: 'Two taps to pay, and someone else confirms it',
     points: [
-      'Residents pay by UPI with the amount and a note already filled in, and staff record the cash they are handed.',
-      'Staff or the committee check each payment, and nobody confirms their own — unless the committee is a single person.',
-      'Then it is on a ledger every resident can read: the name, the flat and how they paid.',
+      'Residents pay by UPI with the amount and note filled in. Staff record cash payments.',
+      'Staff or the committee confirm each payment. Nobody confirms their own, unless the committee is one person.',
+      'Then every resident can see it on the ledger: name, flat and how they paid.',
     ],
   },
   {
@@ -100,17 +100,17 @@ const CHAPTERS: Chapter[] = [
     title: 'Every rupee out, with the bill beside it',
     points: [
       'Each bill is uploaded with the vendor and the amount, and approved by the committee.',
-      'Whoever filed a bill cannot approve it — with the same one-person-committee exception.',
-      'Spending is tracked against the budget line by line, and an overspend is shown, not hidden.',
+      'Whoever filed a bill can’t approve it, unless the committee is one person.',
+      'Spending is tracked against the budget line by line, with any overspend in red.',
     ],
   },
   {
     id: 'prove',
     label: 'Prove',
-    title: 'Proof, not promises',
+    title: 'Match the bank, close the books',
     points: [
-      'Paste in the bank statement and pair each line with the payment it belongs to; the likely ones are suggested. Money nobody can explain is counted, not quietly dropped.',
-      'When a festival closes, the committee decides openly what happens to what is left, and the decision carries a name.',
+      'Paste in the bank statement and pair each line with its payment; likely matches are suggested. Anything unexplained is listed and totalled.',
+      'When a festival closes, the committee decides where the leftover goes, and residents see who decided.',
       'The Money page shows where every rupee of the balance is, event by event.',
     ],
   },
@@ -280,9 +280,8 @@ export default async function LandingPage(props: PageProps<'/'>) {
                   </span>
                 </h1>
                 <p className="text-ink-muted mt-6 max-w-xl text-lg text-pretty">
-                  Samudaya gives every community event its own activities, budget, fund and public
-                  ledger — so residents can see exactly what is planned, what was spent, and on
-                  what. On the web and on your phone.
+                  Each event gets its own activities, budget, fund and a ledger every resident can
+                  see. On the web and on your phone.
                 </p>
                 <div className="mt-8 flex flex-wrap gap-3">
                   <ButtonLink
@@ -302,7 +301,7 @@ export default async function LandingPage(props: PageProps<'/'>) {
                 </div>
                 <p className="text-ink-muted mt-4 max-w-md text-sm">
                   Residents join with the code their committee shares, and staff approve each one.
-                  Setting your society up for the first time? You don’t need a code.
+                  Starting a new society? No code needed.
                 </p>
               </div>
 
@@ -333,9 +332,8 @@ export default async function LandingPage(props: PageProps<'/'>) {
                 </div>
                 <DemoVideo />
                 <figcaption className="text-ink-muted border-border-base border-t px-5 py-3 text-sm">
-                  Under two minutes, and every point is on screen — no sound needed. The screens are
-                  drawn from the app&rsquo;s own; the society, the neighbours and the amounts are
-                  invented.
+                  Under two minutes, no sound needed. Drawn from the app&rsquo;s own screens; the
+                  society, neighbours and amounts are invented.
                 </figcaption>
               </figure>
             </div>
@@ -347,7 +345,7 @@ export default async function LandingPage(props: PageProps<'/'>) {
               <Kicker>How it works</Kicker>
               <SectionTitle id="how">From the first plan to the last rupee</SectionTitle>
               <p className="text-ink-muted mt-3 max-w-2xl text-lg text-pretty">
-                Four steps, the same four for every festival. Pick one and watch it happen.
+                The same four steps for every festival. Pick one to watch.
               </p>
             </div>
             <Tour chapters={CHAPTERS} />
@@ -368,14 +366,11 @@ export default async function LandingPage(props: PageProps<'/'>) {
                 <Kicker>Dressed for the occasion</Kicker>
                 <SectionTitle id="festivals">Every festival, in its own colours</SectionTitle>
                 <p className="text-ink-muted mt-3 max-w-2xl text-pretty">
-                  Start an event and Samudaya suggests the festivals coming up. Pick one and it
-                  fills in the name and a date, and the event takes that festival&rsquo;s colours
-                  {next ? <> — this page is wearing {next.name}&rsquo;s</> : null}. A festival that
-                  follows the moon comes with a reminder to check the date before you publish.
+                  Start an event and pick from the festivals coming up. Samudaya fills in the name
+                  and a date, and the event takes that festival&rsquo;s colours. If the date moves
+                  each year, it reminds you to check before you publish.
                 </p>
-                <p className="text-ink mt-3 font-medium">
-                  Go on — tap one, and this page puts it on.
-                </p>
+                <p className="text-ink mt-3 font-medium">Tap one to try it on this page.</p>
               </div>
               <FestivalPicker />
             </div>

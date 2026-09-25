@@ -327,9 +327,7 @@ export function CollectScene({ festival, emoji }: SceneProps) {
             ✓ Confirmed by Meera Iyer
           </p>
         </div>
-        <p className="text-ink-subtle text-[11px]">
-          Meera checks it against the screenshot — not Ananya.
-        </p>
+        <p className="text-ink-subtle text-[11px]">Ananya paid it, so Ananya can’t confirm it.</p>
       </Card>
 
       <Card>
@@ -345,7 +343,7 @@ export function CollectScene({ festival, emoji }: SceneProps) {
       <Card className="space-y-1.5">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold">The ledger</span>
-          <span className="text-ink-subtle text-[11px]">every resident sees it</span>
+          <span className="text-ink-subtle text-[11px]">every resident can see it</span>
         </div>
         <div style={{ height: arrived * 46, opacity: arrived, overflow: 'hidden' }}>
           <LedgerLine name="Ananya Das" meta="Flat A-203 · UPI" amount="+₹2,001" fresh />
@@ -424,7 +422,7 @@ export function SpendScene({ festival, emoji }: SceneProps) {
                   className="text-danger mt-1 text-[11px] font-semibold"
                   style={{ opacity: rise(frame, line.at + 22, 10) }}
                 >
-                  {formatMoney(overBy)} over — shown, not hidden
+                  {formatMoney(overBy)} over budget
                 </p>
               ) : null}
             </div>
@@ -505,7 +503,7 @@ export function ProveScene({ festival, emoji }: SceneProps) {
           })}
         </div>
         <p className="text-ink-muted mt-2 text-[11px]" style={{ opacity: signed }}>
-          Decided by Chitra Rao · on the record for every resident
+          Decided by Chitra Rao · every resident can see it
         </p>
       </Card>
     </Screen>

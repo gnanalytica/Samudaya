@@ -203,8 +203,8 @@ export default function Payments() {
                 <Card style={{ gap: spacing.md }}>
                   <Heading>Waiting for confirmation</Heading>
                   <Caption>
-                    Residents reported these UPI payments. Match each reference with the society’s
-                    bank statement before confirming; only confirmed payments count.
+                    Match each against the bank statement before confirming. Only confirmed payments
+                    count.
                   </Caption>
                   {waiting.map((row) => (
                     <PendingPayment
@@ -223,8 +223,8 @@ export default function Payments() {
               <Card style={{ gap: spacing.md }}>
                 <Heading>Confirmed payments</Heading>
                 <Caption>
-                  The amount, the transaction ID and the screenshot stay together after
-                  confirmation, so the statement can be checked against this page at any time.
+                  Transaction IDs and screenshots stay here, to check against the statement any
+                  time.
                 </Caption>
                 {rows.length ? (
                   rows.map((row) => (
@@ -325,7 +325,7 @@ function PendingPayment({
 
   const review = async (confirm: boolean) => {
     if (!confirm && !note.trim()) {
-      setError('Say why it could not be confirmed, e.g. no matching credit in the bank statement.');
+      setError('Say why it can’t be confirmed.');
       return;
     }
     const corrected = Number(amount);
@@ -405,7 +405,7 @@ function PendingPayment({
         editedAt={row.updated_at}
       />
       {mine ? (
-        <Caption>You reported this payment, so another committee member has to confirm it.</Caption>
+        <Caption>You reported this payment. Another committee member must confirm it.</Caption>
       ) : mayReview ? (
         declining ? (
           <View style={{ gap: spacing.sm }}>

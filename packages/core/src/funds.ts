@@ -56,9 +56,8 @@ export const SURPLUS_ANSWER_LABEL: Record<SurplusAnswer, string> = {
 
 export const SURPLUS_ANSWER_DETAIL: Record<SurplusAnswer, string> = {
   society_balance:
-    'It sits with the society, on everybody’s home screen, until the committee puts it behind an event.',
-  another_event:
-    'It shows on that event’s bar as money already received, so residents are asked only for the difference.',
+    'Everyone sees it on the home screen until the committee puts it behind an event.',
+  another_event: 'It counts towards that event’s target, so residents are asked only for the rest.',
 };
 
 export const surplusAnswerSchema = z.enum(SURPLUS_ANSWERS);
@@ -206,6 +205,41 @@ export function carriedDeciders(movements: CarriedInRow[]): string | null {
   if (names.length === 0) return null;
   if (names.length === 1) return names[0]!;
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The line under a fund card saying what residents have reported paying that
+ * nobody has confirmed yet. Null when there is none.
+ *
+ * A card leads with confirmed money only, so Velocity vipers read "₹0 of
+ * ₹1,93,010 raised" while two households had reported ₹20,500 between them:
+ * true, and exactly what makes somebody who has paid think their money went
+ * missing. The bar already drew it as a paler segment; nothing said what the
+ * paler segment was.
+ */
+export function awaitingLine(pending: number, currency = 'INR'): string | null {
+  if (pending <= 0) return null;
+  return `${formatMoney(pending, currency)} more reported, waiting to be confirmed`;
+}
+
+/**
+ * The line under a compact fund card whose event has money carried into it:
+ * that the money is already in the fund, and whose decision it was when the
+ * card knows.
+ *
+ * The card's headline counts only what residents gave, so an event holding
+ * ₹6,990 carried across from a closed one led with "₹0 raised" and read as an
+ * empty fund. "After ₹6,990 carried across" explained the smaller ask without
+ * saying where the ₹6,990 now was.
+ */
+export function alreadyInFundLine(
+  carriedIn: number,
+  deciders: string | null = null,
+  currency = 'INR',
+): string | null {
+  if (carriedIn <= 0) return null;
+  const money = formatMoney(carriedIn, currency);
+  return `${money} already in the fund, carried across by the committee${deciders ? ` · decided by ${deciders}` : ''}`;
 }
 
 /** One place the society's money is, as the Money page lists it. */

@@ -343,8 +343,8 @@ export function ContributeForm({
             ) : (
               <p className="border-border-base text-ink-muted rounded-lg border border-dashed px-4 py-3 text-center text-sm">
                 {flatNeeded && !flatId
-                  ? 'Choose your flat and an amount above to open your UPI app with them filled in.'
-                  : 'Choose an amount above to open your UPI app with it filled in.'}
+                  ? 'Choose your flat and an amount above to open your UPI app.'
+                  : 'Choose an amount above to open your UPI app.'}
               </p>
             )}
             {/* Most residents pay from the phone they are reading this on.
@@ -357,8 +357,8 @@ export function ContributeForm({
               <span className="hidden sm:inline">
                 Copy the UPI ID and the note, and pay from your phone.
               </span>{' '}
-              Put the note in the payment&rsquo;s remark so the committee can tell your payment
-              apart. You pay {upi.payeeName} directly; Samudaya never handles the money.
+              Put the note in the payment&rsquo;s remark. You pay {upi.payeeName} directly; Samudaya
+              never handles the money.
             </p>
           </section>
 
@@ -401,10 +401,10 @@ export function ContributeForm({
             </Field>
 
             <Field
-              label={`${COPY.upiReference} — optional`}
+              label={COPY.upiReference}
               htmlFor="upi-reference"
               error={state.fieldErrors?.reference}
-              hint="If you have it to hand it saves staff a step. If not, a screenshot below is enough."
+              hint="Optional if you attach a screenshot below."
             >
               {(control) => (
                 <Input
@@ -438,7 +438,7 @@ export function ContributeForm({
                 answers that in the same branded style as every other error. */}
             <Submit disabled={uploading || (flatNeeded && !flatId)} />
             <p className="text-ink-subtle text-center text-xs">
-              It shows as waiting until staff confirm it against the bank statement.
+              It shows as waiting until staff confirm it.
             </p>
           </form>
         </div>

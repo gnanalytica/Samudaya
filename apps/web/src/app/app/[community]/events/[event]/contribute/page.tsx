@@ -65,7 +65,7 @@ export default async function ContributePage(
     <>
       <PageHeader
         title={`Support ${event.name}`}
-        description={`Your contribution goes to the ${event.name} fund and nowhere else.`}
+        description={`Your contribution goes only to the ${event.name} fund.`}
       />
       <PageBody>
         <Link
@@ -95,15 +95,15 @@ export default async function ContributePage(
               currency={community.currency}
             />
             <p className="text-ink-subtle mt-2 text-xs">
-              Confirmed payments only. {stats.contributors}{' '}
-              {stats.contributors === 1 ? 'household has' : 'households have'} contributed so far.
+              Confirmed payments only, from {stats.contributors}{' '}
+              {stats.contributors === 1 ? 'household' : 'households'}.
               {stats.fundPending > 0 ? (
                 <>
                   {' '}
-                  A further {formatMoney(stats.fundPending, community.currency)} from{' '}
+                  {formatMoney(stats.fundPending, community.currency)} more reported by{' '}
                   {stats.pendingContributors}{' '}
-                  {stats.pendingContributors === 1 ? 'household is' : 'households are'} waiting to
-                  be matched against the bank.
+                  {stats.pendingContributors === 1 ? 'household' : 'households'}, waiting to be
+                  confirmed.
                 </>
               ) : null}
             </p>
@@ -125,8 +125,8 @@ export default async function ContributePage(
           ) : (
             <Card>
               <CardBody className="text-ink-muted text-sm">
-                Your society hasn’t set up UPI payments in the app yet. Please pay the committee
-                directly for now, or ask them to add the society’s UPI ID.
+                Your society hasn’t set up UPI payments yet. Pay the committee directly, or ask them
+                to add the society’s UPI ID.
               </CardBody>
             </Card>
           )}

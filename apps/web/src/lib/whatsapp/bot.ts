@@ -332,7 +332,7 @@ async function handleSuggest(db: Db, sender: Sender, text: string): Promise<stri
 
   if (error) return 'I couldn’t send that just now. Please try again.';
 
-  return `Sent to the committee: *${name}*\n\nThanks for the idea — your neighbours can back it in the app.`;
+  return `Sent to the committee: *${name}*\n\nThanks for the idea. Your neighbours can back it in the app.`;
 }
 
 async function handleStop(db: Db, phone: string): Promise<string> {
@@ -341,7 +341,7 @@ async function handleStop(db: Db, phone: string): Promise<string> {
     .update({ opted_out_at: new Date().toISOString() })
     .eq('phone', phone);
 
-  return 'Done — I won’t message this number again. Send *start* any time to turn it back on.';
+  return 'Done. I won’t message this number again. Send *start* to turn it back on.';
 }
 
 /**

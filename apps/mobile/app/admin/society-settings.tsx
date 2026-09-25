@@ -50,7 +50,7 @@ export default function SocietySettings() {
           />
           <LinkRow
             label="UPI ID"
-            detail={activeCommunity.upi_vpa ?? 'Not set — residents can’t pay by UPI yet'}
+            detail={activeCommunity.upi_vpa ?? 'Not set. Residents can’t pay by UPI yet'}
             onPress={() => router.push('/admin/upi')}
           />
           <LinkRow

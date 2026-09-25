@@ -101,8 +101,8 @@ function Form({
           <View style={{ gap: 2 }}>
             <Title>Society UPI ID</Title>
             <Caption>
-              Residents pay this UPI ID straight from their UPI app. There’s no gateway or fee;
-              staff confirm each payment against the bank statement.
+              Residents pay this ID from their UPI app, with no gateway or fee. Staff confirm each
+              payment against the bank statement.
             </Caption>
           </View>
           <Card style={{ gap: spacing.lg }}>

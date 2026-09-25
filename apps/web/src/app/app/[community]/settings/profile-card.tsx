@@ -44,7 +44,7 @@ export function ProfileCard({
             label="Phone number"
             htmlFor="phone"
             error={state.fieldErrors?.phone}
-            hint="Staff and the committee see it, so they can reach you. Neighbours do not."
+            hint="Only staff and the committee see it."
           >
             {(control) => (
               <Input
@@ -59,11 +59,7 @@ export function ProfileCard({
               />
             )}
           </Field>
-          <Field
-            label="Email"
-            htmlFor="email"
-            hint="Changing your email means signing in again, so it lives in your account settings."
-          >
+          <Field label="Email" htmlFor="email" hint="Your sign-in email. It can’t be changed here.">
             {(control) => <Input {...control} value={email} readOnly disabled />}
           </Field>
           {state.success ? (

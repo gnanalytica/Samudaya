@@ -236,9 +236,7 @@ export function Suggestions({
             onPress={() => void submit()}
             loading={busy === 'submit'}
           />
-          {sent ? (
-            <Caption>Sent. The committee will review it before it goes to a vote.</Caption>
-          ) : null}
+          {sent ? <Caption>Sent to the committee for review.</Caption> : null}
           <ErrorText message={error} />
         </View>
       ) : null}

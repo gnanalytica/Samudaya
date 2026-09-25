@@ -192,8 +192,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
           <div className="border-warning/40 bg-warning/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
             <Clock className="text-warning mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink">
-              This campaign is waiting for the committee. Residents will see it and can contribute
-              once it is approved.
+              Waiting for the committee. Once approved, residents can see it and contribute.
             </p>
           </div>
         ) : null}
@@ -299,13 +298,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               <Card>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-ink text-sm font-medium">
-                      There is a WhatsApp group for this
-                    </p>
-                    <p className="text-ink-muted text-xs">
-                      The app keeps the plan and the money. The chatting happens where it already
-                      does.
-                    </p>
+                    <p className="text-ink text-sm font-medium">This event has a WhatsApp group</p>
                   </div>
                   <WhatsappGroupLink url={event.whatsapp_group_url} />
                 </CardBody>
@@ -315,10 +308,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
             {/* The argument that produced the decision, kept next to it. A tab
                 of its own would have made five; it belongs under About. */}
             <Card>
-              <CardHeader
-                title="Discussion"
-                description="Anything worth settling about this event. Everyone in the society can read it."
-              />
+              <CardHeader title="Discussion" description="Everyone in the society can read this." />
               <CardBody>
                 <CommentThread
                   slug={slug}
@@ -366,9 +356,8 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 </div>
                 {stats.fundPending > 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
-                    {formatMoney(stats.fundPending, community.currency)} more has been reported and
-                    is waiting to be matched against the bank. It counts towards the total once it
-                    is confirmed.
+                    {formatMoney(stats.fundPending, community.currency)} more reported, waiting to
+                    be confirmed.
                   </p>
                 ) : null}
                 {/* Money the society already had, moved here by the committee,
@@ -557,7 +546,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <EmptyState
                   icon={<Receipt className="size-6" />}
                   title="Nothing spent yet"
-                  description="Bills approved by the committee appear here, with the bill, for everyone to see."
+                  description="Bills the committee approves appear here, for everyone to see."
                 />
               )}
             </Card>
@@ -593,9 +582,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
             <div className="border-border-base bg-surface-sunken text-ink-muted rounded-lg border px-4 py-3 text-sm">
               🔒 <span className="text-ink font-medium">If money is left over:</span>{' '}
               {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}
-              <p className="text-ink-subtle mt-1 text-xs">
-                Fixed when the event was created, before any money was collected.
-              </p>
+              <p className="text-ink-subtle mt-1 text-xs">Fixed before any money was collected.</p>
             </div>
           </div>
         ) : null}
@@ -703,13 +690,13 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               myMembershipId={membership.id}
               canVote={can(role, 'vote') && event.status !== 'completed'}
               canApprove={canApprove}
-              emptyDescription="Suggestions the committee approves are put to residents here."
+              emptyDescription="Suggestions the committee approves go to a vote here."
             />
             {can(role, 'suggest') && event.status === 'published' ? (
               <Card>
                 <CardHeader
                   title="Suggest something"
-                  description="The committee reviews every suggestion, then puts it to residents for a vote."
+                  description="The committee reviews it first."
                 />
                 <CardBody>
                   <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />

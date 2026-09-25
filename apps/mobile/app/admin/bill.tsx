@@ -297,7 +297,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
             </Title>
             <Caption>
               {wasDecided
-                ? 'This bill has already been decided. Saving a revision withdraws that decision and sends it back for approval.'
+                ? 'Saving withdraws the current decision and sends the bill back for approval.'
                 : existing?.status === 'changes_requested'
                   ? 'Saving sends it back to the committee for approval.'
                   : 'The committee approves every bill before it appears in the accounts.'}
@@ -346,9 +346,6 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
               onChange={setCategory}
               preferred={categories}
             />
-            {categories.length ? (
-              <Caption>Categories in this event’s budget are listed first.</Caption>
-            ) : null}
             <FilePickerField
               label="Photo of the bill"
               file={billFile}

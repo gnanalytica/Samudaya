@@ -13,7 +13,7 @@ const initial: ApiKeyState = {};
 
 const SCOPE_HELP: Record<string, string> = {
   'announcements:read': 'Read notices',
-  'announcements:write': 'Post notices — residents will see them',
+  'announcements:write': 'Post notices to residents',
   'requests:read': 'Read service requests',
   'requests:write': 'Raise and update service requests',
   'visitors:read': 'Read visitor passes and gate codes',
@@ -39,7 +39,7 @@ function RevealedKey({ value }: { value: string }) {
     <div className="border-warning/40 bg-warning/10 rounded-xl border p-4">
       <p className="text-ink flex items-center gap-1.5 text-sm font-medium">
         <TriangleAlert className="text-warning size-4" aria-hidden="true" />
-        Copy this now — it won’t be shown again
+        Copy this now. It won’t be shown again.
       </p>
       <div className="mt-2 flex items-center gap-2">
         <code className="bg-surface-raised text-ink min-w-0 flex-1 truncate rounded-lg px-3 py-2 font-mono text-xs">
@@ -67,7 +67,7 @@ function RevealedKey({ value }: { value: string }) {
         </button>
       </div>
       <p className="text-ink-muted mt-2 text-xs">
-        Only the digest is stored. If you lose it, revoke the key and make a new one.
+        If you lose it, revoke the key and make a new one.
       </p>
     </div>
   );
@@ -78,10 +78,7 @@ export function ApiKeyForm({ slug }: { slug: string }) {
 
   return (
     <Card className="h-fit">
-      <CardHeader
-        title="Create a key"
-        description="Grant only what the integration actually needs."
-      />
+      <CardHeader title="Create a key" description="Grant only what the integration needs." />
       <CardBody className="space-y-4">
         {state.createdKey ? <RevealedKey value={state.createdKey} /> : null}
 

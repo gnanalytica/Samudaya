@@ -12,7 +12,7 @@ const societyUpiSchema = z.object({
   upi_payee_name: z
     .string()
     .trim()
-    .min(1, 'Name the account holder, as UPI apps will show it')
+    .min(1, 'Add the payee name')
     .max(80, 'Keep it under 80 characters'),
 });
 

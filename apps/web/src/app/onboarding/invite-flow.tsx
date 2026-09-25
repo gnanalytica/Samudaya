@@ -87,10 +87,7 @@ export function InviteFlow({ initialCode = '' }: { initialCode?: string }) {
         <Submit label={`Join ${preview.communityName}`} busy="Joining…" />
         <p className="text-ink-subtle flex items-start gap-2 text-xs">
           <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-          <span>
-            This code was issued by your committee and admits you straight away — there is no
-            waiting for approval. If the society above is not yours, do not use it.
-          </span>
+          <span>Joining is immediate. If the society above isn’t yours, don’t use this code.</span>
         </p>
       </form>
     );

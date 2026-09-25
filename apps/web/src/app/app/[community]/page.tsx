@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import {
   COPY,
+  alreadyInFundLine,
+  awaitingLine,
   can,
   carriedDeciders,
   countdown,
@@ -60,7 +62,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     {
       href: `${base}/money`,
       label: 'Money',
-      detail: 'Every rupee in and out, for every event',
+      detail: 'Every rupee in and out',
       icon: Wallet,
     },
   ].filter((item) => !onTheBar.has(item.href));
@@ -104,6 +106,10 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
   // shows its effect says whose.
   const carriedBy =
     next && (s?.fundCarried ?? 0) > 0 ? carriedDeciders(await getCarriedInto(next.id)) : null;
+  // The card leads with confirmed money only. Without these it read "₹0 of
+  // ₹1,93,010 raised" over an event holding ₹6,990 with ₹20,500 more reported.
+  const waiting = awaitingLine(s?.fundPending ?? 0, community.currency);
+  const inFund = alreadyInFundLine(s?.fundCarried ?? 0, carriedBy, community.currency);
   // Every idea in the society, an event's as much as its own: a vote you have
   // not cast is a vote you have not cast, and this used to count only half of
   // them because the other half lived on their event's page.
@@ -158,7 +164,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               </span>
               <span className="text-ink-subtle mt-0.5 block text-xs">
                 Left over from {balance.movements} closed{' '}
-                {balance.movements === 1 ? 'event' : 'events'}, not yet behind a new one
+                {balance.movements === 1 ? 'event' : 'events'}
               </span>
             </span>
             <ArrowRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
@@ -224,23 +230,30 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   <span>{funded}%</span>
                 </div>
                 <div
-                  className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-black/20"
+                  className="relative mt-1.5 flex h-2 overflow-hidden rounded-full bg-black/20"
                   role="progressbar"
                   aria-valuenow={funded}
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-label="Fund progress"
+                  aria-valuetext={[
+                    `${funded}% confirmed`,
+                    bar.pending > 0 ? `${bar.pending}% waiting to be confirmed` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
                 >
-                  <div
-                    className="h-full rounded-full bg-white/85"
-                    style={{ width: `${funded}%` }}
-                  />
+                  <div className="h-full bg-white/85" style={{ width: `${funded}%` }} />
+                  {/* Reported and not yet confirmed, paler, as FundBar draws it. */}
+                  {bar.pending > 0 ? (
+                    <div className="h-full bg-white/40" style={{ width: `${bar.pending}%` }} />
+                  ) : null}
                 </div>
-                {(s?.fundCarried ?? 0) > 0 ? (
-                  <p className="relative mt-1.5 text-xs text-white/75">
-                    After {formatMoney(s?.fundCarried ?? 0, community.currency)} carried across by
-                    the committee{carriedBy ? ` · decided by ${carriedBy}` : ''}
-                  </p>
+                {waiting || inFund ? (
+                  <div className="relative mt-1.5 space-y-0.5 text-xs text-white/75">
+                    {waiting ? <p>{waiting}</p> : null}
+                    {inFund ? <p>{inFund}</p> : null}
+                  </div>
                 ) : null}
                 <div className="relative mt-4 flex flex-wrap gap-2">
                   <ButtonLink
@@ -301,7 +314,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               description={
                 staff
                   ? 'Create the first event with its budget, then publish it.'
-                  : 'When the society plans something, it will show up here.'
+                  : 'Events the society plans show up here.'
               }
               action={
                 staff ? (
@@ -326,6 +339,12 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   cs?.fundTarget ?? 0,
                   cs?.fundCarried ?? 0,
                 ).confirmed;
+                const note = [
+                  awaitingLine(cs?.fundPending ?? 0, community.currency),
+                  alreadyInFundLine(cs?.fundCarried ?? 0, null, community.currency),
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
                 return (
                   <Link
                     key={campaign.id}
@@ -345,6 +364,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                         community.currency,
                       )}
                     </p>
+                    {note ? <p className="text-ink-subtle mt-0.5 text-xs">{note}</p> : null}
                   </Link>
                 );
               })}
@@ -406,7 +426,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                         Suggest an idea or an activity
                       </span>
                       <span className="text-ink-muted block text-xs">
-                        For an event or for the society. The committee puts it to a vote.
+                        For an event or the society.
                         {societyIdeas ? ` ${societyIdeas} open for voting now.` : ''}
                       </span>
                     </span>
@@ -426,8 +446,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                         Start a fundraising campaign
                       </span>
                       <span className="text-ink-muted block text-xs">
-                        Raise money for something the society needs. The committee approves it
-                        first.
+                        The committee approves it first.
                       </span>
                     </span>
                   </span>

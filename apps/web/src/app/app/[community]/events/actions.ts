@@ -263,10 +263,7 @@ export async function suggestForEvent(
 
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/todo`);
-  return {
-    ...EMPTY_STATE,
-    success: 'Sent to the committee. Once they approve it, residents can vote on it.',
-  };
+  return { ...EMPTY_STATE, success: 'Sent to the committee. Once approved, it goes to a vote.' };
 }
 
 /**
@@ -317,10 +314,7 @@ export async function suggestIdea(_prev: ActionState, formData: FormData): Promi
   revalidatePath(`/app/${slug}/suggest`);
   if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/todo`);
-  return {
-    ...EMPTY_STATE,
-    success: 'Sent to the committee. Once they open it, residents can vote on it.',
-  };
+  return { ...EMPTY_STATE, success: 'Sent to the committee. Once approved, it goes to a vote.' };
 }
 
 /** One vote per person, for or against; voting again changes the vote. */

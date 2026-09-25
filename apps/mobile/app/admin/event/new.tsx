@@ -182,7 +182,7 @@ export default function NewEvent() {
         >
           <View style={{ gap: 2 }}>
             <Title>New event</Title>
-            <Caption>A name and a date are enough to start; add the rest now or later.</Caption>
+            <Caption>Only a name and date are required.</Caption>
           </View>
 
           <Card style={{ gap: spacing.lg }}>
@@ -197,7 +197,7 @@ export default function NewEvent() {
 
           <Card style={{ gap: spacing.md }}>
             <Heading>Activities</Heading>
-            <Caption>Pick a type to add it; you can rename it.</Caption>
+            <Caption>Pick a type to add an activity.</Caption>
             <ActivityTypeChips
               onPick={(item) =>
                 setActivities((current) => [

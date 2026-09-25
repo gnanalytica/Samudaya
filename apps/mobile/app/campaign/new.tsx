@@ -127,9 +127,7 @@ export default function NewCampaign() {
         >
           <View style={{ gap: 2 }}>
             <Title>Start a fundraising campaign</Title>
-            <Caption>
-              The committee approves every campaign before residents are asked to give.
-            </Caption>
+            <Caption>The committee reviews each campaign before residents can contribute.</Caption>
           </View>
 
           <Card style={{ gap: spacing.lg }}>

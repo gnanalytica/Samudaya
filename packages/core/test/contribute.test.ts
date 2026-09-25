@@ -16,7 +16,13 @@ import {
   normalizeStats,
   stillNeeded,
 } from '../src/events';
-import { carriedDeciders, carriedFromLine, carriedInLine } from '../src/funds';
+import {
+  alreadyInFundLine,
+  awaitingLine,
+  carriedDeciders,
+  carriedFromLine,
+  carriedInLine,
+} from '../src/funds';
 
 /**
  * Two things a resident sees on the way to paying: what the bar says has been
@@ -381,5 +387,37 @@ describe('carriedDeciders', () => {
   it('says nothing when nobody is recorded', () => {
     expect(carriedDeciders([by(null)])).toBeNull();
     expect(carriedDeciders([])).toBeNull();
+  });
+});
+
+/**
+ * What a compact fund card says under its bar. It leads with confirmed money
+ * only, so without these two lines an event with money reported and money
+ * carried in read "₹0 of ₹1,93,010 raised" and looked empty.
+ */
+describe('the lines under a fund card', () => {
+  it('says what has been reported and is waiting to be confirmed', () => {
+    expect(awaitingLine(20_500)).toBe('₹20,500 more reported, waiting to be confirmed');
+  });
+
+  it('says nothing when nothing is waiting', () => {
+    expect(awaitingLine(0)).toBeNull();
+  });
+
+  it('says money carried across is already in the fund, and whose decision it was', () => {
+    expect(alreadyInFundLine(6_990, 'Pranav Aditya')).toBe(
+      '₹6,990 already in the fund, carried across by the committee · decided by Pranav Aditya',
+    );
+  });
+
+  it('leaves the name out when the card does not know it', () => {
+    expect(alreadyInFundLine(6_990)).toBe(
+      '₹6,990 already in the fund, carried across by the committee',
+    );
+  });
+
+  it('says nothing about an event that nothing was carried into, or that gave money away', () => {
+    expect(alreadyInFundLine(0, 'Pranav Aditya')).toBeNull();
+    expect(alreadyInFundLine(-6_990)).toBeNull();
   });
 });

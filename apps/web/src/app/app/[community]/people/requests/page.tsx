@@ -71,7 +71,7 @@ export default async function JoinRequestsPage(
                       <p className="text-ink-subtle mt-0.5 text-xs">
                         asked {relativeTime(request.created_at)}
                         {request.relation === 'other'
-                          ? ' · a supervisor or other society staff; admit as staff if so'
+                          ? ' · works for the society'
                           : ` · claims to be the ${request.relation}`}
                       </p>
                     </div>

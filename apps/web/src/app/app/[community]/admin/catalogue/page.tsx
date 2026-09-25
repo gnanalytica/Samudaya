@@ -23,7 +23,7 @@ export default async function CataloguePage(props: PageProps<'/app/[community]/a
     <>
       <PageHeader
         title="Catalogue"
-        description="The choices events, budgets and bills pick from, so everyone files spending the same way. Names, descriptions and notes stay free text."
+        description="The choices events, budgets and bills pick from."
       />
       <PageBody>
         <Link
@@ -38,8 +38,8 @@ export default async function CataloguePage(props: PageProps<'/app/[community]/a
           <Card className="border-accent/40 mb-5">
             <CardBody className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-ink text-sm">
-                Every society starts with a catalogue suited to Indian residential events. Rename,
-                add or archive anything that doesn’t fit, then confirm it here.
+                This is a starter catalogue. Rename, add or archive anything that doesn’t fit, then
+                confirm.
               </p>
               <form action={markCatalogueReviewed}>
                 <input type="hidden" name="slug" value={community.slug} />

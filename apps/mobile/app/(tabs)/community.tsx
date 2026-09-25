@@ -239,10 +239,7 @@ export default function Community() {
             })
           ) : (
             <Card>
-              <EmptyState
-                title="No ideas yet"
-                description="Be the first to suggest something for the society."
-              />
+              <EmptyState title="No ideas yet" description="Suggest something above." />
             </Card>
           )}
         </View>

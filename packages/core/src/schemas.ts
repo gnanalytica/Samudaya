@@ -149,14 +149,14 @@ export type FoundSocietyInput = z.infer<typeof foundSocietySchema>;
 export const createUnitSchema = z.object({
   community_id: uuid,
   block: z.string().trim().max(20).optional(),
-  number: z.string().trim().min(1, 'Unit number is required').max(20),
+  number: z.string().trim().min(1, 'Enter the flat number').max(20),
   floor: z.coerce.number().int().min(-5).max(200).optional(),
   bedrooms: z.coerce.number().int().min(0).max(20).optional(),
 });
 export type CreateUnitInput = z.infer<typeof createUnitSchema>;
 
 export const requestToJoinSchema = z.object({
-  join_code: z.string().trim().min(4, 'Enter the Society ID your admin gave you').max(20),
+  join_code: z.string().trim().min(4, 'Enter the society code your committee shared').max(20),
   unit_id: uuid.nullable().optional(),
   name: z.string().trim().min(2, 'Tell us your name').max(120),
   phone: z.string().trim().max(20).optional(),
@@ -218,7 +218,7 @@ export const createEventSchema = z
     // database refuses a zero outright.
     suggested_amount: z.coerce
       .number()
-      .positive('A suggested amount has to be more than nothing')
+      .positive('Enter an amount greater than zero, or leave it blank')
       .max(10_000_000)
       .nullable()
       .optional(),
@@ -401,7 +401,7 @@ export type ApiScope = (typeof API_SCOPES)[number];
 
 export const createApiKeySchema = z.object({
   community_id: uuid,
-  name: z.string().trim().min(2, 'Name the key so you can recognise it later').max(80),
+  name: z.string().trim().min(2, 'Name the key').max(80),
   scopes: z.array(z.enum(API_SCOPES)).min(1, 'Pick at least one scope'),
   expires_at: z.string().datetime({ offset: true }).nullable().optional(),
 });

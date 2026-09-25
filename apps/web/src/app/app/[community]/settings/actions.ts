@@ -144,8 +144,5 @@ export async function askToChangeFlat(
   if (data !== 'ok') return { error: requestUnitChangeMessage(data ?? '') };
 
   revalidatePath(`/app/${slug}/settings`);
-  return {
-    ...EMPTY_STATE,
-    success: 'Sent. The committee will confirm it, and you will hear either way.',
-  };
+  return { ...EMPTY_STATE, success: 'Sent. You’ll hear back once the committee decides.' };
 }

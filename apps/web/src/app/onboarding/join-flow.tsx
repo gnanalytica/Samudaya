@@ -127,8 +127,7 @@ export function JoinFlow({
 
             {worksHere ? (
               <p className="text-ink-muted text-sm">
-                Supervisors, managers and other staff don’t need a flat. The committee will choose
-                your role when they approve you.
+                No flat needed. The committee sets your role when they approve you.
               </p>
             ) : units.length ? (
               <div className="grid gap-4 sm:grid-cols-2">
@@ -166,8 +165,8 @@ export function JoinFlow({
               </div>
             ) : (
               <p className="text-ink-muted text-sm">
-                No flats are listed for this code yet. You can still send your request; staff will
-                confirm your flat. If the code is wrong, we’ll tell you when you send.
+                No flats are listed for this code yet. Send your request anyway; staff will confirm
+                your flat.
               </p>
             )}
 
@@ -233,7 +232,7 @@ export function JoinFlow({
           <Submit label="Continue" busy="Checking…" />
           <p className="text-ink-subtle flex items-start gap-2 text-xs">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            The code only lets you ask. Staff or the committee approve who gets in.
+            Staff or the committee approve who gets in.
           </p>
         </form>
       </CardBody>

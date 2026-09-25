@@ -25,7 +25,7 @@ export default async function NewEventPage(props: PageProps<'/app/[community]/ad
     <>
       <PageHeader
         title="Create an event"
-        description="Name, date and budget are enough to start. You can add bills and more activities later."
+        description="Start with a name, date and budget. Add bills and activities later."
       />
       <PageBody>
         <div className="mx-auto max-w-2xl">

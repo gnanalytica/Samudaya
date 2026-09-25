@@ -107,7 +107,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
     <>
       <PageHeader
         title="Reconcile"
-        description="Import the society's statement and pair each line with the payment it turned out to be."
+        description="Import the bank statement and match each line to a payment."
       />
       <PageBody>
         <StatTiles>
@@ -129,7 +129,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
           <Card className="mt-5">
             <CardHeader
               title="Import a statement"
-              description="Overlapping months are safe: a line the account already has is recognised and skipped."
+              description="Overlapping months are fine. Lines already imported are skipped."
             />
             <CardBody>
               <ImportStatementForm slug={slug} accounts={accounts} />
@@ -139,7 +139,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
           <Card className="mt-5">
             <CardHeader
               title="Name the account first"
-              description="A statement is imported against one account, so the app can tell two months of the same account from two different ones."
+              description="You need one before you import a statement."
             />
             <CardBody>
               {can(role, 'roles:manage') ? (
@@ -155,11 +155,11 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
 
         <Card className="mt-5">
           <CardHeader
-            title={`Nobody has explained these yet (${allOpen.length})`}
+            title={`Unexplained lines (${allOpen.length})`}
             description={
               allOpen.length > PAGE
-                ? `Every line the bank posted that the app cannot account for. Showing the ${PAGE} most recent; clear these and the rest appear.`
-                : 'Every line the bank posted that the app cannot account for. Pair it with a payment, or say what it was.'
+                ? `Showing the ${PAGE} most recent. Clear these to see the rest.`
+                : 'Match each to a payment, or set it aside with a reason.'
             }
           />
           {open.length ? (
@@ -213,7 +213,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
                       <p className="text-ink-subtle text-xs">
                         {incoming
                           ? 'No reported payment matches this. Ask around, or set it aside.'
-                          : 'Money going out is matched against a bill, which is not built yet — set it aside with what it was.'}
+                          : 'Matching money out to bills isn’t available yet. Set it aside with what it was.'}
                       </p>
                     )}
 
@@ -228,8 +228,8 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
               title={lines.length ? 'Everything is accounted for' : 'Nothing imported yet'}
               description={
                 lines.length
-                  ? 'Every line the bank has posted is either matched to a payment or written off with a reason.'
-                  : 'Import a statement above and its lines appear here, waiting to be paired.'
+                  ? 'Every line is matched to a payment or set aside with a reason.'
+                  : 'Import a statement above to see its lines here.'
               }
             />
           )}
@@ -239,7 +239,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
           <Card className="mt-5">
             <CardHeader
               title={`Settled (${settled.length})`}
-              description="Lines already paired or written off, and who decided."
+              description="Lines matched or set aside, and who did it."
             />
             <ul className="divide-border-base divide-y">
               {settled.slice(0, 60).map((line) => (
@@ -282,10 +282,7 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
 
         {accounts.length && can(role, 'roles:manage') ? (
           <Card className="mt-5">
-            <CardHeader
-              title="Accounts"
-              description="What the society banks with. The account number is never stored in full."
-            />
+            <CardHeader title="Accounts" description="Account numbers are never stored in full." />
             <ul className="divide-border-base divide-y">
               {accounts.map((account) => (
                 <li key={account.id} className="flex items-center gap-3 px-5 py-3">
@@ -304,12 +301,6 @@ export default async function ReconcilePage(props: PageProps<'/app/[community]/a
             </CardBody>
           </Card>
         ) : null}
-
-        <p className="text-ink-subtle mt-4 text-xs">
-          A bank feed would fill this automatically, and needs an account aggregator licensed by the
-          RBI sitting in the middle. The import above and a feed post to the same place, so nothing
-          on this screen changes on the day one is connected.
-        </p>
       </PageBody>
     </>
   );

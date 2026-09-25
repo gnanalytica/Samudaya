@@ -188,10 +188,6 @@ export default function Money() {
             {holdings && (holdings.length || heldBySociety !== 0 || movements.length) ? (
               <Card style={{ gap: spacing.sm }}>
                 <Body>Where the {formatMoney(balance, currency)} is</Body>
-                <Caption>
-                  Every rupee the society holds is behind an event, or kept for the society until
-                  the committee puts it behind one.
-                </Caption>
                 {holdings.map((holding) => {
                   const note = holdingNote(holding, currency);
                   const row = (
@@ -230,7 +226,7 @@ export default function Money() {
                 <View style={{ flexDirection: 'row', gap: spacing.md }}>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Body>Kept for the society</Body>
-                    <Caption>Behind no event, until the committee puts it behind one</Caption>
+                    <Caption>Not behind any event yet</Caption>
                   </View>
                   <Text style={{ color: colors.ink, fontSize: 14, fontWeight: '600' }}>
                     {formatMoney(heldBySociety, currency)}
@@ -299,8 +295,7 @@ export default function Money() {
             ) : null}
 
             <Caption>
-              Confirmed payments in and approved bills out. A payment waiting to be confirmed is not
-              here yet.
+              Confirmed payments in, approved bills out. Payments show here once confirmed.
             </Caption>
           </View>
         }
@@ -310,18 +305,16 @@ export default function Money() {
             description={
               rows.length
                 ? 'Try a different filter.'
-                : 'Confirmed payments and approved bills appear here, for every event, for ever.'
+                : 'Confirmed payments and approved bills will show up here.'
             }
           />
         }
         ListFooterComponent={
           <View style={{ gap: spacing.xs, paddingTop: spacing.lg }}>
             <Caption>
-              Money in names who paid, their flat and how the money arrived, the way a contribution
-              list always has. Money out names the vendor, the amount and whoever on the committee
-              approved it, with the bill attached for anyone to open. A payment screenshot opens
-              only for the payer and for staff. Nothing here is a way to contact anybody — that
-              stays on People, for the people entitled to it.
+              Money in shows who paid, their flat and how. Money out shows the vendor, who approved
+              it and the bill, which anyone can open. Only the payer and staff can open a payment
+              screenshot. No contact details are shown here.
             </Caption>
             {totals?.last_movement_at ? (
               <Caption>Last movement {relativeTime(totals.last_movement_at)}.</Caption>

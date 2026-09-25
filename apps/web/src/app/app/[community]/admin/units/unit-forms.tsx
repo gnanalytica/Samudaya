@@ -130,8 +130,8 @@ export function GenerateFlatsForm({ slug }: { slug: string }) {
       </label>
       <p className="text-ink-muted text-sm">
         {preview
-          ? `${preview.count} flats, numbered ${label(preview.first)} to ${label(preview.last)}. Flats that already exist are skipped.`
-          : 'Fill in towers, floors and flats per floor to see how many flats this makes.'}
+          ? `${preview.count} flats, numbered ${label(preview.first)} to ${label(preview.last)}. Existing flats are skipped.`
+          : 'Fill in all three to see how many flats this makes.'}
       </p>
       <Feedback state={state} />
       <Submit
@@ -157,7 +157,7 @@ export function ImportFlatsForm({ slug }: { slug: string }) {
       <Field
         label="Spreadsheet (CSV)"
         htmlFor="flats-csv"
-        hint="One row per flat. Columns: tower and flat (required), floor, bhk and sqft (optional). Export from Excel or Google Sheets as CSV."
+        hint="One row per flat. Columns: flat (required), tower, floor, bhk and sqft. Export from Excel or Google Sheets as CSV."
       >
         {(control) => (
           <Input

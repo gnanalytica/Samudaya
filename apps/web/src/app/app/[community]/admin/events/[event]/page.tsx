@@ -494,8 +494,8 @@ export default async function ManageEventPage(
                     !isCommittee
                       ? 'Correct or re-upload a bill while it is pending or sent back.'
                       : alone
-                        ? 'Approve to publish a bill to residents. You are the whole committee, so your own bills are yours to approve.'
-                        : 'Approve to publish a bill to residents. Nobody approves a bill they uploaded or revised.'
+                        ? 'Approving shows a bill to residents. As the only committee member, you approve your own bills too.'
+                        : 'Approving shows a bill to residents. You can’t approve a bill you uploaded or revised.'
                   }
                 />
                 <ul className="divide-border-base divide-y">
@@ -522,8 +522,8 @@ export default async function ManageEventPage(
                               {expense.reviser?.profiles?.full_name
                                 ? ` by ${expense.reviser.profiles.full_name}`
                                 : ''}{' '}
-                              on {formatDate(expense.revised_at.slice(0, 10))} — needs approving
-                              again
+                              on {formatDate(expense.revised_at.slice(0, 10))}. Needs approving
+                              again.
                             </p>
                           ) : null}
                           {expense.review_note ? (
@@ -691,8 +691,8 @@ export default async function ManageEventPage(
                   title={`Waiting for confirmation (${waitingPayments.length})`}
                   description={
                     isCommittee
-                      ? 'Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count, and the amount can be corrected to what the bank shows.'
-                      : 'Residents reported these UPI payments. Check each reference on the bank statement; only confirmed payments count.'
+                      ? 'Check each UPI transaction ID against the bank statement. Only confirmed payments count. Correct the amount if the bank shows a different one.'
+                      : 'Check each UPI transaction ID against the bank statement. Only confirmed payments count.'
                   }
                 />
                 <ul className="divide-border-base divide-y">

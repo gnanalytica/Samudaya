@@ -48,16 +48,13 @@ export default async function SuggestPage(props: PageProps<'/app/[community]/sug
               ]
                 .filter(Boolean)
                 .join(' · ')
-            : 'Anything worth doing — for an event, or for the society itself.'
+            : 'For an event or the society.'
         }
       />
       <PageBody>
         {can(role, 'suggest') ? (
           <Card className="mb-3">
-            <CardHeader
-              title="Suggest something"
-              description="The committee reads every suggestion, then puts it to residents for a vote."
-            />
+            <CardHeader title="Suggest something" description="The committee reviews it first." />
             <CardBody>
               <SocietySuggestionForm slug={community.slug} events={running} />
             </CardBody>
@@ -70,7 +67,7 @@ export default async function SuggestPage(props: PageProps<'/app/[community]/sug
           myMembershipId={membership.id}
           canVote={can(role, 'vote')}
           canApprove={can(role, 'suggestions:approve')}
-          emptyDescription="Suggest something above, and the committee will put it to a vote."
+          emptyDescription="Suggestions the committee approves go to a vote here."
           showEvent
         />
       </PageBody>

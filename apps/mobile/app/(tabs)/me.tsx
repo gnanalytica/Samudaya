@@ -121,7 +121,7 @@ export default function Me() {
           />
           <LinkRow
             label="Ideas"
-            detail="Suggest something, and vote on what others suggested"
+            detail="Suggest ideas and vote on them"
             onPress={() => router.push('/ideas')}
           />
         </Card>
