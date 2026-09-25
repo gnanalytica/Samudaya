@@ -34,7 +34,7 @@ export function SocietyUpiForm({
           label="Society UPI ID"
           htmlFor="upi-vpa"
           error={state.fieldErrors?.upi_vpa}
-          hint="Preferably the association's bank account, not a personal one."
+          hint="Use the association’s bank account, not a personal one."
           required
         >
           {(control) => (

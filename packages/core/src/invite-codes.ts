@@ -35,10 +35,10 @@ export type JoinRequestStatus =
   'pending' | 'already_member' | 'not_found' | 'bad_unit' | 'rate_limited' | 'unauthenticated';
 
 const JOIN_MESSAGES: Record<JoinRequestStatus, string> = {
-  pending: 'Request sent. Your society admin will approve it shortly.',
-  already_member: 'You’re already a member of this community.',
-  not_found: 'We don’t recognise that Society ID. Check it and try again.',
-  bad_unit: 'That flat isn’t part of this community.',
+  pending: 'Request sent. Staff or the committee will review it.',
+  already_member: 'You’re already a member of this society.',
+  not_found: 'We don’t recognise that society code. Check it and try again.',
+  bad_unit: 'That flat isn’t part of this society.',
   rate_limited: 'Too many attempts. Wait 15 minutes and try again.',
   unauthenticated: 'Please sign in first.',
 };
@@ -60,11 +60,11 @@ export type RedeemStatus =
 
 const REDEEM_MESSAGES: Record<RedeemStatus, string> = {
   ok: 'You’re in.',
-  already_member: 'You’re already a member of this community.',
+  already_member: 'You’re already a member of this society.',
   not_found: 'We don’t recognise that code. Check it and try again.',
-  expired: 'That code has expired. Ask your admin for a new one.',
-  revoked: 'That code was cancelled. Ask your admin for a new one.',
-  exhausted: 'That code has already been used the maximum number of times.',
+  expired: 'That code has expired. Ask the committee for a new one.',
+  revoked: 'That code was cancelled. Ask the committee for a new one.',
+  exhausted: 'That code has been used up. Ask the committee for a new one.',
   rate_limited: 'Too many incorrect codes. Wait 15 minutes and try again.',
   unauthenticated: 'Please sign in first.',
 };

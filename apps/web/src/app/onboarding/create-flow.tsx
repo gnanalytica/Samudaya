@@ -62,7 +62,7 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
                   Residents will find it at <span className="font-mono">/app/{preview}</span>
                 </>
               ) : (
-                'As it appears on the gate — residents should recognise it.'
+                'As written on the gate.'
               )
             }
             required
@@ -135,7 +135,7 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
                   <>Flat {read.number}, no tower</>
                 )
               ) : (
-                'As it is on your door. Leave it blank if you run the society without living in it.'
+                'As written on your door. Leave blank if you don’t live in the society.'
               )
             }
           >
@@ -156,7 +156,7 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
               label="Address"
               htmlFor="cs-address"
               error={state.fieldErrors?.address}
-              hint="Optional — you can add this later."
+              hint="Optional."
             >
               {(control) => (
                 <Input
@@ -192,8 +192,7 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
           <Submit />
           <p className="text-ink-subtle flex items-start gap-2 text-xs">
             <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-            You become the first committee member. Next you’ll add your flats and get a Society code
-            to share with residents.
+            You become the first committee member and get a society code for residents.
           </p>
         </form>
       </CardBody>

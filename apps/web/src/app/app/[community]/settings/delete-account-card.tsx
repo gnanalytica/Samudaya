@@ -38,7 +38,7 @@ export function DeleteAccountCard() {
 
   return (
     <Card>
-      <CardHeader title="Delete your account" description="Permanent, and it cannot be undone." />
+      <CardHeader title="Delete your account" description="This can’t be undone." />
       <CardBody>
         <p className="text-ink-muted text-sm">This deletes:</p>
         <ul className="text-ink-muted mt-2 list-disc space-y-1 pl-5 text-sm">

@@ -8,7 +8,7 @@ export default async function AuthErrorPage(props: { searchParams: Promise<{ rea
 
   const message =
     reason === 'missing_code'
-      ? 'That sign-in link was incomplete. It may have been cut off by your email client.'
+      ? 'That sign-in link was incomplete. Your email app may have cut it off.'
       : reason
         ? decodeURIComponent(reason)
         : 'Something went wrong while signing you in.';
@@ -18,7 +18,7 @@ export default async function AuthErrorPage(props: { searchParams: Promise<{ rea
       <h1 className="text-xl font-semibold tracking-tight">We couldn’t sign you in</h1>
       <p className="text-ink-muted mt-2 text-sm">{message}</p>
       <p className="text-ink-muted mt-1 text-sm">
-        Sign-in links can only be used once, and expire after an hour.
+        Sign-in links work once and expire after an hour.
       </p>
       <div className="mt-6 flex gap-3">
         <ButtonLink href="/login">Try again</ButtonLink>

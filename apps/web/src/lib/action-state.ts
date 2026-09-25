@@ -105,7 +105,7 @@ export function friendlyDbError(error: { code?: string; message?: string } | nul
   // we swallow into form state is otherwise invisible there.
   if (error.code && SCHEMA_MISMATCH.includes(error.code)) {
     console.error('[samudaya] database is behind the app', error.code, error.message);
-    return 'This isn’t available yet — our side, not yours. We’ve been alerted.';
+    return 'This isn’t available yet. The problem is on our side, and we’ve been alerted.';
   }
 
   const known = KNOWN_DB_MESSAGES.find((message) => error.message?.includes(message));

@@ -53,8 +53,8 @@ export function FlatCard({
         title="Your flat"
         description={
           pending
-            ? `You have asked to be listed at ${pending}. The committee will confirm it.`
-            : 'The committee confirms a change, because your flat is what the money pages name you by.'
+            ? `You’ve asked to be listed at ${pending}. Waiting for the committee.`
+            : 'The committee confirms any change.'
         }
       />
       <CardBody>
@@ -99,7 +99,7 @@ export function FlatCard({
           <Field
             label="Anything the committee should know"
             htmlFor="flat-note"
-            hint="Optional — when you moved, who you swapped with."
+            hint="Optional. When you moved, or who you swapped with."
           >
             {(control) => <Input {...control} name="note" maxLength={300} />}
           </Field>

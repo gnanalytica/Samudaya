@@ -100,8 +100,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
         {!canParticipate(role) ? (
           <Card className="mb-5">
             <CardBody className="text-ink-muted text-sm">
-              As staff you run events from Manage and clear your To do list. Contributing, voting
-              and suggesting are for residents and the committee.
+              Contributing, voting and suggesting are for residents and the committee.
             </CardBody>
           </Card>
         ) : null}
@@ -167,7 +166,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
             <EmptyState
               icon={<Receipt className="size-6" />}
               title="Nothing yet"
-              description="When you contribute to an event, your receipts show up here."
+              description="Your receipts show up here after you contribute."
             />
           )}
         </Card>

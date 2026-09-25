@@ -62,7 +62,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     {
       href: `${base}/money`,
       label: 'Money',
-      detail: 'Every rupee in and out, for every event',
+      detail: 'Every rupee in and out',
       icon: Wallet,
     },
   ].filter((item) => !onTheBar.has(item.href));
@@ -164,7 +164,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               </span>
               <span className="text-ink-subtle mt-0.5 block text-xs">
                 Left over from {balance.movements} closed{' '}
-                {balance.movements === 1 ? 'event' : 'events'}, not yet behind a new one
+                {balance.movements === 1 ? 'event' : 'events'}
               </span>
             </span>
             <ArrowRight className="text-ink-subtle size-4 shrink-0" aria-hidden="true" />
@@ -314,7 +314,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
               description={
                 staff
                   ? 'Create the first event with its budget, then publish it.'
-                  : 'When the society plans something, it will show up here.'
+                  : 'Events the society plans show up here.'
               }
               action={
                 staff ? (
@@ -426,7 +426,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                         Suggest an idea or an activity
                       </span>
                       <span className="text-ink-muted block text-xs">
-                        For an event or for the society. The committee puts it to a vote.
+                        For an event or the society.
                         {societyIdeas ? ` ${societyIdeas} open for voting now.` : ''}
                       </span>
                     </span>
@@ -446,8 +446,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                         Start a fundraising campaign
                       </span>
                       <span className="text-ink-muted block text-xs">
-                        Raise money for something the society needs. The committee approves it
-                        first.
+                        The committee approves it first.
                       </span>
                     </span>
                   </span>

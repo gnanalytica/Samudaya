@@ -80,7 +80,7 @@ export async function SetupChecklist({ community }: { community: Community }) {
         title={`Set up ${community.name}`}
         description={
           done === total
-            ? 'Everything is in place. Finish setup to tuck this away.'
+            ? 'Everything is in place.'
             : `${done} of ${total} done. Residents can join as soon as your flats are in.`
         }
         action={

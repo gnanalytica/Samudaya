@@ -25,12 +25,11 @@ export const ROLE_LABEL: Record<Role, string> = {
 };
 
 export const ROLE_DESCRIPTION: Record<Role, string> = {
-  resident:
-    'Views events, contributes, suggests activities and ideas, votes, sees where the money goes, and proposes fundraising campaigns.',
+  resident: 'Contributes, votes, suggests ideas and proposes campaigns.',
   staff:
-    'Runs the society day to day: uploads and corrects bills, admits and removes residents, creates and manages events, and tracks which flat paid for what.',
+    'Runs events, uploads bills, records payments, and admits or removes residents. Doesn’t contribute or vote.',
   committee:
-    'Everything staff can do, plus the final say: approves or rejects bills, fundraising campaigns and suggestions, closes events, and assigns roles.',
+    'Everything residents and staff can do, plus approving bills, campaigns and suggestions, closing events and assigning roles.',
 };
 
 /** Roles the committee can hand out. */
@@ -196,7 +195,7 @@ const REQUEST_UNIT_MESSAGES: Record<RequestUnitChangeStatus, string> = {
   not_a_member: 'You are not a member of this society.',
   no_unit: 'That flat no longer exists.',
   wrong_community: 'That flat belongs to another society.',
-  already_there: 'That is already the flat you are listed at.',
+  already_there: 'You are already listed at that flat.',
 };
 
 export function requestUnitChangeMessage(status: string): string {

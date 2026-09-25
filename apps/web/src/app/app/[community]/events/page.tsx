@@ -113,7 +113,6 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
     <>
       <PageHeader
         title="Events"
-        description="Every event and campaign with its budget, spending and activities."
         action={
           <div className="flex flex-wrap gap-2">
             {can(role, 'campaigns:propose') ? (
@@ -136,7 +135,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
           <div className="border-success/30 bg-success/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
             <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink">
-              Campaign sent to the committee. Once they approve it, every resident can see it and
+              Campaign sent to the committee. Once approved, every resident can see it and
               contribute.
             </p>
           </div>
@@ -159,7 +158,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
               description={
                 staff
                   ? 'Create the first one with its budget, then publish it.'
-                  : 'When the society plans something, it will appear here.'
+                  : 'Events the society plans show up here.'
               }
             />
           </Card>

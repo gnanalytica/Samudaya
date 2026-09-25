@@ -21,11 +21,10 @@ const FOUND_MESSAGES: Record<FoundSocietyStatus, string> = {
   ok: 'Your society is ready.',
   unauthenticated: 'Please sign in first.',
   invalid_name: 'Give your society a name of at least two characters.',
-  invalid_phone: 'Check the phone number — 10 digits, or the full international form.',
+  invalid_phone: 'Enter a 10-digit mobile number, or the full international form.',
   invalid_flat: 'Write your flat the way it is on the door, like A 703 or 1402.',
   too_many: `You have already opened ${SOCIETY_LIMIT} societies. Write to us and we'll set the next one up with you.`,
-  no_slug_free:
-    'That name is taken by too many societies already. Add your area or city to tell them apart.',
+  no_slug_free: 'Too many societies have that name. Add your area or city to it.',
 };
 
 export function foundSocietyMessage(status: string): string {
@@ -93,7 +92,7 @@ export const CATALOGUE_KIND_LABEL: Record<
   budget_category: {
     title: 'Budget and bill categories',
     singular: 'Category',
-    hint: 'Used for budget lines and bills, so planned and actual spending line up.',
+    hint: 'Used for budget lines and bills.',
   },
   venue: {
     title: 'Venues',
@@ -262,11 +261,11 @@ export function residentInviteMessage({
   link: string;
 }): string {
   return [
-    `Namaste! ${societyName} is now on Samudaya for our events, activities and a transparent account of every rupee.`,
+    `Namaste! ${societyName} now plans its events on Samudaya and shows where every rupee goes.`,
     '',
     `1. Open ${link}`,
     '2. Sign in with Google',
-    `3. Society code: ${code} (already filled in from the link)`,
+    `3. Society code: ${code} (the link fills it in)`,
     '4. Pick your flat and send your details',
     '',
     'Staff will approve you, and then you can see events, contribute and vote.',
@@ -306,8 +305,7 @@ export function setupSteps(facts: SetupFacts): SetupStep[] {
     {
       id: 'flats',
       title: 'Add your flats',
-      description:
-        'Generate towers and floors, or import a spreadsheet. Residents pick their flat when they join.',
+      description: 'Generate towers and floors, or import a spreadsheet.',
       done: facts.flats > 0,
     },
     {
@@ -337,7 +335,7 @@ export function setupSteps(facts: SetupFacts): SetupStep[] {
     {
       id: 'event',
       title: 'Create your first event',
-      description: 'With a budget and activities, so residents have something to join.',
+      description: 'Add a budget and activities.',
       done: facts.events > 0,
     },
   ];

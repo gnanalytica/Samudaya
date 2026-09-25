@@ -135,8 +135,7 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
             <>
               <h1 className="text-2xl font-semibold tracking-tight">Start your society</h1>
               <p className="text-ink-muted mt-1.5 mb-6 text-sm">
-                Two details now; flats, categories and your UPI ID come next, on a checklist that
-                keeps your place.
+                A few details now. Flats, categories and your UPI ID come next.
               </p>
               <CreateFlow />
               <p className="text-ink-muted mt-5 text-center text-sm">
@@ -150,8 +149,7 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
             <>
               <h1 className="text-2xl font-semibold tracking-tight">Use your invite code</h1>
               <p className="text-ink-muted mt-1.5 mb-6 text-sm">
-                A code your committee sent you personally. It admits you straight away, with your
-                flat already set.
+                A personal code from your committee. It lets you in straight away.
               </p>
               <InviteFlow initialCode={initialInvite} />
               <p className="text-ink-muted mt-5 text-center text-sm">
@@ -165,8 +163,7 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
             <>
               <h1 className="text-2xl font-semibold tracking-tight">Join your society</h1>
               <p className="text-ink-muted mt-1.5 mb-6 text-sm">
-                Enter the society code your committee shared, then tell us who you are and which
-                flat is yours.
+                Enter your society code, then your details and flat.
               </p>
               <JoinFlow initialCode={initialCode} initialName={profile?.full_name ?? ''} />
               <p className="text-ink-muted mt-5 text-center text-sm">
@@ -187,19 +184,19 @@ export default async function OnboardingPage(props: PageProps<'/onboarding'>) {
                   href="/onboarding?mode=join"
                   icon={<KeyRound className="size-5" aria-hidden="true" />}
                   title="I have a society code"
-                  detail="Your committee shares one code with every resident. Pick your flat and staff let you in."
+                  detail="One code for every resident. Pick your flat and staff let you in."
                 />
                 <ChoiceCard
                   href="/onboarding?mode=invite"
                   icon={<Ticket className="size-5" aria-hidden="true" />}
                   title="I was sent an invite code"
-                  detail="A code addressed to you and your flat. No waiting — it admits you as soon as you use it."
+                  detail="A code just for you. It lets you in straight away."
                 />
                 <ChoiceCard
                   href="/onboarding?mode=create"
                   icon={<Building2 className="size-5" aria-hidden="true" />}
                   title="I’m setting up my society"
-                  detail="Create it now and you become its first committee member, with a code to share."
+                  detail="You become its first committee member, with a code to share."
                 />
               </div>
             </>

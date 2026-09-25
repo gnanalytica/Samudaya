@@ -89,7 +89,7 @@ export function LoginForm({ next }: { next: string }) {
               label="Email"
               htmlFor="email"
               error={emailState.error}
-              hint="We’ll email you a link — no password to remember."
+              hint="No password needed."
             >
               {(control) => (
                 <Input

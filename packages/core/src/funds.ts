@@ -56,9 +56,8 @@ export const SURPLUS_ANSWER_LABEL: Record<SurplusAnswer, string> = {
 
 export const SURPLUS_ANSWER_DETAIL: Record<SurplusAnswer, string> = {
   society_balance:
-    'It sits with the society, on everybody’s home screen, until the committee puts it behind an event.',
-  another_event:
-    'It shows on that event’s bar as money already received, so residents are asked only for the difference.',
+    'Everyone sees it on the home screen until the committee puts it behind an event.',
+  another_event: 'It counts towards that event’s target, so residents are asked only for the rest.',
 };
 
 export const surplusAnswerSchema = z.enum(SURPLUS_ANSWERS);

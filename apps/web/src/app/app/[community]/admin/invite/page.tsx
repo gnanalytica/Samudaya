@@ -21,7 +21,7 @@ export default async function InvitePage(props: PageProps<'/app/[community]/admi
     <>
       <PageHeader
         title="Invite"
-        description="One society code for everyone. The join link fills it in, and staff or the committee approve each person."
+        description={`One society code for everyone. Staff or the committee approve each person in ${COPY.todo}.`}
       />
       <PageBody>
         <div className="mx-auto max-w-3xl space-y-5">
@@ -67,10 +67,9 @@ export default async function InvitePage(props: PageProps<'/app/[community]/admi
             />
             <CardBody className="space-y-3 text-sm">
               <ol className="text-ink list-decimal space-y-1.5 pl-5">
-                <li>Send them the join link above (or the society code).</li>
+                <li>Send them the join link or society code.</li>
                 <li>
-                  They sign in with Google and choose <strong>I work for the society</strong>, so
-                  they don’t need a flat.
+                  They sign in with Google and choose <strong>I work for the society</strong>.
                 </li>
                 <li>
                   A committee member opens {COPY.todo} and admits them <strong>as staff</strong>.

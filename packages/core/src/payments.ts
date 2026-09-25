@@ -72,7 +72,7 @@ export function paymentEvidenceProblem(
   hasProof: boolean,
 ): string | null {
   if (reference || hasProof) return null;
-  return 'Add the UPI transaction ID or a screenshot of the payment, so it can be checked.';
+  return 'Add the UPI transaction ID or a screenshot of the payment.';
 }
 
 export type UpiPaymentLink = {

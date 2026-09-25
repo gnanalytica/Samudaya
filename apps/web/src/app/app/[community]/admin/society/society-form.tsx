@@ -35,11 +35,7 @@ export function SocietyDetailsForm({
   return (
     <form action={action} className="space-y-4">
       <input type="hidden" name="slug" value={slug} />
-      <Field
-        label="Society name"
-        htmlFor="soc-name"
-        hint="Set when Samudaya created your society. Ask the Samudaya team to change it."
-      >
+      <Field label="Society name" htmlFor="soc-name" hint="To change it, ask the Samudaya team.">
         {(control) => <Input {...control} value={name} readOnly disabled />}
       </Field>
       <Field label="Address" htmlFor="soc-address" error={state.fieldErrors?.address} required>
@@ -76,7 +72,7 @@ export function SocietyDetailsForm({
         label="WhatsApp group"
         htmlFor="soc-whatsapp"
         error={state.fieldErrors?.whatsapp_group_url}
-        hint="WhatsApp → the group → Group info → Invite via link. Every member sees a button to join."
+        hint="WhatsApp → the group → Group info → Invite via link. Members get a button to join."
       >
         {(control) => (
           <Input

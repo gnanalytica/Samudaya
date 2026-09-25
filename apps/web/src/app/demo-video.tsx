@@ -44,11 +44,10 @@ export function DemoVideo() {
       preload="metadata"
     >
       Samudaya, following one contribution the whole way: a resident pays ₹2,001 towards Ganesh
-      Chaturthi, it arrives on the committee&rsquo;s list, somebody who did not pay it confirms it
-      against the screenshot, and it lands on a ledger every resident can read with a name and a
-      flat beside it. Then the money out — a bill the person who filed it may not approve, the
-      spending against budget, the bank statement reconciled, and the ₹1,100 left at the end going
-      to the society by a recorded decision.
+      Chaturthi, someone else confirms it, and it goes on the ledger every resident can see, with a
+      name and flat. Then the money out: a bill the person who filed it can&rsquo;t approve,
+      spending against the budget, the bank statement reconciled, and the ₹1,100 left over kept for
+      the society.
     </video>
   );
 }

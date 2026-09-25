@@ -97,7 +97,7 @@ export default async function SocietySettingsPage(
           <Card id="catalogue" className="scroll-mt-20">
             <CardHeader
               title="Catalogue"
-              description="The event types, venues, budget categories, activities and vendors that forms pick from."
+              description="The choices events, budgets and bills pick from."
               action={
                 <ButtonLink href={`${base}/admin/catalogue`} size="sm" variant="secondary">
                   <Library className="size-4" aria-hidden="true" />
@@ -117,7 +117,7 @@ export default async function SocietySettingsPage(
           <Card id="upi" className="scroll-mt-20">
             <CardHeader
               title="UPI ID"
-              description="Residents pay straight to this UPI ID from their UPI app, then report the UPI transaction ID. Staff confirm each one against the bank statement before it counts."
+              description="Residents pay to this UPI ID and report the transaction ID. A payment counts once staff confirm it against the bank statement."
             />
             <CardBody>
               <SocietyUpiForm
@@ -131,7 +131,7 @@ export default async function SocietySettingsPage(
           <Card id="invite" className="scroll-mt-20">
             <CardHeader
               title="Invite"
-              description="One society code for everyone. The join link fills it in, and staff or the committee approve each person from To do."
+              description={`One society code for everyone. Staff or the committee approve each person in ${COPY.todo}.`}
             />
             <CardBody className="space-y-6">
               <div className="grid gap-6 sm:grid-cols-[1fr_auto]">
@@ -170,10 +170,9 @@ export default async function SocietySettingsPage(
               <div id="staff" className="scroll-mt-20">
                 <h3 className="text-ink mb-2 text-sm font-semibold">Bring in staff</h3>
                 <ol className="text-ink list-decimal space-y-1.5 pl-5 text-sm">
-                  <li>Send them the join link above (or the society code).</li>
+                  <li>Send them the join link or society code.</li>
                   <li>
-                    They sign in with Google and choose <strong>I work for the society</strong>, so
-                    they don’t need a flat.
+                    They sign in with Google and choose <strong>I work for the society</strong>.
                   </li>
                   <li>
                     In {COPY.todo}, admit them <strong>as staff</strong>.

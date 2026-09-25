@@ -159,8 +159,8 @@ export function FundToy() {
 
         {reached ? (
           <p className="landing-pop text-ink mt-4 rounded-xl bg-[var(--festival-wash)] px-3 py-2 text-sm font-medium">
-            <span aria-hidden="true">🎉 </span>Target reached — and every rupee has a name and a
-            flat beside it.
+            <span aria-hidden="true">🎉 </span>Target reached. Every rupee has a name and a flat
+            beside it.
           </p>
         ) : (
           <p className="text-ink-muted mt-4 text-xs font-medium">
@@ -216,15 +216,14 @@ export function FundToy() {
 
         <div className="mt-5 flex items-baseline justify-between gap-3">
           <p className="text-ink text-sm font-semibold">The ledger</p>
-          <p className="text-ink-subtle text-xs">every resident can read it</p>
+          <p className="text-ink-subtle text-xs">every resident can see it</p>
         </div>
         <ul className="mt-2 min-h-[9.75rem] space-y-1.5">
           {ledger.length === 0 ? (
             <li className="border-border-base text-ink-subtle grid min-h-[9.75rem] place-items-center rounded-xl border border-dashed px-6 text-center text-xs">
               <span>
                 <ReceiptIndianRupee className="mx-auto mb-2 size-6 opacity-60" aria-hidden="true" />
-                Nothing here yet. A payment lands on the ledger once staff or the committee have
-                confirmed it.
+                Nothing here yet. Payments appear once staff or the committee confirm them.
               </span>
             </li>
           ) : (

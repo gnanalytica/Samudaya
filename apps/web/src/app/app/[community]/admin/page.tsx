@@ -129,7 +129,9 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {(s?.pendingExpenses ?? 0) > 0 ? (
-                        <Badge tone="warning">{s?.pendingExpenses} bills pending</Badge>
+                        <Badge tone="warning">
+                          {s?.pendingExpenses} {s?.pendingExpenses === 1 ? 'bill' : 'bills'} pending
+                        </Badge>
                       ) : null}
                       <EventStatusBadge status={event.status} />
                     </div>

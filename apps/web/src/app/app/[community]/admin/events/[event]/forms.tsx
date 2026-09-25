@@ -234,7 +234,7 @@ export function EventDetailsForm({
         label="Suggested per flat"
         htmlFor="ev-suggested"
         error={state.fieldErrors?.suggested_amount}
-        hint="Offered first on the contribute screen, and chosen for the resident. Leave it empty to take whatever people give."
+        hint="Pre-filled on the contribute screen. Leave empty to take whatever people give."
       >
         {(control) => (
           <Input
@@ -333,7 +333,7 @@ export function AddActivityForm({
         label="Type"
         items={pickers.activity_type}
         placeholder="Choose a type (optional)"
-        hint="Picking a type fills in the name and emoji; change the name to suit this event."
+        hint="Fills in the name and emoji."
         manageHref={pickers.manageHref}
         onPick={(item) => {
           if (!item) return;
@@ -493,7 +493,7 @@ export function ExpenseForm({
         defaultId={expense?.category_id}
         defaultLabel={expense?.category}
         placeholder="Choose a category"
-        hint="The same categories as the budget, so planned and spent line up."
+        hint="Same categories as the budget."
         manageHref={pickers.manageHref}
       />
       <FileUpload
@@ -866,7 +866,7 @@ export function AllocateSurplusForm({
     <Card className="border-accent/40">
       <CardHeader
         title={`${formatMoney(surplus, currency)} left over`}
-        description="Residents' money the event did not spend. The committee decides where it goes, and everybody sees the decision."
+        description="Residents’ money the event didn’t spend. Everyone will see what you decide."
       />
       <CardBody>
         <form action={action} className="space-y-4">

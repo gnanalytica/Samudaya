@@ -240,7 +240,7 @@ const updateEventSchema = z.object({
   // Null is a real answer: plenty of events take whatever people give.
   suggested_amount: z.coerce
     .number()
-    .positive('A suggested amount has to be more than nothing')
+    .positive('Enter an amount greater than zero, or leave it blank')
     .max(10_000_000)
     .nullable(),
   whatsapp_group_url: optionalWhatsappGroup,
@@ -665,7 +665,7 @@ const recordPaymentSchema = z.object({
   amount: z.coerce
     .number()
     .positive('Enter an amount greater than zero')
-    .max(10_000_000, 'That is larger than this app will accept'),
+    .max(10_000_000, 'That amount is too large'),
   method: paymentMethodSchema,
   reference: z.string().trim().max(120).optional(),
   paid_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a date'),
@@ -723,7 +723,7 @@ const reviewPaymentSchema = z
       z.coerce
         .number()
         .positive('Enter an amount greater than zero')
-        .max(10_000_000, 'That is larger than this app will accept')
+        .max(10_000_000, 'That amount is too large')
         .optional(),
     ),
   })
@@ -997,7 +997,7 @@ export async function allocateSurplus(
     success:
       kind === 'society_balance'
         ? 'Kept for the society. Everybody can see it on their home screen.'
-        : 'Carried forward. It counts towards that event from now on.',
+        : 'Carried across. It now counts towards that event.',
   };
 }
 

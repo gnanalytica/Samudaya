@@ -62,7 +62,7 @@ export default async function SettingsPage(props: PageProps<'/app/[community]/se
             <CardBody>
               <dl className="space-y-2.5 text-sm">
                 <div className="flex justify-between gap-4">
-                  <dt className="text-ink-muted">Community</dt>
+                  <dt className="text-ink-muted">Society</dt>
                   <dd className="text-ink text-right font-medium">{community.name}</dd>
                 </div>
                 <div className="flex justify-between gap-4">

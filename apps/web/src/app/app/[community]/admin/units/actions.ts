@@ -47,8 +47,8 @@ async function insertMissing(communityId: string, rows: FlatRow[]) {
 
 function summary(added: number, skipped: number) {
   const parts = [`Added ${added} flat${added === 1 ? '' : 's'}`];
-  if (skipped) parts.push(`${skipped} already existed and were left as they were`);
-  return `${parts.join('; ')}.`;
+  if (skipped) parts.push(`skipped ${skipped} that already existed`);
+  return `${parts.join(', ')}.`;
 }
 
 export async function generateUnits(_prev: ActionState, formData: FormData): Promise<ActionState> {

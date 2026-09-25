@@ -71,7 +71,7 @@ export function AddAccountForm({ slug }: { slug: string }) {
           label="Last four digits"
           htmlFor="acct-last4"
           error={state.fieldErrors?.last4}
-          hint="The account number is deliberately not stored in full."
+          hint="The full number is never stored."
         >
           {(control) => (
             <Input {...control} name="last4" inputMode="numeric" maxLength={4} placeholder="4417" />
@@ -153,7 +153,7 @@ export function ImportStatementForm({
           label="Statement"
           htmlFor="csv"
           error={state.fieldErrors?.csv}
-          hint="Include the row with the column names. Dates, amounts and narration are read; anything above the header is ignored."
+          hint="Include the row with the column names. Anything above it is ignored."
         >
           {(control) => (
             <textarea

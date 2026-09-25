@@ -35,7 +35,7 @@ export function InviteForm({ slug, units }: { slug: string; units: Unit[] }) {
     <Card className="h-fit">
       <CardHeader
         title="Create an invite code"
-        description="Share it with a resident — they enter it once, after signing in."
+        description="The resident enters it once, after signing in."
       />
       <CardBody className="space-y-4">
         {state.createdCode ? <CopyCode code={state.createdCode} /> : null}
@@ -64,7 +64,7 @@ export function InviteForm({ slug, units }: { slug: string; units: Unit[] }) {
             label="Attach to a unit"
             htmlFor="unit_id"
             error={state.fieldErrors?.unit_id}
-            hint="Optional. Whoever redeems the code is seated in this flat."
+            hint="Optional. Whoever uses the code joins this flat."
           >
             {(control) => (
               <Select {...control} name="unit_id" defaultValue="">
@@ -106,7 +106,7 @@ export function InviteForm({ slug, units }: { slug: string; units: Unit[] }) {
             label="Label"
             htmlFor="label"
             error={state.fieldErrors?.label}
-            hint="Just for you — e.g. “Tower B move-ins”."
+            hint="For your reference, e.g. “Tower B move-ins”."
           >
             {(control) => <Input {...control} name="label" placeholder="Flat A-101" />}
           </Field>
