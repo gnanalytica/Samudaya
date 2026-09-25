@@ -200,6 +200,23 @@ export const getFundMovements = cache(async (communityId: string) => {
   return data ?? [];
 });
 
+/**
+ * Every sum carried into one event, oldest first, with where it came from and
+ * the committee member who moved it: the event names them beside its fund, as
+ * the Money page does in its history.
+ */
+export const getCarriedInto = cache(async (eventId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('fund_movements')
+    .select(
+      'id, kind, amount, decided_at, from_event:events!fund_movements_from_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+    )
+    .eq('to_event_id', eventId)
+    .order('decided_at', { ascending: true });
+  return data ?? [];
+});
+
 /** Events a surplus can be carried into: still open, and not the one it came from. */
 export const getOpenEvents = cache(async (communityId: string, exceptId: string) => {
   const supabase = await getSupabase();

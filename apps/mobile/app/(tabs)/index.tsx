@@ -4,6 +4,7 @@ import {
   ROLE_LABEL,
   TODO_KIND,
   can,
+  carriedDeciders,
   countdown,
   formatDate,
   formatMoney,
@@ -15,7 +16,13 @@ import {
   setupSteps,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
-import { fetchEvents, fetchSocietyBalance, fetchStats, pickNextEvent } from '../../src/lib/events';
+import {
+  fetchCarriedInto,
+  fetchEvents,
+  fetchSocietyBalance,
+  fetchStats,
+  pickNextEvent,
+} from '../../src/lib/events';
 import { fetchSetupFacts } from '../../src/lib/setup';
 import { groupTodo, useTodoItems } from '../../src/lib/todo';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -52,14 +59,17 @@ export default function Home() {
     async (communityId) => {
       const events = await fetchEvents(communityId);
       const next = pickNextEvent(events);
-      const [stats, society] = await Promise.all([
+      const [stats, society, carriedIn] = await Promise.all([
         next ? fetchStats([next.id]) : new Map<string, ReturnType<typeof normalizeStats>>(),
         fetchSocietyBalance(communityId),
+        next ? fetchCarriedInto(next.id) : Promise.resolve([]),
       ]);
       return {
         next: next ?? null,
         stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
         society,
+        // Who put money behind the next event, named on its card.
+        carriedBy: carriedDeciders(carriedIn),
       };
     },
   );
@@ -181,6 +191,7 @@ export default function Home() {
                 {stats.fundCarried > 0 ? (
                   <Caption>
                     After {formatMoney(stats.fundCarried, currency)} carried across by the committee
+                    {data?.carriedBy ? ` · decided by ${data.carriedBy}` : ''}
                   </Caption>
                 ) : null}
               </View>

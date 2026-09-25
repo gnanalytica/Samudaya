@@ -3,7 +3,6 @@ import { ArrowLeft, FileText, Receipt, Sparkles, Wallet } from 'lucide-react';
 import {
   COPY,
   can,
-  carriedInLine,
   formatDate,
   formatMoney,
   fundAsk,
@@ -23,6 +22,7 @@ import {
   getCommitteeCount,
   getEventStats,
   getExpenses,
+  getCarriedInto,
   getOpenEvents,
   getPayments,
   getSocietyBalance,
@@ -31,6 +31,7 @@ import {
 } from '@/lib/events';
 import { getSupabase } from '@/lib/supabase/server';
 import { activeItems, getCatalogue } from '@/lib/catalogue';
+import { CarriedIn } from '@/components/carried-in';
 import { CatalogueSelect } from '@/components/catalogue-select';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -93,6 +94,7 @@ export default async function ManageEventPage(
     committeeCount,
     society,
     openEvents,
+    carriedIn,
   ] = await Promise.all([
     getEventStats(event.id),
     getBudgetLines(event.id),
@@ -111,6 +113,7 @@ export default async function ManageEventPage(
     getCommitteeCount(community.id),
     getSocietyBalance(community.id),
     getOpenEvents(community.id, event.id),
+    getCarriedInto(event.id),
   ]);
 
   // The database steps the separation-of-duties rule aside when there is
@@ -223,11 +226,16 @@ export default async function ManageEventPage(
                 <div className="mt-2">
                   <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
-                {stats.fundCarried !== 0 ? (
+                {stats.fundCarried > 0 ? (
+                  <CarriedIn
+                    target={stats.fundTarget}
+                    carried={stats.fundCarried}
+                    movements={carriedIn}
+                    currency={community.currency}
+                  />
+                ) : stats.fundCarried < 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
-                    {stats.fundCarried > 0
-                      ? carriedInLine(stats.fundTarget, stats.fundCarried, community.currency)
-                      : `${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
+                    {`${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
                   </p>
                 ) : null}
                 {/* With money carried in and nothing raised yet, the line above

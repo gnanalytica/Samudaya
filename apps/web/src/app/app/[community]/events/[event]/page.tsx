@@ -16,7 +16,6 @@ import {
   COPY,
   FUND_RULE_LABEL,
   can,
-  carriedInLine,
   correctionNote,
   countdown,
   formatDate,
@@ -31,6 +30,7 @@ import {
   budgetVsSpent,
   getActivities,
   getBudgetLines,
+  getCarriedInto,
   getEventStats,
   getExpenses,
   getMyParticipation,
@@ -55,6 +55,7 @@ import {
 } from '@/components/badges';
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
+import { CarriedIn } from '@/components/carried-in';
 import { AuditTrail } from '@/components/audit-trail';
 import { SuggestionBoard } from '@/components/suggestion-board';
 import { CommentThread } from '@/components/comment-thread';
@@ -76,24 +77,34 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const event = await requireEvent(community.id, eventSlug);
 
   const supabase = await getSupabase();
-  const [stats, budget, expenses, activities, registrations, suggestions, mine, myPayments] =
-    await Promise.all([
-      getEventStats(event.id),
-      getBudgetLines(event.id),
-      getExpenses(event.id),
-      getActivities(event.id),
-      getRegistrations(event.id),
-      getSuggestions(event.id, membership.id),
-      getMyParticipation(event.id, membership.id),
-      supabase
-        .from('contributions')
-        .select(
-          'id, amount, reported_amount, status, method, reference, receipt_no, review_note, paid_at',
-        )
-        .eq('event_id', event.id)
-        .eq('membership_id', membership.id)
-        .order('paid_at', { ascending: false }),
-    ]);
+  const [
+    stats,
+    budget,
+    expenses,
+    activities,
+    registrations,
+    suggestions,
+    mine,
+    myPayments,
+    carriedIn,
+  ] = await Promise.all([
+    getEventStats(event.id),
+    getBudgetLines(event.id),
+    getExpenses(event.id),
+    getActivities(event.id),
+    getRegistrations(event.id),
+    getSuggestions(event.id, membership.id),
+    getMyParticipation(event.id, membership.id),
+    supabase
+      .from('contributions')
+      .select(
+        'id, amount, reported_amount, status, method, reference, receipt_no, review_note, paid_at',
+      )
+      .eq('event_id', event.id)
+      .eq('membership_id', membership.id)
+      .order('paid_at', { ascending: false }),
+    getCarriedInto(event.id),
+  ]);
 
   const base = `/app/${community.slug}`;
   const here = `${base}/events/${event.slug}`;
@@ -107,7 +118,6 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   // What residents are asked for, which is what the fund cards lead with: the
   // target less anything the committee carried across (see fundAsk).
   const ask = fundAsk(stats.fundTarget, stats.fundCarried);
-  const carried = carriedInLine(stats.fundTarget, stats.fundCarried, community.currency);
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
@@ -276,7 +286,12 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               <div className="mt-2">
                 <FundBar percent={funded} pendingPercent={bar.pending} />
               </div>
-              {carried ? <p className="text-ink-subtle mt-2 text-xs">{carried}</p> : null}
+              <CarriedIn
+                target={stats.fundTarget}
+                carried={stats.fundCarried}
+                movements={carriedIn}
+                currency={community.currency}
+              />
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
 
@@ -356,11 +371,14 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                     is confirmed.
                   </p>
                 ) : null}
-                {/* Money the society already had, moved here by the committee.
-                    Said out loud rather than folded into the raised figure:
-                    "sixty flats gave ₹30,000" and "the committee moved ₹10,000
-                    across from last year" are different sentences. */}
-                {carried ? <p className="text-ink-subtle mt-2 text-xs">{carried}</p> : null}
+                {/* Money the society already had, moved here by the committee,
+                    and who moved it. */}
+                <CarriedIn
+                  target={stats.fundTarget}
+                  carried={stats.fundCarried}
+                  movements={carriedIn}
+                  currency={community.currency}
+                />
                 <StatTiles className="mt-4 gap-2">
                   <StatTile
                     label="Raised"

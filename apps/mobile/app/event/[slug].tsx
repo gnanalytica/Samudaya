@@ -7,6 +7,7 @@ import {
   EVENT_STATUS_LABEL,
   EVENT_TABS,
   can,
+  carriedFromLine,
   carriedInLine,
   correctionNote,
   countdown,
@@ -149,6 +150,11 @@ export default function EventDetail() {
                 label="Fund progress"
               />
               {carried ? <Caption>{carried}</Caption> : null}
+              {carried
+                ? data.carriedIn.map((movement) => (
+                    <Caption key={movement.id}>{carriedFromLine(movement, currency)}</Caption>
+                  ))
+                : null}
               <View style={{ gap: spacing.xs }}>
                 <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
                 <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
@@ -276,8 +282,14 @@ function About({
           {/* Money the society already had, moved here by the committee. Said
               out loud rather than folded into the raised figure: "sixty flats
               gave ₹30,000" and "the committee moved ₹10,000 across from last
-              year" are different sentences. */}
+              year" are different sentences — and each sum carries the name of
+              the committee member who moved it. */}
           {carried ? <Caption>{carried}</Caption> : null}
+          {carried
+            ? data.carriedIn.map((movement) => (
+                <Caption key={movement.id}>{carriedFromLine(movement, currency)}</Caption>
+              ))
+            : null}
         </Card>
       </Pressable>
     </>

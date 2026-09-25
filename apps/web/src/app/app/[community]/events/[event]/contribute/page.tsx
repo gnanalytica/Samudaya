@@ -1,18 +1,11 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
-import {
-  can,
-  carriedInLine,
-  formatDate,
-  formatMoney,
-  fundAsk,
-  fundBarSegments,
-  unitLabel,
-} from '@samudaya/core';
+import { can, formatDate, formatMoney, fundAsk, fundBarSegments, unitLabel } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
-import { getEventStats, requireEvent } from '@/lib/events';
+import { getCarriedInto, getEventStats, requireEvent } from '@/lib/events';
+import { CarriedIn } from '@/components/carried-in';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { FundBar, PaymentStatusBadge } from '@/components/badges';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -32,7 +25,7 @@ export default async function ContributePage(
   if (event.status !== 'published' || !can(role, 'contribute')) notFound();
 
   const supabase = await getSupabase();
-  const [stats, flat, allFlats, mine] = await Promise.all([
+  const [stats, flat, allFlats, mine, carriedIn] = await Promise.all([
     getEventStats(event.id),
     unitIds[0]
       ? supabase.from('units').select('block, number').eq('id', unitIds[0]).maybeSingle()
@@ -56,6 +49,7 @@ export default async function ContributePage(
       .eq('event_id', event.id)
       .eq('membership_id', membership.id)
       .order('paid_at', { ascending: false }),
+    getCarriedInto(event.id),
   ]);
   const bar = fundBarSegments(
     stats.fundRaised,
@@ -94,11 +88,12 @@ export default async function ContributePage(
             <div className="mt-2">
               <FundBar percent={funded} pendingPercent={bar.pending} />
             </div>
-            {stats.fundCarried > 0 ? (
-              <p className="text-ink-subtle mt-2 text-xs">
-                {carriedInLine(stats.fundTarget, stats.fundCarried, community.currency)}
-              </p>
-            ) : null}
+            <CarriedIn
+              target={stats.fundTarget}
+              carried={stats.fundCarried}
+              movements={carriedIn}
+              currency={community.currency}
+            />
             <p className="text-ink-subtle mt-2 text-xs">
               Confirmed payments only. {stats.contributors}{' '}
               {stats.contributors === 1 ? 'household has' : 'households have'} contributed so far.

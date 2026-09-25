@@ -14,6 +14,7 @@ import {
 import {
   COPY,
   can,
+  carriedDeciders,
   countdown,
   festivalFor,
   formatDate,
@@ -24,7 +25,7 @@ import {
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getTodoItems } from '@/lib/todo';
-import { getSocietyBalance, getIdeas, listEvents, getStatsFor } from '@/lib/events';
+import { getCarriedInto, getSocietyBalance, getIdeas, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { bottomNavItems } from '@/components/nav-items';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
@@ -98,6 +99,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     next?.name,
   );
   const balance = await getSocietyBalance(community.id);
+  // Who put money behind the next event, named on its card: moving the
+  // society's money is one committee member's decision, and the card that
+  // shows its effect says whose.
+  const carriedBy =
+    next && (s?.fundCarried ?? 0) > 0 ? carriedDeciders(await getCarriedInto(next.id)) : null;
   // Every idea in the society, an event's as much as its own: a vote you have
   // not cast is a vote you have not cast, and this used to count only half of
   // them because the other half lived on their event's page.
@@ -233,7 +239,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 {(s?.fundCarried ?? 0) > 0 ? (
                   <p className="relative mt-1.5 text-xs text-white/75">
                     After {formatMoney(s?.fundCarried ?? 0, community.currency)} carried across by
-                    the committee
+                    the committee{carriedBy ? ` · decided by ${carriedBy}` : ''}
                   </p>
                 ) : null}
                 <div className="relative mt-4 flex flex-wrap gap-2">

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { fundAsk } from './events';
-import { formatMoney } from './format';
+import { formatDate, formatMoney } from './format';
 import { uuid } from './schemas';
 
 /**
@@ -156,12 +156,56 @@ export function fundMovementLine(movement: FundMovementRow, currency = 'INR'): s
 export function carriedInLine(target: number, carriedIn: number, currency = 'INR'): string | null {
   if (carriedIn <= 0) return null;
   const carried = formatMoney(carriedIn, currency);
-  if (target <= 0) return `${carried} was carried across by the committee from a closed event.`;
+  if (target <= 0) return `${carried} was carried across by the committee.`;
   const ask = fundAsk(target, carriedIn);
   if (ask === 0) {
     return `${carried} carried across by the committee covers the whole ${formatMoney(target, currency)} target, so residents are not asked for anything.`;
   }
   return `${carried} of the ${formatMoney(target, currency)} target was carried across by the committee, so residents are asked for ${formatMoney(ask, currency)}.`;
+}
+
+/** A sum moved into an event, with the committee member who moved it. */
+export type CarriedInRow = FundMovementRow & {
+  decider?: { profiles?: { full_name: string | null } | null } | null;
+};
+
+/**
+ * Where one sum carried into an event came from, who decided it and when.
+ *
+ * The fund card says how much was carried; this says whose decision it was.
+ * Only the committee can move the society's money (spend_society_balance and
+ * allocate_surplus record the member as decided_by), and residents asked for
+ * less because of it should see who decided that on the event itself, not
+ * only in the Money page's history of where money has moved.
+ */
+export function carriedFromLine(movement: CarriedInRow, currency = 'INR'): string {
+  const money = formatMoney(Number(movement.amount ?? 0), currency);
+  const source =
+    movement.kind === 'from_balance'
+      ? 'from what the society had kept'
+      : `left over from ${movement.from_event?.name ?? 'a closed event'}`;
+  const who = movement.decider?.profiles?.full_name;
+  const when = movement.decided_at ? formatDate(movement.decided_at.slice(0, 10)) : null;
+  return [`${money} ${source}`, who ? `decided by ${who}` : null, when].filter(Boolean).join(' · ');
+}
+
+/**
+ * Who decided what was carried into an event, for a card with room for one
+ * line: a name, or several joined as a sentence would. Null when nobody is
+ * recorded (a member who has since left), so the card says nothing rather
+ * than something vague.
+ */
+export function carriedDeciders(movements: CarriedInRow[]): string | null {
+  const names = [
+    ...new Set(
+      movements
+        .map((movement) => movement.decider?.profiles?.full_name)
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ];
+  if (names.length === 0) return null;
+  if (names.length === 1) return names[0]!;
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
 /** One place the society's money is, as the Money page lists it. */
