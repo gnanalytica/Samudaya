@@ -71,6 +71,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     suggestions,
     payments,
     eventType,
+    carriedIn,
   ] = await Promise.all([
     supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
     supabase
@@ -116,6 +117,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
           .eq('id', event.event_type_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    fetchCarriedInto(event.id),
   ]);
 
   const counts = new Map(
@@ -134,6 +136,8 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     })),
     registrations: registrations.data ?? [],
     myPayments: payments.data ?? [],
+    // Every sum the committee moved behind this event, and who moved it.
+    carriedIn,
     // Residents see suggestions open for voting, plus their own awaiting the
     // committee. Staff and committee see everything still in play.
     suggestions: await withTallies(suggestions.data ?? [], membershipId),
@@ -263,6 +267,21 @@ export function makeSlug(name: string) {
     .slice(0, 48);
   const suffix = Math.random().toString(36).slice(2, 6);
   return `${base || 'campaign'}-${suffix}`;
+}
+
+/**
+ * Every sum carried into one event, oldest first, with where it came from and
+ * the committee member who moved it — the same rows the web event page names.
+ */
+export async function fetchCarriedInto(eventId: string) {
+  const { data } = await supabase
+    .from('fund_movements')
+    .select(
+      'id, kind, amount, decided_at, from_event:events!fund_movements_from_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+    )
+    .eq('to_event_id', eventId)
+    .order('decided_at', { ascending: true });
+  return data ?? [];
 }
 
 /**

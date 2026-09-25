@@ -165,6 +165,40 @@ describe('what the society kept', () => {
   });
 });
 
+describe('money moved behind an event', () => {
+  /**
+   * Only a committee member can move the society's money, and the database
+   * records who (fund_movements.decided_by). The Money page's history always
+   * named them; the event the money landed in said only "the committee", so a
+   * resident asked for ₹1,93,010 instead of ₹2,00,000 could not see on the
+   * event whose decision that was. Every screen that says money was carried
+   * in now says who carried it, and when.
+   */
+  it('names who moved it, on every screen that says it was moved', () => {
+    const component = read('web', 'src', 'components', 'carried-in.tsx');
+    expect(component).toContain('carriedFromLine');
+    for (const parts of [
+      ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'page.tsx'],
+      ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'contribute', 'page.tsx'],
+      ['web', 'src', 'app', 'app', '[community]', 'admin', 'events', '[event]', 'page.tsx'],
+    ]) {
+      const screen = read(...parts);
+      expect(screen, parts.join('/')).toContain('<CarriedIn');
+      expect(screen, parts.join('/')).toContain('getCarriedInto');
+      // The bare sentence, without the name, would be the old gap back.
+      expect(screen, parts.join('/')).not.toContain('carriedInLine(');
+    }
+    expect(read('mobile', 'app', 'event', '[slug].tsx')).toContain('carriedFromLine');
+  });
+
+  it('names them on the home card of both apps too', () => {
+    expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain(
+      'carriedDeciders',
+    );
+    expect(read('mobile', 'app', '(tabs)', 'index.tsx')).toContain('carriedDeciders');
+  });
+});
+
 describe('the fund bar', () => {
   /**
    * Nine screens draw this bar between them. A bar measured against the target

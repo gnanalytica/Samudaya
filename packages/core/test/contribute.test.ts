@@ -16,7 +16,7 @@ import {
   normalizeStats,
   stillNeeded,
 } from '../src/events';
-import { carriedInLine } from '../src/funds';
+import { carriedDeciders, carriedFromLine, carriedInLine } from '../src/funds';
 
 /**
  * Two things a resident sees on the way to paying: what the bar says has been
@@ -316,5 +316,70 @@ describe('what residents are asked for', () => {
   it('says nothing about an event that nothing was carried into', () => {
     expect(carriedInLine(200_000, 0)).toBeNull();
     expect(carriedInLine(200_000, -6_990)).toBeNull();
+  });
+
+  it('does not guess where money came from when the event has no target', () => {
+    // It can come from the society's kept balance as well as a closed event.
+    expect(carriedInLine(0, 6_990)).toBe('₹6,990 was carried across by the committee.');
+  });
+});
+
+/**
+ * The name on the decision. The society's money moves only when a committee
+ * member moves it, and the event it lands in says who, and when — the same
+ * name the Money page's history shows.
+ */
+describe('carriedFromLine', () => {
+  const fromBalance = {
+    kind: 'from_balance' as const,
+    amount: '6990.00',
+    decided_at: '2026-09-24T10:15:00Z',
+    from_event: null,
+    decider: { profiles: { full_name: 'Pranav Aditya' } },
+  };
+
+  it('names the society as the source, and who put the money behind the event', () => {
+    expect(carriedFromLine(fromBalance)).toBe(
+      '₹6,990 from what the society had kept · decided by Pranav Aditya · 24 Sept 2026',
+    );
+  });
+
+  it('names the closed event a surplus came from', () => {
+    expect(
+      carriedFromLine({
+        ...fromBalance,
+        kind: 'next_event',
+        from_event: { name: 'Summer Camp 2026' },
+      }),
+    ).toBe('₹6,990 left over from Summer Camp 2026 · decided by Pranav Aditya · 24 Sept 2026');
+  });
+
+  it('leaves the name out, rather than inventing one, when the member has left', () => {
+    expect(carriedFromLine({ ...fromBalance, decider: null })).toBe(
+      '₹6,990 from what the society had kept · 24 Sept 2026',
+    );
+  });
+});
+
+describe('carriedDeciders', () => {
+  const by = (full_name: string | null) => ({
+    kind: 'from_balance' as const,
+    amount: 1000,
+    decider: { profiles: { full_name } },
+  });
+
+  it('names one member once, however many sums they moved', () => {
+    expect(carriedDeciders([by('Pranav Aditya'), by('Pranav Aditya')])).toBe('Pranav Aditya');
+  });
+
+  it('joins several as a sentence would', () => {
+    expect(carriedDeciders([by('Pranav Aditya'), by('Chitra Rao'), by('Bala Krishnan')])).toBe(
+      'Pranav Aditya, Chitra Rao and Bala Krishnan',
+    );
+  });
+
+  it('says nothing when nobody is recorded', () => {
+    expect(carriedDeciders([by(null)])).toBeNull();
+    expect(carriedDeciders([])).toBeNull();
   });
 });
