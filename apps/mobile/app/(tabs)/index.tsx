@@ -3,6 +3,8 @@ import { useRouter } from 'expo-router';
 import {
   ROLE_LABEL,
   TODO_KIND,
+  alreadyInFundLine,
+  awaitingLine,
   can,
   carriedDeciders,
   countdown,
@@ -99,6 +101,10 @@ export default function Home() {
     stats.fundCarried,
   );
   const funded = fundBar.confirmed;
+  // The card leads with confirmed money only: say what the paler segment is,
+  // and that money carried in is already in the fund.
+  const waiting = awaitingLine(stats.fundPending, currency);
+  const inFund = alreadyInFundLine(stats.fundCarried, data?.carriedBy ?? null, currency);
   const heldBySociety = data?.society.balance ?? 0;
   const balanceMovements = data?.society.movements ?? 0;
   const normalized = normalizeRole(role);
@@ -188,12 +194,8 @@ export default function Home() {
                   tone="success"
                   label="Fund progress"
                 />
-                {stats.fundCarried > 0 ? (
-                  <Caption>
-                    After {formatMoney(stats.fundCarried, currency)} carried across by the committee
-                    {data?.carriedBy ? ` · decided by ${data.carriedBy}` : ''}
-                  </Caption>
-                ) : null}
+                {waiting ? <Caption>{waiting}</Caption> : null}
+                {inFund ? <Caption>{inFund}</Caption> : null}
               </View>
 
               <View style={{ flexDirection: 'row', gap: spacing.md }}>

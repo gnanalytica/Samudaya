@@ -3,6 +3,8 @@ import { today as localToday } from '../../src/components/date-field';
 import { useRouter } from 'expo-router';
 import {
   EVENT_STATUS_LABEL,
+  alreadyInFundLine,
+  awaitingLine,
   can,
   countdown,
   formatDate,
@@ -125,6 +127,8 @@ export default function Events() {
             item.stats?.fundCarried ?? 0,
           );
           const funded = fundBar.confirmed;
+          const waiting = awaitingLine(item.stats?.fundPending ?? 0, currency);
+          const inFund = alreadyInFundLine(item.stats?.fundCarried ?? 0, null, currency);
           return (
             <Pressable
               accessibilityRole="button"
@@ -185,12 +189,10 @@ export default function Events() {
                       tone="success"
                       label="Fund progress"
                     />
-                    {(item.stats?.fundCarried ?? 0) > 0 ? (
-                      <Caption>
-                        After {formatMoney(item.stats?.fundCarried ?? 0, currency)} carried across
-                        by the committee
-                      </Caption>
-                    ) : null}
+                    {/* The headline counts confirmed money only; say what the
+                        paler segment is, and that money carried in is there. */}
+                    {waiting ? <Caption>{waiting}</Caption> : null}
+                    {inFund ? <Caption>{inFund}</Caption> : null}
                   </View>
                 ) : item.status === 'proposed' ? (
                   <Caption>Target {formatMoney(item.fund_target, currency)}</Caption>

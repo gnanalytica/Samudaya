@@ -197,6 +197,27 @@ describe('money moved behind an event', () => {
     );
     expect(read('mobile', 'app', '(tabs)', 'index.tsx')).toContain('carriedDeciders');
   });
+
+  it('says on every compact fund card what is already in the fund and what is waiting', () => {
+    // Velocity vipers read "₹0 of ₹1,93,010 raised · After ₹6,990 carried
+    // across by the committee" while ₹6,990 sat in its fund and two households
+    // had reported ₹20,500 more. The ₹0 was true — confirmed money only — and
+    // the card said nothing about either sum being there.
+    for (const parts of [
+      ['web', 'src', 'app', 'app', '[community]', 'page.tsx'],
+      ['web', 'src', 'app', 'app', '[community]', 'events', 'page.tsx'],
+      ['mobile', 'app', '(tabs)', 'index.tsx'],
+      ['mobile', 'app', '(tabs)', 'events.tsx'],
+    ]) {
+      const screen = read(...parts);
+      expect(screen, parts.join('/')).toContain('awaitingLine(');
+      expect(screen, parts.join('/')).toContain('alreadyInFundLine(');
+      expect(screen, parts.join('/')).not.toContain('After {formatMoney');
+    }
+    // The web home card draws its own bar on the festival colour; it has to
+    // draw the paler waiting segment the shared FundBar draws everywhere else.
+    expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain('bar.pending');
+  });
 });
 
 describe('the fund bar', () => {
