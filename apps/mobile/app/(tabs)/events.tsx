@@ -109,10 +109,7 @@ export default function Events() {
           ) : null
         }
         ListEmptyComponent={
-          <EmptyState
-            title="No events yet"
-            description="When the society plans something, it will appear here."
-          />
+          <EmptyState title="No events yet" description="New events will show up here." />
         }
         renderSectionHeader={({ section }) => (
           <View style={{ paddingTop: spacing.md, paddingBottom: spacing.xs }}>

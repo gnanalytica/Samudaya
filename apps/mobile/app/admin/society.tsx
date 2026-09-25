@@ -137,7 +137,7 @@ function Form({
               placeholder="560067"
             />
             <Input label="City" value={city} onChangeText={setCity} placeholder="Bengaluru" />
-            <Body muted>The society code can only be changed by the Samudaya team.</Body>
+            <Body muted>Only the Samudaya team can change the society code.</Body>
           </Card>
           <ErrorText message={error} />
           <Button label="Save" onPress={() => void save()} loading={busy} />

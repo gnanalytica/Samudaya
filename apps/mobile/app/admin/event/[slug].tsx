@@ -271,9 +271,7 @@ function StatusCard({ data, onChange }: { data: Loaded; onChange: () => void }) 
       </View>
 
       {proposed ? (
-        <Caption>
-          This is a resident’s campaign. The committee approves it from To do on the Manage tab.
-        </Caption>
+        <Caption>A resident’s campaign. The committee approves it from To do.</Caption>
       ) : null}
 
       {!proposed && !finished ? (
@@ -666,7 +664,7 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
           </View>
         ) : (
           <View style={{ gap: spacing.sm }}>
-            <Caption>Add an activity by type; you can rename it.</Caption>
+            <Caption>Pick a type to add an activity.</Caption>
             <ActivityTypeChips
               onPick={(item) =>
                 setDraft({ typeId: item.id, name: item.label, emoji: item.emoji ?? '🎭' })
@@ -769,10 +767,7 @@ function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void })
     <Card style={{ gap: spacing.md }}>
       <View style={{ gap: 2 }}>
         <Title>{formatMoney(surplus, currency)} left over</Title>
-        <Caption>
-          Residents’ money this event did not spend. The committee decides where it goes, and
-          everybody sees the decision.
-        </Caption>
+        <Caption>Residents’ money this event didn’t spend. Everyone sees what you decide.</Caption>
       </View>
 
       <View style={{ gap: spacing.sm }}>
@@ -866,10 +861,7 @@ function BringInBalanceCard({ data, onChange }: { data: Loaded; onChange: () => 
     <Card style={{ gap: spacing.md }}>
       <View style={{ gap: 2 }}>
         <Heading>Bring in society funds</Heading>
-        <Caption>
-          The society is holding {formatMoney(data.societyBalance, currency)} that is not behind any
-          event.
-        </Caption>
+        <Caption>Kept for the society: {formatMoney(data.societyBalance, currency)}</Caption>
       </View>
       <Input
         label="Amount (₹)"

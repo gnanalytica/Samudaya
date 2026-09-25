@@ -221,10 +221,7 @@ export default function Catalogue() {
         >
           <View style={{ gap: 2 }}>
             <Title>Catalogue</Title>
-            <Caption>
-              The choices staff pick from when planning events and raising bills, so the same thing
-              is always called the same name. Descriptions and notes stay free text.
-            </Caption>
+            <Caption>The choices staff pick from when planning events and raising bills.</Caption>
           </View>
 
           <ChipRow>
@@ -420,8 +417,8 @@ export default function Catalogue() {
               <Heading>Setup</Heading>
               <Body muted>
                 {activeCommunity?.catalogue_reviewed_at
-                  ? 'You’ve already confirmed the catalogue. You can keep editing it any time.'
-                  : 'Once these lists suit your society, confirm it to tick off this setup step.'}
+                  ? 'Catalogue confirmed. Edit it any time.'
+                  : 'Confirm once these lists suit your society.'}
               </Body>
               {!activeCommunity?.catalogue_reviewed_at ? (
                 <Button

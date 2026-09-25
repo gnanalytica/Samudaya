@@ -71,10 +71,7 @@ export default function Requests() {
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <Caption>
-          Check each person against your records before admitting them. They see nothing in the app
-          until you do.
-        </Caption>
+        <Caption>Check each person against your records before admitting them.</Caption>
         {data?.length ? (
           data.map((request) => (
             <RequestCard

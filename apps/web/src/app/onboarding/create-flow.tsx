@@ -100,7 +100,7 @@ export function CreateFlow({ initialCity = '' }: { initialCity?: string }) {
             label="Your phone number"
             htmlFor="cs-phone"
             error={state.fieldErrors?.phone}
-            hint="Residents and the committee see it. Nobody else does."
+            hint="Only staff and the committee see it."
             required
           >
             {(control) => (

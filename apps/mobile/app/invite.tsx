@@ -130,18 +130,14 @@ export default function Invite() {
                 }}
               />
               <Caption>
-                This code was issued by your committee and admits you straight away — there is no
-                waiting for approval. If the society above is not yours, do not use it.
+                This code admits you straight away. If this isn’t your society, don’t use it.
               </Caption>
               <ErrorText message={error} />
             </>
           ) : (
             <>
               <Title>Use your invite code</Title>
-              <Body muted>
-                A code your committee sent you personally. It admits you straight away, with your
-                flat already set.
-              </Body>
+              <Body muted>A personal code from your committee. It lets you in straight away.</Body>
               <View style={{ gap: spacing.xs }}>
                 <Input
                   label="Invite code"

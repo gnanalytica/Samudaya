@@ -141,7 +141,7 @@ export default function Home() {
               label={`Kept for the society · ${formatMoney(heldBySociety, currency)}`}
               detail={`Left over from ${balanceMovements} closed ${
                 balanceMovements === 1 ? 'event' : 'events'
-              }, not yet behind a new one`}
+              }`}
               onPress={() => router.push('/money')}
             />
           </Card>
@@ -225,20 +225,14 @@ export default function Home() {
           </>
         ) : (
           <Card>
-            <EmptyState
-              title="Nothing planned yet"
-              description="When the society plans an event, it will show up here."
-            />
+            <EmptyState title="Nothing planned yet" description="New events will show up here." />
           </Card>
         )}
 
         {can(role, 'campaigns:propose') ? (
           <Card style={{ gap: spacing.sm }}>
             <Heading>Raising money for something?</Heading>
-            <Body muted>
-              Propose a fundraising campaign. The committee reviews it before residents can
-              contribute.
-            </Body>
+            <Body muted>The committee reviews each campaign before residents can contribute.</Body>
             <Button
               label="Start a campaign"
               variant="secondary"

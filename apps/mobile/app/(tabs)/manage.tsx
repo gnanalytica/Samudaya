@@ -100,7 +100,7 @@ export default function Manage() {
           {can(role, 'payments:record') ? (
             <LinkRow
               label="Reconcile"
-              detail="Pair the bank's statement with the payments people reported"
+              detail="Match the bank statement to reported payments"
               onPress={() => router.push('/admin/reconcile')}
             />
           ) : null}

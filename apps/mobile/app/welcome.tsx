@@ -17,7 +17,7 @@ type Copy = {
 const COPY: Record<Role, Copy> = {
   resident: {
     headline: 'You’re in',
-    intro: 'Your society’s events, and every rupee behind them, in one place.',
+    intro: 'Your society’s events and every rupee behind them.',
     points: [
       {
         title: 'See what’s coming up',
@@ -26,7 +26,7 @@ const COPY: Record<Role, Copy> = {
       { title: 'Contribute by UPI', detail: 'Pay the society directly from your UPI app.' },
       {
         title: 'Take part',
-        detail: 'Register yourself or family members for activities, suggest ideas and vote.',
+        detail: 'Register for activities, suggest ideas and vote.',
       },
       {
         title: 'Follow the money',
@@ -34,7 +34,7 @@ const COPY: Record<Role, Copy> = {
       },
       {
         title: 'Start a campaign',
-        detail: 'Raising money for something? Propose it and the committee reviews it.',
+        detail: 'The committee reviews each campaign before residents can contribute.',
       },
     ],
     cta: { label: 'See events', href: '/(tabs)/events' },

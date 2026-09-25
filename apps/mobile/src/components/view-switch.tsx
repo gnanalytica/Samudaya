@@ -18,8 +18,8 @@ export function ViewSwitchCard() {
       <View style={{ gap: 2 }}>
         <Heading>What you see</Heading>
         <Caption>
-          {VIEW_MODE_LABEL.resident} hides Manage so you see the app the way your neighbours do. You
-          keep every committee permission.
+          {VIEW_MODE_LABEL.resident} shows what residents see. Your committee permissions are
+          unchanged.
         </Caption>
       </View>
       <ChipRow>

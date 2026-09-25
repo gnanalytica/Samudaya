@@ -6,6 +6,7 @@ import {
   COPY,
   EVENT_STATUS_LABEL,
   EVENT_TABS,
+  awaitingLine,
   can,
   carriedFromLine,
   carriedInLine,
@@ -232,10 +233,7 @@ function About({
     <>
       {event.status === 'proposed' ? (
         <Card>
-          <Body muted>
-            This campaign is waiting for the committee. Residents can contribute once it is
-            approved.
-          </Body>
+          <Body muted>Waiting for the committee. Residents can contribute once it’s approved.</Body>
         </Card>
       ) : null}
 
@@ -274,10 +272,7 @@ function About({
             label="Fund progress"
           />
           {stats.fundPending > 0 ? (
-            <Caption>
-              {formatMoney(stats.fundPending, currency)} reported and waiting to be confirmed
-              against the bank. It counts once staff match it.
-            </Caption>
+            <Caption>{awaitingLine(stats.fundPending, currency)}</Caption>
           ) : null}
           {/* Money the society already had, moved here by the committee. Said
               out loud rather than folded into the raised figure: "sixty flats
@@ -408,7 +403,7 @@ function BudgetAndSpending({ data, currency }: { data: Detail; currency: string 
             />
           </>
         ) : (
-          <Caption>No budget has been set for this event yet.</Caption>
+          <Caption>No budget set yet.</Caption>
         )}
       </Card>
 
@@ -461,7 +456,7 @@ function Activities({
       <Card>
         <EmptyState
           title="No activities yet"
-          description="When the organisers add activities, you can register here."
+          description="Register here once the organisers add activities."
         />
       </Card>
     );
@@ -507,9 +502,7 @@ function Activities({
     <Card style={{ gap: spacing.lg }}>
       <View style={{ gap: 2 }}>
         <Heading>Activities</Heading>
-        {mayRegister ? (
-          <Caption>Register yourself, and anyone else from your flat by name.</Caption>
-        ) : null}
+        {mayRegister ? <Caption>Register yourself or anyone from your flat.</Caption> : null}
       </View>
       {data.activities.map((activity) => {
         const mine = data.registrations.filter((row) => row.activity_id === activity.id);

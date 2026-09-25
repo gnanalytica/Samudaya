@@ -71,7 +71,7 @@ export default function DeleteAccount() {
           keyboardShouldPersistTaps="handled"
         >
           <Title>Delete your account</Title>
-          <Body muted>This is permanent, and it cannot be undone.</Body>
+          <Body muted>This can’t be undone.</Body>
 
           <Card style={{ gap: spacing.xs }}>
             <Heading>This deletes</Heading>
@@ -106,8 +106,8 @@ export default function DeleteAccount() {
           <ErrorText message={error} />
 
           <Caption>
-            If you are the last committee member of a society that still has members, this will
-            refuse and say which — make somebody else a committee member first, from People.
+            Last committee member of a society with other members? Make someone else a committee
+            member first, from People.
           </Caption>
         </ScrollView>
       </KeyboardAvoidingView>

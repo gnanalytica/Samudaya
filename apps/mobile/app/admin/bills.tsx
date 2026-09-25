@@ -232,7 +232,7 @@ function BillCard({
       {bill.revised_at ? (
         <Caption>
           Revised by {bill.reviser?.profiles?.full_name ?? 'someone'} on{' '}
-          {formatDate(bill.revised_at.slice(0, 10))} — needs approving again
+          {formatDate(bill.revised_at.slice(0, 10))} · needs approval again
         </Caption>
       ) : null}
       <View style={{ flexDirection: 'row', gap: spacing.xs }}>
@@ -295,9 +295,7 @@ function BillCard({
         ) : (
           <View style={{ gap: spacing.sm }}>
             {ownBill ? (
-              <Caption>
-                You wrote the version on the table, so another committee member must approve it.
-              </Caption>
+              <Caption>You wrote this version. Another committee member must approve it.</Caption>
             ) : (
               <Button
                 label="Approve"

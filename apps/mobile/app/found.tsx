@@ -82,8 +82,7 @@ export default function Found() {
           <View style={{ gap: 2 }}>
             <Title>Start your society</Title>
             <Body muted>
-              A few details now. Flats, categories and your UPI ID come next, on a checklist that
-              keeps your place.
+              A few details now. Flats, categories and your UPI ID come next, on a setup checklist.
             </Body>
           </View>
 
@@ -100,7 +99,7 @@ export default function Found() {
               <Caption>
                 {preview
                   ? `Residents will find it at /app/${preview}`
-                  : 'As it appears on the gate — residents should recognise it.'}
+                  : 'As it appears on the gate.'}
               </Caption>
             </View>
 
@@ -123,7 +122,7 @@ export default function Found() {
                 autoCapitalize="none"
                 maxLength={20}
               />
-              <Caption>Residents and the committee see it. Nobody else does.</Caption>
+              <Caption>Only staff and the committee see it.</Caption>
             </View>
 
             {/* Every resident is asked which flat they live in; the founder
@@ -146,7 +145,7 @@ export default function Found() {
                   ? splitFlat(flat).block
                     ? `Tower ${splitFlat(flat).block}, flat ${splitFlat(flat).number}`
                     : `Flat ${splitFlat(flat).number}, no tower`
-                  : 'As it is on your door. Leave it blank if you run the society without living in it.'}
+                  : 'As it is on your door. Leave blank if you don’t live here.'}
               </Caption>
             </View>
 
@@ -158,7 +157,7 @@ export default function Found() {
                 placeholder="Seegehalli, Whitefield"
                 maxLength={300}
               />
-              <Caption>Optional. You can add this later.</Caption>
+              <Caption>Optional.</Caption>
             </View>
 
             <Input
@@ -172,7 +171,7 @@ export default function Found() {
 
             <Button label="Create the society" onPress={() => void submit()} loading={busy} />
             <Caption>
-              You become the first committee member, with a Society code to share with residents.
+              You become the first committee member, with a society code to share with residents.
             </Caption>
           </Card>
 

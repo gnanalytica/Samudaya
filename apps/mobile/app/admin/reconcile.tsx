@@ -125,10 +125,7 @@ export default function Reconcile() {
     return (
       <Screen>
         <View style={{ padding: spacing.lg }}>
-          <EmptyState
-            title="Staff only"
-            description="Reconciling the society's statement is for the people who record payments."
-          />
+          <EmptyState title="Staff and committee only" />
         </View>
       </Screen>
     );
@@ -185,10 +182,6 @@ export default function Reconcile() {
           ) : (
             <Card style={{ gap: spacing.sm }}>
               <Heading>Name the account first</Heading>
-              <Caption>
-                A statement is imported against one account, so the app can tell two months of the
-                same account from two different ones.
-              </Caption>
               {mayManage ? (
                 <AddAccountForm onDone={refresh} />
               ) : (
@@ -201,8 +194,8 @@ export default function Reconcile() {
             <Heading>Nobody has explained these yet ({allOpen.length})</Heading>
             <Caption>
               {allOpen.length > PAGE
-                ? `Every line the bank posted that the app cannot account for. Showing the ${PAGE} most recent; clear these and the rest appear.`
-                : 'Every line the bank posted that the app cannot account for. Pair it with a payment, or say what it was.'}
+                ? `Pair each with a payment, or say what it was. Showing the ${PAGE} most recent.`
+                : 'Pair each with a payment, or say what it was.'}
             </Caption>
             {open.length ? (
               open.map((line) => (
@@ -213,8 +206,8 @@ export default function Reconcile() {
                 title={lines.length ? 'Everything is accounted for' : 'Nothing imported yet'}
                 description={
                   lines.length
-                    ? 'Every line the bank has posted is either matched to a payment or written off with a reason.'
-                    : 'Import a statement above and its lines appear here, waiting to be paired.'
+                    ? 'Every bank line is matched to a payment or set aside with a reason.'
+                    : 'Import a statement above to see its lines here.'
                 }
               />
             )}
@@ -223,7 +216,7 @@ export default function Reconcile() {
           {settled.length ? (
             <View style={{ gap: spacing.sm }}>
               <Heading>Settled ({settled.length})</Heading>
-              <Caption>Lines already paired or written off, and who decided.</Caption>
+              <Caption>Lines already paired or set aside, and who decided.</Caption>
               {settled.slice(0, 60).map((line) => (
                 <SettledLine
                   key={line.id}
@@ -239,9 +232,7 @@ export default function Reconcile() {
           {accounts.length && mayManage ? (
             <Card style={{ gap: spacing.sm }}>
               <Heading>Accounts</Heading>
-              <Caption>
-                What the society banks with. The account number is never stored in full.
-              </Caption>
+              <Caption>The full account number is never stored.</Caption>
               {/* Plain rows, not LinkRow: there is nothing to open, and a
                   chevron that does nothing is a worse lie than no chevron. */}
               {accounts.map((account) => (
@@ -259,9 +250,8 @@ export default function Reconcile() {
           ) : null}
 
           <Caption>
-            A bank feed would fill this automatically, and needs an account aggregator licensed by
-            the RBI sitting in the middle. The import above and a feed post to the same place, so
-            nothing on this screen changes on the day one is connected.
+            An automatic bank feed needs an RBI-licensed account aggregator. Until then, import
+            statements above.
           </Caption>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -343,9 +333,7 @@ function ImportCard({ accounts, onDone }: { accounts: Account[]; onDone: () => v
     <Card style={{ gap: spacing.md }}>
       <View style={{ gap: 2 }}>
         <Heading>Import a statement</Heading>
-        <Caption>
-          Overlapping months are safe: a line the account already has is recognised and skipped.
-        </Caption>
+        <Caption>Overlapping months are safe. Lines already imported are skipped.</Caption>
       </View>
 
       {accounts.length > 1 ? (
@@ -377,9 +365,7 @@ function ImportCard({ accounts, onDone }: { accounts: Account[]; onDone: () => v
         autoCorrect={false}
       />
       <Caption>
-        {source
-          ? `Read from ${source}.`
-          : 'Include the row with the column names. Anything above the header is ignored.'}
+        {source ? `Read from ${source}.` : 'Include the header row. Anything above it is ignored.'}
       </Caption>
 
       <ChipRow>
@@ -536,10 +522,7 @@ function OpenLine({
           <Caption>No reported payment matches this. Ask around, or set it aside.</Caption>
         )
       ) : (
-        <Caption>
-          Money going out is matched against a bill, which is not built yet — set it aside with what
-          it was.
-        </Caption>
+        <Caption>Money out can’t be matched to a bill yet. Set it aside with what it was.</Caption>
       )}
 
       <Input

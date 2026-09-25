@@ -96,7 +96,7 @@ export function validateDetails(
           ? issue.message
           : 'Pick an end date on or after the start date, or clear it.',
       expected_attendance: 'Expected attendance should be a whole number.',
-      suggested_amount: 'A suggested amount has to be more than nothing, or left empty.',
+      suggested_amount: 'Enter an amount greater than zero, or leave it blank.',
     };
     return { error: friendly[field] ?? issue?.message ?? 'Check the event details.' };
   }
@@ -191,7 +191,7 @@ export function DetailsFields({
           placeholder="The society"
         />
         <DateField
-          label="Ends on (for events over several days)"
+          label="Ends on"
           value={details.endsOn || null}
           onChange={(next) => set('endsOn', next ?? '')}
           minimumDate={details.startsOn || null}
@@ -214,8 +214,7 @@ export function DetailsFields({
             placeholder="2100"
           />
           <Caption>
-            Offered first on the contribute screen, and chosen for the resident. Leave it empty to
-            take whatever people give.
+            Selected by default when residents contribute. Leave empty to accept any amount.
           </Caption>
         </View>
         <FundRuleFields details={details} onChange={onChange} />
@@ -250,9 +249,7 @@ export function FundRuleFields({
         onChangeText={(value) => onChange({ ...details, fundRuleNote: value })}
         placeholder="Any surplus goes to Deepavali 2027."
       />
-      <Caption>
-        Decided before any money comes in, so nobody decides after seeing what’s left.
-      </Caption>
+      <Caption>Residents see this on the event. Decide it before anyone pays.</Caption>
     </View>
   );
 }
@@ -320,7 +317,7 @@ export function BudgetLinesEditor({
         onPress={() => onChange([...lines, newBudgetLine()])}
       />
       <Body>Fund target: {formatMoney(total, currency)}</Body>
-      <Caption>The target residents see is the sum of these lines.</Caption>
+      <Caption>Residents see this as the target.</Caption>
     </View>
   );
 }

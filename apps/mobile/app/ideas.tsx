@@ -63,9 +63,7 @@ export default function Ideas() {
         <View style={{ gap: 2 }}>
           <Title>Ideas</Title>
           <Caption>
-            {voting
-              ? `${voting} open for voting`
-              : 'Anything worth doing — an activity, or something for the committee.'}
+            {voting ? `${voting} open for voting` : 'Suggestions for the society and its events.'}
           </Caption>
         </View>
 
@@ -75,7 +73,7 @@ export default function Ideas() {
           open
           onChange={refresh}
           showEvent
-          emptyDescription="Suggest something below, and the committee will put it to a vote."
+          emptyDescription="Residents’ ideas will show up here."
         />
 
         <View style={{ height: spacing.xl }} />

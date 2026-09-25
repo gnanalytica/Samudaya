@@ -156,10 +156,7 @@ export default function Join() {
               <Badge label="Waiting for approval" tone="warning" />
             </View>
             <Title>Your request is with the society</Title>
-            <Body muted>
-              Staff or the committee will check your details and admit you. You’ll see events and
-              everything else as soon as they do.
-            </Body>
+            <Body muted>Staff or the committee will check your details and admit you.</Body>
             <View style={{ gap: 2 }}>
               <Caption>SENT {formatDate(request.created_at.slice(0, 10)).toUpperCase()}</Caption>
               <Body>{request.claimed_name}</Body>
@@ -258,8 +255,8 @@ export default function Join() {
             <Title>Join your society</Title>
             <Body muted>
               {step === 'code'
-                ? 'Enter the society code your committee shared. Everyone in the society uses the same code.'
-                : 'Tell staff who you are. They check these details before letting you in.'}
+                ? 'Enter the society code your committee shared.'
+                : 'Staff check these details before letting you in.'}
             </Body>
           </View>
 
@@ -312,7 +309,7 @@ export default function Join() {
               />
               {relation === 'other' ? (
                 <Caption>
-                  No flat needed. The committee will admit you as staff after checking with you.
+                  No flat needed. The committee sets your role when they approve you.
                 </Caption>
               ) : (
                 <FlatPicker
@@ -356,8 +353,7 @@ export default function Join() {
           {step === 'code' && !editing ? (
             <View style={{ gap: spacing.sm }}>
               <Caption>
-                Nobody has put your society on Samudaya yet? Start it and you become its first
-                committee member.
+                Society not on Samudaya yet? Start it and become its first committee member.
               </Caption>
               <Button
                 label="Start a new society"
@@ -462,9 +458,7 @@ function FlatPicker({
         <Caption>No flat matches. Check the tower and number.</Caption>
       )}
       {matches.length > 60 ? (
-        <Caption>
-          Showing 60 of {matches.length}. Pick a tower or type your flat number to narrow it.
-        </Caption>
+        <Caption>Showing 60 of {matches.length}. Pick a tower or type your flat number.</Caption>
       ) : null}
     </View>
   );
