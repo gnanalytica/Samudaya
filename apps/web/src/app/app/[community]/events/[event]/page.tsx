@@ -23,6 +23,7 @@ import {
   formatMoney,
   fundBarSegments,
   inTheFund,
+  practiceDatesLine,
   receiptRef,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
@@ -533,6 +534,18 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
         ) : null}
 
         {/* ----------------------------------------------------- activities */}
+        {active === 'activities' && can(role, 'activities:manage') ? (
+          <div className="mb-3 flex justify-end">
+            <ButtonLink
+              href={`${base}/admin/events/${event.slug}?tab=activities`}
+              size="sm"
+              variant="secondary"
+            >
+              <Settings2 className="size-4" aria-hidden="true" />
+              Manage activities
+            </ButtonLink>
+          </div>
+        ) : null}
         {active === 'activities' ? (
           activities.length ? (
             <div className="space-y-3">
@@ -557,6 +570,16 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                             {count} registered
                             {activity.capacity ? ` of ${activity.capacity} places` : ''}
                           </p>
+                          {activity.memberships?.profiles?.full_name ? (
+                            <p className="text-ink-subtle mt-0.5 text-xs">
+                              Coordinator: {activity.memberships.profiles.full_name}
+                            </p>
+                          ) : null}
+                          {activity.practice_dates.length ? (
+                            <p className="text-ink-subtle mt-0.5 text-xs">
+                              Practice: {practiceDatesLine(activity.practice_dates)}
+                            </p>
+                          ) : null}
                         </div>
                         {!activity.is_open ? (
                           <Badge tone="neutral">Closed</Badge>

@@ -88,7 +88,9 @@ export async function fetchEventDetail(communityId: string, slug: string, member
       .order('spent_on', { ascending: false }),
     supabase
       .from('event_activities')
-      .select('id, name, emoji, description, is_open, capacity')
+      .select(
+        'id, name, emoji, description, is_open, capacity, practice_dates, memberships!event_activities_coordinator_id_fkey(profiles(full_name))',
+      )
       .eq('event_id', event.id)
       .order('position'),
     supabase.from('activity_stats').select('activity_id, interested').eq('event_id', event.id),

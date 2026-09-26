@@ -91,7 +91,7 @@ export const getActivities = cache(async (eventId: string) => {
     supabase
       .from('event_activities')
       .select(
-        'id, name, emoji, description, capacity, is_open, practice_dates, memberships!event_activities_coordinator_id_fkey(profiles(full_name))',
+        'id, name, emoji, description, capacity, is_open, practice_dates, coordinator_id, memberships!event_activities_coordinator_id_fkey(profiles(full_name))',
       )
       .eq('event_id', eventId)
       .order('position')

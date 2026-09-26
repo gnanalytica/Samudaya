@@ -354,24 +354,36 @@ export function budgetProblem(lines: DraftBudgetLine[]): string | null {
 
 export type DraftActivity = { key: string; typeId: string | null; name: string; emoji: string };
 
+/**
+ * Starts an activity from a catalogue type, which fills in its name and emoji,
+ * or from Other, which starts blank. Other is always offered: not everything is
+ * in the catalogue, and an empty catalogue must not stop anyone adding one.
+ */
 export function ActivityTypeChips({
   onPick,
 }: {
-  onPick: (item: { id: string; label: string; emoji: string | null }) => void;
+  /** `id` is null for Other. */
+  onPick: (item: { id: string | null; label: string; emoji: string | null }) => void;
 }) {
   const { data: types, loading } = useCatalogue('activity_type');
   if (loading && !types) return <Caption>Loading…</Caption>;
-  if (!types?.length)
-    return <Caption>No activity types yet. Add them from Manage → Catalogue.</Caption>;
   return (
-    <ChipRow>
-      {types.map((item) => (
-        <Chip
-          key={item.id}
-          label={item.emoji ? `${item.emoji} ${item.label}` : item.label}
-          onPress={() => onPick(item)}
-        />
-      ))}
-    </ChipRow>
+    <View style={{ gap: spacing.sm }}>
+      <Caption>
+        {types?.length
+          ? 'Pick a type, or Other to name your own.'
+          : 'No activity types yet. Tap Other to name your own, or add types in Manage → Catalogue.'}
+      </Caption>
+      <ChipRow>
+        {(types ?? []).map((item) => (
+          <Chip
+            key={item.id}
+            label={item.emoji ? `${item.emoji} ${item.label}` : item.label}
+            onPress={() => onPick(item)}
+          />
+        ))}
+        <Chip label="Other" onPress={() => onPick({ id: null, label: '', emoji: null })} />
+      </ChipRow>
+    </View>
   );
 }

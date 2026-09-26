@@ -19,3 +19,4 @@ export * from './ledger';
 export * from './funds';
 export * from './audit';
 export * from './account';
+export * from './activities';

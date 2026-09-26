@@ -197,7 +197,6 @@ export default function NewEvent() {
 
           <Card style={{ gap: spacing.md }}>
             <Heading>Activities</Heading>
-            <Caption>Pick a type to add an activity.</Caption>
             <ActivityTypeChips
               onPick={(item) =>
                 setActivities((current) => [

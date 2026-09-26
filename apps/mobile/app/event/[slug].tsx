@@ -3,6 +3,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  AGE_GROUPS,
   COPY,
   EVENT_STATUS_LABEL,
   EVENT_TABS,
@@ -16,6 +17,7 @@ import {
   formatMoney,
   fundBarSegments,
   inTheFund,
+  practiceDatesLine,
   type EventTab,
   type FundRule,
 } from '@samudaya/core';
@@ -448,6 +450,7 @@ function Activities({
   const { viewRole: role, membershipId, profile } = useAuth();
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [familyName, setFamilyName] = useState('');
+  const [familyAge, setFamilyAge] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const mayRegister = open && can(role, 'activities:register');
 
@@ -469,6 +472,8 @@ function Activities({
       activity_id: activityId,
       membership_id: membershipId,
       participant_name: participantName,
+      // Asked only about a family member, as on the web.
+      age_group: participantName ? familyAge : null,
       channel: 'mobile',
     });
     setBusy(null);
@@ -480,6 +485,7 @@ function Activities({
       return;
     }
     setFamilyName('');
+    setFamilyAge(null);
     setAddingFor(null);
     onChange();
   };
@@ -522,6 +528,12 @@ function Activities({
                   {activity.capacity ? ` · ${activity.capacity} places` : ''}
                   {!activity.is_open ? ' · registration closed' : ''}
                 </Caption>
+                {activity.memberships?.profiles?.full_name ? (
+                  <Caption>Coordinator: {activity.memberships.profiles.full_name}</Caption>
+                ) : null}
+                {activity.practice_dates.length ? (
+                  <Caption>Practice: {practiceDatesLine(activity.practice_dates)}</Caption>
+                ) : null}
               </View>
             </View>
 
@@ -558,6 +570,19 @@ function Activities({
                     autoCapitalize="words"
                     placeholder="e.g. Aarav"
                   />
+                  <View style={{ gap: spacing.xs }}>
+                    <Body>Age group</Body>
+                    <ChipRow>
+                      {AGE_GROUPS.map((group) => (
+                        <Chip
+                          key={group}
+                          label={group}
+                          selected={familyAge === group}
+                          onPress={() => setFamilyAge(familyAge === group ? null : group)}
+                        />
+                      ))}
+                    </ChipRow>
+                  </View>
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <View style={{ flex: 1 }}>
                       <Button
@@ -589,6 +614,7 @@ function Activities({
                     label="+ Family member"
                     onPress={() => {
                       setFamilyName('');
+                      setFamilyAge(null);
                       setAddingFor(activity.id);
                     }}
                     disabled={busy !== null}

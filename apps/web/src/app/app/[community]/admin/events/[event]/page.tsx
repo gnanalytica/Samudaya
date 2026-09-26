@@ -8,6 +8,7 @@ import {
   fundBarSegments,
   inTheFund,
   nextEditionName,
+  practiceDatesLine,
   receiptRef,
   stillNeeded,
   todayIn,
@@ -55,6 +56,7 @@ import {
   AddBudgetLineForm,
   AllocateSurplusForm,
   CloseEventForm,
+  EditActivityForm,
   EventDetailsForm,
   ExpenseForm,
   RecordPaymentForm,
@@ -77,8 +79,10 @@ export default async function ManageEventPage(
 
   const isCommittee = can(role, 'expenses:approve');
   // The same list the event page renders, so one strip spans both routes.
+  // Activities is a reader's tab in that strip; its organiser half, reached
+  // from there by "Manage activities", lives here.
   const tabs = eventTabsFor({ role, kind: event.kind, status: event.status }).filter(
-    (t) => t.admin,
+    (t) => t.admin || (t.id === 'activities' && can(role, 'activities:manage')),
   );
   const active = tabs.find((t) => t.id === tab)?.id ?? 'overview';
   const base = `/app/${community.slug}`;
@@ -96,6 +100,7 @@ export default async function ManageEventPage(
     society,
     openEvents,
     carriedIn,
+    directory,
   ] = await Promise.all([
     getEventStats(event.id),
     getBudgetLines(event.id),
@@ -115,6 +120,11 @@ export default async function ManageEventPage(
     getSocietyBalance(community.id),
     getOpenEvents(community.id, event.id),
     getCarriedInto(event.id),
+    // Whoever could coordinate an activity. The whole society, so only on the
+    // tab that asks.
+    active === 'activities'
+      ? supabase.rpc('society_people', { p_community_id: community.id })
+      : null,
   ]);
 
   // The database steps the separation-of-duties rule aside when there is
@@ -142,6 +152,21 @@ export default async function ManageEventPage(
   const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
+  // As on the phone: an event's activities stop changing once it is closed or
+  // cancelled.
+  const locked = closed || event.status === 'cancelled';
+  const members = (directory?.data ?? [])
+    .flatMap((person) =>
+      person.membership_id
+        ? [
+            {
+              id: person.membership_id,
+              label: [person.full_name ?? 'Unnamed', person.flat].filter(Boolean).join(' · '),
+            },
+          ]
+        : [],
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
   const open = expenses.filter((e) => e.status === 'pending' || e.status === 'changes_requested');
   const decided = expenses.filter((e) => e.status === 'approved' || e.status === 'rejected');
   const categories = budgetVsSpent(budget, expenses);
@@ -403,13 +428,28 @@ export default async function ManageEventPage(
             {activities.length ? (
               activities.map((activity) => {
                 const people = registrations.filter((r) => r.activity_id === activity.id);
+                const coordinator = activity.memberships?.profiles?.full_name ?? null;
                 return (
                   <Card key={activity.id}>
                     <CardHeader
                       title={`${activity.emoji} ${activity.name}`}
-                      description={`${people.length} registered${
-                        activity.capacity ? ` of ${activity.capacity} places` : ''
-                      }${activity.is_open ? '' : ' · registrations closed'}`}
+                      description={
+                        <>
+                          {`${people.length} registered${
+                            activity.capacity ? ` of ${activity.capacity} places` : ''
+                          }${activity.is_open ? '' : ' · registrations closed'}`}
+                          {coordinator ? (
+                            <span className="text-ink-subtle block text-xs">
+                              Coordinator: {coordinator}
+                            </span>
+                          ) : null}
+                          {activity.practice_dates.length ? (
+                            <span className="text-ink-subtle block text-xs">
+                              Practice: {practiceDatesLine(activity.practice_dates)}
+                            </span>
+                          ) : null}
+                        </>
+                      }
                       action={
                         <form action={updateActivity} className="flex gap-2">
                           <input type="hidden" name="slug" value={slug} />
@@ -458,6 +498,34 @@ export default async function ManageEventPage(
                           </li>
                         ))}
                       </ul>
+                    ) : null}
+                    {!locked ? (
+                      <CardBody
+                        className={people.length ? 'border-border-base border-t' : undefined}
+                      >
+                        <details className="group">
+                          <summary className="text-accent cursor-pointer text-sm">
+                            Edit<span className="sr-only"> {activity.name}</span>
+                          </summary>
+                          <div className="mt-3">
+                            <EditActivityForm
+                              slug={slug}
+                              eventSlug={event.slug}
+                              activity={{
+                                id: activity.id,
+                                name: activity.name,
+                                emoji: activity.emoji,
+                                description: activity.description,
+                                capacity: activity.capacity,
+                                coordinator_id: activity.coordinator_id,
+                                coordinator_name: coordinator,
+                                practice_dates: activity.practice_dates,
+                              }}
+                              members={members}
+                            />
+                          </div>
+                        </details>
+                      </CardBody>
                     ) : null}
                   </Card>
                 );
