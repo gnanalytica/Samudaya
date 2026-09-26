@@ -9,10 +9,16 @@ import { usePushRegistration } from '../src/lib/use-push-registration';
 import { usePushTapHandler } from '../src/lib/notifications';
 import { useTheme } from '../src/lib/use-theme';
 import { initErrorReporting } from '../src/lib/observability';
+import { applySavedAppearance } from '../src/lib/appearance';
 
 // Before the first render, so a crash while the tree is mounting is still
 // reported. Inert without a DSN — see lib/observability.
 initErrorReporting();
+
+// Started before the first render too: the saved Light or Dark is read from
+// storage, and starting now lets it land while the app is still loading rather
+// than after the first real screen has drawn.
+applySavedAppearance();
 
 function RootStack() {
   const { colors, isDark } = useTheme();

@@ -42,6 +42,8 @@ describe('festival colours in a browser without light-dark()', () => {
       expect(block).toContain(`${token}: var(${token}-light) !important;`);
       expect(block).toContain(`${token}: var(${token}-dark) !important;`);
     }
-    expect(block).toContain('@media (prefers-color-scheme: dark)');
+    // The dark halves go by the same rule as every other dark style: a choice
+    // made in the profile menu, or else the device.
+    expect(block).toContain('@variant dark {');
   });
 });

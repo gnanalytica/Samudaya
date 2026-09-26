@@ -16,6 +16,7 @@ import {
 } from '../../src/components/ui';
 import { LinkRow } from '../../src/components/admin-ui';
 import { ViewSwitchCard } from '../../src/components/view-switch';
+import { AppearanceCard } from '../../src/components/appearance-card';
 import { useUnreadCount } from '../../src/lib/notifications';
 import { minTapTarget, spacing } from '../../src/lib/theme';
 
@@ -148,6 +149,8 @@ export default function Me() {
             })}
           </Card>
         ) : null}
+
+        <AppearanceCard />
 
         <Button
           label="Join another society"

@@ -62,6 +62,18 @@ export const EVENT_TABS = [
 ] as const;
 export type EventTab = (typeof EVENT_TABS)[number]['id'];
 
+/** How the app looks. System follows the device, and is what everyone starts on. */
+export const APPEARANCE_CHOICES = [
+  { id: 'system', label: 'System' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+] as const;
+export type AppearanceChoice = (typeof APPEARANCE_CHOICES)[number]['id'];
+
+/** Anything unrecognised, including no stored choice, means System. */
+export const parseAppearance = (value: unknown): AppearanceChoice =>
+  value === 'light' || value === 'dark' ? value : 'system';
+
 /** Default fund rule when the organiser doesn't open "More options". */
 export const DEFAULT_FUND_RULE = 'general_fund' as const;
 
