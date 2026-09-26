@@ -131,7 +131,7 @@ export function SuggestionBoard({
     if (!row.events) return <span className="text-ink-subtle text-xs">{sep}For the society</span>;
     return (
       <Link
-        href={`/app/${slug}/events/${row.events.slug}?tab=vote`}
+        href={`/app/${slug}/events/${row.events.slug}#vote`}
         className="text-ink-subtle hover:text-ink text-xs underline underline-offset-2"
       >
         {sep}

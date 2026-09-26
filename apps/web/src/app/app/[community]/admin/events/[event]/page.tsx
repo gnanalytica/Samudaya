@@ -451,31 +451,33 @@ export default async function ManageEventPage(
                         </>
                       }
                       action={
-                        <form action={updateActivity} className="flex gap-2">
-                          <input type="hidden" name="slug" value={slug} />
-                          <input type="hidden" name="event" value={event.slug} />
-                          <input type="hidden" name="activity_id" value={activity.id} />
-                          <Button
-                            type="submit"
-                            size="sm"
-                            variant="secondary"
-                            name="intent"
-                            value={activity.is_open ? 'close' : 'open'}
-                          >
-                            {activity.is_open ? 'Close registrations' : 'Reopen'}
-                          </Button>
-                          {people.length === 0 ? (
+                        locked ? undefined : (
+                          <form action={updateActivity} className="flex gap-2">
+                            <input type="hidden" name="slug" value={slug} />
+                            <input type="hidden" name="event" value={event.slug} />
+                            <input type="hidden" name="activity_id" value={activity.id} />
                             <Button
                               type="submit"
                               size="sm"
-                              variant="ghost"
+                              variant="secondary"
                               name="intent"
-                              value="remove"
+                              value={activity.is_open ? 'close' : 'open'}
                             >
-                              Remove
+                              {activity.is_open ? 'Close registrations' : 'Reopen'}
                             </Button>
-                          ) : null}
-                        </form>
+                            {people.length === 0 ? (
+                              <Button
+                                type="submit"
+                                size="sm"
+                                variant="ghost"
+                                name="intent"
+                                value="remove"
+                              >
+                                Remove
+                              </Button>
+                            ) : null}
+                          </form>
+                        )
                       }
                     />
                     {people.length ? (
@@ -539,12 +541,14 @@ export default async function ManageEventPage(
                 />
               </Card>
             )}
-            <Card>
-              <CardHeader title="Add an activity" />
-              <CardBody>
-                <AddActivityForm slug={slug} eventSlug={event.slug} pickers={pickers} />
-              </CardBody>
-            </Card>
+            {!locked ? (
+              <Card>
+                <CardHeader title="Add an activity" />
+                <CardBody>
+                  <AddActivityForm slug={slug} eventSlug={event.slug} pickers={pickers} />
+                </CardBody>
+              </Card>
+            ) : null}
           </div>
         ) : null}
 

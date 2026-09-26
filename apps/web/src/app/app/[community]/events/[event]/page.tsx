@@ -63,17 +63,19 @@ import { AuditTrail } from '@/components/audit-trail';
 import { SuggestionBoard } from '@/components/suggestion-board';
 import { CommentThread } from '@/components/comment-thread';
 import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
-import { EventTabs, eventTabsFor } from '@/components/event-tabs';
+import { eventTabsFor } from '@/components/event-tabs';
+import { SectionBar } from '@/components/section-bar';
 import { cancelRegistration } from '../actions';
 import { RegisterForm, SuggestionForm } from './participation-forms';
 
 /**
- * An event in four tabs: About, Money (the fund, budget against spending and
- * every approved bill), Activities to register for, and Vote.
+ * An event on one page, read top to bottom: what it is, its money (the fund,
+ * budget against spending and every approved bill), activities to register
+ * for, ideas to vote on, and the discussion. A bar pinned above them jumps
+ * between the sections and shows which one is being read.
  */
 export default async function EventDetailPage(props: PageProps<'/app/[community]/events/[event]'>) {
   const { community: slug, event: eventSlug } = await props.params;
-  const { tab } = await props.searchParams;
   // Committee in resident view sees exactly what residents see.
   const { community, viewRole: role, membership } = await requireCommunity(slug);
   const event = await requireEvent(community.id, eventSlug);
@@ -124,8 +126,8 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
   const canApprove = can(role, 'suggestions:approve');
-  // The Vote tab's badge counts what is waiting on *this* person: a vote they
-  // have not cast, or — for the committee — a suggestion nobody has opened yet.
+  // The Ideas badge counts what is waiting on *this* person: a vote they have
+  // not cast, or — for the committee — a suggestion nobody has opened yet.
   const needsMe = suggestions.filter((s) =>
     s.status === 'accepted' ? s.myVote === null : canApprove && s.status === 'new',
   ).length;
@@ -134,11 +136,23 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const categories = budgetVsSpent(budget, expenses);
   const myRegistrations = registrations.filter((r) => r.membership_id === membership.id);
 
-  // One list, shared with the console, so the two bars cannot drift apart.
-  const tabs = eventTabsFor({ role, kind: event.kind, status: event.status }).filter(
-    (t) => !t.admin,
-  );
-  const active = tabs.find((t) => t.id === tab)?.id ?? 'about';
+  // One list, shared with the console, so this page's sections and the
+  // organiser's pages cannot drift apart. A campaign has no activities, and a
+  // proposal nothing to vote on yet.
+  const tabs = eventTabsFor({ role, kind: event.kind, status: event.status });
+  const shown = new Set(tabs.filter((t) => !t.admin).map((t) => t.id));
+  const sections = [
+    ...tabs
+      .filter((t) => !t.admin)
+      .map((t) => ({ id: t.id, label: t.label, count: t.id === 'vote' ? needsMe : undefined })),
+    { id: 'discussion', label: 'Discussion' },
+  ];
+  const organiserPages = tabs
+    .filter((t) => t.admin)
+    .map((t) => ({
+      label: t.label,
+      href: `${base}/admin/events/${event.slug}${t.id === 'overview' ? '' : `?tab=${t.id}`}`,
+    }));
 
   const eventType = event.event_type_id
     ? (await getCatalogue(community.id)).event_type.find((item) => item.id === event.event_type_id)
@@ -197,19 +211,11 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
           </div>
         ) : null}
 
-        <EventTabs
-          base={base}
-          eventSlug={event.slug}
-          active={active}
-          role={role}
-          kind={event.kind}
-          status={event.status}
-          counts={{ vote: needsMe }}
-        />
+        <SectionBar sections={sections} links={organiserPages} />
 
-        {/* ---------------------------------------------------------- about */}
-        {active === 'about' ? (
-          <div className="space-y-5">
+        <div className="space-y-10">
+          {/* ---------------------------------------------------------- about */}
+          <section id="about" aria-label="About" className={SECTION}>
             <Card>
               <CardBody className="space-y-4">
                 {event.description ? (
@@ -271,29 +277,6 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               </CardBody>
             </Card>
 
-            <Link
-              href={`${here}?tab=money`}
-              className="border-border-base bg-surface-raised hover:bg-surface-sunken block rounded-xl border p-5 transition-colors"
-            >
-              <div className="text-ink-muted flex justify-between text-sm font-medium">
-                <span>
-                  {formatMoney(held, community.currency)} of{' '}
-                  {formatMoney(stats.fundTarget, community.currency)}
-                </span>
-                <span>{funded}%</span>
-              </div>
-              <div className="mt-2">
-                <FundBar percent={funded} pendingPercent={bar.pending} />
-              </div>
-              <FundKey
-                confirmed={held}
-                pending={stats.fundPending}
-                currency={community.currency}
-                className="mt-2"
-              />
-              <p className="text-accent mt-2 text-xs">See where the money goes</p>
-            </Link>
-
             {event.whatsapp_group_url ? (
               <Card>
                 <CardBody className="flex flex-wrap items-center justify-between gap-3">
@@ -304,27 +287,13 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 </CardBody>
               </Card>
             ) : null}
+          </section>
 
-            {/* The argument that produced the decision, kept next to it. A tab
-                of its own would have made five; it belongs under About. */}
-            <Card>
-              <CardHeader title="Discussion" description="Everyone in the society can read this." />
-              <CardBody>
-                <CommentThread
-                  slug={slug}
-                  subject={{ eventId: event.id }}
-                  eventSlug={event.slug}
-                  myMembershipId={membership.id}
-                  canModerate={isStaff}
-                />
-              </CardBody>
-            </Card>
-          </div>
-        ) : null}
-
-        {/* ---------------------------------------------------------- money */}
-        {active === 'money' ? (
-          <div className="space-y-5">
+          {/* ---------------------------------------------------------- money */}
+          <section id="money" aria-labelledby="money-heading" className={SECTION}>
+            <h2 id="money-heading" className={HEADING}>
+              {COPY.money}
+            </h2>
             <Card>
               <CardHeader
                 title={isCampaign ? 'Campaign fund' : 'Fund'}
@@ -530,150 +499,182 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}
               <p className="text-ink-subtle mt-1 text-xs">Fixed before any money was collected.</p>
             </div>
-          </div>
-        ) : null}
+          </section>
 
-        {/* ----------------------------------------------------- activities */}
-        {active === 'activities' && can(role, 'activities:manage') ? (
-          <div className="mb-3 flex justify-end">
-            <ButtonLink
-              href={`${base}/admin/events/${event.slug}?tab=activities`}
-              size="sm"
-              variant="secondary"
-            >
-              <Settings2 className="size-4" aria-hidden="true" />
-              Manage activities
-            </ButtonLink>
-          </div>
-        ) : null}
-        {active === 'activities' ? (
-          activities.length ? (
-            <div className="space-y-3">
-              {activities.map((activity) => {
-                const mineHere = myRegistrations.filter((r) => r.activity_id === activity.id);
-                const selfRegistered = mineHere.some((r) => !r.participant_name);
-                const count = registrations.filter((r) => r.activity_id === activity.id).length;
-                const full = activity.capacity !== null && count >= activity.capacity;
-                return (
-                  <Card key={activity.id}>
-                    <CardBody>
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-ink text-sm font-semibold">
-                            <span className="mr-1.5">{activity.emoji}</span>
-                            {activity.name}
-                          </p>
-                          {activity.description ? (
-                            <p className="text-ink-muted mt-1 text-sm">{activity.description}</p>
-                          ) : null}
-                          <p className="text-ink-subtle mt-1.5 text-xs">
-                            {count} registered
-                            {activity.capacity ? ` of ${activity.capacity} places` : ''}
-                          </p>
-                          {activity.memberships?.profiles?.full_name ? (
-                            <p className="text-ink-subtle mt-0.5 text-xs">
-                              Coordinator: {activity.memberships.profiles.full_name}
-                            </p>
-                          ) : null}
-                          {activity.practice_dates.length ? (
-                            <p className="text-ink-subtle mt-0.5 text-xs">
-                              Practice: {practiceDatesLine(activity.practice_dates)}
-                            </p>
-                          ) : null}
-                        </div>
-                        {!activity.is_open ? (
-                          <Badge tone="neutral">Closed</Badge>
-                        ) : full ? (
-                          <Badge tone="neutral">Full</Badge>
-                        ) : null}
-                      </div>
-
-                      {mineHere.length ? (
-                        <ul className="mt-3 space-y-1.5">
-                          {mineHere.map((registration) => (
-                            <li
-                              key={registration.id}
-                              className="flex items-center justify-between gap-3 text-sm"
-                            >
-                              <span className="text-success inline-flex items-center gap-1.5">
-                                <Check className="size-4" aria-hidden="true" />
-                                {registration.participant_name ?? 'You'}
-                              </span>
-                              {open ? (
-                                <form action={cancelRegistration}>
-                                  <input type="hidden" name="slug" value={slug} />
-                                  <input type="hidden" name="event" value={event.slug} />
-                                  <input
-                                    type="hidden"
-                                    name="registration_id"
-                                    value={registration.id}
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="text-ink-muted hover:text-ink text-xs underline underline-offset-4"
-                                  >
-                                    Withdraw
-                                  </button>
-                                </form>
+          {/* ----------------------------------------------------- activities */}
+          {shown.has('activities') ? (
+            <section id="activities" aria-labelledby="activities-heading" className={SECTION}>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="activities-heading" className={HEADING}>
+                  Activities
+                </h2>
+                {can(role, 'activities:manage') ? (
+                  <ButtonLink
+                    href={`${base}/admin/events/${event.slug}?tab=activities`}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Settings2 className="size-4" aria-hidden="true" />
+                    Manage activities
+                  </ButtonLink>
+                ) : null}
+              </div>
+              {activities.length ? (
+                <div className="space-y-3">
+                  {activities.map((activity) => {
+                    const mineHere = myRegistrations.filter((r) => r.activity_id === activity.id);
+                    const selfRegistered = mineHere.some((r) => !r.participant_name);
+                    const count = registrations.filter((r) => r.activity_id === activity.id).length;
+                    const full = activity.capacity !== null && count >= activity.capacity;
+                    return (
+                      <Card key={activity.id}>
+                        <CardBody>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-ink text-sm font-semibold">
+                                <span className="mr-1.5">{activity.emoji}</span>
+                                {activity.name}
+                              </p>
+                              {activity.description ? (
+                                <p className="text-ink-muted mt-1 text-sm">
+                                  {activity.description}
+                                </p>
                               ) : null}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
+                              <p className="text-ink-subtle mt-1.5 text-xs">
+                                {count} registered
+                                {activity.capacity ? ` of ${activity.capacity} places` : ''}
+                              </p>
+                              {activity.memberships?.profiles?.full_name ? (
+                                <p className="text-ink-subtle mt-0.5 text-xs">
+                                  Coordinator: {activity.memberships.profiles.full_name}
+                                </p>
+                              ) : null}
+                              {activity.practice_dates.length ? (
+                                <p className="text-ink-subtle mt-0.5 text-xs">
+                                  Practice: {practiceDatesLine(activity.practice_dates)}
+                                </p>
+                              ) : null}
+                            </div>
+                            {!activity.is_open ? (
+                              <Badge tone="neutral">Closed</Badge>
+                            ) : full ? (
+                              <Badge tone="neutral">Full</Badge>
+                            ) : null}
+                          </div>
 
-                      {open && activity.is_open && !full && can(role, 'activities:register') ? (
-                        <div className="border-border-base mt-3 border-t pt-3">
-                          <RegisterForm
-                            slug={slug}
-                            eventSlug={event.slug}
-                            activityId={activity.id}
-                            activityName={activity.name}
-                            selfRegistered={selfRegistered}
-                          />
-                        </div>
-                      ) : null}
-                    </CardBody>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card>
-              <EmptyState
-                icon={<Sparkles className="size-6" />}
-                title="No activities yet"
-                description="Staff add activities you and your family can register for."
+                          {mineHere.length ? (
+                            <ul className="mt-3 space-y-1.5">
+                              {mineHere.map((registration) => (
+                                <li
+                                  key={registration.id}
+                                  className="flex items-center justify-between gap-3 text-sm"
+                                >
+                                  <span className="text-success inline-flex items-center gap-1.5">
+                                    <Check className="size-4" aria-hidden="true" />
+                                    {registration.participant_name ?? 'You'}
+                                  </span>
+                                  {open ? (
+                                    <form action={cancelRegistration}>
+                                      <input type="hidden" name="slug" value={slug} />
+                                      <input type="hidden" name="event" value={event.slug} />
+                                      <input
+                                        type="hidden"
+                                        name="registration_id"
+                                        value={registration.id}
+                                      />
+                                      <button
+                                        type="submit"
+                                        className="text-ink-muted hover:text-ink text-xs underline underline-offset-4"
+                                      >
+                                        Withdraw
+                                      </button>
+                                    </form>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+
+                          {open && activity.is_open && !full && can(role, 'activities:register') ? (
+                            <div className="border-border-base mt-3 border-t pt-3">
+                              <RegisterForm
+                                slug={slug}
+                                eventSlug={event.slug}
+                                activityId={activity.id}
+                                activityName={activity.name}
+                                selfRegistered={selfRegistered}
+                              />
+                            </div>
+                          ) : null}
+                        </CardBody>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Card>
+                  <EmptyState
+                    icon={<Sparkles className="size-6" />}
+                    title="No activities yet"
+                    description="Staff add activities you and your family can register for."
+                  />
+                </Card>
+              )}
+            </section>
+          ) : null}
+
+          {/* ---------------------------------------------------------- ideas */}
+          {shown.has('vote') ? (
+            <section id="vote" aria-labelledby="ideas-heading" className={SECTION}>
+              <h2 id="ideas-heading" className={HEADING}>
+                Ideas
+              </h2>
+              <SuggestionBoard
+                slug={slug}
+                eventSlug={event.slug}
+                rows={suggestions}
+                myMembershipId={membership.id}
+                canVote={can(role, 'vote') && event.status !== 'completed'}
+                canApprove={canApprove}
+                emptyDescription="Suggestions the committee approves go to a vote here."
               />
-            </Card>
-          )
-        ) : null}
+              {can(role, 'suggest') && event.status === 'published' ? (
+                <Card>
+                  <CardHeader
+                    title="Suggest an idea"
+                    description={`For ${event.name}. The committee reviews it first.`}
+                  />
+                  <CardBody>
+                    <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />
+                  </CardBody>
+                </Card>
+              ) : null}
+            </section>
+          ) : null}
 
-        {/* ----------------------------------------------------------- vote */}
-        {active === 'vote' ? (
-          <div className="space-y-3">
-            <SuggestionBoard
-              slug={slug}
-              eventSlug={event.slug}
-              rows={suggestions}
-              myMembershipId={membership.id}
-              canVote={can(role, 'vote') && event.status !== 'completed'}
-              canApprove={canApprove}
-              emptyDescription="Suggestions the committee approves go to a vote here."
-            />
-            {can(role, 'suggest') && event.status === 'published' ? (
-              <Card>
-                <CardHeader
-                  title="Suggest an idea"
-                  description={`For ${event.name}. The committee reviews it first.`}
+          {/* ----------------------------------------------------- discussion */}
+          <section id="discussion" aria-label="Discussion" className={SECTION}>
+            {/* The argument that produced the decision, kept on the same page,
+                after everything it was about. */}
+            <Card>
+              <CardHeader title="Discussion" description="Everyone in the society can read this." />
+              <CardBody>
+                <CommentThread
+                  slug={slug}
+                  subject={{ eventId: event.id }}
+                  eventSlug={event.slug}
+                  myMembershipId={membership.id}
+                  canModerate={isStaff}
                 />
-                <CardBody>
-                  <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />
-                </CardBody>
-              </Card>
-            ) : null}
-          </div>
-        ) : null}
+              </CardBody>
+            </Card>
+          </section>
+        </div>
       </PageBody>
     </div>
   );
 }
+
+/** Sections sit under the pinned bar when jumped to: the phone header and the bar, or just the bar. */
+const SECTION = 'scroll-mt-28 space-y-5 md:scroll-mt-16';
+const HEADING = 'text-ink text-lg font-semibold tracking-tight';

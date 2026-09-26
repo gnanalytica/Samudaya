@@ -180,7 +180,7 @@ export function ContributeForm({
             <ButtonLink href={`/app/${slug}/money?view=mine`} variant="secondary" size="sm">
               My contributions
             </ButtonLink>
-            <ButtonLink href={`/app/${slug}/events/${eventSlug}?tab=money`} size="sm">
+            <ButtonLink href={`/app/${slug}/events/${eventSlug}#money`} size="sm">
               Back to the event
             </ButtonLink>
           </div>

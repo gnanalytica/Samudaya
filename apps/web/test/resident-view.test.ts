@@ -98,3 +98,46 @@ describe('ideas', () => {
     );
   });
 });
+
+describe('the event page', () => {
+  it('is one page read top to bottom on the web, under a pinned bar', () => {
+    const page = webEvent();
+    expect(page).toContain('<SectionBar');
+    expect(page).not.toContain('<EventTabs');
+    for (const id of ['about', 'money', 'activities', 'vote', 'discussion']) {
+      expect(page).toContain(`id="${id}"`);
+    }
+  });
+
+  it('is one screen on the phone too, with the bar pinned while it scrolls', () => {
+    const screen = phoneEvent();
+    expect(screen).toContain('useSectionScroll(');
+    expect(screen).toContain('stickyHeaderIndices={[1]}');
+    expect(screen).not.toContain('<Segmented');
+  });
+
+  it('still lands old ?tab= links on their section', () => {
+    // The WhatsApp bot has sent a great many of them.
+    expect(read('web', 'src', 'components', 'section-bar.tsx')).toContain(".get('tab')");
+    expect(read('mobile', 'src', 'components', 'section-scroll.tsx')).toContain('id === initial');
+  });
+});
+
+describe('activities on a finished event', () => {
+  const actions = () =>
+    read(...WEB, 'admin', 'events', 'actions.ts').slice(
+      read(...WEB, 'admin', 'events', 'actions.ts').indexOf('export async function addActivity'),
+    );
+
+  it('can no longer be added, closed, reopened or removed, whatever the page shows', () => {
+    const add = actions().slice(0, actions().indexOf('export async function updateActivity'));
+    expect(add).toContain("event.status === 'completed' || event.status === 'cancelled'");
+    const update = actions().slice(actions().indexOf('export async function updateActivity'));
+    expect(update.slice(0, 1600)).toContain("status === 'completed' || status === 'cancelled'");
+    expect(update.slice(0, 1600)).toContain("intent === 'remove' && !registered");
+  });
+
+  it('are not offered on the phone once full', () => {
+    expect(phoneEvent()).toContain('mayRegister && activity.is_open && !full');
+  });
+});

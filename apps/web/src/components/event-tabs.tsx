@@ -87,7 +87,7 @@ export function EventTabs({
   const href = (tab: Tab) =>
     tab.admin
       ? `${base}/admin/events/${eventSlug}${tab.id === 'overview' ? '' : `?tab=${tab.id}`}`
-      : `${base}/events/${eventSlug}${tab.id === 'about' ? '' : `?tab=${tab.id}`}`;
+      : `${base}/events/${eventSlug}${tab.id === 'about' ? '' : `#${tab.id}`}`;
 
   return (
     <nav

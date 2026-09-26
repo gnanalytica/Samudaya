@@ -430,6 +430,9 @@ export async function addActivity(_prev: ActionState, formData: FormData): Promi
   const context = await requireCapability(communitySlug, 'activities:manage');
   const event = await findEvent(context.community.id, eventSlug);
   if (!event) return { error: 'That event no longer exists.' };
+  if (event.status === 'completed' || event.status === 'cancelled') {
+    return { error: 'This event is closed or cancelled, so its activities can’t be changed.' };
+  }
 
   const parsed = createActivitySchema.safeParse({
     event_id: event.id,
@@ -474,13 +477,30 @@ export async function updateActivity(formData: FormData): Promise<void> {
   const intent = String(formData.get('intent') ?? '');
 
   const supabase = await getSupabase();
+  // Whatever the page offered: nothing changes on an event that is over or
+  // called off, and nobody is dropped from an activity by deleting it.
+  const [{ data: activity }, { count: registered }] = await Promise.all([
+    supabase
+      .from('event_activities')
+      .select('id, events!inner(status)')
+      .eq('id', activityId)
+      .eq('community_id', context.community.id)
+      .maybeSingle(),
+    supabase
+      .from('activity_participants')
+      .select('id', { count: 'exact', head: true })
+      .eq('activity_id', activityId),
+  ]);
+  const status = activity?.events.status;
+  if (!activity || status === 'completed' || status === 'cancelled') return;
+
   if (intent === 'open' || intent === 'close') {
     await supabase
       .from('event_activities')
       .update({ is_open: intent === 'open' })
       .eq('id', activityId)
       .eq('community_id', context.community.id);
-  } else if (intent === 'remove') {
+  } else if (intent === 'remove' && !registered) {
     await supabase
       .from('event_activities')
       .delete()

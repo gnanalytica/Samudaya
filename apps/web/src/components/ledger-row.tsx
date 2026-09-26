@@ -95,7 +95,7 @@ export function LedgerRow({
               <>
                 {' · '}
                 <Link
-                  href={`/app/${slug}/events/${row.event_slug}?tab=money`}
+                  href={`/app/${slug}/events/${row.event_slug}#money`}
                   className="hover:text-ink underline underline-offset-2"
                 >
                   {row.event_name}

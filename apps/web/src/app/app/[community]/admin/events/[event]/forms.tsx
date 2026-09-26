@@ -372,7 +372,12 @@ export function AddActivityForm({
           </Field>
         </div>
         <div className="w-28">
-          <Field label="Places" htmlFor="act-capacity" hint="Blank = no limit">
+          <Field
+            label="Places"
+            htmlFor="act-capacity"
+            hint="Blank = no limit"
+            error={state.fieldErrors?.capacity}
+          >
             {(control) => <Input {...control} name="capacity" type="number" min={1} />}
           </Field>
         </div>

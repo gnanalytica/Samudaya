@@ -75,7 +75,7 @@ export default async function ContributePage(
       />
       <PageBody>
         <Link
-          href={`/app/${slug}/events/${event.slug}?tab=money`}
+          href={`/app/${slug}/events/${event.slug}#money`}
           className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
         >
           <ArrowLeft className="size-4" aria-hidden="true" />

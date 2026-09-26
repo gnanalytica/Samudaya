@@ -283,7 +283,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
             <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Take part</h2>
             <div className="grid gap-3 sm:grid-cols-3">
               <Link
-                href={`${base}/events/${next.slug}?tab=activities`}
+                href={`${base}/events/${next.slug}#activities`}
                 className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
               >
                 <CalendarDays className="text-accent size-5" aria-hidden="true" />
@@ -291,7 +291,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 <p className="text-ink-muted text-xs">Register yourself or your family.</p>
               </Link>
               <Link
-                href={`${base}/events/${next.slug}?tab=vote`}
+                href={`${base}/events/${next.slug}#vote`}
                 className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
               >
                 <Lightbulb className="text-accent size-5" aria-hidden="true" />
@@ -299,7 +299,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 <p className="text-ink-muted text-xs">Ideas the committee approves go to a vote.</p>
               </Link>
               <Link
-                href={`${base}/events/${next.slug}?tab=money`}
+                href={`${base}/events/${next.slug}#money`}
                 className="border-border-base bg-surface-raised hover:bg-surface-sunken rounded-xl border p-4 transition-colors"
               >
                 <BarChart3 className="text-accent size-5" aria-hidden="true" />

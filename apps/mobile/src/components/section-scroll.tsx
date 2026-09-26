@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   View,
+  type ViewStyle,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -80,11 +81,14 @@ export function SectionBar<T extends string>({
   current,
   onJump,
   onLayout,
+  style,
 }: {
   sections: readonly { id: T; label: string }[];
   current: T | undefined;
   onJump: (id: T) => void;
   onLayout: (event: LayoutChangeEvent) => void;
+  /** E.g. a negative margin, so the pinned bar reaches the screen's edges. */
+  style?: ViewStyle;
 }) {
   const { colors } = useTheme();
   const value = current ?? sections[0]?.id;
@@ -92,11 +96,14 @@ export function SectionBar<T extends string>({
   return (
     <View
       onLayout={onLayout}
-      style={{
-        backgroundColor: colors.surface,
-        paddingVertical: spacing.sm,
-        marginVertical: -spacing.sm,
-      }}
+      style={[
+        {
+          backgroundColor: colors.surface,
+          paddingVertical: spacing.sm,
+          marginVertical: -spacing.sm,
+        },
+        style,
+      ]}
     >
       <Segmented options={sections} value={value} onChange={onJump} />
     </View>

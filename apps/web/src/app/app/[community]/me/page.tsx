@@ -106,7 +106,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                     </p>
                     {row.event_activities?.events?.slug ? (
                       <Link
-                        href={`${base}/events/${row.event_activities.events.slug}?tab=activities`}
+                        href={`${base}/events/${row.event_activities.events.slug}#activities`}
                         className="text-ink-subtle mt-0.5 text-xs hover:underline"
                       >
                         {row.event_activities.events.name}
