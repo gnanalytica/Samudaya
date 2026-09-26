@@ -306,6 +306,24 @@ export const UPLOAD_MIME_TYPES = [
  * the web offered ₹500/₹1,001/₹2,001/₹5,001 and the phone ₹1,001/₹2,001/₹5,001,
  * which is the kind of difference nobody decides on purpose.
  */
+/**
+ * A member's own payments, totalled the way a fund bar reads them: what staff
+ * have confirmed, and what is still to be confirmed. A payment turned down or
+ * refunded counts in neither.
+ */
+export function myPaymentTotals(rows: { amount: number | string; status: string }[]): {
+  confirmed: number;
+  pending: number;
+} {
+  let confirmed = 0;
+  let pending = 0;
+  for (const row of rows) {
+    if (row.status === 'succeeded') confirmed += Number(row.amount);
+    else if (row.status === 'pending') pending += Number(row.amount);
+  }
+  return { confirmed, pending };
+}
+
 export const GENERIC_CONTRIBUTION_PRESETS = [500, 1001, 2001, 5001] as const;
 
 export function contributionPresets(suggested: number | null | undefined): number[] {

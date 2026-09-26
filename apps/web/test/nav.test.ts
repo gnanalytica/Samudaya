@@ -5,20 +5,35 @@ import { bottomNavItems, visibleNav } from '@/components/nav-items';
 import { eventTabsFor } from '@/components/event-tabs';
 
 describe('bottomNavItems', () => {
-  it('gives a resident Home, Events, Money and Me', () => {
+  it('gives a resident Home, Events, Money and Me, with Contribute in the middle', () => {
     // The ledger is the thing this app exists to publish. Making a resident
     // open Home first to read it is a small version of the mistake the sheet
     // made with Manage.
     const labels = bottomNavItems('arkala', 'resident').map((item) => item.label);
-    expect(labels).toEqual(['Home', 'Events', 'Money', 'Me']);
+    expect(labels).toEqual(['Home', 'Events', 'Contribute', 'Money', 'Me']);
   });
 
   it('trades Money for Manage once you run the society', () => {
-    // The shape the phone app has always had.
-    for (const role of ['staff', 'committee'] as const) {
-      const labels = bottomNavItems('arkala', role).map((item) => item.label);
-      expect(labels, role).toEqual(['Home', 'Events', 'Manage', 'Me']);
-    }
+    expect(bottomNavItems('arkala', 'committee').map((item) => item.label)).toEqual([
+      'Home',
+      'Events',
+      'Contribute',
+      'Manage',
+      'Me',
+    ]);
+    // Staff don't contribute, so their bar has no button to press.
+    expect(bottomNavItems('arkala', 'staff').map((item) => item.label)).toEqual([
+      'Home',
+      'Events',
+      'Manage',
+      'Me',
+    ]);
+  });
+
+  it('raises Contribute as a button that opens the choice of what to pay for', () => {
+    const button = bottomNavItems('arkala', 'resident').find((item) => item.action);
+    expect(button?.href).toBe('/app/arkala/contribute');
+    expect(read('components', 'sidebar-nav.tsx')).toContain('item.action');
   });
 
   it('never puts People on the bar, and never strands it', () => {
@@ -33,9 +48,10 @@ describe('bottomNavItems', () => {
     expect(read('app', 'app', '[community]', 'manage', 'page.tsx')).toContain('${base}/people');
   });
 
-  it('never grows past four, which is what a 360px phone fits', () => {
+  it('never grows past four tabs, which is what a 360px phone fits beside the button', () => {
     for (const role of ['resident', 'staff', 'committee'] as const) {
-      expect(bottomNavItems('arkala', role), role).toHaveLength(4);
+      const tabs = bottomNavItems('arkala', role).filter((item) => !item.action);
+      expect(tabs, role).toHaveLength(4);
     }
   });
 

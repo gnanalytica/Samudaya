@@ -118,7 +118,7 @@ describe('what the society kept', () => {
       ['web', 'src', 'app', 'app', '[community]', 'page.tsx'],
       ['web', 'src', 'app', 'app', '[community]', 'money', 'page.tsx'],
       ['mobile', 'app', '(tabs)', 'index.tsx'],
-      ['mobile', 'app', 'money.tsx'],
+      ['mobile', 'app', '(tabs)', 'money.tsx'],
     ]) {
       // Comments may still tell the story; the words on screen may not.
       const code = read(...parts).replace(/\{\/\*[\s\S]*?\*\/\}|\/\*[\s\S]*?\*\//g, '');
@@ -129,7 +129,7 @@ describe('what the society kept', () => {
   it('is shown on both money screens as part of where the balance is', () => {
     for (const parts of [
       ['web', 'src', 'app', 'app', '[community]', 'money', 'page.tsx'],
-      ['mobile', 'app', 'money.tsx'],
+      ['mobile', 'app', '(tabs)', 'money.tsx'],
     ]) {
       const screen = read(...parts);
       expect(screen, parts.join('/')).toContain('whereTheBalanceIs');
@@ -145,7 +145,7 @@ describe('what the society kept', () => {
     expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain(
       'money#society-balance',
     );
-    expect(read('mobile', 'app', 'money.tsx')).toContain('fundMovementLine');
+    expect(read('mobile', 'app', '(tabs)', 'money.tsx')).toContain('fundMovementLine');
   });
 
   it('is decided at closure by the committee, on both apps', () => {

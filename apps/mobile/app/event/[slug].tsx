@@ -6,6 +6,8 @@ import {
   COPY,
   EVENT_STATUS_LABEL,
   EVENT_TABS,
+  budgetBar,
+  budgetTotal,
   can,
   carriedFromLine,
   correctionNote,
@@ -337,40 +339,68 @@ function Analytics({ data, currency }: { data: Detail; currency: string }) {
 
 function BudgetAndSpending({ data, currency }: { data: Detail; currency: string }) {
   const rows = budgetVsSpent(data.budget, data.expenses);
-  const planned = data.budget.reduce((sum, line) => sum + Number(line.amount), 0);
-  const spent = data.expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const total = budgetTotal(rows);
 
   return (
     <>
       <Card style={{ gap: spacing.md }}>
-        <Heading>Budget vs spent</Heading>
+        <Heading>Budget and spending</Heading>
         {rows.length ? (
           <>
+            <View style={{ gap: 4 }}>
+              <View
+                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
+              >
+                <Body>
+                  {formatMoney(total.spent, currency)}
+                  {total.planned > 0
+                    ? ` of ${formatMoney(total.planned, currency)} spent`
+                    : ' spent, with no budget set'}
+                </Body>
+                {total.planned > 0 ? (
+                  <Caption tone={total.over ? 'danger' : undefined}>
+                    {total.over ? `${formatMoney(total.over, currency)} over` : `${total.percent}%`}
+                  </Caption>
+                ) : null}
+              </View>
+              {total.planned > 0 ? (
+                <Meter
+                  percent={total.percent}
+                  tone={total.over ? 'danger' : 'success'}
+                  label="Whole budget, spent against plan"
+                />
+              ) : null}
+            </View>
             {rows.map((row) => {
-              const percent = row.planned > 0 ? Math.round((row.spent / row.planned) * 100) : 100;
-              const over = row.planned > 0 && row.spent > row.planned;
+              const bar = budgetBar(row.planned, row.spent);
               return (
                 <View key={row.category} style={{ gap: 4 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: spacing.md,
+                    }}
+                  >
                     <Body>{row.category}</Body>
-                    <Caption>
-                      {formatMoney(row.spent, currency)} / {formatMoney(row.planned, currency)}
+                    <Caption tone={bar.over ? 'danger' : undefined}>
+                      {bar.unplanned
+                        ? formatMoney(row.spent, currency)
+                        : `${formatMoney(row.spent, currency)} of ${formatMoney(row.planned, currency)}`}
                     </Caption>
                   </View>
                   <Meter
-                    percent={percent}
-                    tone={over ? 'accent' : 'success'}
-                    label={`${row.category} spending against budget`}
+                    percent={bar.percent}
+                    tone={bar.over ? 'danger' : bar.unplanned ? 'warning' : 'success'}
+                    label={`${row.category}, spent against plan`}
                   />
-                  {over ? <Caption>Over budget</Caption> : null}
-                  {row.planned === 0 ? <Caption>Not in the budget</Caption> : null}
+                  {bar.over ? (
+                    <Caption tone="danger">{formatMoney(bar.over, currency)} over</Caption>
+                  ) : null}
+                  {bar.unplanned ? <Caption tone="warning">Not in the budget</Caption> : null}
                 </View>
               );
             })}
-            <KeyValue
-              label="Total"
-              value={`${formatMoney(spent, currency)} of ${formatMoney(planned, currency)}`}
-            />
           </>
         ) : (
           <Caption>No budget set yet.</Caption>

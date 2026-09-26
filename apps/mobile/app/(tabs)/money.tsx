@@ -4,9 +4,13 @@ import { useRouter } from 'expo-router';
 import {
   LEDGER_FILTERS,
   UNPUBLISHED_EVENT,
+  can,
+  correctionNote,
   filterLedger,
   formatDate,
   formatMoney,
+  myPaymentTotals,
+  receiptRef,
   fundMovementLine,
   holdingNote,
   ledgerEvidence,
@@ -17,16 +21,26 @@ import {
   relativeTime,
   whereTheBalanceIs,
 } from '@samudaya/core';
-import { useAuth } from '../src/lib/auth';
-import { supabase } from '../src/lib/supabase';
-import { useCommunityData } from '../src/lib/use-community-data';
-import { reportHandled } from '../src/lib/observability';
-import { Body, Button, Caption, Card, EmptyState, Loading, Screen } from '../src/components/ui';
-import { Chip, ChipRow } from '../src/components/admin-ui';
-import { StatTile } from '../src/components/event-ui';
-import { ViewFileButton } from '../src/components/file-ui';
-import { minTapTarget, spacing } from '../src/lib/theme';
-import { useTheme } from '../src/lib/use-theme';
+import { useAuth } from '../../src/lib/auth';
+import { supabase } from '../../src/lib/supabase';
+import { useCommunityData } from '../../src/lib/use-community-data';
+import { reportHandled } from '../../src/lib/observability';
+import {
+  Badge,
+  Body,
+  Button,
+  Caption,
+  Card,
+  EmptyState,
+  Heading,
+  Loading,
+  Screen,
+} from '../../src/components/ui';
+import { Chip, ChipRow, Segmented } from '../../src/components/admin-ui';
+import { StatTile } from '../../src/components/event-ui';
+import { ViewFileButton } from '../../src/components/file-ui';
+import { minTapTarget, spacing } from '../../src/lib/theme';
+import { useTheme } from '../../src/lib/use-theme';
 
 /**
  * The society's money, all of it, for everybody — the web Money page, on a
@@ -46,7 +60,130 @@ import { useTheme } from '../src/lib/use-theme';
  * deciding anything — including which rows offer their evidence, since the view
  * hands a payment screenshot only to the payer and to staff.
  */
+const MONEY_VIEWS = [
+  { id: 'society', label: 'Society' },
+  { id: 'mine', label: 'My contributions' },
+] as const;
+
+/** The society's money and the member's own, as two views of one tab. */
 export default function Money() {
+  const { role } = useAuth();
+  // Staff don't contribute, so they have nothing of their own to show.
+  const hasOwn = can(role, 'contribute');
+  const [view, setView] = useState<(typeof MONEY_VIEWS)[number]['id']>('society');
+
+  return (
+    <Screen>
+      {hasOwn ? (
+        <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
+          <Segmented options={MONEY_VIEWS} value={view} onChange={setView} />
+        </View>
+      ) : null}
+      {hasOwn && view === 'mine' ? <MyContributions /> : <SocietyMoney />}
+    </Screen>
+  );
+}
+
+/**
+ * What this member has paid and where each payment stands. It used to be on
+ * Me, away from the rest of the money; somebody checking whether their payment
+ * was confirmed now looks where the money is.
+ */
+function MyContributions() {
+  const router = useRouter();
+  const { activeCommunity, membershipId } = useAuth();
+  const currency = activeCommunity?.currency ?? 'INR';
+
+  const { data, loading, refreshing, refresh } = useCommunityData(
+    `money:mine:${membershipId}`,
+    async () => {
+      const { data: rows } = await supabase
+        .from('contributions')
+        .select(
+          'id, amount, reported_amount, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
+        )
+        .eq('membership_id', membershipId ?? '')
+        .order('paid_at', { ascending: false })
+        .limit(200);
+      return rows ?? [];
+    },
+  );
+
+  if (loading && !data) return <Loading />;
+
+  const rows = data ?? [];
+  const totals = myPaymentTotals(rows);
+
+  return (
+    <FlatList
+      data={rows}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+      ListHeaderComponent={
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+          <StatTile label="CONFIRMED" value={formatMoney(totals.confirmed, currency)} />
+          <StatTile label="TO BE CONFIRMED" value={formatMoney(totals.pending, currency)} />
+        </View>
+      }
+      ListEmptyComponent={
+        <Card style={{ gap: spacing.md }}>
+          <Caption>Nothing yet. Your receipts will show up here.</Caption>
+          <Button label="Contribute" onPress={() => router.push('/contribute')} />
+        </Card>
+      }
+      renderItem={({ item: contribution }) => {
+        const corrected = correctionNote(
+          contribution.amount,
+          contribution.reported_amount,
+          currency,
+        );
+        return (
+          <Card style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Body>
+                {contribution.events?.emoji} {contribution.events?.name}
+              </Body>
+              <Caption>
+                {contribution.status === 'succeeded'
+                  ? receiptRef(contribution.events?.slug, contribution.receipt_no)
+                  : contribution.reference
+                    ? `UPI transaction ID ${contribution.reference}`
+                    : 'Reported'}{' '}
+                · {formatDate(contribution.paid_at.slice(0, 10))}
+              </Caption>
+              <View style={{ flexDirection: 'row' }}>
+                <PaymentStatus status={contribution.status} />
+              </View>
+              {contribution.status === 'failed' && contribution.review_note ? (
+                <Caption>{contribution.review_note}</Caption>
+              ) : null}
+              {/* A figure that moved with no explanation on the row is the app
+                  looking like it lost somebody's money. */}
+              {corrected ? (
+                <Caption>
+                  {corrected}
+                  {contribution.review_note ? ` · ${contribution.review_note}` : ''}
+                </Caption>
+              ) : null}
+            </View>
+            <Heading>{formatMoney(contribution.amount, currency)}</Heading>
+          </Card>
+        );
+      }}
+    />
+  );
+}
+
+/** Where a member's reported payment stands. */
+function PaymentStatus({ status }: { status: string }) {
+  if (status === 'succeeded') return <Badge label="Confirmed" tone="success" />;
+  if (status === 'failed') return <Badge label="Not confirmed" tone="danger" />;
+  if (status === 'refunded') return <Badge label="Refunded" />;
+  return <Badge label="Waiting for confirmation" tone="warning" />;
+}
+
+function SocietyMoney() {
   const router = useRouter();
   const { colors } = useTheme();
   const { activeCommunity } = useAuth();

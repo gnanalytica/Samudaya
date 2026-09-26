@@ -1,6 +1,6 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
 import { COPY, can } from '@samudaya/core';
-import { Text, type ColorValue } from 'react-native';
+import { Pressable, Text, View, type ColorValue } from 'react-native';
 import { useAuth } from '../../src/lib/auth';
 import { useTodoItems } from '../../src/lib/todo';
 import { NotificationBell } from '../../src/components/notification-bell';
@@ -15,11 +15,55 @@ function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
   return <Text style={{ fontSize: 20, color }}>{glyph}</Text>;
 }
 
+/**
+ * Contribute is the thing a resident most often opens the app to do, so it is
+ * a raised button in the middle of the bar rather than a tab. It opens what is
+ * collecting money over the tabs, or the one event that is.
+ */
+function ContributeButton({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Contribute"
+      onPress={onPress}
+      style={{ flex: 1, alignItems: 'center' }}
+    >
+      <View
+        style={{
+          marginTop: -14,
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          borderWidth: 3,
+          borderColor: colors.surfaceRaised,
+          backgroundColor: colors.accent,
+          alignItems: 'center',
+          justifyContent: 'center',
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOpacity: 0.18,
+          shadowRadius: 4,
+          shadowOffset: { width: 0, height: 2 },
+        }}
+      >
+        <Text style={{ color: colors.accentInk, fontSize: 26, lineHeight: 28, fontWeight: '600' }}>
+          +
+        </Text>
+      </View>
+      <Text style={{ color: colors.inkSubtle, fontSize: 10, marginTop: 2 }}>Contribute</Text>
+    </Pressable>
+  );
+}
+
 export default function TabsLayout() {
+  const router = useRouter();
   const { colors } = useTheme();
   const { loading, user, memberships, welcomedAt, viewRole } = useAuth();
   // The committee's resident view hides Manage, exactly as residents see it.
   const staffView = can(viewRole, 'events:manage');
+  // Staff don't contribute; residents and the committee do.
+  const contributes = can(viewRole, 'contribute');
   const { data: todo } = useTodoItems();
   const todoCount = staffView ? (todo?.length ?? 0) : 0;
 
@@ -44,7 +88,12 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: colors.surfaceRaised },
         headerTintColor: colors.ink,
         headerTitleStyle: { fontWeight: '600' },
-        tabBarStyle: { backgroundColor: colors.surfaceRaised, borderTopColor: colors.border },
+        // Visible, so the Contribute button can rise above the bar's edge.
+        tabBarStyle: {
+          backgroundColor: colors.surfaceRaised,
+          borderTopColor: colors.border,
+          overflow: 'visible',
+        },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.inkSubtle,
         sceneStyle: { backgroundColor: colors.surface },
@@ -63,6 +112,29 @@ export default function TabsLayout() {
         options={{
           title: 'Events',
           tabBarIcon: ({ color }) => <TabIcon glyph="◈" color={color} />,
+          headerRight: () => <NotificationBell />,
+        }}
+      />
+      <Tabs.Screen
+        name="give"
+        options={
+          contributes
+            ? {
+                title: 'Contribute',
+                tabBarButton: () => <ContributeButton onPress={() => router.push('/contribute')} />,
+              }
+            : { href: null }
+        }
+      />
+      {/* The ledger is what the app exists to publish, so residents get it on
+          the bar. Staff and the committee have Manage there instead and reach
+          Money from Home and Me. */}
+      <Tabs.Screen
+        name="money"
+        options={{
+          title: 'Money',
+          href: staffView ? null : undefined,
+          tabBarIcon: ({ color }) => <TabIcon glyph="₹" color={color} />,
           headerRight: () => <NotificationBell />,
         }}
       />

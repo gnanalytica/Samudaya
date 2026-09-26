@@ -47,13 +47,13 @@ export function Meter({
   percent: number;
   /** Clamped to whatever the bar has left after the confirmed segment. */
   pendingPercent?: number;
-  tone?: 'accent' | 'success';
+  tone?: 'accent' | 'success' | 'danger' | 'warning';
   label: string;
 }) {
   const { colors } = useTheme();
   const clamped = Math.min(100, Math.max(0, percent));
   const pending = Math.min(100 - clamped, Math.max(0, pendingPercent));
-  const fill = tone === 'success' ? colors.success : colors.accent;
+  const fill = colors[tone];
   return (
     <View
       accessibilityRole="progressbar"

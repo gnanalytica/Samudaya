@@ -3,6 +3,7 @@ import { PiggyBank, Scale, Wallet } from 'lucide-react';
 import {
   LEDGER_FILTERS,
   UNPUBLISHED_EVENT,
+  can,
   filterLedger,
   formatDate,
   formatMoney,
@@ -23,6 +24,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatTile, StatTiles } from '@/components/badges';
 import { LedgerRow } from '@/components/ledger-row';
 import { cn } from '@/lib/utils';
+import { MyContributions } from './my-contributions';
 
 export const metadata = { title: 'Money' };
 
@@ -45,8 +47,25 @@ export const metadata = { title: 'Money' };
  */
 export default async function MoneyPage(props: PageProps<'/app/[community]/money'>) {
   const { community: slug } = await props.params;
-  const { show, event } = await props.searchParams;
-  const { community } = await requireCommunity(slug);
+  const { show, event, view } = await props.searchParams;
+  const { community, role, membership } = await requireCommunity(slug);
+  // Staff don't contribute, so they have nothing of their own to show.
+  const hasOwn = can(role, 'contribute');
+  const mine = hasOwn && view === 'mine';
+  const views = hasOwn ? <MoneyViews slug={slug} mine={mine} /> : null;
+
+  if (mine) {
+    return (
+      <>
+        <PageHeader title="Money" description="Your payments, and where each one stands." />
+        <PageBody>
+          {views}
+          <MyContributions slug={slug} membershipId={membership.id} currency={community.currency} />
+        </PageBody>
+      </>
+    );
+  }
+
   const supabase = await getSupabase();
 
   const [ledger, totals, society, movements, eventStats, eventNames] = await Promise.all([
@@ -102,6 +121,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         description={`Every rupee ${community.name} has taken in and spent.`}
       />
       <PageBody>
+        {views}
         <StatTiles>
           <StatTile
             label="Collected"
@@ -309,5 +329,35 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         ) : null}
       </PageBody>
     </>
+  );
+}
+
+/** The society's money and the member's own, as two views of one page. */
+function MoneyViews({ slug, mine }: { slug: string; mine: boolean }) {
+  const tab = (active: boolean) =>
+    cn(
+      'rounded-md px-3 py-1.5 whitespace-nowrap',
+      active ? 'bg-surface-sunken text-ink font-medium' : 'text-ink-muted hover:text-ink',
+    );
+  return (
+    <nav
+      aria-label="Whose money"
+      className="border-border-base bg-surface-raised mb-5 flex w-fit gap-1 rounded-lg border p-1 text-sm"
+    >
+      <Link
+        href={`/app/${slug}/money`}
+        aria-current={mine ? undefined : 'page'}
+        className={tab(!mine)}
+      >
+        Society
+      </Link>
+      <Link
+        href={`/app/${slug}/money?view=mine`}
+        aria-current={mine ? 'page' : undefined}
+        className={tab(mine)}
+      >
+        My contributions
+      </Link>
+    </nav>
   );
 }

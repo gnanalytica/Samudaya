@@ -136,7 +136,7 @@ export async function contribute(
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/events/${eventSlug}/contribute`);
   revalidatePath(`/app/${slug}/admin/events/${eventSlug}`);
-  revalidatePath(`/app/${slug}/me`);
+  revalidatePath(`/app/${slug}/money`);
   return {
     ...EMPTY_STATE,
     reported: { amount: parsed.data.amount, reference: parsed.data.reference },

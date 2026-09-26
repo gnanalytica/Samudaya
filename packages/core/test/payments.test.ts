@@ -3,6 +3,7 @@ import {
   billPath,
   correctionNote,
   correctionNoteForStaff,
+  myPaymentTotals,
   newTransactionRef,
   parseUpiResponse,
   paymentProofPath,
@@ -140,5 +141,23 @@ describe('a corrected amount', () => {
 
   it('works upwards too, because a correction is not always downwards', () => {
     expect(correctionNote(5000, 500)).toBe('Corrected from ₹500, which is what you reported');
+  });
+});
+
+describe('myPaymentTotals', () => {
+  it('splits what staff confirmed from what is still to be confirmed', () => {
+    expect(
+      myPaymentTotals([
+        { amount: '5001', status: 'succeeded' },
+        { amount: 2001, status: 'pending' },
+        { amount: 1001, status: 'failed' },
+        { amount: 500, status: 'refunded' },
+        { amount: 1500, status: 'succeeded' },
+      ]),
+    ).toEqual({ confirmed: 6501, pending: 2001 });
+  });
+
+  it('is zero for somebody who has not paid yet', () => {
+    expect(myPaymentTotals([])).toEqual({ confirmed: 0, pending: 0 });
   });
 });

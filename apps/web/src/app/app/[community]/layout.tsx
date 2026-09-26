@@ -79,8 +79,8 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
           </div>
         </header>
 
-        {/* Bottom padding clears the mobile nav bar. */}
-        <main id="main" className="min-w-0 flex-1 pb-20 md:pb-0">
+        {/* Bottom padding clears the mobile nav bar and its raised button. */}
+        <main id="main" className="min-w-0 flex-1 pb-24 md:pb-0">
           {viewMode === 'resident' ? <ResidentViewBanner slug={community.slug} /> : null}
           {props.children}
         </main>

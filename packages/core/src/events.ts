@@ -256,6 +256,47 @@ export function stillNeeded(target: number, raised: number, carriedIn = 0): numb
 }
 
 /**
+ * A budget line against its own plan, which is what its bar shows.
+ *
+ * Lines used to be drawn against the biggest one, so Decor at 93% of its plan
+ * looked half empty beside Food. Spending with no line behind it is
+ * `unplanned`: all of it is outside the budget, and a share of nothing says
+ * nothing.
+ */
+export type BudgetBar = {
+  planned: number;
+  spent: number;
+  /** Spent as a share of the plan, clamped for the bar. */
+  percent: number;
+  /** How far past the plan, or 0. */
+  over: number;
+  unplanned: boolean;
+};
+
+export function budgetBar(planned: number, spent: number): BudgetBar {
+  const unplanned = planned <= 0 && spent > 0;
+  return {
+    planned,
+    spent,
+    percent: unplanned ? 100 : fundedPercent(spent, planned),
+    over: planned > 0 ? Math.max(0, spent - planned) : 0,
+    unplanned,
+  };
+}
+
+/**
+ * The whole budget as one bar. An underspent line offsets an overspent one
+ * here, as it does in the event's accounts; each line's own bar still shows
+ * where it went over.
+ */
+export function budgetTotal(rows: { planned: number; spent: number }[]): BudgetBar {
+  return budgetBar(
+    rows.reduce((sum, row) => sum + row.planned, 0),
+    rows.reduce((sum, row) => sum + row.spent, 0),
+  );
+}
+
+/**
  * Surplus once an event closes. Negative means the event overspent, which is
  * shown as a shortfall rather than hidden behind a zero.
  */

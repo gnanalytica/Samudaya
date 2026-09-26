@@ -4,6 +4,7 @@ import {
   ClipboardCheck,
   LayoutDashboard,
   Lightbulb,
+  Plus,
   Scale,
   Settings2,
   SquareMenu,
@@ -26,6 +27,8 @@ export type NavItem = {
   badge?: 'todo';
   /** Other section roots this item stands for, so it stays lit inside them. */
   covers?: string[];
+  /** Drawn as the raised button in the middle of the bottom bar. */
+  action?: boolean;
 };
 
 /**
@@ -120,7 +123,8 @@ function manageTab(slug: string): NavItem {
 }
 
 /**
- * Four tabs — and which four depends on whether you run the society.
+ * Four tabs — and which four depends on whether you run the society — with
+ * Contribute raised in the middle for everyone who contributes.
  *
  * Residents get Home, Events, Money, Me. Staff and the committee get Home,
  * Events, Manage, Me, with the To do count riding on the tab.
@@ -137,16 +141,31 @@ function manageTab(slug: string): NavItem {
  * as the second row of the Manage hub, and under "More in this society" on
  * Home — which is built by subtracting this bar from the list, so the two
  * cannot drift.
+ *
+ * Contribute is the one thing a resident most often opens the app to do, so it
+ * is a button rather than a tab. Staff don't contribute and don't get it.
  */
 export function bottomNavItems(slug: string, role: MemberRole): NavItem[] {
   const primary = visibleNav(slug, role)
     .flatMap((group) => group.items)
     .filter((item) => item.primary);
-  if (!can(role, 'events:manage')) return primary;
 
   // Money gives up the slot rather than Manage taking a fifth: five labels
   // across a 360px phone is where they wrap. Staff read the ledger from Home,
   // which lists whatever their bar left out.
   const rest = primary.filter((item) => item.href !== `/app/${slug}/money`);
-  return [...rest.slice(0, 2), manageTab(slug), ...rest.slice(2)];
+  const tabs = can(role, 'events:manage')
+    ? [...rest.slice(0, 2), manageTab(slug), ...rest.slice(2)]
+    : primary;
+
+  if (!can(role, 'contribute')) return tabs;
+  return [...tabs.slice(0, 2), contributeButton(slug), ...tabs.slice(2)];
+}
+
+/**
+ * Opens what is collecting money, or goes straight to the one event that is.
+ * Not in navItems(): the desktop sidebar draws it as a button of its own.
+ */
+export function contributeButton(slug: string): NavItem {
+  return { href: `/app/${slug}/contribute`, label: 'Contribute', icon: Plus, action: true };
 }

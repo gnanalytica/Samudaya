@@ -56,13 +56,13 @@ import {
 } from '@/components/badges';
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
+import { BudgetBars } from '@/components/budget-bars';
 import { CarriedIn } from '@/components/carried-in';
 import { AuditTrail } from '@/components/audit-trail';
 import { SuggestionBoard } from '@/components/suggestion-board';
 import { CommentThread } from '@/components/comment-thread';
 import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
 import { EventTabs, eventTabsFor } from '@/components/event-tabs';
-import { cn } from '@/lib/utils';
 import { cancelRegistration } from '../actions';
 import { RegisterForm, SuggestionForm } from './participation-forms';
 
@@ -131,8 +131,6 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   const approved = expenses.filter((expense) => expense.status === 'approved');
   const awaiting = expenses.filter((expense) => expense.status !== 'approved');
   const categories = budgetVsSpent(budget, expenses);
-  const plannedTotal = categories.reduce((sum, row) => sum + row.planned, 0);
-  const largest = Math.max(1, ...categories.map((row) => Math.max(row.planned, row.spent)));
   const myRegistrations = registrations.filter((r) => r.membership_id === membership.id);
 
   // One list, shared with the console, so the two bars cannot drift apart.
@@ -429,58 +427,10 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
 
             {!isCampaign ? (
               <Card>
-                <CardHeader
-                  title="Budget and spending"
-                  description={
-                    plannedTotal > 0
-                      ? `${Math.round((stats.spent / plannedTotal) * 100)}% of the ${formatMoney(plannedTotal, community.currency)} budget used.`
-                      : undefined
-                  }
-                />
+                <CardHeader title="Budget and spending" />
                 {categories.length ? (
-                  <CardBody className="space-y-4">
-                    <div className="text-ink-subtle flex gap-4 text-xs">
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="bg-border-strong inline-block size-2.5 rounded-sm" />{' '}
-                        Planned
-                      </span>
-                      <span className="inline-flex items-center gap-1.5">
-                        <span className="bg-accent inline-block size-2.5 rounded-sm" /> Spent
-                      </span>
-                    </div>
-                    {categories.map((row) => {
-                      const over = row.planned > 0 && row.spent > row.planned;
-                      return (
-                        <div key={row.label}>
-                          <div className="flex justify-between gap-3 text-sm">
-                            <span className="text-ink font-medium">{row.label}</span>
-                            <span className={over ? 'text-danger' : 'text-ink-muted'}>
-                              {formatMoney(row.spent, community.currency)} of{' '}
-                              {row.planned > 0
-                                ? formatMoney(row.planned, community.currency)
-                                : 'no budget'}
-                            </span>
-                          </div>
-                          <div className="mt-1.5 space-y-1">
-                            <div className="bg-surface-sunken h-2 overflow-hidden rounded-full">
-                              <div
-                                className="bg-border-strong h-full rounded-full"
-                                style={{ width: `${(row.planned / largest) * 100}%` }}
-                              />
-                            </div>
-                            <div className="bg-surface-sunken h-2 overflow-hidden rounded-full">
-                              <div
-                                className={cn(
-                                  'h-full rounded-full',
-                                  over ? 'bg-danger' : 'bg-accent',
-                                )}
-                                style={{ width: `${(row.spent / largest) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <CardBody>
+                    <BudgetBars rows={categories} currency={community.currency} />
                   </CardBody>
                 ) : (
                   <EmptyState

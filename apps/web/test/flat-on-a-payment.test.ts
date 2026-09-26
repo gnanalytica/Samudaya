@@ -99,11 +99,11 @@ describe('a ledger row that still has no flat', () => {
     // Both surfaces ask the same function, so neither can decide on its own
     // that a missing flat is worth mentioning and the other stay quiet.
     expect(web('components', 'ledger-row.tsx')).toContain('const flat = ledgerFlat(row);');
-    expect(mobile('app', 'money.tsx')).toContain('const flat = ledgerFlat(item);');
+    expect(mobile('app', '(tabs)', 'money.tsx')).toContain('const flat = ledgerFlat(item);');
   });
 
   it('draws it as the gap it is, not as a flat called “not recorded”', () => {
     expect(web('components', 'ledger-row.tsx')).toContain('flat.known');
-    expect(mobile('app', 'money.tsx')).toContain('flat.known');
+    expect(mobile('app', '(tabs)', 'money.tsx')).toContain('flat.known');
   });
 });

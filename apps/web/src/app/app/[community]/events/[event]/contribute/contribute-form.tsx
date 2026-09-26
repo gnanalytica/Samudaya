@@ -177,8 +177,8 @@ export function ContributeForm({
             is confirmed.
           </p>
           <div className="mt-7 flex justify-center gap-3">
-            <ButtonLink href={`/app/${slug}/me`} variant="secondary" size="sm">
-              My payments
+            <ButtonLink href={`/app/${slug}/money?view=mine`} variant="secondary" size="sm">
+              My contributions
             </ButtonLink>
             <ButtonLink href={`/app/${slug}/events/${eventSlug}?tab=money`} size="sm">
               Back to the event
