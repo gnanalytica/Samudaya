@@ -475,7 +475,7 @@ export function HomeScreen() {
             target less the ₹7,800 the Balance shot moves in from Summer Camp,
             so nobody is asked twice for money that is already there. */}
         <div style={{ fontSize: 11.5, color: subtle, marginTop: 3 }}>
-          After {rupees(7800)} carried across by the committee
+          {rupees(7800)} already in the fund, carried across by the committee
         </div>
       </Card>
       <div style={{ display: 'flex', gap: 10 }}>
@@ -1477,7 +1477,7 @@ export function BudgetScreen() {
                     opacity: ramp(frame, sec(1.3), sec(1.7)),
                   }}
                 >
-                  {rupees(line.spent - line.planned)} over — and on the record
+                  {rupees(line.spent - line.planned)} over budget
                 </div>
               ) : null}
             </div>

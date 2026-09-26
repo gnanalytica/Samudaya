@@ -175,7 +175,7 @@ export const SHOTS: Shot[] = [
     id: 'budget',
     chapter: 'Spend',
     headline: 'Spend vs plan, per line',
-    points: ['₹31,200 of ₹35,000 used', 'Overspends shown, not hidden'],
+    points: ['₹31,200 of ₹35,000 used', 'Any overspend is flagged'],
     screen: <BudgetScreen />,
     tabs: COMMITTEE,
     active: 'Events',
