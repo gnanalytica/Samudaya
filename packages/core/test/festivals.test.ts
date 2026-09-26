@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_FESTIVAL, FESTIVALS, festivalById, festivalFor } from '../src/festivals';
+import {
+  DEFAULT_FESTIVAL,
+  FESTIVALS,
+  festivalById,
+  festivalFor,
+  headingTowards,
+} from '../src/festivals';
 
 describe('festivalFor', () => {
   it('reads the event type first, because that is what the society filed it as', () => {
@@ -63,5 +69,19 @@ describe('festivalById', () => {
     expect(festivalById('lunar-new-year').id).toBe('community');
     expect(festivalById(null).id).toBe('community');
     expect(festivalById(undefined).id).toBe('community');
+  });
+});
+
+describe('headingTowards', () => {
+  it('names the festival when the event is one', () => {
+    const diwali = festivalFor('Diwali Mela 2026');
+    expect(headingTowards(diwali, 'Diwali Mela 2026')).toBe(diwali.label);
+  });
+
+  it('names the event itself when it is not a festival, never the palette', () => {
+    expect(headingTowards(festivalFor('Velocity vipers'), 'Velocity vipers')).toBe(
+      'Velocity vipers',
+    );
+    expect(headingTowards(DEFAULT_FESTIVAL, 'Velocity vipers')).not.toBe(DEFAULT_FESTIVAL.label);
   });
 });

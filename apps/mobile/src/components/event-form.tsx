@@ -112,9 +112,17 @@ export function validateDetails(
 export function DetailsFields({
   details,
   onChange,
+  fundRuleLocked = false,
 }: {
   details: EventDetails;
   onChange: (next: EventDetails) => void;
+  /**
+   * Editing an event that already exists. The leftover rule is set once, when
+   * the event is created: residents see it marked as fixed, and the web has
+   * never offered a way to change it. The phone's editor did, which made that
+   * promise untrue.
+   */
+  fundRuleLocked?: boolean;
 }) {
   const set = <K extends keyof EventDetails>(key: K, value: EventDetails[K]) =>
     onChange({ ...details, [key]: value });
@@ -217,7 +225,17 @@ export function DetailsFields({
             Selected by default when residents contribute. Leave empty to accept any amount.
           </Caption>
         </View>
-        <FundRuleFields details={details} onChange={onChange} />
+        {fundRuleLocked ? (
+          <View style={{ gap: spacing.xs }}>
+            <Body>
+              If money is left over:{' '}
+              {details.fundRuleNote.trim() || FUND_RULE_PLAIN[details.fundRule]}
+            </Body>
+            <Caption>Fixed when the event was created.</Caption>
+          </View>
+        ) : (
+          <FundRuleFields details={details} onChange={onChange} />
+        )}
       </Disclosure>
     </View>
   );
@@ -249,7 +267,9 @@ export function FundRuleFields({
         onChangeText={(value) => onChange({ ...details, fundRuleNote: value })}
         placeholder="Any surplus goes to Deepavali 2027."
       />
-      <Caption>Residents see this on the event. Decide it before anyone pays.</Caption>
+      <Caption>
+        Residents see this on the event. It can’t be changed once the event is created.
+      </Caption>
     </View>
   );
 }

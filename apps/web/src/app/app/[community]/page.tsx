@@ -23,6 +23,7 @@ import {
   formatMoney,
   fundAsk,
   fundBarSegments,
+  headingTowards,
   todayIn,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
@@ -126,7 +127,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
       <FestivalHeader
         festival={nextFestival}
         title={firstName ? `Hello, ${firstName}` : community.name}
-        description={next ? `${community.name} · ${nextFestival.label} next` : community.name}
+        description={
+          next
+            ? `${community.name} · ${headingTowards(nextFestival, next.name)} next`
+            : community.name
+        }
       />
 
       <PageBody>

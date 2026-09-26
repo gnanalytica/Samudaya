@@ -375,7 +375,7 @@ export function CreateEventForm({
               <Field
                 label="If money is left over"
                 htmlFor="ne-fund-rule"
-                hint="Residents see this on the event. Decide it before anyone pays."
+                hint="Residents see this on the event. It can’t be changed once the event is created."
               >
                 {(control) => (
                   <Select {...control} name="fund_rule" defaultValue={DEFAULT_FUND_RULE}>

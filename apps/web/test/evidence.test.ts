@@ -257,3 +257,19 @@ describe('the fund bar', () => {
     expect(read('mobile', 'src', 'components', 'event-ui.tsx')).not.toContain('carriedPercent');
   });
 });
+
+describe('the leftover rule', () => {
+  /**
+   * Residents see an event's leftover rule with a lock and "Fixed before any
+   * money was collected". The web never had a way to change it after creation;
+   * the phone's event editor did, which made the lock untrue.
+   */
+  it('is set when the event is created and changed nowhere after', () => {
+    const editor = read('mobile', 'app', 'admin', 'event', '[slug].tsx');
+    expect(editor).toContain('fundRuleLocked');
+    expect(editor).not.toMatch(/fund_rule:\s*values/);
+    expect(
+      read('web', 'src', 'app', 'app', '[community]', 'admin', 'events', '[event]', 'forms.tsx'),
+    ).not.toContain('fund_rule');
+  });
+});

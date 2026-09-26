@@ -383,8 +383,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
         description: values.description ?? null,
         expected_attendance: values.expected_attendance ?? null,
         suggested_amount: values.suggested_amount ?? null,
-        fund_rule: values.fund_rule,
-        fund_rule_note: values.fund_rule_note ?? null,
+        // No fund_rule here: it is fixed when the event is created.
       })
       .eq('id', event.id);
     setBusy(false);
@@ -407,6 +406,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
           setDetails(next);
           setSaved(false);
         }}
+        fundRuleLocked
       />
       <ErrorText message={error} />
       {saved ? <Caption>Saved.</Caption> : null}
