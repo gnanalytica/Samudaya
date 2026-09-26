@@ -91,7 +91,7 @@ export default function Events() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          can(role, 'campaigns:propose') || can(role, 'events:manage') ? (
+          can(role, 'campaigns:propose') || can(role, 'events:manage') || can(role, 'suggest') ? (
             <View style={{ marginBottom: spacing.sm, gap: spacing.sm }}>
               {can(role, 'events:manage') ? (
                 <Button label="New event" onPress={() => router.push('/admin/event/new')} />
@@ -101,6 +101,15 @@ export default function Events() {
                   label="Start a fundraising campaign"
                   variant="secondary"
                   onPress={() => router.push('/campaign/new')}
+                />
+              ) : null}
+              {/* Ideas live here as well as under Me: this is where people are
+                  already thinking about what the society does. */}
+              {can(role, 'suggest') ? (
+                <Button
+                  label="Suggest an idea"
+                  variant="secondary"
+                  onPress={() => router.push('/ideas')}
                 />
               ) : null}
             </View>

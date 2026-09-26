@@ -640,8 +640,8 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
             {can(role, 'suggest') && event.status === 'published' ? (
               <Card>
                 <CardHeader
-                  title="Suggest something"
-                  description="The committee reviews it first."
+                  title="Suggest an idea"
+                  description={`For ${event.name}. The committee reviews it first.`}
                 />
                 <CardBody>
                   <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />

@@ -19,23 +19,14 @@ function Submit() {
 }
 
 /**
- * An activity worth doing, or something the committee should look at — for the
- * society, or for whichever event is running. The committee opens it for
- * voting, and then everybody has a say.
+ * An idea or an activity for the society. The committee opens it for voting,
+ * and then everybody has a say.
  *
- * It used to be able to say only "the society", which meant a resident who
- * wanted to suggest something for Dasara had to find Dasara's own page first.
- * The events are passed in rather than fetched here so the choice is the same
- * list the server will accept.
+ * It doesn't ask which event: the page is the society's, and an idea for an
+ * event is suggested from that event's own page, where there is no question
+ * which one it's about.
  */
-export function SocietySuggestionForm({
-  slug,
-  events,
-}: {
-  slug: string;
-  /** Published events, newest question first. Empty is fine: the society is. */
-  events: { slug: string; name: string; emoji: string }[];
-}) {
+export function SocietySuggestionForm({ slug }: { slug: string }) {
   const [state, action] = useActionState<ActionState, FormData>(suggestIdea, EMPTY_STATE);
   const ref = useResetOnSuccess(state);
 
@@ -43,20 +34,6 @@ export function SocietySuggestionForm({
     <form ref={ref} action={action} className="space-y-3">
       <FocusFirstError signal={state} />
       <input type="hidden" name="slug" value={slug} />
-      {events.length ? (
-        <Field label="What is it about?" htmlFor="ss-event" error={state.fieldErrors?.event}>
-          {(control) => (
-            <Select {...control} name="event" defaultValue="">
-              <option value="">The society</option>
-              {events.map((event) => (
-                <option key={event.slug} value={event.slug}>
-                  {event.emoji} {event.name}
-                </option>
-              ))}
-            </Select>
-          )}
-        </Field>
-      ) : null}
       <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
         <Field label="Type" htmlFor="ss-kind">
           {(control) => (

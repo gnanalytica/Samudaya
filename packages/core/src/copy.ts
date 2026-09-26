@@ -58,7 +58,7 @@ export const EVENT_TABS = [
   { id: 'about', label: 'About' },
   { id: 'money', label: 'Money' },
   { id: 'activities', label: 'Activities' },
-  { id: 'vote', label: 'Vote' },
+  { id: 'vote', label: 'Ideas' },
 ] as const;
 export type EventTab = (typeof EVENT_TABS)[number]['id'];
 

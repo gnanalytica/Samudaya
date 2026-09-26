@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { CalendarDays, CheckCircle2, Megaphone, Plus } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Lightbulb, Megaphone, Plus } from 'lucide-react';
 import {
   can,
   countdown,
@@ -114,6 +114,14 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
         title="Events"
         action={
           <div className="flex flex-wrap gap-2">
+            {/* Ideas live here as well as on their own page: this is where
+                people are already thinking about what the society does. */}
+            {can(role, 'suggest') ? (
+              <ButtonLink href={`/app/${slug}/suggest`} size="sm" variant="secondary">
+                <Lightbulb className="size-4" aria-hidden="true" />
+                Suggest an idea
+              </ButtonLink>
+            ) : null}
             {can(role, 'campaigns:propose') ? (
               <ButtonLink href={`/app/${slug}/events/propose`} size="sm" variant="secondary">
                 <Megaphone className="size-4" aria-hidden="true" />

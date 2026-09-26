@@ -1,6 +1,6 @@
 import { can } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
-import { getIdeas, listEvents } from '@/lib/events';
+import { getIdeas } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { SuggestionBoard } from '@/components/suggestion-board';
@@ -23,18 +23,10 @@ export const metadata = { title: 'Ideas' };
 export default async function SuggestPage(props: PageProps<'/app/[community]/suggest'>) {
   const { community: slug } = await props.params;
   const { community, viewRole: role, membership } = await requireCommunity(slug);
-  const [rows, events] = await Promise.all([
-    getIdeas(community.id, membership.id),
-    listEvents(community.id),
-  ]);
+  const rows = await getIdeas(community.id, membership.id);
 
   const open = rows.filter((row) => row.status === 'accepted').length;
   const waiting = rows.filter((row) => row.status === 'new').length;
-  // A draft is not offered: nobody outside the committee can see it, so a
-  // suggestion attached to one would be a suggestion nobody could vote on.
-  const running = events
-    .filter((event) => event.status === 'published')
-    .map((event) => ({ slug: event.slug, name: event.name, emoji: event.emoji }));
 
   return (
     <>
@@ -48,15 +40,18 @@ export default async function SuggestPage(props: PageProps<'/app/[community]/sug
               ]
                 .filter(Boolean)
                 .join(' · ')
-            : 'For an event or the society.'
+            : 'Ideas for the society and its events.'
         }
       />
       <PageBody>
         {can(role, 'suggest') ? (
           <Card className="mb-3">
-            <CardHeader title="Suggest something" description="The committee reviews it first." />
+            <CardHeader
+              title="Suggest an idea"
+              description="For the society. To suggest one for an event, use the event’s page."
+            />
             <CardBody>
-              <SocietySuggestionForm slug={community.slug} events={running} />
+              <SocietySuggestionForm slug={community.slug} />
             </CardBody>
           </Card>
         ) : null}

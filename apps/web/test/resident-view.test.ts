@@ -82,3 +82,19 @@ describe('money', () => {
     expect(form).not.toContain('/me`');
   });
 });
+
+describe('ideas', () => {
+  it('can be suggested from the Events tab, on both apps', () => {
+    expect(read(...WEB, 'events', 'page.tsx')).toContain('Suggest an idea');
+    expect(read('mobile', 'app', '(tabs)', 'events.tsx')).toContain('label="Suggest an idea"');
+  });
+
+  it('are called Ideas on the event page too, not Vote', () => {
+    expect(read('web', 'src', 'components', 'event-tabs.tsx')).toContain(
+      "{ id: 'vote', label: 'Ideas', admin: false }",
+    );
+    expect(read('..', 'packages', 'core', 'src', 'copy.ts')).toContain(
+      "{ id: 'vote', label: 'Ideas' }",
+    );
+  });
+});
