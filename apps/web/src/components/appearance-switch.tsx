@@ -3,7 +3,7 @@
 import { useId, useSyncExternalStore } from 'react';
 import { SunMoon } from 'lucide-react';
 import { APPEARANCE_CHOICES, parseAppearance, type AppearanceChoice } from '@samudaya/core';
-import { APPEARANCE_KEY } from '@/lib/appearance';
+import { APPEARANCE_KEY, CHOSEN_THEME_COLOR_ID, THEME_COLOR } from '@/lib/appearance';
 import { cn } from '@/lib/utils';
 
 // What the page is showing is the mark on <html>, so that is what the buttons
@@ -24,6 +24,20 @@ function choose(choice: AppearanceChoice) {
   const root = document.documentElement;
   if (choice === 'system') delete root.dataset.theme;
   else root.dataset.theme = choice;
+  // The browser toolbar follows: a tag of its own for Light or Dark, first in
+  // <head> so it wins, and none for System, which leaves the device's pair.
+  let chosen = document.getElementById(CHOSEN_THEME_COLOR_ID) as HTMLMetaElement | null;
+  if (choice === 'system') {
+    chosen?.remove();
+  } else {
+    if (!chosen) {
+      chosen = document.createElement('meta');
+      chosen.name = 'theme-color';
+      chosen.id = CHOSEN_THEME_COLOR_ID;
+      document.head.prepend(chosen);
+    }
+    chosen.content = THEME_COLOR[choice];
+  }
   try {
     if (choice === 'system') localStorage.removeItem(APPEARANCE_KEY);
     else localStorage.setItem(APPEARANCE_KEY, choice);

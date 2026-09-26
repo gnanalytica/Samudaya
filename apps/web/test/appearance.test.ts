@@ -3,7 +3,12 @@ import { join } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { APPEARANCE_CHOICES, parseAppearance } from '@samudaya/core';
-import { APPEARANCE_KEY, APPEARANCE_SCRIPT } from '@/lib/appearance';
+import {
+  APPEARANCE_KEY,
+  APPEARANCE_SCRIPT,
+  CHOSEN_THEME_COLOR_ID,
+  THEME_COLOR,
+} from '@/lib/appearance';
 
 /**
  * System, Light or Dark, on the web and on the phone.
@@ -22,12 +27,18 @@ const count = (haystack: string, needle: string) => haystack.split(needle).lengt
 /** Runs the <head> script the way a browser would, against a stand-in page. */
 function headScript(saved: () => string | null) {
   const root = { dataset: {} as Record<string, string> };
+  // What the script puts at the top of <head>, ahead of the layout's own pair.
+  const added: Record<string, string>[] = [];
   const context = {
     localStorage: { getItem: (key: string) => (key === APPEARANCE_KEY ? saved() : null) },
-    document: { documentElement: root },
+    document: {
+      documentElement: root,
+      createElement: () => ({}) as Record<string, string>,
+      head: { prepend: (element: Record<string, string>) => added.unshift(element) },
+    },
   };
   runInNewContext(APPEARANCE_SCRIPT, context);
-  return { theme: root.dataset.theme, context };
+  return { theme: root.dataset.theme, added, context };
 }
 
 describe('the choice', () => {
@@ -67,6 +78,16 @@ describe('the web head script', () => {
     expect(headScript(blocked).theme).toBeUndefined();
   });
 
+  it('paints the browser toolbar in the chosen colour, whatever the device is set to', () => {
+    // First in <head>, so it wins over the layout's pair, which it never edits.
+    expect(headScript(() => 'dark').added).toEqual([
+      { name: 'theme-color', id: CHOSEN_THEME_COLOR_ID, content: THEME_COLOR.dark },
+    ]);
+    expect(headScript(() => 'light').added[0]?.content).toBe(THEME_COLOR.light);
+    // System leaves the toolbar to the layout's one-per-appearance pair.
+    expect(headScript(() => null).added).toEqual([]);
+  });
+
   it('leaves nothing behind on window', () => {
     expect(Object.keys(headScript(() => 'dark').context)).toEqual(['localStorage', 'document']);
   });
@@ -75,6 +96,10 @@ describe('the web head script', () => {
     const layout = read('web', 'src', 'app', 'layout.tsx');
     const head = layout.slice(layout.indexOf('<head>'), layout.indexOf('</head>'));
     expect(head).toContain('__html: APPEARANCE_SCRIPT');
+    // Its own toolbar tags, ahead of the script that repaints them. Next's
+    // viewport export would re-create them on every client-side navigation.
+    expect(head.indexOf('name="theme-color"')).toBeLessThan(head.indexOf('APPEARANCE_SCRIPT'));
+    expect(layout).not.toContain('themeColor');
     expect(layout).toMatch(/<html lang="en" suppressHydrationWarning>/);
     expect(layout).not.toContain('next/headers');
   });
@@ -119,6 +144,12 @@ describe('the web control', () => {
     expect(control).toContain('localStorage.setItem(APPEARANCE_KEY, choice)');
     expect(control).toContain('localStorage.removeItem(APPEARANCE_KEY)');
     expect(control).toContain('delete root.dataset.theme');
+  });
+
+  it('repaints the browser toolbar as it changes, and hands it back to the device for System', () => {
+    expect(control).toContain('document.getElementById(CHOSEN_THEME_COLOR_ID)');
+    expect(control).toContain('chosen?.remove()');
+    expect(control).toContain('document.head.prepend(chosen)');
   });
 
   it('is a labelled group of toggle buttons that leave the menu open', () => {

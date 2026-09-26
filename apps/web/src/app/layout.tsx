@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { APPEARANCE_SCRIPT } from '@/lib/appearance';
+import { APPEARANCE_SCRIPT, THEME_COLOR } from '@/lib/appearance';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -27,10 +27,6 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#12211c' },
-  ],
   width: 'device-width',
   initialScale: 1,
 };
@@ -40,6 +36,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     // The script marks <html> with the chosen appearance before React hydrates it.
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* One per device appearance, for System. Light or Dark adds a tag of
+            its own ahead of these (lib/appearance.ts). */}
+        <meta
+          name="theme-color"
+          media="(prefers-color-scheme: light)"
+          content={THEME_COLOR.light}
+        />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content={THEME_COLOR.dark} />
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
       </head>
       <body className="min-h-dvh font-sans antialiased">
