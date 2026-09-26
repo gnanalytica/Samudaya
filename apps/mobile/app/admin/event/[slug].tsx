@@ -20,12 +20,16 @@ import {
   can,
   createActivitySchema,
   eventSlug as makeEventSlug,
+  formatDate,
   formatMoney,
   nextEditionDate,
   nextEditionName,
+  placesProblem,
+  practiceDatesLine,
   type FundRule,
   surplusKindFor,
   type SurplusAnswer,
+  updateActivitySchema,
 } from '@samudaya/core';
 import { useAuth } from '../../../src/lib/auth';
 import { supabase } from '../../../src/lib/supabase';
@@ -45,6 +49,7 @@ import {
 } from '../../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../../src/components/admin-ui';
 import { CataloguePicker } from '../../../src/components/catalogue-ui';
+import { DateField } from '../../../src/components/date-field';
 import {
   ActivityTypeChips,
   DetailsFields,
@@ -70,11 +75,15 @@ async function loadEvent(communityId: string, slug: string) {
       .select('id, category, category_id, amount, position')
       .eq('event_id', event.id)
       .order('position'),
+    // Who registered, and who registered them, as the web's organiser page lists them.
     supabase
       .from('event_activities')
-      .select('id, name, emoji, is_open, activity_participants(count)')
+      .select(
+        'id, name, emoji, description, capacity, is_open, coordinator_id, practice_dates, memberships!event_activities_coordinator_id_fkey(profiles(full_name)), activity_participants(id, participant_name, memberships!activity_participants_membership_id_fkey(profiles(full_name)))',
+      )
       .eq('event_id', event.id)
-      .order('position'),
+      .order('position')
+      .order('joined_at', { referencedTable: 'activity_participants' }),
     supabase
       .from('expenses')
       .select('id', { count: 'exact', head: true })
@@ -103,10 +112,10 @@ async function loadEvent(communityId: string, slug: string) {
     event,
     eventTypeLabel: eventType.data?.label ?? null,
     budget: budget.data ?? [],
-    activities: (activities.data ?? []).map((activity) => ({
+    activities: (activities.data ?? []).map(({ activity_participants: people, ...activity }) => ({
       ...activity,
-      registrations:
-        (activity.activity_participants as unknown as { count: number }[] | null)?.[0]?.count ?? 0,
+      people,
+      registrations: people.length,
     })),
     openBills: openBills.count ?? 0,
     stats: stats.data,
@@ -383,8 +392,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
         description: values.description ?? null,
         expected_attendance: values.expected_attendance ?? null,
         suggested_amount: values.suggested_amount ?? null,
-        fund_rule: values.fund_rule,
-        fund_rule_note: values.fund_rule_note ?? null,
+        // No fund_rule here: it is fixed when the event is created.
       })
       .eq('id', event.id);
     setBusy(false);
@@ -407,6 +415,7 @@ function DetailsCard({ data, onChange }: { data: Loaded; onChange: () => void })
           setDetails(next);
           setSaved(false);
         }}
+        fundRuleLocked
       />
       <ErrorText message={error} />
       {saved ? <Caption>Saved.</Caption> : null}
@@ -537,13 +546,29 @@ function BudgetCard({ data, onChange }: { data: Loaded; onChange: () => void }) 
   );
 }
 
+type Activity = Loaded['activities'][number];
+
+/** "Aarav · registered by Priya Sharma" for a family member, as the web lists them. */
+function registrantLine(row: Activity['people'][number]) {
+  const by = row.memberships?.profiles?.full_name;
+  if (!row.participant_name) return by ?? 'Resident';
+  return by ? `${row.participant_name} · registered by ${by}` : row.participant_name;
+}
+
+type ActivityDraft = {
+  typeId: string | null;
+  name: string;
+  emoji: string;
+  places: string;
+  description: string;
+};
+
 function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void }) {
   const { activeCommunity } = useAuth();
   const invalidate = useInvalidate(onChange);
   const { event } = data;
-  const [draft, setDraft] = useState<{ typeId: string | null; name: string; emoji: string } | null>(
-    null,
-  );
+  const [draft, setDraft] = useState<ActivityDraft | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const locked = event.status === 'completed' || event.status === 'cancelled';
@@ -554,6 +579,8 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
       event_id: event.id,
       name: draft.name,
       emoji: draft.emoji || '🎭',
+      description: draft.description.trim() || undefined,
+      capacity: draft.places.trim() || null,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? 'Check the activity.');
@@ -566,6 +593,8 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
       community_id: activeCommunity.id,
       name: parsed.data.name,
       emoji: parsed.data.emoji,
+      description: parsed.data.description ?? null,
+      capacity: parsed.data.capacity ?? null,
       activity_type_id: draft.typeId,
       position: data.activities.length,
     });
@@ -604,37 +633,68 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
     <Card style={{ gap: spacing.md }}>
       <Heading>Activities</Heading>
       {data.activities.length ? (
-        data.activities.map((activity) => (
-          <View key={activity.id} style={{ gap: spacing.xs }}>
-            <Body>
-              {activity.emoji} {activity.name}
-            </Body>
-            <Caption>
-              {activity.registrations} registered · {activity.is_open ? 'Open' : 'Closed'}
-            </Caption>
-            {!locked ? (
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        data.activities.map((activity) =>
+          editing === activity.id && !locked ? (
+            <ActivityEditor
+              key={activity.id}
+              eventId={event.id}
+              activity={activity}
+              onCancel={() => setEditing(null)}
+              onSaved={async () => {
+                setEditing(null);
+                await invalidate();
+              }}
+            />
+          ) : (
+            <View key={activity.id} style={{ gap: spacing.xs }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <View style={{ flex: 1 }}>
-                  <Button
-                    label={activity.is_open ? 'Close registrations' : 'Reopen'}
-                    variant="secondary"
-                    onPress={() => void update(activity.id, activity.is_open ? 'close' : 'open')}
-                    loading={busy === activity.id}
-                  />
+                  <Body>
+                    {activity.emoji} {activity.name}
+                  </Body>
                 </View>
-                {activity.registrations === 0 ? (
-                  <View style={{ width: 100 }}>
+                {!locked ? <Chip label="Edit" onPress={() => setEditing(activity.id)} /> : null}
+              </View>
+              <Caption>
+                {activity.registrations} registered
+                {activity.capacity ? ` of ${activity.capacity} places` : ''} ·{' '}
+                {activity.is_open ? 'Open' : 'Closed'}
+              </Caption>
+              {activity.memberships?.profiles?.full_name ? (
+                <Caption>Coordinator: {activity.memberships.profiles.full_name}</Caption>
+              ) : null}
+              {activity.practice_dates.length ? (
+                <Caption>Practice: {practiceDatesLine(activity.practice_dates)}</Caption>
+              ) : null}
+              {activity.people.map((row) => (
+                <Body key={row.id} muted>
+                  {registrantLine(row)}
+                </Body>
+              ))}
+              {!locked ? (
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}>
                     <Button
-                      label="Remove"
+                      label={activity.is_open ? 'Close registrations' : 'Reopen'}
                       variant="secondary"
-                      onPress={() => void update(activity.id, 'remove')}
+                      onPress={() => void update(activity.id, activity.is_open ? 'close' : 'open')}
+                      loading={busy === activity.id}
                     />
                   </View>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        ))
+                  {activity.registrations === 0 ? (
+                    <View style={{ width: 100 }}>
+                      <Button
+                        label="Remove"
+                        variant="secondary"
+                        onPress={() => void update(activity.id, 'remove')}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          ),
+        )
       ) : (
         <Body muted>No activities yet.</Body>
       )}
@@ -659,22 +719,270 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
                 />
               </View>
             </View>
+            <Input
+              label="Places"
+              value={draft.places}
+              onChangeText={(places) =>
+                setDraft({ ...draft, places: places.replace(/[^0-9]/g, '') })
+              }
+              keyboardType="number-pad"
+              placeholder="No limit"
+            />
+            <Input
+              label="Description"
+              value={draft.description}
+              onChangeText={(description) => setDraft({ ...draft, description })}
+              multiline
+              style={{ minHeight: 72, textAlignVertical: 'top' }}
+            />
             <Button label="Add activity" onPress={() => void add()} loading={busy === 'add'} />
             <Button label="Cancel" variant="secondary" onPress={() => setDraft(null)} />
           </View>
         ) : (
-          <View style={{ gap: spacing.sm }}>
-            <Caption>Pick a type to add an activity.</Caption>
-            <ActivityTypeChips
-              onPick={(item) =>
-                setDraft({ typeId: item.id, name: item.label, emoji: item.emoji ?? '🎭' })
-              }
-            />
-          </View>
+          <ActivityTypeChips
+            onPick={(item) =>
+              setDraft({
+                typeId: item.id,
+                name: item.label,
+                emoji: item.emoji ?? '🎭',
+                places: '',
+                description: '',
+              })
+            }
+          />
         )
       ) : null}
       <ErrorText message={error} />
     </Card>
+  );
+}
+
+/** A day added to the list, which stays in date order and holds each day once. */
+const withDay = (days: string[], day: string) =>
+  days.includes(day) ? days : [...days, day].sort();
+
+/**
+ * Everything about an activity once it is added, as the web's Edit has it:
+ * places, description, who coordinates it and when it practises.
+ */
+function ActivityEditor({
+  eventId,
+  activity,
+  onCancel,
+  onSaved,
+}: {
+  eventId: string;
+  activity: Activity;
+  onCancel: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState(() => ({
+    emoji: activity.emoji,
+    name: activity.name,
+    places: activity.capacity ? String(activity.capacity) : '',
+    description: activity.description ?? '',
+    coordinatorId: activity.coordinator_id,
+    days: activity.practice_dates,
+  }));
+  const [day, setDay] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+    setForm((current) => ({ ...current, [key]: value }));
+  const dropDay = (gone: string) =>
+    set(
+      'days',
+      form.days.filter((other) => other !== gone),
+    );
+
+  // Names and flats only; a coordinator is anyone in the society.
+  const { data: members, loading: loadingMembers } = useCommunityData(
+    'activity-coordinators',
+    async (communityId) => {
+      const { data: people } = await supabase.rpc('society_people', {
+        p_community_id: communityId,
+      });
+      return (people ?? [])
+        .flatMap((person) =>
+          person.membership_id
+            ? [
+                {
+                  id: person.membership_id,
+                  label: [person.full_name ?? 'Unnamed', person.flat].filter(Boolean).join(' · '),
+                },
+              ]
+            : [],
+        )
+        .sort((a, b) => a.label.localeCompare(b.label));
+    },
+  );
+
+  const query = search.trim().toLowerCase();
+  const matches = query
+    ? (members ?? []).filter((member) => member.label.toLowerCase().includes(query)).slice(0, 8)
+    : [];
+  const coordinator =
+    members?.find((member) => member.id === form.coordinatorId)?.label ??
+    (form.coordinatorId === activity.coordinator_id
+      ? activity.memberships?.profiles?.full_name
+      : null) ??
+    'Current coordinator';
+
+  const save = async () => {
+    const parsed = updateActivitySchema.safeParse({
+      id: activity.id,
+      name: form.name,
+      emoji: form.emoji || '🎭',
+      description: form.description,
+      capacity: form.places.trim() || null,
+      coordinator_id: form.coordinatorId,
+      // A day picked and never added is still meant.
+      practice_dates: day ? withDay(form.days, day) : form.days,
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? 'Check the activity.');
+      return;
+    }
+    const { id, ...changes } = parsed.data;
+    setBusy(true);
+    setError(null);
+    // Only a change is checked, against a fresh count. Nothing caps
+    // registrations in the database, so an activity can already hold more
+    // people than places, and that must not stop anyone fixing its name.
+    if (changes.capacity !== null && changes.capacity !== activity.capacity) {
+      const { count } = await supabase
+        .from('activity_participants')
+        .select('id', { count: 'exact', head: true })
+        .eq('activity_id', id);
+      const tooFew = placesProblem(changes.capacity, count ?? activity.registrations);
+      if (tooFew) {
+        setBusy(false);
+        setError(tooFew);
+        return;
+      }
+    }
+    const { error: updateError } = await supabase
+      .from('event_activities')
+      .update(changes)
+      .eq('id', id)
+      .eq('event_id', eventId);
+    setBusy(false);
+    if (updateError) {
+      setError(
+        updateError.code === '23505'
+          ? 'This event already has an activity with that name.'
+          : updateError.message,
+      );
+      return;
+    }
+    onSaved();
+  };
+
+  return (
+    <View style={{ gap: spacing.md }}>
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <View style={{ width: 64 }}>
+          <Input
+            label="Emoji"
+            value={form.emoji}
+            maxLength={8}
+            onChangeText={(value) => set('emoji', value)}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Input
+            label="Activity name"
+            value={form.name}
+            onChangeText={(value) => set('name', value)}
+          />
+        </View>
+      </View>
+      <Input
+        label="Places"
+        value={form.places}
+        onChangeText={(value) => set('places', value.replace(/[^0-9]/g, ''))}
+        keyboardType="number-pad"
+        placeholder="No limit"
+      />
+      <Input
+        label="Description"
+        value={form.description}
+        onChangeText={(value) => set('description', value)}
+        multiline
+        style={{ minHeight: 72, textAlignVertical: 'top' }}
+      />
+
+      <View style={{ gap: spacing.sm }}>
+        <Body>Coordinator</Body>
+        <ChipRow>
+          <Chip
+            label="None"
+            selected={!form.coordinatorId}
+            onPress={() => set('coordinatorId', null)}
+          />
+          {form.coordinatorId ? (
+            <Chip label={coordinator} selected onPress={() => set('coordinatorId', null)} />
+          ) : null}
+        </ChipRow>
+        <Input
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Find someone by name or flat"
+          accessibilityLabel="Find a coordinator by name or flat"
+        />
+        {query ? (
+          loadingMembers ? (
+            <Caption>Loading…</Caption>
+          ) : matches.length ? (
+            <ChipRow>
+              {matches.map((member) => (
+                <Chip
+                  key={member.id}
+                  label={member.label}
+                  selected={member.id === form.coordinatorId}
+                  onPress={() => {
+                    set('coordinatorId', member.id);
+                    setSearch('');
+                  }}
+                />
+              ))}
+            </ChipRow>
+          ) : (
+            <Caption>Nobody matches.</Caption>
+          )
+        ) : null}
+      </View>
+
+      <View style={{ gap: spacing.sm }}>
+        <Body>Practice dates</Body>
+        {form.days.length ? (
+          <ChipRow>
+            {form.days.map((practice) => (
+              <Chip
+                key={practice}
+                label={`${formatDate(practice)}  ✕`}
+                onPress={() => dropDay(practice)}
+              />
+            ))}
+          </ChipRow>
+        ) : null}
+        <DateField label="Add a date" value={day} onChange={setDay} />
+        <Button
+          label="Add date"
+          variant="secondary"
+          disabled={!day}
+          onPress={() => {
+            if (day) set('days', withDay(form.days, day));
+            setDay(null);
+          }}
+        />
+      </View>
+
+      <ErrorText message={error} />
+      <Button label="Save changes" onPress={() => void save()} loading={busy} />
+      <Button label="Cancel" variant="secondary" onPress={onCancel} />
+    </View>
   );
 }
 

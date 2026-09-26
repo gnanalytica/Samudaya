@@ -2,11 +2,12 @@ import Link from 'next/link';
 import { Bell, ChevronDown, Eye, LogOut, Settings } from 'lucide-react';
 import type { ViewMode } from '@samudaya/core';
 import { switchView } from '@/app/app/[community]/view-actions';
+import { AppearanceSwitch } from '@/components/appearance-switch';
 import { cn } from '@/lib/utils';
 
 /**
- * The signed-in person's menu: notifications, their settings and sign out.
- * A native <details> keeps it working without client JavaScript.
+ * The signed-in person's menu: notifications, their settings, appearance and
+ * sign out. A native <details> keeps it working without client JavaScript.
  */
 export function ProfileMenu({
   slug,
@@ -94,6 +95,7 @@ export function ProfileMenu({
           <Settings className="size-4" aria-hidden="true" />
           Settings
         </Link>
+        <AppearanceSwitch />
         <form action="/auth/signout" method="post">
           <button type="submit" className={item}>
             <LogOut className="size-4" aria-hidden="true" />

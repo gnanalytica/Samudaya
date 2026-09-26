@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { startActivityAsync } from 'expo-intent-launcher';
 import { useQueryClient } from '@tanstack/react-query';
@@ -8,7 +16,11 @@ import {
   COPY,
   can,
   contributionPresets,
+  countdown,
+  formatDate,
   formatMoney,
+  fundBarSegments,
+  inTheFund,
   isSuggestedAmount,
   newTransactionRef,
   optionalUpiReference,
@@ -21,7 +33,7 @@ import {
 } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
-import { fetchEventBySlug } from '../src/lib/events';
+import { fetchEventBySlug, fetchEvents, fetchStats } from '../src/lib/events';
 import { uploadFile, type PickedFile } from '../src/lib/storage';
 import { useCommunityData } from '../src/lib/use-community-data';
 import {
@@ -38,6 +50,7 @@ import {
 } from '../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../src/components/admin-ui';
 import { FilePickerField } from '../src/components/file-ui';
+import { Meter } from '../src/components/event-ui';
 import { radius, spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
 
@@ -54,7 +67,117 @@ import { useTheme } from '../src/lib/use-theme';
  * return nothing, so the resident enters the reference there.
  */
 export default function Contribute() {
-  const { event: eventSlug } = useLocalSearchParams<{ event: string }>();
+  const { event } = useLocalSearchParams<{ event?: string }>();
+  return event ? <ContributeTo eventSlug={event} /> : <ChooseEvent />;
+}
+
+/**
+ * What the tab bar's Contribute button opens: everything collecting money
+ * right now. With only one, there is nothing to ask, so it goes straight there.
+ */
+function ChooseEvent() {
+  const router = useRouter();
+  const { activeCommunity, role } = useAuth();
+  const currency = activeCommunity?.currency ?? 'INR';
+
+  const { data, loading } = useCommunityData('contribute:choose', async (communityId) => {
+    const open = (await fetchEvents(communityId))
+      .filter((event) => event.status === 'published')
+      .sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+    const stats = await fetchStats(open.map((event) => event.id));
+    return open.map((event) => ({ ...event, stats: stats.get(event.id) }));
+  });
+
+  if (!can(role, 'contribute')) {
+    return (
+      <Screen>
+        <EmptyState
+          title="Staff don’t contribute"
+          description="Record a flat’s payment from Manage → Payments."
+        />
+      </Screen>
+    );
+  }
+
+  if (loading && !data) {
+    return (
+      <Screen>
+        <Loading />
+      </Screen>
+    );
+  }
+
+  const open = data ?? [];
+  const only = open.length === 1 ? open[0] : undefined;
+  if (only) {
+    return <Redirect href={{ pathname: '/contribute', params: { event: only.slug } }} />;
+  }
+
+  return (
+    <Screen>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.md }}>
+        {open.length ? (
+          <>
+            <Caption>Pick what you’re paying for.</Caption>
+            {open.map((event) => {
+              const target = event.stats?.fundTarget ?? event.fund_target;
+              const held = inTheFund(event.stats?.fundRaised ?? 0, event.stats?.fundCarried ?? 0);
+              const bar = fundBarSegments(
+                event.stats?.fundRaised ?? 0,
+                event.stats?.fundPending ?? 0,
+                target,
+                event.stats?.fundCarried ?? 0,
+              );
+              return (
+                <Pressable
+                  key={event.id}
+                  accessibilityRole="button"
+                  // Replaced rather than pushed, so Done after paying goes back
+                  // to wherever the button was pressed, not to this list.
+                  onPress={() =>
+                    router.replace({ pathname: '/contribute', params: { event: event.slug } })
+                  }
+                >
+                  <Card style={{ gap: spacing.sm }}>
+                    <View style={{ gap: 2 }}>
+                      <Body>
+                        {event.emoji} {event.name}
+                      </Body>
+                      <Caption>
+                        {event.kind === 'campaign' ? 'Fundraising campaign · ' : ''}
+                        {formatDate(event.starts_on)}
+                        {countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''}
+                      </Caption>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Caption>
+                        {formatMoney(held, currency)} of {formatMoney(target, currency)}
+                      </Caption>
+                      <Caption>{bar.confirmed}%</Caption>
+                    </View>
+                    <Meter
+                      percent={bar.confirmed}
+                      pendingPercent={bar.pending}
+                      tone="success"
+                      label="Fund progress"
+                    />
+                  </Card>
+                </Pressable>
+              );
+            })}
+          </>
+        ) : (
+          <EmptyState
+            title="Nothing is collecting money right now"
+            description="When the committee opens an event or a campaign, it shows up here."
+          />
+        )}
+      </ScrollView>
+    </Screen>
+  );
+}
+
+function ContributeTo({ eventSlug }: { eventSlug: string }) {
   const { activeCommunity, membershipId, role } = useAuth();
 
   const { data, loading } = useCommunityData(
@@ -400,7 +523,8 @@ function PayWithUpi({
             <Body muted>Waiting for confirmation</Body>
             <Caption>
               {captured ? 'We got the payment details from your UPI app. ' : ''}
-              It counts in the event total once staff confirm it. Follow it under Me.
+              It counts in the event total once staff confirm it. Follow it under Money → My
+              contributions.
             </Caption>
           </Card>
           <Button label="Done" onPress={() => router.back()} />

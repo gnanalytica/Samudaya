@@ -1,36 +1,27 @@
-import { carriedFromLine, carriedInLine, type CarriedInRow } from '@samudaya/core';
+import { carriedFromLine, type CarriedInRow } from '@samudaya/core';
 import { cn } from '@/lib/utils';
 
 /**
- * Money the society already had, moved behind this event by the committee:
- * how it changes what residents are asked for, then each sum — where it came
- * from, who decided it and when.
- *
- * Said out loud rather than folded into the raised figure: "sixty flats gave
- * ₹30,000" and "the committee moved ₹10,000 across from last year" are
- * different sentences, and the second one carries a name.
+ * Money the committee carried into this event, one row per sum: where it came
+ * from, who decided it and when. It is counted in the fund like any other
+ * money (inTheFund); this is its entry in the event's money, the way a
+ * contribution has a payer and a bill has an approver.
  */
 export function CarriedIn({
-  target,
-  carried,
   movements,
   currency,
   className,
 }: {
-  target: number;
-  carried: number;
   movements: (CarriedInRow & { id: string })[];
   currency: string;
   className?: string;
 }) {
-  const summary = carriedInLine(target, carried, currency);
-  if (!summary) return null;
+  if (!movements.length) return null;
   return (
-    <div className={cn('text-ink-subtle mt-2 space-y-0.5 text-xs', className)}>
-      <p>{summary}</p>
+    <ul className={cn('text-ink-subtle mt-2 space-y-0.5 text-xs', className)}>
       {movements.map((movement) => (
-        <p key={movement.id}>{carriedFromLine(movement, currency)}</p>
+        <li key={movement.id}>+ {carriedFromLine(movement, currency)}</li>
       ))}
-    </div>
+    </ul>
   );
 }

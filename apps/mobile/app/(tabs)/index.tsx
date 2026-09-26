@@ -3,28 +3,19 @@ import { useRouter } from 'expo-router';
 import {
   ROLE_LABEL,
   TODO_KIND,
-  alreadyInFundLine,
-  awaitingLine,
   can,
-  carriedDeciders,
   countdown,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
   normalizeRole,
   normalizeStats,
   setupProgress,
   setupSteps,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
-import {
-  fetchCarriedInto,
-  fetchEvents,
-  fetchSocietyBalance,
-  fetchStats,
-  pickNextEvent,
-} from '../../src/lib/events';
+import { fetchEvents, fetchSocietyBalance, fetchStats, pickNextEvent } from '../../src/lib/events';
 import { fetchSetupFacts } from '../../src/lib/setup';
 import { groupTodo, useTodoItems } from '../../src/lib/todo';
 import { useCommunityData } from '../../src/lib/use-community-data';
@@ -42,7 +33,7 @@ import {
 } from '../../src/components/ui';
 import { LinkRow } from '../../src/components/admin-ui';
 import { ResidentViewBanner } from '../../src/components/view-switch';
-import { Meter, StatTile } from '../../src/components/event-ui';
+import { FundKey, Meter, StatTile } from '../../src/components/event-ui';
 import { todoTitle } from '../../src/components/todo-queue';
 import { spacing } from '../../src/lib/theme';
 
@@ -61,17 +52,14 @@ export default function Home() {
     async (communityId) => {
       const events = await fetchEvents(communityId);
       const next = pickNextEvent(events);
-      const [stats, society, carriedIn] = await Promise.all([
+      const [stats, society] = await Promise.all([
         next ? fetchStats([next.id]) : new Map<string, ReturnType<typeof normalizeStats>>(),
         fetchSocietyBalance(communityId),
-        next ? fetchCarriedInto(next.id) : Promise.resolve([]),
       ]);
       return {
         next: next ?? null,
         stats: next ? (stats.get(next.id) ?? normalizeStats(null)) : normalizeStats(null),
         society,
-        // Who put money behind the next event, named on its card.
-        carriedBy: carriedDeciders(carriedIn),
       };
     },
   );
@@ -101,10 +89,9 @@ export default function Home() {
     stats.fundCarried,
   );
   const funded = fundBar.confirmed;
-  // The card leads with confirmed money only: say what the paler segment is,
-  // and that money carried in is already in the fund.
-  const waiting = awaitingLine(stats.fundPending, currency);
-  const inFund = alreadyInFundLine(stats.fundCarried, data?.carriedBy ?? null, currency);
+  // What the fund holds, carried money included: the card's headline and the
+  // bar's solid part. Where carried money came from is a row on the event.
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const heldBySociety = data?.society.balance ?? 0;
   const balanceMovements = data?.society.movements ?? 0;
   const normalized = normalizeRole(role);
@@ -183,8 +170,7 @@ export default function Home() {
               <View style={{ gap: spacing.xs }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <Caption>
-                    {formatMoney(stats.fundRaised, currency)} of{' '}
-                    {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), currency)}
+                    {formatMoney(held, currency)} of {formatMoney(stats.fundTarget, currency)}
                   </Caption>
                   <Caption>{funded}%</Caption>
                 </View>
@@ -194,8 +180,7 @@ export default function Home() {
                   tone="success"
                   label="Fund progress"
                 />
-                {waiting ? <Caption>{waiting}</Caption> : null}
-                {inFund ? <Caption>{inFund}</Caption> : null}
+                <FundKey confirmed={held} pending={stats.fundPending} currency={currency} />
               </View>
 
               <View style={{ flexDirection: 'row', gap: spacing.md }}>
@@ -218,9 +203,9 @@ export default function Home() {
             </Card>
 
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <StatTile label="RAISED" value={formatMoney(stats.fundRaised, currency)} />
               <StatTile label="SPENT" value={formatMoney(stats.spent, currency)} />
               <StatTile label="HOUSEHOLDS" value={String(stats.contributors)} />
+              <StatTile label="REGISTERED" value={String(stats.participants)} />
             </View>
           </>
         ) : (

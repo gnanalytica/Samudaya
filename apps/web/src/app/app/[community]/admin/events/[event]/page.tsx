@@ -5,9 +5,10 @@ import {
   can,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
   nextEditionName,
+  practiceDatesLine,
   receiptRef,
   stillNeeded,
   todayIn,
@@ -43,6 +44,7 @@ import {
   EventStatusBadge,
   ExpenseStatusBadge,
   FundBar,
+  FundKey,
   PaymentStatusBadge,
   StatTile,
   StatTiles,
@@ -54,6 +56,7 @@ import {
   AddBudgetLineForm,
   AllocateSurplusForm,
   CloseEventForm,
+  EditActivityForm,
   EventDetailsForm,
   ExpenseForm,
   RecordPaymentForm,
@@ -76,8 +79,10 @@ export default async function ManageEventPage(
 
   const isCommittee = can(role, 'expenses:approve');
   // The same list the event page renders, so one strip spans both routes.
+  // Activities is a reader's tab in that strip; its organiser half, reached
+  // from there by "Manage activities", lives here.
   const tabs = eventTabsFor({ role, kind: event.kind, status: event.status }).filter(
-    (t) => t.admin,
+    (t) => t.admin || (t.id === 'activities' && can(role, 'activities:manage')),
   );
   const active = tabs.find((t) => t.id === tab)?.id ?? 'overview';
   const base = `/app/${community.slug}`;
@@ -95,6 +100,7 @@ export default async function ManageEventPage(
     society,
     openEvents,
     carriedIn,
+    directory,
   ] = await Promise.all([
     getEventStats(event.id),
     getBudgetLines(event.id),
@@ -114,6 +120,11 @@ export default async function ManageEventPage(
     getSocietyBalance(community.id),
     getOpenEvents(community.id, event.id),
     getCarriedInto(event.id),
+    // Whoever could coordinate an activity. The whole society, so only on the
+    // tab that asks.
+    active === 'activities'
+      ? supabase.rpc('society_people', { p_community_id: community.id })
+      : null,
   ]);
 
   // The database steps the separation-of-duties rule aside when there is
@@ -138,8 +149,24 @@ export default async function ManageEventPage(
     stats.fundCarried,
   );
   const funded = bar.confirmed;
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
+  // As on the phone: an event's activities stop changing once it is closed or
+  // cancelled.
+  const locked = closed || event.status === 'cancelled';
+  const members = (directory?.data ?? [])
+    .flatMap((person) =>
+      person.membership_id
+        ? [
+            {
+              id: person.membership_id,
+              label: [person.full_name ?? 'Unnamed', person.flat].filter(Boolean).join(' · '),
+            },
+          ]
+        : [],
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
   const open = expenses.filter((e) => e.status === 'pending' || e.status === 'changes_requested');
   const decided = expenses.filter((e) => e.status === 'approved' || e.status === 'rejected');
   const categories = budgetVsSpent(budget, expenses);
@@ -211,37 +238,31 @@ export default async function ManageEventPage(
             </div>
             <Card>
               <CardBody>
-                {/* Leads with what residents are asked for, not the target:
-                    money the committee carried across has already come off
-                    it. It is never a contribution either, so the line under
-                    the bar says in words where the difference went. */}
+                {/* What the fund holds, carried money included, against the
+                    event's target; striped, what is still to be confirmed. */}
                 <div className="text-ink-muted flex justify-between text-sm font-medium">
                   <span>
-                    {formatMoney(stats.fundRaised, community.currency)} of{' '}
-                    {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), community.currency)}{' '}
-                    raised
+                    {formatMoney(held, community.currency)} of{' '}
+                    {formatMoney(stats.fundTarget, community.currency)}
                   </span>
                   <span>{funded}%</span>
                 </div>
                 <div className="mt-2">
                   <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
-                {stats.fundCarried > 0 ? (
-                  <CarriedIn
-                    target={stats.fundTarget}
-                    carried={stats.fundCarried}
-                    movements={carriedIn}
-                    currency={community.currency}
-                  />
-                ) : stats.fundCarried < 0 ? (
+                <FundKey
+                  confirmed={held}
+                  pending={stats.fundPending}
+                  currency={community.currency}
+                  className="mt-2"
+                />
+                <CarriedIn movements={carriedIn} currency={community.currency} />
+                {stats.fundCarried < 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
                     {`${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
                   </p>
                 ) : null}
-                {/* With money carried in and nothing raised yet, the line above
-                    has just said what residents are asked for; saying the same
-                    figure again as "still to raise" reads as a second number. */}
-                {!closed && (stats.fundCarried <= 0 || stats.fundRaised > 0) ? (
+                {!closed ? (
                   <p className="text-ink-subtle mt-1 text-xs">
                     {formatMoney(
                       stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
@@ -407,39 +428,56 @@ export default async function ManageEventPage(
             {activities.length ? (
               activities.map((activity) => {
                 const people = registrations.filter((r) => r.activity_id === activity.id);
+                const coordinator = activity.memberships?.profiles?.full_name ?? null;
                 return (
                   <Card key={activity.id}>
                     <CardHeader
                       title={`${activity.emoji} ${activity.name}`}
-                      description={`${people.length} registered${
-                        activity.capacity ? ` of ${activity.capacity} places` : ''
-                      }${activity.is_open ? '' : ' · registrations closed'}`}
+                      description={
+                        <>
+                          {`${people.length} registered${
+                            activity.capacity ? ` of ${activity.capacity} places` : ''
+                          }${activity.is_open ? '' : ' · registrations closed'}`}
+                          {coordinator ? (
+                            <span className="text-ink-subtle block text-xs">
+                              Coordinator: {coordinator}
+                            </span>
+                          ) : null}
+                          {activity.practice_dates.length ? (
+                            <span className="text-ink-subtle block text-xs">
+                              Practice: {practiceDatesLine(activity.practice_dates)}
+                            </span>
+                          ) : null}
+                        </>
+                      }
                       action={
-                        <form action={updateActivity} className="flex gap-2">
-                          <input type="hidden" name="slug" value={slug} />
-                          <input type="hidden" name="event" value={event.slug} />
-                          <input type="hidden" name="activity_id" value={activity.id} />
-                          <Button
-                            type="submit"
-                            size="sm"
-                            variant="secondary"
-                            name="intent"
-                            value={activity.is_open ? 'close' : 'open'}
-                          >
-                            {activity.is_open ? 'Close registrations' : 'Reopen'}
-                          </Button>
-                          {people.length === 0 ? (
+                        locked ? undefined : (
+                          <form action={updateActivity} className="flex gap-2">
+                            <input type="hidden" name="slug" value={slug} />
+                            <input type="hidden" name="event" value={event.slug} />
+                            <input type="hidden" name="activity_id" value={activity.id} />
                             <Button
                               type="submit"
                               size="sm"
-                              variant="ghost"
+                              variant="secondary"
                               name="intent"
-                              value="remove"
+                              value={activity.is_open ? 'close' : 'open'}
                             >
-                              Remove
+                              {activity.is_open ? 'Close registrations' : 'Reopen'}
                             </Button>
-                          ) : null}
-                        </form>
+                            {people.length === 0 ? (
+                              <Button
+                                type="submit"
+                                size="sm"
+                                variant="ghost"
+                                name="intent"
+                                value="remove"
+                              >
+                                Remove
+                              </Button>
+                            ) : null}
+                          </form>
+                        )
                       }
                     />
                     {people.length ? (
@@ -463,6 +501,34 @@ export default async function ManageEventPage(
                         ))}
                       </ul>
                     ) : null}
+                    {!locked ? (
+                      <CardBody
+                        className={people.length ? 'border-border-base border-t' : undefined}
+                      >
+                        <details className="group">
+                          <summary className="text-accent cursor-pointer text-sm">
+                            Edit<span className="sr-only"> {activity.name}</span>
+                          </summary>
+                          <div className="mt-3">
+                            <EditActivityForm
+                              slug={slug}
+                              eventSlug={event.slug}
+                              activity={{
+                                id: activity.id,
+                                name: activity.name,
+                                emoji: activity.emoji,
+                                description: activity.description,
+                                capacity: activity.capacity,
+                                coordinator_id: activity.coordinator_id,
+                                coordinator_name: coordinator,
+                                practice_dates: activity.practice_dates,
+                              }}
+                              members={members}
+                            />
+                          </div>
+                        </details>
+                      </CardBody>
+                    ) : null}
                   </Card>
                 );
               })
@@ -475,12 +541,14 @@ export default async function ManageEventPage(
                 />
               </Card>
             )}
-            <Card>
-              <CardHeader title="Add an activity" />
-              <CardBody>
-                <AddActivityForm slug={slug} eventSlug={event.slug} pickers={pickers} />
-              </CardBody>
-            </Card>
+            {!locked ? (
+              <Card>
+                <CardHeader title="Add an activity" />
+                <CardBody>
+                  <AddActivityForm slug={slug} eventSlug={event.slug} pickers={pickers} />
+                </CardBody>
+              </Card>
+            ) : null}
           </div>
         ) : null}
 

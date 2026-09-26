@@ -60,9 +60,11 @@ export function Body({ children, muted = false }: { children: ReactNode; muted?:
   );
 }
 
-export function Caption({ children }: { children: ReactNode }) {
+export function Caption({ children, tone }: { children: ReactNode; tone?: 'danger' | 'warning' }) {
   const { colors } = useTheme();
-  return <Text style={{ color: colors.inkSubtle, fontSize: 12 }}>{children}</Text>;
+  return (
+    <Text style={{ color: tone ? colors[tone] : colors.inkSubtle, fontSize: 12 }}>{children}</Text>
+  );
 }
 
 export function Button({

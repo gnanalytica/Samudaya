@@ -19,8 +19,10 @@ import {
   optionalUpiReference,
   optionalWhatsappGroup,
   paymentMethodSchema,
+  placesProblem,
   reviewExpenseSchema,
   spendBalanceSchema,
+  updateActivitySchema,
   uuid,
 } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
@@ -428,6 +430,9 @@ export async function addActivity(_prev: ActionState, formData: FormData): Promi
   const context = await requireCapability(communitySlug, 'activities:manage');
   const event = await findEvent(context.community.id, eventSlug);
   if (!event) return { error: 'That event no longer exists.' };
+  if (event.status === 'completed' || event.status === 'cancelled') {
+    return { error: 'This event is closed or cancelled, so its activities can’t be changed.' };
+  }
 
   const parsed = createActivitySchema.safeParse({
     event_id: event.id,
@@ -472,13 +477,30 @@ export async function updateActivity(formData: FormData): Promise<void> {
   const intent = String(formData.get('intent') ?? '');
 
   const supabase = await getSupabase();
+  // Whatever the page offered: nothing changes on an event that is over or
+  // called off, and nobody is dropped from an activity by deleting it.
+  const [{ data: activity }, { count: registered }] = await Promise.all([
+    supabase
+      .from('event_activities')
+      .select('id, events!inner(status)')
+      .eq('id', activityId)
+      .eq('community_id', context.community.id)
+      .maybeSingle(),
+    supabase
+      .from('activity_participants')
+      .select('id', { count: 'exact', head: true })
+      .eq('activity_id', activityId),
+  ]);
+  const status = activity?.events.status;
+  if (!activity || status === 'completed' || status === 'cancelled') return;
+
   if (intent === 'open' || intent === 'close') {
     await supabase
       .from('event_activities')
       .update({ is_open: intent === 'open' })
       .eq('id', activityId)
       .eq('community_id', context.community.id);
-  } else if (intent === 'remove') {
+  } else if (intent === 'remove' && !registered) {
     await supabase
       .from('event_activities')
       .delete()
@@ -487,6 +509,93 @@ export async function updateActivity(formData: FormData): Promise<void> {
   }
 
   refreshEvent(communitySlug, eventSlug);
+}
+
+/**
+ * Everything about an activity after it is added: name, places, description,
+ * who coordinates it and when it practises. Not once its event is over or
+ * called off, the same rule the phone follows.
+ */
+export async function editActivity(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const communitySlug = String(formData.get('slug') ?? '');
+  const eventSlug = String(formData.get('event') ?? '');
+  const context = await requireCapability(communitySlug, 'activities:manage');
+  const event = await findEvent(context.community.id, eventSlug);
+  if (!event) return { error: 'That event no longer exists.' };
+  if (event.status === 'completed' || event.status === 'cancelled') {
+    return { error: 'This event is closed or cancelled, so its activities can’t be changed.' };
+  }
+
+  const parsed = updateActivitySchema.safeParse({
+    id: formData.get('activity_id'),
+    name: formData.get('name'),
+    emoji: formData.get('emoji') || '🎭',
+    description: formData.get('description') ?? '',
+    capacity: String(formData.get('capacity') ?? '').trim() || null,
+    coordinator_id: String(formData.get('coordinator_id') ?? '') || null,
+    practice_dates: formData.getAll('practice_date').map(String).filter(Boolean),
+  });
+  if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
+  const { id, ...changes } = parsed.data;
+
+  const supabase = await getSupabase();
+  const [current, registered, coordinator] = await Promise.all([
+    supabase
+      .from('event_activities')
+      .select('capacity')
+      .eq('id', id)
+      .eq('event_id', event.id)
+      .maybeSingle(),
+    supabase
+      .from('activity_participants')
+      .select('id', { count: 'exact', head: true })
+      .eq('activity_id', id),
+    // The column only knows it points at a membership, not whose.
+    changes.coordinator_id
+      ? supabase
+          .from('memberships')
+          .select('id')
+          .eq('id', changes.coordinator_id)
+          .eq('community_id', context.community.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  if (!current.data) return { error: 'That activity no longer exists.' };
+  if (registered.error) return { error: friendlyDbError(registered.error) };
+  if (changes.coordinator_id && !coordinator.data) {
+    return { fieldErrors: { coordinator_id: 'Pick someone from this society.' } };
+  }
+  // Only a change is checked. Nothing caps registrations in the database, so an
+  // activity can already hold more people than places, and that must not stop
+  // anyone fixing its name.
+  const tooFew =
+    changes.capacity === current.data.capacity
+      ? null
+      : placesProblem(changes.capacity, registered.count ?? 0);
+  if (tooFew) return { fieldErrors: { capacity: tooFew } };
+
+  // Scoped to the event checked above, not only the society, so an activity in
+  // a finished event cannot be reached through an open event's form.
+  const { data, error } = await supabase
+    .from('event_activities')
+    .update(changes)
+    .eq('id', id)
+    .eq('event_id', event.id)
+    .eq('community_id', context.community.id)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    return {
+      error:
+        error.code === '23505'
+          ? 'This event already has an activity with that name.'
+          : friendlyDbError(error),
+    };
+  }
+  if (!data) return { error: 'That activity no longer exists.' };
+
+  refreshEvent(communitySlug, eventSlug);
+  return { ...EMPTY_STATE, success: 'Saved.' };
 }
 
 // ---------------------------------------------------------------------------

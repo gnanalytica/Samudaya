@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { APPEARANCE_SCRIPT } from '@/lib/appearance';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -36,7 +37,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The script marks <html> with the chosen appearance before React hydrates it.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
+      </head>
       <body className="min-h-dvh font-sans antialiased">
         <a
           href="#main"

@@ -94,10 +94,10 @@ export const SHOTS: Shot[] = [
     id: 'home',
     chapter: 'Plan',
     headline: 'Every festival, one screen',
-    // Since carried money stopped hiding inside the target, the app asks
-    // residents only for the rest: ₹35,000 less the ₹7,800 moved in from
-    // Summer Camp, which the Balance shot shows arriving.
-    points: ['₹24,500 of ₹27,200 raised', '₹7,800 carried in'],
+    // What the fund holds against the event's own target, the ₹7,800 the
+    // Balance shot moves in from Summer Camp included. Same length as the old
+    // pair, so the shot holds as long as it did.
+    points: ['₹32,300 of ₹35,000', '₹7,800 from Summer Camp'],
     screen: <HomeScreen />,
     active: 'Home',
     zoom: [1.0, 1.05],
@@ -175,7 +175,7 @@ export const SHOTS: Shot[] = [
     id: 'budget',
     chapter: 'Spend',
     headline: 'Spend vs plan, per line',
-    points: ['₹31,200 of ₹35,000 used', 'Overspends shown, not hidden'],
+    points: ['₹31,200 of ₹35,000 used', 'Any overspend is flagged'],
     screen: <BudgetScreen />,
     tabs: COMMITTEE,
     active: 'Events',

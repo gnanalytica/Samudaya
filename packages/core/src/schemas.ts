@@ -308,10 +308,39 @@ export const createActivitySchema = z.object({
   emoji: z.string().trim().min(1).max(8).default('🎭'),
   description: z.string().trim().max(2000).optional(),
   coordinator_id: uuid.nullable().optional(),
-  capacity: z.coerce.number().int().min(1).max(10000).nullable().optional(),
-  practice_dates: z.array(isoDate).max(20).default([]),
+  capacity: z.coerce
+    .number()
+    .int('Places must be a whole number')
+    .min(1, 'Enter at least 1 place, or leave it blank for no limit')
+    .max(10000, 'Up to 10,000 places')
+    .nullable()
+    .optional(),
+  practice_dates: z.array(isoDate).max(20, 'Up to 20 practice dates').default([]),
 });
 export type CreateActivityInput = z.infer<typeof createActivitySchema>;
+
+const activityFields = createActivitySchema.shape;
+
+/**
+ * Changing an activity after it is added: the same rules, on every field at
+ * once. Nothing that can be cleared is optional, so a field left out is refused
+ * rather than quietly emptied; blank or null is how a form says "none".
+ * Practice dates come back in date order, once each, which is how they are
+ * shown.
+ *
+ * Places below the people already registered is checked against the rows, by
+ * placesProblem(); a schema cannot see them.
+ */
+export const updateActivitySchema = createActivitySchema.omit({ event_id: true }).extend({
+  id: uuid,
+  description: activityFields.description.unwrap().transform((value) => value || null),
+  coordinator_id: activityFields.coordinator_id.unwrap(),
+  capacity: activityFields.capacity.unwrap(),
+  practice_dates: activityFields.practice_dates
+    .unwrap()
+    .transform((dates) => [...new Set(dates)].sort()),
+});
+export type UpdateActivityInput = z.infer<typeof updateActivitySchema>;
 
 export const joinActivitySchema = z.object({
   activity_id: uuid,

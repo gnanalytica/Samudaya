@@ -196,15 +196,8 @@ export function fundedPercent(raised: number, target: number): number {
 }
 
 /**
- * What an event asks its residents for: the target, less whatever the
- * committee has already carried across into it from a closed event.
- *
- * This, not the target, is the figure a fund card leads with. A card that read
- * "Target ₹2,00,000" over an event already holding ₹6,990 of it told sixty
- * flats they owed the whole ₹2,00,000, when the money was carried across
- * precisely so that they would not. The target is still the event's — the sum
- * it was planned against — and every card that leads with this figure says in
- * words how the two differ.
+ * The target less whatever the committee has carried into the event: what
+ * residents between them are asked for. stillNeeded() starts from it.
  *
  * Money carried out of an event (a negative net figure, on an event that gave
  * its surplus away) never raises what the event asked for.
@@ -214,21 +207,32 @@ export function fundAsk(target: number, carriedIn = 0): number {
 }
 
 /**
- * The two widths a fund bar draws — money confirmed and money on its way — as
- * shares of what residents are asked for (fundAsk), not of the target.
+ * What an event's fund holds: residents' confirmed payments, plus whatever the
+ * committee carried into it. Carried money is money in the fund like any
+ * other; it has a row in the event's money list saying where it came from, and
+ * no line of its own on a card.
  *
- * Measured that way, the bar, the percentage beside it and the "₹X of ₹Y" line
- * all describe the same thing. They used to disagree: the bar drew money
- * carried across as a first segment of the target while the percentage beside
- * it counted contributions only, so an event holding ₹6,990 of ₹2,00,000
- * showed a sliver of colour over "0%".
+ * Money carried out of an event (its surplus given to another) is not taken
+ * off here: it left after it was raised, the way a bill does.
+ */
+export function inTheFund(raised: number, carriedIn = 0): number {
+  return raised + Math.max(0, carriedIn);
+}
+
+/**
+ * The two widths a fund bar draws, as shares of the event's target: what is
+ * confirmed (inTheFund), solid, then what residents have reported paying and
+ * nobody has confirmed yet, striped.
  *
- * The two stack, so pending is whatever the bar has left after confirmed —
- * never its own share. Without that clamp an event at 90% confirmed with
- * another 30% reported would draw 120% of a bar that is 100% wide.
+ * Measured against the target, the bar, the percentage beside it and the
+ * "₹X of ₹Y" line are one statement: ₹6,990 of ₹2,00,000 is 3%. The cards used
+ * to measure against the target less the carried money, which put a figure
+ * like ₹1,93,010 on screen that was nobody's goal, and led with "₹0 raised"
+ * over a fund that held ₹6,990.
  *
- * When money carried across covers the whole target there is nothing left to
- * ask for, and the bar is full before anybody has paid.
+ * The two stack, so the striped part is whatever the bar has left after the
+ * solid part, never its own share: 90% confirmed with another 30% reported
+ * still draws a bar 100% wide.
  */
 export function fundBarSegments(
   raised: number,
@@ -236,10 +240,8 @@ export function fundBarSegments(
   target: number,
   carriedIn = 0,
 ): { confirmed: number; pending: number } {
-  const ask = fundAsk(target, carriedIn);
-  if (target > 0 && ask === 0) return { confirmed: 100, pending: 0 };
-  const confirmed = fundedPercent(raised, ask);
-  return { confirmed, pending: Math.min(100 - confirmed, fundedPercent(pending, ask)) };
+  const confirmed = fundedPercent(inTheFund(raised, carriedIn), target);
+  return { confirmed, pending: Math.min(100 - confirmed, fundedPercent(pending, target)) };
 }
 
 /**
@@ -251,6 +253,47 @@ export function fundBarSegments(
  */
 export function stillNeeded(target: number, raised: number, carriedIn = 0): number {
   return Math.max(0, fundAsk(target, carriedIn) - raised);
+}
+
+/**
+ * A budget line against its own plan, which is what its bar shows.
+ *
+ * Lines used to be drawn against the biggest one, so Decor at 93% of its plan
+ * looked half empty beside Food. Spending with no line behind it is
+ * `unplanned`: all of it is outside the budget, and a share of nothing says
+ * nothing.
+ */
+export type BudgetBar = {
+  planned: number;
+  spent: number;
+  /** Spent as a share of the plan, clamped for the bar. */
+  percent: number;
+  /** How far past the plan, or 0. */
+  over: number;
+  unplanned: boolean;
+};
+
+export function budgetBar(planned: number, spent: number): BudgetBar {
+  const unplanned = planned <= 0 && spent > 0;
+  return {
+    planned,
+    spent,
+    percent: unplanned ? 100 : fundedPercent(spent, planned),
+    over: planned > 0 ? Math.max(0, spent - planned) : 0,
+    unplanned,
+  };
+}
+
+/**
+ * The whole budget as one bar. An underspent line offsets an overspent one
+ * here, as it does in the event's accounts; each line's own bar still shows
+ * where it went over.
+ */
+export function budgetTotal(rows: { planned: number; spent: number }[]): BudgetBar {
+  return budgetBar(
+    rows.reduce((sum, row) => sum + row.planned, 0),
+    rows.reduce((sum, row) => sum + row.spent, 0),
+  );
 }
 
 /**

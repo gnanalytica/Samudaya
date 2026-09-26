@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { fundAsk } from './events';
 import { formatDate, formatMoney } from './format';
 import { uuid } from './schemas';
 
@@ -143,26 +142,6 @@ export function fundMovementLine(movement: FundMovementRow, currency = 'INR'): s
   }
 }
 
-/**
- * The sentence under a fund card whose event has money carried into it, saying
- * how the figure the card leads with was reached. Null when nothing was.
- *
- * The card leads with what residents are asked for (fundAsk), and somebody who
- * remembers the event being planned at ₹2,00,000 would otherwise read
- * ₹1,93,010 as a mistake — or, the old way round, read ₹2,00,000 as what they
- * are still being asked for.
- */
-export function carriedInLine(target: number, carriedIn: number, currency = 'INR'): string | null {
-  if (carriedIn <= 0) return null;
-  const carried = formatMoney(carriedIn, currency);
-  if (target <= 0) return `${carried} was carried across by the committee.`;
-  const ask = fundAsk(target, carriedIn);
-  if (ask === 0) {
-    return `${carried} carried across by the committee covers the whole ${formatMoney(target, currency)} target, so residents are not asked for anything.`;
-  }
-  return `${carried} of the ${formatMoney(target, currency)} target was carried across by the committee, so residents are asked for ${formatMoney(ask, currency)}.`;
-}
-
 /** A sum moved into an event, with the committee member who moved it. */
 export type CarriedInRow = FundMovementRow & {
   decider?: { profiles?: { full_name: string | null } | null } | null;
@@ -189,57 +168,22 @@ export function carriedFromLine(movement: CarriedInRow, currency = 'INR'): strin
 }
 
 /**
- * Who decided what was carried into an event, for a card with room for one
- * line: a name, or several joined as a sentence would. Null when nobody is
- * recorded (a member who has since left), so the card says nothing rather
- * than something vague.
- */
-export function carriedDeciders(movements: CarriedInRow[]): string | null {
-  const names = [
-    ...new Set(
-      movements
-        .map((movement) => movement.decider?.profiles?.full_name)
-        .filter((name): name is string => Boolean(name)),
-    ),
-  ];
-  if (names.length === 0) return null;
-  if (names.length === 1) return names[0]!;
-  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
-}
-
-/**
- * The line under a fund card saying what residents have reported paying that
- * nobody has confirmed yet. Null when there is none.
+ * The key under a fund bar: what its solid part is and what its striped part
+ * is. The striped half only when something is waiting to be confirmed.
  *
- * A card leads with confirmed money only, so Velocity vipers read "₹0 of
- * ₹1,93,010 raised" while two households had reported ₹20,500 between them:
- * true, and exactly what makes somebody who has paid think their money went
- * missing. The bar already drew it as a paler segment; nothing said what the
- * paler segment was.
+ * "To be confirmed" rather than "pending": in a UPI app pending means a
+ * payment that has not gone through, which is the last thing somebody who has
+ * paid should read.
  */
-export function awaitingLine(pending: number, currency = 'INR'): string | null {
-  if (pending <= 0) return null;
-  return `${formatMoney(pending, currency)} more reported, waiting to be confirmed`;
-}
-
-/**
- * The line under a compact fund card whose event has money carried into it:
- * that the money is already in the fund, and whose decision it was when the
- * card knows.
- *
- * The card's headline counts only what residents gave, so an event holding
- * ₹6,990 carried across from a closed one led with "₹0 raised" and read as an
- * empty fund. "After ₹6,990 carried across" explained the smaller ask without
- * saying where the ₹6,990 now was.
- */
-export function alreadyInFundLine(
-  carriedIn: number,
-  deciders: string | null = null,
+export function fundKey(
+  confirmed: number,
+  pending: number,
   currency = 'INR',
-): string | null {
-  if (carriedIn <= 0) return null;
-  const money = formatMoney(carriedIn, currency);
-  return `${money} already in the fund, carried across by the committee${deciders ? ` · decided by ${deciders}` : ''}`;
+): { confirmed: string; pending: string | null } {
+  return {
+    confirmed: `${formatMoney(confirmed, currency)} confirmed`,
+    pending: pending > 0 ? `${formatMoney(pending, currency)} to be confirmed` : null,
+  };
 }
 
 /** One place the society's money is, as the Money page lists it. */

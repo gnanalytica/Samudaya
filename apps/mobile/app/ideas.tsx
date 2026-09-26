@@ -1,6 +1,6 @@
 import { RefreshControl, ScrollView, View } from 'react-native';
 import { useAuth } from '../src/lib/auth';
-import { fetchEvents, fetchIdeas } from '../src/lib/events';
+import { fetchIdeas } from '../src/lib/events';
 import { useCommunityData } from '../src/lib/use-community-data';
 import { Caption, Loading, Screen, Title } from '../src/components/ui';
 import { Suggestions } from '../src/components/suggestions';
@@ -24,13 +24,7 @@ export default function Ideas() {
 
   const { data, loading, refreshing, refresh } = useCommunityData(
     `ideas:${membershipId}`,
-    async (communityId) => {
-      const [rows, events] = await Promise.all([
-        fetchIdeas(communityId, membershipId ?? ''),
-        fetchEvents(communityId),
-      ]);
-      return { rows, events };
-    },
+    async (communityId) => ({ rows: await fetchIdeas(communityId, membershipId ?? '') }),
   );
 
   if (loading && !data) {
@@ -42,14 +36,9 @@ export default function Ideas() {
   }
 
   const rows = data?.rows ?? [];
-  // The society first, then whatever is still being run. A draft event is not
-  // offered: nobody outside the committee can see it to vote on it.
-  const targets = [
-    { id: null, label: 'The society' },
-    ...(data?.events ?? [])
-      .filter((event) => event.status === 'published')
-      .map((event) => ({ id: event.id, label: `${event.emoji} ${event.name}` })),
-  ];
+  // Only the society, so no picker: a resident is already in it, and an idea
+  // for an event is suggested from that event's own screen.
+  const targets = [{ id: null, label: 'The society' }];
 
   const voting = rows.filter((row) => row.status === 'accepted').length;
 

@@ -3,6 +3,7 @@
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { UserPlus } from 'lucide-react';
+import { AGE_GROUPS } from '@samudaya/core';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
 import { EMPTY_STATE, type ActionState } from '@/lib/action-state';
@@ -78,10 +79,9 @@ export function RegisterForm({
             {(control) => (
               <Select {...control} name="age_group" defaultValue="">
                 <option value="">—</option>
-                <option>Kids (5–12)</option>
-                <option>Teens</option>
-                <option>Adults</option>
-                <option>Seniors</option>
+                {AGE_GROUPS.map((group) => (
+                  <option key={group}>{group}</option>
+                ))}
               </Select>
             )}
           </Field>

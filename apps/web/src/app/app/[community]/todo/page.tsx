@@ -45,7 +45,7 @@ function detailHref(base: string, item: TodoItem): string | null {
       return event ? `${base}/events/${event}` : null;
     // A suggestion belongs either to an event or to the society itself.
     case 'suggestion_to_review':
-      return event ? `${base}/events/${event}?tab=vote` : `${base}/suggest`;
+      return event ? `${base}/events/${event}#vote` : `${base}/suggest`;
   }
 }
 

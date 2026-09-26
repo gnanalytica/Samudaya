@@ -1,22 +1,23 @@
 import { useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  AGE_GROUPS,
   COPY,
   EVENT_STATUS_LABEL,
   EVENT_TABS,
-  awaitingLine,
+  budgetBar,
+  budgetTotal,
   can,
   carriedFromLine,
-  carriedInLine,
   correctionNote,
   countdown,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
-  type EventTab,
+  inTheFund,
+  practiceDatesLine,
   type FundRule,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
@@ -36,19 +37,28 @@ import {
   Screen,
   Title,
 } from '../../src/components/ui';
-import { Chip, ChipRow, Segmented } from '../../src/components/admin-ui';
+import { Chip, ChipRow } from '../../src/components/admin-ui';
 import { FUND_RULE_PLAIN } from '../../src/components/event-form';
-import { KeyValue, Meter, StatTile } from '../../src/components/event-ui';
+import { FundKey, KeyValue, Meter, StatTile } from '../../src/components/event-ui';
 import { Suggestions } from '../../src/components/suggestions';
 import { ViewFileButton } from '../../src/components/file-ui';
+import { SectionBar, useSectionScroll } from '../../src/components/section-scroll';
 import { spacing } from '../../src/lib/theme';
 
 type Detail = NonNullable<Awaited<ReturnType<typeof fetchEventDetail>>>;
 
+const SECTION_IDS = EVENT_TABS.map((section) => section.id);
+
+/**
+ * An event on one screen, read top to bottom: what it is, its money,
+ * activities to register for and ideas to vote on, under a bar that jumps
+ * between them. `?tab=activities` still opens at that section.
+ */
 export default function EventDetail() {
   const { slug, tab: initialTab } = useLocalSearchParams<{ slug: string; tab?: string }>();
-  const [tab, setTab] = useState<EventTab>(
-    () => EVENT_TABS.find((item) => item.id === initialTab)?.id ?? 'about',
+  const { scroll, current, jump, onScroll, sectionProps, onBarLayout } = useSectionScroll(
+    SECTION_IDS,
+    initialTab,
   );
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -77,17 +87,12 @@ export default function EventDetail() {
   }
 
   const { event, stats } = data;
-  const fundBar = fundBarSegments(
-    stats.fundRaised,
-    stats.fundPending,
-    stats.fundTarget,
-    stats.fundCarried,
-  );
-  const funded = fundBar.confirmed;
-  // What residents are asked for, which is what the fund card leads with: the
-  // target less anything the committee carried across (see fundAsk).
   const target = stats.fundTarget || event.fund_target;
-  const carried = carriedInLine(target, stats.fundCarried, currency);
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, target, stats.fundCarried);
+  const funded = fundBar.confirmed;
+  // What the fund holds, carried money included: the headline, against the
+  // event's target. Carried sums are rows under the bar, with who moved them.
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const open = event.status === 'published';
 
   const changed = () => {
@@ -95,9 +100,24 @@ export default function EventDetail() {
     void queryClient.invalidateQueries({ queryKey: ['events'] });
   };
 
+  // A campaign has no activities, and a proposal nothing to vote on yet.
+  const sections = EVENT_TABS.filter((section) =>
+    section.id === 'activities'
+      ? event.kind !== 'campaign'
+      : section.id === 'vote'
+        ? event.status !== 'proposed'
+        : true,
+  );
+  const has = (id: string) => sections.some((section) => section.id === id);
+
   return (
     <Screen>
       <ScrollView
+        ref={scroll}
+        // The section bar, the second child, stays pinned while the rest scrolls.
+        stickyHeaderIndices={[1]}
+        onScroll={onScroll}
+        scrollEventThrottle={32}
         contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         keyboardShouldPersistTaps="handled"
@@ -130,75 +150,82 @@ export default function EventDetail() {
           </Caption>
         </View>
 
-        <Segmented options={EVENT_TABS} value={tab} onChange={setTab} />
+        <SectionBar
+          sections={sections}
+          current={current}
+          onJump={jump}
+          onLayout={onBarLayout}
+          style={{ marginHorizontal: -spacing.lg, paddingHorizontal: spacing.lg }}
+        />
 
-        {tab === 'about' ? (
-          <About data={data} currency={currency} onMoney={() => setTab('money')} />
-        ) : null}
+        <View {...sectionProps('about')} style={{ gap: spacing.lg }}>
+          <About data={data} />
+        </View>
 
-        {tab === 'money' ? (
-          <>
-            <Card style={{ gap: spacing.md }}>
-              <Heading>Fund</Heading>
-              <Title>{formatMoney(stats.fundRaised, currency)}</Title>
-              <Caption>
-                raised of {formatMoney(fundAsk(target, stats.fundCarried), currency)}
-              </Caption>
-              <Meter
-                percent={funded}
-                pendingPercent={fundBar.pending}
-                tone="success"
-                label="Fund progress"
+        <View {...sectionProps('money')} style={{ gap: spacing.lg }}>
+          <Heading>{COPY.money}</Heading>
+          <Card style={{ gap: spacing.md }}>
+            <Heading>Fund</Heading>
+            <Title>{formatMoney(held, currency)}</Title>
+            <Caption>of {formatMoney(target, currency)}</Caption>
+            <Meter
+              percent={funded}
+              pendingPercent={fundBar.pending}
+              tone="success"
+              label="Fund progress"
+            />
+            <FundKey confirmed={held} pending={stats.fundPending} currency={currency} />
+            {data.carriedIn.map((movement) => (
+              <Caption key={movement.id}>+ {carriedFromLine(movement, currency)}</Caption>
+            ))}
+            <View style={{ gap: spacing.xs }}>
+              <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
+              <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
+              <KeyValue label={COPY.households} value={String(stats.contributors)} />
+            </View>
+            {open && can(role, 'contribute') ? (
+              <Button
+                label="Contribute"
+                onPress={() => router.push(`/contribute?event=${event.slug}`)}
               />
-              {carried ? <Caption>{carried}</Caption> : null}
-              {carried
-                ? data.carriedIn.map((movement) => (
-                    <Caption key={movement.id}>{carriedFromLine(movement, currency)}</Caption>
-                  ))
-                : null}
-              <View style={{ gap: spacing.xs }}>
-                <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
-                <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
-                <KeyValue label={COPY.households} value={String(stats.contributors)} />
-              </View>
-              {open && can(role, 'contribute') ? (
-                <Button
-                  label="Contribute"
-                  onPress={() => router.push(`/contribute?event=${event.slug}`)}
-                />
-              ) : null}
-              {can(role, 'payments:view') ? (
-                <Button
-                  label="Who has paid"
-                  variant="secondary"
-                  onPress={() => router.push(`/admin/payments?event=${event.slug}`)}
-                />
-              ) : null}
-              <Caption>
-                🔒 If money is left over:{' '}
-                {event.fund_rule_note ?? FUND_RULE_PLAIN[event.fund_rule as FundRule]}
-              </Caption>
-            </Card>
+            ) : null}
+            {can(role, 'payments:view') ? (
+              <Button
+                label="Who has paid"
+                variant="secondary"
+                onPress={() => router.push(`/admin/payments?event=${event.slug}`)}
+              />
+            ) : null}
+            <Caption>
+              🔒 If money is left over:{' '}
+              {event.fund_rule_note ?? FUND_RULE_PLAIN[event.fund_rule as FundRule]}
+            </Caption>
+          </Card>
 
-            {data.myPayments.length ? <YourPayments data={data} currency={currency} /> : null}
+          {data.myPayments.length ? <YourPayments data={data} currency={currency} /> : null}
 
-            <Analytics data={data} currency={currency} />
+          <Analytics data={data} currency={currency} />
 
-            <BudgetAndSpending data={data} currency={currency} />
-          </>
+          <BudgetAndSpending data={data} currency={currency} />
+        </View>
+
+        {has('activities') ? (
+          <View {...sectionProps('activities')} style={{ gap: spacing.lg }}>
+            <Activities data={data} open={open} onChange={changed} />
+          </View>
         ) : null}
 
-        {tab === 'activities' ? <Activities data={data} open={open} onChange={changed} /> : null}
-
-        {tab === 'vote' ? (
-          // One target, so no picker: on an event's own page there is only one
-          // thing a suggestion could be about.
-          <Suggestions
-            rows={data.suggestions}
-            targets={[{ id: data.event.id, label: data.event.name }]}
-            open={open}
-            onChange={changed}
-          />
+        {has('vote') ? (
+          <View {...sectionProps('vote')} style={{ gap: spacing.lg }}>
+            {/* One target, so no picker: on an event's own page there is only
+                one thing a suggestion could be about. */}
+            <Suggestions
+              rows={data.suggestions}
+              targets={[{ id: data.event.id, label: data.event.name }]}
+              open={open}
+              onChange={changed}
+            />
+          </View>
         ) : null}
         <View style={{ height: spacing.xl }} />
       </ScrollView>
@@ -206,24 +233,8 @@ export default function EventDetail() {
   );
 }
 
-function About({
-  data,
-  currency,
-  onMoney,
-}: {
-  data: Detail;
-  currency: string;
-  onMoney: () => void;
-}) {
-  const { event, stats } = data;
-  const fundBar = fundBarSegments(
-    stats.fundRaised,
-    stats.fundPending,
-    stats.fundTarget,
-    stats.fundCarried,
-  );
-  const target = stats.fundTarget || event.fund_target;
-  const carried = carriedInLine(target, stats.fundCarried, currency);
+function About({ data }: { data: Detail }) {
+  const { event } = data;
   const dates =
     event.ends_on && event.ends_on !== event.starts_on
       ? `${formatDate(event.starts_on)} – ${formatDate(event.ends_on)}`
@@ -250,43 +261,6 @@ function About({
           {event.organizer ? <KeyValue label="Organiser" value={event.organizer} /> : null}
         </View>
       </Card>
-
-      <Pressable
-        accessibilityRole="button"
-        onPress={onMoney}
-        style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
-      >
-        <Card style={{ gap: spacing.sm }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Heading>{COPY.money}</Heading>
-            <Caption>See where it went ›</Caption>
-          </View>
-          <Caption>
-            {formatMoney(stats.fundRaised, currency)} raised of{' '}
-            {formatMoney(fundAsk(target, stats.fundCarried), currency)}
-          </Caption>
-          <Meter
-            percent={fundBar.confirmed}
-            pendingPercent={fundBar.pending}
-            tone="success"
-            label="Fund progress"
-          />
-          {stats.fundPending > 0 ? (
-            <Caption>{awaitingLine(stats.fundPending, currency)}</Caption>
-          ) : null}
-          {/* Money the society already had, moved here by the committee. Said
-              out loud rather than folded into the raised figure: "sixty flats
-              gave ₹30,000" and "the committee moved ₹10,000 across from last
-              year" are different sentences — and each sum carries the name of
-              the committee member who moved it. */}
-          {carried ? <Caption>{carried}</Caption> : null}
-          {carried
-            ? data.carriedIn.map((movement) => (
-                <Caption key={movement.id}>{carriedFromLine(movement, currency)}</Caption>
-              ))
-            : null}
-        </Card>
-      </Pressable>
     </>
   );
 }
@@ -341,9 +315,7 @@ function YourPayments({ data, currency }: { data: Detail; currency: string }) {
 }
 
 function Analytics({ data, currency }: { data: Detail; currency: string }) {
-  const { stats, budget, expenses } = data;
-  const planned = budget.reduce((sum, line) => sum + Number(line.amount), 0);
-  const spentPercent = planned > 0 ? Math.round((stats.spent / planned) * 100) : 0;
+  const { stats, expenses } = data;
   const perContribution = stats.contributors > 0 ? stats.fundRaised / stats.contributors : 0;
   const biggest = [...expenses].sort((a, b) => Number(b.amount) - Number(a.amount))[0];
 
@@ -351,7 +323,6 @@ function Analytics({ data, currency }: { data: Detail; currency: string }) {
     <View style={{ gap: spacing.md }}>
       <Heading>At a glance</Heading>
       <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <StatTile label="BUDGET USED" value={planned > 0 ? `${spentPercent}%` : '—'} />
         <StatTile label="PER HOUSEHOLD" value={formatMoney(perContribution, currency)} />
         <StatTile label="BILLS" value={String(expenses.length)} />
       </View>
@@ -367,40 +338,68 @@ function Analytics({ data, currency }: { data: Detail; currency: string }) {
 
 function BudgetAndSpending({ data, currency }: { data: Detail; currency: string }) {
   const rows = budgetVsSpent(data.budget, data.expenses);
-  const planned = data.budget.reduce((sum, line) => sum + Number(line.amount), 0);
-  const spent = data.expenses.reduce((sum, expense) => sum + Number(expense.amount), 0);
+  const total = budgetTotal(rows);
 
   return (
     <>
       <Card style={{ gap: spacing.md }}>
-        <Heading>Budget vs spent</Heading>
+        <Heading>Budget and spending</Heading>
         {rows.length ? (
           <>
+            <View style={{ gap: 4 }}>
+              <View
+                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
+              >
+                <Body>
+                  {formatMoney(total.spent, currency)}
+                  {total.planned > 0
+                    ? ` of ${formatMoney(total.planned, currency)} spent`
+                    : ' spent, with no budget set'}
+                </Body>
+                {total.planned > 0 ? (
+                  <Caption tone={total.over ? 'danger' : undefined}>
+                    {total.over ? `${formatMoney(total.over, currency)} over` : `${total.percent}%`}
+                  </Caption>
+                ) : null}
+              </View>
+              {total.planned > 0 ? (
+                <Meter
+                  percent={total.percent}
+                  tone={total.over ? 'danger' : 'success'}
+                  label="Whole budget, spent against plan"
+                />
+              ) : null}
+            </View>
             {rows.map((row) => {
-              const percent = row.planned > 0 ? Math.round((row.spent / row.planned) * 100) : 100;
-              const over = row.planned > 0 && row.spent > row.planned;
+              const bar = budgetBar(row.planned, row.spent);
               return (
                 <View key={row.category} style={{ gap: 4 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      gap: spacing.md,
+                    }}
+                  >
                     <Body>{row.category}</Body>
-                    <Caption>
-                      {formatMoney(row.spent, currency)} / {formatMoney(row.planned, currency)}
+                    <Caption tone={bar.over ? 'danger' : undefined}>
+                      {bar.unplanned
+                        ? formatMoney(row.spent, currency)
+                        : `${formatMoney(row.spent, currency)} of ${formatMoney(row.planned, currency)}`}
                     </Caption>
                   </View>
                   <Meter
-                    percent={percent}
-                    tone={over ? 'accent' : 'success'}
-                    label={`${row.category} spending against budget`}
+                    percent={bar.percent}
+                    tone={bar.over ? 'danger' : bar.unplanned ? 'warning' : 'success'}
+                    label={`${row.category}, spent against plan`}
                   />
-                  {over ? <Caption>Over budget</Caption> : null}
-                  {row.planned === 0 ? <Caption>Not in the budget</Caption> : null}
+                  {bar.over ? (
+                    <Caption tone="danger">{formatMoney(bar.over, currency)} over</Caption>
+                  ) : null}
+                  {bar.unplanned ? <Caption tone="warning">Not in the budget</Caption> : null}
                 </View>
               );
             })}
-            <KeyValue
-              label="Total"
-              value={`${formatMoney(spent, currency)} of ${formatMoney(planned, currency)}`}
-            />
           </>
         ) : (
           <Caption>No budget set yet.</Caption>
@@ -448,6 +447,7 @@ function Activities({
   const { viewRole: role, membershipId, profile } = useAuth();
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [familyName, setFamilyName] = useState('');
+  const [familyAge, setFamilyAge] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const mayRegister = open && can(role, 'activities:register');
 
@@ -469,6 +469,8 @@ function Activities({
       activity_id: activityId,
       membership_id: membershipId,
       participant_name: participantName,
+      // Asked only about a family member, as on the web.
+      age_group: participantName ? familyAge : null,
       channel: 'mobile',
     });
     setBusy(null);
@@ -480,6 +482,7 @@ function Activities({
       return;
     }
     setFamilyName('');
+    setFamilyAge(null);
     setAddingFor(null);
     onChange();
   };
@@ -507,6 +510,8 @@ function Activities({
       {data.activities.map((activity) => {
         const mine = data.registrations.filter((row) => row.activity_id === activity.id);
         const selfRegistered = mine.some((row) => !row.participant_name);
+        // As on the web: a full activity stops offering places it doesn't have.
+        const full = activity.capacity != null && activity.registered >= activity.capacity;
         return (
           <View key={activity.id} style={{ gap: spacing.sm }}>
             <View
@@ -520,8 +525,14 @@ function Activities({
                 <Caption>
                   {activity.registered} registered
                   {activity.capacity ? ` · ${activity.capacity} places` : ''}
-                  {!activity.is_open ? ' · registration closed' : ''}
+                  {!activity.is_open ? ' · registration closed' : full ? ' · full' : ''}
                 </Caption>
+                {activity.memberships?.profiles?.full_name ? (
+                  <Caption>Coordinator: {activity.memberships.profiles.full_name}</Caption>
+                ) : null}
+                {activity.practice_dates.length ? (
+                  <Caption>Practice: {practiceDatesLine(activity.practice_dates)}</Caption>
+                ) : null}
               </View>
             </View>
 
@@ -548,7 +559,7 @@ function Activities({
               </ChipRow>
             ) : null}
 
-            {mayRegister && activity.is_open ? (
+            {mayRegister && activity.is_open && !full ? (
               addingFor === activity.id ? (
                 <View style={{ gap: spacing.sm }}>
                   <Input
@@ -558,6 +569,19 @@ function Activities({
                     autoCapitalize="words"
                     placeholder="e.g. Aarav"
                   />
+                  <View style={{ gap: spacing.xs }}>
+                    <Body>Age group</Body>
+                    <ChipRow>
+                      {AGE_GROUPS.map((group) => (
+                        <Chip
+                          key={group}
+                          label={group}
+                          selected={familyAge === group}
+                          onPress={() => setFamilyAge(familyAge === group ? null : group)}
+                        />
+                      ))}
+                    </ChipRow>
+                  </View>
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <View style={{ flex: 1 }}>
                       <Button
@@ -589,6 +613,7 @@ function Activities({
                     label="+ Family member"
                     onPress={() => {
                       setFamilyName('');
+                      setFamilyAge(null);
                       setAddingFor(activity.id);
                     }}
                     disabled={busy !== null}

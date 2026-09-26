@@ -5,6 +5,8 @@ import {
   FUND_RULE_LABEL,
   REQUIREMENT_KEYS,
   TASK_STATUS_DOT,
+  budgetBar,
+  budgetTotal,
   fundedPercent,
   normalizeStats,
   surplus,
@@ -24,6 +26,45 @@ describe('fundedPercent', () => {
 
   it('does not divide by zero when no target was set', () => {
     expect(fundedPercent(5000, 0)).toBe(0);
+  });
+});
+
+describe('budgetBar', () => {
+  it('measures a line against its own plan, not against the biggest line', () => {
+    expect(budgetBar(9_000, 8_400)).toMatchObject({ percent: 93, over: 0, unplanned: false });
+    expect(budgetBar(2_000, 0)).toMatchObject({ percent: 0, over: 0 });
+  });
+
+  it('fills the bar and says by how much when a line goes past its plan', () => {
+    expect(budgetBar(6_000, 6_500)).toMatchObject({ percent: 100, over: 500 });
+  });
+
+  it('marks spending with no line behind it as outside the budget', () => {
+    expect(budgetBar(0, 9_200)).toMatchObject({ percent: 100, over: 0, unplanned: true });
+    expect(budgetBar(0, 0)).toMatchObject({ percent: 0, unplanned: false });
+  });
+});
+
+describe('budgetTotal', () => {
+  const lines = [
+    { planned: 18_000, spent: 16_300 },
+    { planned: 9_000, spent: 8_400 },
+    { planned: 6_000, spent: 6_500 },
+    { planned: 2_000, spent: 0 },
+  ];
+
+  it('adds the plans and the spending into one bar', () => {
+    expect(budgetTotal(lines)).toMatchObject({
+      planned: 35_000,
+      spent: 31_200,
+      percent: 89,
+      over: 0,
+    });
+  });
+
+  it('lets an underspent line offset an overspent one, as the accounts do', () => {
+    expect(budgetTotal(lines).over).toBe(0);
+    expect(budgetTotal([...lines, { planned: 0, spent: 9_200 }]).over).toBe(5_400);
   });
 });
 

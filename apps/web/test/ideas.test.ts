@@ -42,22 +42,19 @@ describe('both apps list both kinds of idea', () => {
 describe('suggesting from the Ideas page', () => {
   const actions = () => web('app', 'app', '[community]', 'events', 'actions.ts');
 
-  it('resolves the event by slug against this society, and only a published one', () => {
-    // A form posts what the browser hands it. An id for somebody else's
-    // society, or for a draft nobody can see yet, must find no row.
+  it('is for the society, without asking which', () => {
+    // A resident already in the society was being asked to pick "The society"
+    // again. An idea for an event comes from that event's page instead.
     const action = actions().slice(actions().indexOf('export async function suggestIdea'));
-    const body = action.slice(0, 1600);
-    expect(body).toContain("eq('community_id', context.community.id)");
-    expect(body).toContain("eq('status', 'published')");
-    expect(body).toContain("eq('slug', eventSlug)");
+    expect(action.slice(0, 1200)).toContain('event_id: null');
+    const form = web('app', 'app', '[community]', 'suggest', 'suggest-form.tsx');
+    expect(form).not.toContain('name="event"');
+    expect(mobile('app', 'ideas.tsx')).toContain("[{ id: null, label: 'The society' }]");
   });
 
-  it('offers the same choice the server will accept', () => {
-    // The picker is fed from the page rather than fetched in the client, so
-    // the list and the check cannot drift into disagreeing.
-    const page = web('app', 'app', '[community]', 'suggest', 'page.tsx');
-    expect(page).toContain("event.status === 'published'");
-    expect(page).toContain('events={running}');
+  it('leaves an event’s ideas to the event’s own page', () => {
+    const page = web('app', 'app', '[community]', 'events', '[event]', 'page.tsx');
+    expect(page).toContain('<SuggestionForm');
   });
 });
 

@@ -1,22 +1,11 @@
 import Link from 'next/link';
-import {
-  Building2,
-  CalendarDays,
-  ChevronRight,
-  Lightbulb,
-  Megaphone,
-  Plus,
-  Receipt,
-} from 'lucide-react';
+import { Building2, CalendarDays, ChevronRight, Lightbulb, Megaphone, Plus } from 'lucide-react';
 import {
   EVENT_STATUS_LABEL,
   ROLE_LABEL,
   canParticipate,
-  correctionNote,
-  formatDate,
   formatMoney,
   normalizeRole,
-  receiptRef,
   unitLabel,
 } from '@samudaya/core';
 import { getMemberships, requireCommunity } from '@/lib/auth';
@@ -25,7 +14,7 @@ import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader, CardBody } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { PaymentStatusBadge, StatTile, StatTiles } from '@/components/badges';
+import { StatTile, StatTiles } from '@/components/badges';
 
 export const metadata = { title: 'Me' };
 
@@ -48,15 +37,8 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
   // list the layout already fetched for the switcher, not a second round trip.
   const membershipsPromise = getMemberships();
 
-  const [contributions, registrations, suggestions, campaigns, units] = await Promise.all([
-    supabase
-      .from('contributions')
-      .select(
-        'id, amount, reported_amount, method, status, reference, review_note, receipt_no, paid_at, events(slug, name, emoji)',
-      )
-      .eq('membership_id', membership.id)
-      .order('paid_at', { ascending: false })
-      .limit(50),
+  // Payments are under Money → My contributions, beside the rest of the money.
+  const [registrations, suggestions, campaigns, units] = await Promise.all([
     supabase
       .from('activity_participants')
       .select('id, participant_name, joined_at, event_activities(name, emoji, events(slug, name))')
@@ -83,10 +65,6 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
     (m) => m.communities && m.communities.slug !== community.slug,
   );
 
-  // Only confirmed payments count; reported ones are still waiting for staff.
-  const totalGiven = (contributions.data ?? [])
-    .filter((row) => row.status === 'succeeded')
-    .reduce((sum, row) => sum + Number(row.amount), 0);
   const myUnits = (units.data ?? []).map((unit) => unitLabel(unit)).join(', ');
   const roleLabel = ROLE_LABEL[normalizeRole(role) ?? 'resident'];
 
@@ -106,70 +84,9 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
         ) : null}
 
         <StatTiles>
-          <StatTile label="Contributed" value={formatMoney(totalGiven, community.currency)} />
           <StatTile label="Registrations" value={String(registrations.data?.length ?? 0)} />
           <StatTile label="Suggestions" value={String(suggestions.data?.length ?? 0)} />
         </StatTiles>
-
-        <Card className="mt-5">
-          <CardHeader title="Your payments" />
-          {contributions.data?.length ? (
-            <ul className="divide-border-base divide-y">
-              {contributions.data.map((contribution) => (
-                <li
-                  key={contribution.id}
-                  className="flex items-center justify-between gap-3 px-5 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="text-ink text-sm font-medium">
-                      {contribution.events?.emoji} {contribution.events?.name}
-                    </p>
-                    <p className="text-ink-subtle mt-0.5 text-xs">
-                      <span className="font-mono">
-                        {contribution.status === 'succeeded'
-                          ? receiptRef(contribution.events?.slug, contribution.receipt_no)
-                          : (contribution.reference ?? 'UPI payment')}
-                      </span>
-                      {' · '}
-                      {formatDate(contribution.paid_at.slice(0, 10))}
-                    </p>
-                    {contribution.status === 'failed' && contribution.review_note ? (
-                      <p className="text-danger mt-1 text-xs">{contribution.review_note}</p>
-                    ) : null}
-                    {/* A figure that moved with no explanation on the row is
-                        the app looking like it lost somebody's money. */}
-                    {correctionNote(
-                      contribution.amount,
-                      contribution.reported_amount,
-                      community.currency,
-                    ) ? (
-                      <p className="text-warning mt-1 text-xs">
-                        {correctionNote(
-                          contribution.amount,
-                          contribution.reported_amount,
-                          community.currency,
-                        )}
-                        {contribution.review_note ? ` · ${contribution.review_note}` : ''}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <span className="text-ink text-sm font-semibold">
-                      {formatMoney(contribution.amount, community.currency)}
-                    </span>
-                    <PaymentStatusBadge status={contribution.status} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              icon={<Receipt className="size-6" />}
-              title="Nothing yet"
-              description="Your receipts show up here after you contribute."
-            />
-          )}
-        </Card>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <Card>
@@ -189,7 +106,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                     </p>
                     {row.event_activities?.events?.slug ? (
                       <Link
-                        href={`${base}/events/${row.event_activities.events.slug}?tab=activities`}
+                        href={`${base}/events/${row.event_activities.events.slug}#activities`}
                         className="text-ink-subtle mt-0.5 text-xs hover:underline"
                       >
                         {row.event_activities.events.name}

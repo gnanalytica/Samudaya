@@ -181,6 +181,16 @@ export function festivalById(id: string | null | undefined): Festival {
 }
 
 /**
+ * What the society is heading towards, in words: the festival's name, or the
+ * event's own name when it is not a festival. The fallback's label is only a
+ * palette's name, and printing it made the home screen read "Arkala · Society
+ * next" over an event called Velocity vipers.
+ */
+export function headingTowards(festival: Festival, eventName: string): string {
+  return festival.id === DEFAULT_FESTIVAL.id ? eventName : festival.label;
+}
+
+/**
  * Picks a palette from what the event calls itself. The type is checked first —
  * a society that files its events under "Deepavali" means it — and the name
  * second, which is what catches "Dandiya night" under a generic type.

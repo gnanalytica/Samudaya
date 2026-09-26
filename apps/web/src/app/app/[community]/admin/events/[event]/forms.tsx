@@ -25,6 +25,7 @@ import {
   allocateSurplus,
   closeEvent,
   correctExpense,
+  editActivity,
   recordPayment,
   reviewExpense,
   reviewPayment,
@@ -371,7 +372,12 @@ export function AddActivityForm({
           </Field>
         </div>
         <div className="w-28">
-          <Field label="Places" htmlFor="act-capacity" hint="Blank = no limit">
+          <Field
+            label="Places"
+            htmlFor="act-capacity"
+            hint="Blank = no limit"
+            error={state.fieldErrors?.capacity}
+          >
             {(control) => <Input {...control} name="capacity" type="number" min={1} />}
           </Field>
         </div>
@@ -381,6 +387,186 @@ export function AddActivityForm({
       </Field>
       <Feedback state={state} />
       <Submit label="Add activity" busy="Adding…" />
+    </form>
+  );
+}
+
+/** A date added to the list, which stays in date order and holds each day once. */
+const withDate = (dates: string[], date: string) =>
+  dates.includes(date) ? dates : [...dates, date].sort();
+
+/**
+ * Everything about an activity once it is added, including what adding leaves
+ * out to stay short: who coordinates it, and when it practises.
+ */
+export function EditActivityForm({
+  slug,
+  eventSlug,
+  activity,
+  members,
+}: {
+  slug: string;
+  eventSlug: string;
+  activity: {
+    id: string;
+    name: string;
+    emoji: string;
+    description: string | null;
+    capacity: number | null;
+    coordinator_id: string | null;
+    coordinator_name: string | null;
+    practice_dates: string[];
+  };
+  /** Everyone in the society who could coordinate it. */
+  members: { id: string; label: string }[];
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(editActivity, EMPTY_STATE);
+  const [dates, setDates] = useState(activity.practice_dates);
+  const [draft, setDraft] = useState('');
+  const id = activity.id;
+  // A coordinator who has since left the list is still offered, so saving a
+  // new name doesn't quietly take them off the activity.
+  const coordinatorGone =
+    activity.coordinator_id !== null &&
+    !members.some((member) => member.id === activity.coordinator_id);
+
+  return (
+    <form
+      action={(formData) => {
+        // The picker is named too, so a date picked and never added is still
+        // saved; the list catches up to show it.
+        if (draft) {
+          setDates((current) => withDate(current, draft));
+          setDraft('');
+        }
+        action(formData);
+      }}
+      className="space-y-3"
+    >
+      <Hidden slug={slug} eventSlug={eventSlug} />
+      <input type="hidden" name="activity_id" value={id} />
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="w-20">
+          <Field label="Emoji" htmlFor={`act-emoji-${id}`}>
+            {(control) => (
+              <Input
+                {...control}
+                name="emoji"
+                defaultValue={activity.emoji}
+                maxLength={8}
+                className="text-center"
+              />
+            )}
+          </Field>
+        </div>
+        <div className="min-w-40 flex-1">
+          <Field label="Activity" htmlFor={`act-name-${id}`} error={state.fieldErrors?.name}>
+            {(control) => <Input {...control} name="name" defaultValue={activity.name} required />}
+          </Field>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Places"
+          htmlFor={`act-capacity-${id}`}
+          hint="Blank = no limit"
+          error={state.fieldErrors?.capacity}
+        >
+          {(control) => (
+            <Input
+              {...control}
+              name="capacity"
+              type="number"
+              min={1}
+              defaultValue={activity.capacity ?? ''}
+            />
+          )}
+        </Field>
+        <Field
+          label="Coordinator"
+          htmlFor={`act-coordinator-${id}`}
+          error={state.fieldErrors?.coordinator_id}
+        >
+          {(control) => (
+            <Select {...control} name="coordinator_id" defaultValue={activity.coordinator_id ?? ''}>
+              <option value="">No coordinator</option>
+              {coordinatorGone ? (
+                <option value={activity.coordinator_id ?? ''}>
+                  {activity.coordinator_name ?? 'Current coordinator'}
+                </option>
+              ) : null}
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.label}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      </div>
+      <Field label="Description" htmlFor={`act-desc-${id}`} error={state.fieldErrors?.description}>
+        {(control) => (
+          <Textarea
+            {...control}
+            name="description"
+            rows={2}
+            defaultValue={activity.description ?? ''}
+          />
+        )}
+      </Field>
+      <fieldset className="space-y-2">
+        <legend className="text-ink text-sm font-medium">Practice dates</legend>
+        {dates.length ? (
+          <ul className="space-y-1">
+            {dates.map((date) => (
+              <li key={date} className="flex items-center justify-between gap-3 text-sm">
+                <input type="hidden" name="practice_date" value={date} />
+                <span className="text-ink">{formatDate(date)}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setDates((current) => current.filter((day) => day !== date))}
+                >
+                  Remove<span className="sr-only"> {formatDate(date)}</span>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor={`act-practice-${id}`} className="sr-only">
+            Practice date to add
+          </label>
+          <Input
+            id={`act-practice-${id}`}
+            name="practice_date"
+            type="date"
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            className="w-44"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={!draft}
+            onClick={() => {
+              setDates((current) => withDate(current, draft));
+              setDraft('');
+            }}
+          >
+            Add date
+          </Button>
+        </div>
+        {state.fieldErrors?.practice_dates ? (
+          <p role="alert" className="text-danger text-xs">
+            {state.fieldErrors.practice_dates}
+          </p>
+        ) : null}
+      </fieldset>
+      <Feedback state={state} />
+      <Submit label="Save changes" busy="Saving…" />
     </form>
   );
 }

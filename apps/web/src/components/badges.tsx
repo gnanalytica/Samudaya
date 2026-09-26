@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react';
 import type { Enums } from '@samudaya/supabase';
-import { EVENT_STATUS_LABEL, EXPENSE_STATUS_LABEL, TASK_STATUS_LABEL } from '@samudaya/core';
+import {
+  EVENT_STATUS_LABEL,
+  EXPENSE_STATUS_LABEL,
+  TASK_STATUS_LABEL,
+  fundKey,
+} from '@samudaya/core';
 import { cn } from '@/lib/utils';
 import { Badge, type Tone } from './ui/badge';
 
@@ -69,19 +74,22 @@ export function ReadinessBar({ percent }: { percent: number }) {
   );
 }
 
-/** Fund progress. Deliberately a different colour from readiness. */
 /**
- * Money raised, and — optionally — money on its way behind it.
+ * Diagonal stripes in one colour: money residents have reported paying and
+ * nobody has confirmed yet. Striped rather than paler, because a paler bar
+ * reads as disabled and stripes read as in progress.
+ */
+export function stripes(color: string): string {
+  return `repeating-linear-gradient(-45deg, ${color} 0 4px, color-mix(in oklch, ${color} 30%, transparent) 4px 8px)`;
+}
+
+/**
+ * Fund progress: what the fund holds, solid, then what is waiting to be
+ * confirmed, striped, both as shares of the event's target (fundBarSegments).
+ * `aria-valuenow` is the confirmed figure; nothing counts until it is.
  *
- * The second segment is deliberately the same hue at lower opacity rather than
- * a colour of its own: it is the same money one step earlier, not a different
- * kind of thing, and a resident who has just paid should be able to find their
- * own contribution on the bar without being told the fund is further along
- * than it is. `aria-valuenow` stays the confirmed figure for the same reason.
- *
- * Money the committee carried across is not on the bar: the bar is measured
- * against what residents are asked for, which that money has already been
- * taken off (see fundBarSegments).
+ * Also used as a plain progress bar (setup, votes): without pendingPercent it
+ * is one solid segment.
  */
 export function FundBar({
   percent,
@@ -103,16 +111,69 @@ export function FundBar({
       aria-label="Fund progress"
       aria-valuetext={[
         `${confirmed}% confirmed`,
-        pending > 0 ? `${pending}% waiting to be confirmed` : null,
+        pending > 0 ? `${pending}% to be confirmed` : null,
       ]
         .filter(Boolean)
         .join(', ')}
     >
       <div className="bg-success h-full transition-[width]" style={{ width: `${confirmed}%` }} />
       {pending > 0 ? (
-        <div className="bg-success/40 h-full transition-[width]" style={{ width: `${pending}%` }} />
+        <div
+          className="h-full transition-[width]"
+          style={{ width: `${pending}%`, backgroundImage: stripes('var(--color-success)') }}
+        />
       ) : null}
     </div>
+  );
+}
+
+/**
+ * The key under a fund bar, in place of sentences: a solid swatch for what is
+ * confirmed and a striped one for what is still to be confirmed (fundKey).
+ * `onColor` is for a bar drawn in white on a festival gradient.
+ */
+export function FundKey({
+  confirmed,
+  pending,
+  currency,
+  onColor = false,
+  className,
+}: {
+  confirmed: number;
+  pending: number;
+  currency: string;
+  onColor?: boolean;
+  className?: string;
+}) {
+  const key = fundKey(confirmed, pending, currency);
+  const swatch = onColor ? 'rgb(255 255 255 / 0.9)' : 'var(--color-success)';
+  return (
+    <p
+      className={cn(
+        'flex flex-wrap gap-x-3 gap-y-1 text-xs',
+        onColor ? 'text-white/85' : 'text-ink-muted',
+        className,
+      )}
+    >
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className="inline-block h-2 w-3 rounded-sm"
+          style={{ backgroundColor: swatch }}
+        />
+        {key.confirmed}
+      </span>
+      {key.pending ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            aria-hidden="true"
+            className="inline-block h-2 w-3 rounded-sm"
+            style={{ backgroundImage: stripes(swatch) }}
+          />
+          {key.pending}
+        </span>
+      ) : null}
+    </p>
   );
 }
 

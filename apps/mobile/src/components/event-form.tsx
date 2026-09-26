@@ -112,9 +112,17 @@ export function validateDetails(
 export function DetailsFields({
   details,
   onChange,
+  fundRuleLocked = false,
 }: {
   details: EventDetails;
   onChange: (next: EventDetails) => void;
+  /**
+   * Editing an event that already exists. The leftover rule is set once, when
+   * the event is created: residents see it marked as fixed, and the web has
+   * never offered a way to change it. The phone's editor did, which made that
+   * promise untrue.
+   */
+  fundRuleLocked?: boolean;
 }) {
   const set = <K extends keyof EventDetails>(key: K, value: EventDetails[K]) =>
     onChange({ ...details, [key]: value });
@@ -217,7 +225,17 @@ export function DetailsFields({
             Selected by default when residents contribute. Leave empty to accept any amount.
           </Caption>
         </View>
-        <FundRuleFields details={details} onChange={onChange} />
+        {fundRuleLocked ? (
+          <View style={{ gap: spacing.xs }}>
+            <Body>
+              If money is left over:{' '}
+              {details.fundRuleNote.trim() || FUND_RULE_PLAIN[details.fundRule]}
+            </Body>
+            <Caption>Fixed when the event was created.</Caption>
+          </View>
+        ) : (
+          <FundRuleFields details={details} onChange={onChange} />
+        )}
       </Disclosure>
     </View>
   );
@@ -249,7 +267,9 @@ export function FundRuleFields({
         onChangeText={(value) => onChange({ ...details, fundRuleNote: value })}
         placeholder="Any surplus goes to Deepavali 2027."
       />
-      <Caption>Residents see this on the event. Decide it before anyone pays.</Caption>
+      <Caption>
+        Residents see this on the event. It can’t be changed once the event is created.
+      </Caption>
     </View>
   );
 }
@@ -334,24 +354,36 @@ export function budgetProblem(lines: DraftBudgetLine[]): string | null {
 
 export type DraftActivity = { key: string; typeId: string | null; name: string; emoji: string };
 
+/**
+ * Starts an activity from a catalogue type, which fills in its name and emoji,
+ * or from Other, which starts blank. Other is always offered: not everything is
+ * in the catalogue, and an empty catalogue must not stop anyone adding one.
+ */
 export function ActivityTypeChips({
   onPick,
 }: {
-  onPick: (item: { id: string; label: string; emoji: string | null }) => void;
+  /** `id` is null for Other. */
+  onPick: (item: { id: string | null; label: string; emoji: string | null }) => void;
 }) {
   const { data: types, loading } = useCatalogue('activity_type');
   if (loading && !types) return <Caption>Loading…</Caption>;
-  if (!types?.length)
-    return <Caption>No activity types yet. Add them from Manage → Catalogue.</Caption>;
   return (
-    <ChipRow>
-      {types.map((item) => (
-        <Chip
-          key={item.id}
-          label={item.emoji ? `${item.emoji} ${item.label}` : item.label}
-          onPress={() => onPick(item)}
-        />
-      ))}
-    </ChipRow>
+    <View style={{ gap: spacing.sm }}>
+      <Caption>
+        {types?.length
+          ? 'Pick a type, or Other to name your own.'
+          : 'No activity types yet. Tap Other to name your own, or add types in Manage → Catalogue.'}
+      </Caption>
+      <ChipRow>
+        {(types ?? []).map((item) => (
+          <Chip
+            key={item.id}
+            label={item.emoji ? `${item.emoji} ${item.label}` : item.label}
+            onPress={() => onPick(item)}
+          />
+        ))}
+        <Chip label="Other" onPress={() => onPick({ id: null, label: '', emoji: null })} />
+      </ChipRow>
+    </View>
   );
 }

@@ -132,7 +132,7 @@ export function Suggestions({
   return (
     <Card style={{ gap: spacing.lg }}>
       <View style={{ gap: 2 }}>
-        <Heading>Suggestions</Heading>
+        <Heading>Ideas</Heading>
         <Caption>
           The committee reviews each suggestion, then residents vote. One vote per person.
         </Caption>
@@ -194,7 +194,7 @@ export function Suggestions({
 
       {maySuggest ? (
         <View style={{ gap: spacing.sm }}>
-          <Caption>SUGGEST SOMETHING</Caption>
+          <Caption>SUGGEST AN IDEA</Caption>
           {/* Only worth asking when there is a choice: on an event's own page
               there is exactly one answer and the picker would be furniture. */}
           {targets.length > 1 ? (

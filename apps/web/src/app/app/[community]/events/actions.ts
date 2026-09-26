@@ -136,7 +136,7 @@ export async function contribute(
   revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/events/${eventSlug}/contribute`);
   revalidatePath(`/app/${slug}/admin/events/${eventSlug}`);
-  revalidatePath(`/app/${slug}/me`);
+  revalidatePath(`/app/${slug}/money`);
   return {
     ...EMPTY_STATE,
     reported: { amount: parsed.data.amount, reference: parsed.data.reference },
@@ -267,13 +267,8 @@ export async function suggestForEvent(
 }
 
 /**
- * The same three stages, from the Ideas page — for the society itself, or for
- * an event the resident picks from there.
- *
- * `event` is a slug rather than an id because that is what a form can carry
- * without trusting the browser with a primary key, and it is resolved against
- * this community's published events: an id posted for somebody else's society,
- * or for a draft nobody can see yet, finds no row and is refused.
+ * The same three stages, from the Ideas page, for the society itself. An idea
+ * for an event comes from that event's page (suggestForEvent).
  */
 export async function suggestIdea(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const slug = String(formData.get('slug') ?? '');
@@ -287,24 +282,9 @@ export async function suggestIdea(_prev: ActionState, formData: FormData): Promi
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
   const supabase = await getSupabase();
-
-  const eventSlug = String(formData.get('event') ?? '');
-  let eventId: string | null = null;
-  if (eventSlug) {
-    const { data: event } = await supabase
-      .from('events')
-      .select('id')
-      .eq('community_id', context.community.id)
-      .eq('slug', eventSlug)
-      .eq('status', 'published')
-      .maybeSingle();
-    if (!event) return { fieldErrors: { event: 'Pick the society or an event that is running.' } };
-    eventId = event.id;
-  }
-
   const { error } = await supabase.from('activity_suggestions').insert({
     ...parsed.data,
-    event_id: eventId,
+    event_id: null,
     community_id: context.community.id,
     suggested_by: context.membership.id,
     status: 'new',
@@ -312,7 +292,6 @@ export async function suggestIdea(_prev: ActionState, formData: FormData): Promi
   if (error) return { error: friendlyDbError(error) };
 
   revalidatePath(`/app/${slug}/suggest`);
-  if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/todo`);
   return { ...EMPTY_STATE, success: 'Sent to the committee. Once approved, it goes to a vote.' };
 }

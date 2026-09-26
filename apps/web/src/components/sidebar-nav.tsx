@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { MemberRole } from '@samudaya/core';
+import { Plus } from 'lucide-react';
+import { can, type MemberRole } from '@samudaya/core';
 import { cn } from '@/lib/utils';
-import { bottomNavItems, visibleNav, type NavItem } from './nav-items';
+import { bottomNavItems, contributeButton, visibleNav, type NavItem } from './nav-items';
 
 export type NavCounts = { todo?: number };
 
@@ -53,6 +54,16 @@ export function SidebarNav({
 
   return (
     <nav aria-label="Main" className="space-y-6">
+      {/* The bottom bar's raised button, as the sidebar draws it. */}
+      {can(role, 'contribute') ? (
+        <Link
+          href={contributeButton(slug).href}
+          className="bg-accent text-accent-ink flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 pointer-coarse:min-h-11"
+        >
+          <Plus className="size-4" aria-hidden="true" />
+          Contribute
+        </Link>
+      ) : null}
       {groups.map((group, index) => (
         <div key={group.section || `group-${index}`}>
           {group.section ? (
@@ -120,6 +131,22 @@ export function BottomNav({
           const { href, label, icon: Icon } = item;
           const active = isActive(item);
           const count = item.badge ? (counts[item.badge] ?? 0) : 0;
+          if (item.action) {
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? 'page' : undefined}
+                  className="text-ink-subtle flex flex-col items-center gap-0.5 pb-2.5 text-[11px]"
+                >
+                  <span className="bg-accent text-accent-ink ring-surface-raised -mt-5 grid size-12 place-items-center rounded-full shadow-md ring-4">
+                    <Icon className="size-6" aria-hidden="true" />
+                  </span>
+                  {label}
+                </Link>
+              </li>
+            );
+          }
           return (
             <li key={href}>
               <Link

@@ -1,19 +1,42 @@
-import { Text, View } from 'react-native';
+import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { fundKey } from '@samudaya/core';
 import { Body, Caption, Card } from './ui';
 import { radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
 /**
+ * Diagonal stripes in one colour: money residents have reported paying and
+ * nobody has confirmed yet. Drawn without an SVG dependency, as thin bars
+ * turned 45° inside a clipped box. Striped rather than fainter, because a
+ * fainter bar reads as disabled and stripes read as in progress.
+ */
+export function Stripes({ color, style }: { color: string; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[{ overflow: 'hidden', flexDirection: 'row' }, style]}>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: color, opacity: 0.3 }]} />
+      {Array.from({ length: 48 }, (_, index) => (
+        <View
+          key={index}
+          style={{
+            width: 4,
+            height: 32,
+            marginTop: -12,
+            marginRight: 4,
+            backgroundColor: color,
+            transform: [{ rotate: '45deg' }],
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
  * A thin progress bar, announced to screen readers as a progress indicator.
  *
- * `pendingPercent` draws a second, fainter segment behind the first: on a fund
- * bar that is money reported and not yet confirmed. Same hue at lower opacity
- * rather than a colour of its own — it is the same money one step earlier, and
- * the value announced stays the confirmed figure.
- *
- * Money the committee carried across is not a segment: a fund bar is measured
- * against what residents are asked for, which that money has already been
- * taken off (see fundBarSegments).
+ * On a fund bar `percent` is what the fund holds and `pendingPercent` is what
+ * is still to be confirmed, striped, both as shares of the event's target
+ * (fundBarSegments). The value announced stays the confirmed figure.
  */
 export function Meter({
   percent,
@@ -24,13 +47,13 @@ export function Meter({
   percent: number;
   /** Clamped to whatever the bar has left after the confirmed segment. */
   pendingPercent?: number;
-  tone?: 'accent' | 'success';
+  tone?: 'accent' | 'success' | 'danger' | 'warning';
   label: string;
 }) {
   const { colors } = useTheme();
   const clamped = Math.min(100, Math.max(0, percent));
   const pending = Math.min(100 - clamped, Math.max(0, pendingPercent));
-  const fill = tone === 'success' ? colors.success : colors.accent;
+  const fill = colors[tone];
   return (
     <View
       accessibilityRole="progressbar"
@@ -46,9 +69,39 @@ export function Meter({
     >
       <View style={{ width: `${clamped}%`, height: '100%', backgroundColor: fill }} />
       {pending > 0 ? (
-        <View
-          style={{ width: `${pending}%`, height: '100%', backgroundColor: fill, opacity: 0.4 }}
-        />
+        <Stripes color={fill} style={{ width: `${pending}%`, height: '100%' }} />
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * The key under a fund bar, in place of sentences: a solid swatch for what is
+ * confirmed, a striped one for what is still to be confirmed (fundKey).
+ */
+export function FundKey({
+  confirmed,
+  pending,
+  currency,
+}: {
+  confirmed: number;
+  pending: number;
+  currency: string;
+}) {
+  const { colors } = useTheme();
+  const key = fundKey(confirmed, pending, currency);
+  const swatch = { width: 12, height: 8, borderRadius: 2 };
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View style={[swatch, { backgroundColor: colors.success }]} />
+        <Caption>{key.confirmed}</Caption>
+      </View>
+      {key.pending ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Stripes color={colors.success} style={swatch} />
+          <Caption>{key.pending}</Caption>
+        </View>
       ) : null}
     </View>
   );

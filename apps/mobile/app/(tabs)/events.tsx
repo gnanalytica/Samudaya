@@ -3,14 +3,12 @@ import { today as localToday } from '../../src/components/date-field';
 import { useRouter } from 'expo-router';
 import {
   EVENT_STATUS_LABEL,
-  alreadyInFundLine,
-  awaitingLine,
   can,
   countdown,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { fetchEvents, fetchStats } from '../../src/lib/events';
@@ -26,7 +24,7 @@ import {
   Loading,
   Screen,
 } from '../../src/components/ui';
-import { Meter } from '../../src/components/event-ui';
+import { FundKey, Meter } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function Events() {
@@ -93,7 +91,7 @@ export default function Events() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          can(role, 'campaigns:propose') || can(role, 'events:manage') ? (
+          can(role, 'campaigns:propose') || can(role, 'events:manage') || can(role, 'suggest') ? (
             <View style={{ marginBottom: spacing.sm, gap: spacing.sm }}>
               {can(role, 'events:manage') ? (
                 <Button label="New event" onPress={() => router.push('/admin/event/new')} />
@@ -103,6 +101,15 @@ export default function Events() {
                   label="Start a fundraising campaign"
                   variant="secondary"
                   onPress={() => router.push('/campaign/new')}
+                />
+              ) : null}
+              {/* Ideas live here as well as under Me: this is where people are
+                  already thinking about what the society does. */}
+              {can(role, 'suggest') ? (
+                <Button
+                  label="Suggest an idea"
+                  variant="secondary"
+                  onPress={() => router.push('/ideas')}
                 />
               ) : null}
             </View>
@@ -117,15 +124,15 @@ export default function Events() {
           </View>
         )}
         renderItem={({ item }) => {
+          const target = item.stats?.fundTarget ?? item.fund_target;
           const fundBar = fundBarSegments(
             item.stats?.fundRaised ?? 0,
             item.stats?.fundPending ?? 0,
-            item.stats?.fundTarget ?? 0,
+            target,
             item.stats?.fundCarried ?? 0,
           );
           const funded = fundBar.confirmed;
-          const waiting = awaitingLine(item.stats?.fundPending ?? 0, currency);
-          const inFund = alreadyInFundLine(item.stats?.fundCarried ?? 0, null, currency);
+          const held = inTheFund(item.stats?.fundRaised ?? 0, item.stats?.fundCarried ?? 0);
           return (
             <Pressable
               accessibilityRole="button"
@@ -169,14 +176,7 @@ export default function Events() {
                   <View style={{ gap: 2 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Caption>
-                        {formatMoney(item.stats?.fundRaised ?? 0, currency)} of{' '}
-                        {formatMoney(
-                          fundAsk(
-                            item.stats?.fundTarget ?? item.fund_target,
-                            item.stats?.fundCarried ?? 0,
-                          ),
-                          currency,
-                        )}
+                        {formatMoney(held, currency)} of {formatMoney(target, currency)}
                       </Caption>
                       <Caption>{funded}%</Caption>
                     </View>
@@ -186,10 +186,11 @@ export default function Events() {
                       tone="success"
                       label="Fund progress"
                     />
-                    {/* The headline counts confirmed money only; say what the
-                        paler segment is, and that money carried in is there. */}
-                    {waiting ? <Caption>{waiting}</Caption> : null}
-                    {inFund ? <Caption>{inFund}</Caption> : null}
+                    <FundKey
+                      confirmed={held}
+                      pending={item.stats?.fundPending ?? 0}
+                      currency={currency}
+                    />
                   </View>
                 ) : item.status === 'proposed' ? (
                   <Caption>Target {formatMoney(item.fund_target, currency)}</Caption>
