@@ -13,6 +13,8 @@ export * from './setup';
 export * from './notifications';
 export * from './copy';
 export * from './festivals';
+export * from './motifs';
+export * from './colour';
 export * from './calendar';
 export * from './statement';
 export * from './ledger';

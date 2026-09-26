@@ -27,8 +27,8 @@ import { legible } from '@/lib/contrast';
  *   "1 Nov 2026" on the front page would be exactly the false precision the
  *   calendar's own notes warn against. Those festivals show their window.
  *
- * - The page's colours skip the plain society palette and the national days.
- *   Children's Day and Gandhi Jayanti belong on the list; they are not what
+ * - The page's colours skip everything that is not a festival: the national
+ *   days, Children's Day, Yoga Day. They belong on the list; they are not what
  *   anybody means by making the page festive.
  *
  * Every palette handed back has been through `legible`, because this page
@@ -44,7 +44,6 @@ export type Upcoming = {
   when: string;
 };
 
-const NOT_A_SEASON = new Set(['community', 'national']);
 
 export function season(today: string = todayIn(), count = 5) {
   // Every festival, soonest first — the page colour may need to look past the
@@ -59,7 +58,7 @@ export function season(today: string = todayIn(), count = 5) {
       when: when.exact ? formatDate(when.startsOn) : (when.window ?? 'date varies'),
     };
   });
-  const next = all.find((entry) => !NOT_A_SEASON.has(entry.palette.id)) ?? null;
+  const next = all.find((entry) => entry.palette.kind === 'festival') ?? null;
   return {
     /** The festival whose colours the page wears. */
     next,

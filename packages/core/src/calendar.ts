@@ -1,4 +1,11 @@
-import { FESTIVALS, type FestivalId } from './festivals';
+import {
+  DEFAULT_FESTIVAL,
+  FESTIVALS,
+  mentions,
+  normaliseWords,
+  type Festival,
+  type FestivalId,
+} from './festivals';
 
 /**
  * The year a residential society actually plans around.
@@ -54,7 +61,7 @@ export type CalendarFestival = {
   /** Other names people type. Matched, never displayed. */
   aka?: readonly string[];
   emoji: string;
-  /** Which palette in FESTIVALS this takes. */
+  /** Which look in FESTIVALS this takes. */
   palette: FestivalId;
   date: DateRule;
 };
@@ -78,7 +85,15 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     id: 'lohri',
     name: 'Lohri',
     emoji: '🔥',
-    palette: 'pongal',
+    palette: 'lohri',
+    date: { on: 'fixed', month: 1, day: 13 },
+  },
+  {
+    id: 'bhogi',
+    name: 'Bhogi',
+    aka: ['bhogi mantalu'],
+    emoji: '🔥',
+    palette: 'lohri',
     date: { on: 'fixed', month: 1, day: 13 },
   },
   {
@@ -86,7 +101,7 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Makar Sankranti',
     aka: ['sankranthi', 'uttarayan', 'kite festival'],
     emoji: '🪁',
-    palette: 'pongal',
+    palette: 'sankranti',
     date: { on: 'fixed', month: 1, day: 14 },
   },
   {
@@ -102,7 +117,7 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Magh Bihu',
     aka: ['bhogali bihu'],
     emoji: '🌾',
-    palette: 'pongal',
+    palette: 'harvest',
     date: { on: 'fixed', month: 1, day: 14 },
   },
   {
@@ -118,7 +133,7 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Bohag Bihu',
     aka: ['rongali bihu', 'assamese new year'],
     emoji: '🌾',
-    palette: 'newyear',
+    palette: 'harvest',
     date: { on: 'fixed', month: 4, day: 14 },
   },
   {
@@ -126,8 +141,24 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Baisakhi',
     aka: ['vaisakhi'],
     emoji: '🌾',
-    palette: 'newyear',
+    palette: 'harvest',
     date: { on: 'fixed', month: 4, day: 14 },
+  },
+  {
+    id: 'environment-day',
+    name: 'World Environment Day',
+    aka: ['environment day', 'tree plantation'],
+    emoji: '🌱',
+    palette: 'green',
+    date: { on: 'fixed', month: 6, day: 5 },
+  },
+  {
+    id: 'yoga-day',
+    name: 'International Yoga Day',
+    aka: ['yoga day'],
+    emoji: '🧘',
+    palette: 'wellness',
+    date: { on: 'fixed', month: 6, day: 21 },
   },
   {
     id: 'independence-day',
@@ -142,7 +173,7 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Gandhi Jayanti',
     aka: ['2 october', 'bapu'],
     emoji: '🕊️',
-    palette: 'national',
+    palette: 'gandhi',
     date: { on: 'fixed', month: 10, day: 2 },
   },
   {
@@ -150,7 +181,7 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Children’s Day',
     aka: ['bal diwas', 'childrens day'],
     emoji: '🧒',
-    palette: 'community',
+    palette: 'kids',
     date: { on: 'fixed', month: 11, day: 14 },
   },
   {
@@ -168,7 +199,7 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Maha Shivratri',
     aka: ['shivaratri', 'shivratri'],
     emoji: '🔱',
-    palette: 'community',
+    palette: 'shivratri',
     date: { on: 'moves', month: 2, day: 26, window: 'late February or early March' },
   },
   {
@@ -184,24 +215,56 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     name: 'Ugadi',
     aka: ['yugadi', 'gudi padwa', 'telugu new year', 'kannada new year'],
     emoji: '🌿',
-    palette: 'newyear',
+    palette: 'ugadi',
     date: { on: 'moves', month: 3, day: 30, window: 'late March or early April' },
+  },
+  {
+    id: 'mahavir-jayanti',
+    name: 'Mahavir Jayanti',
+    aka: ['mahaveer jayanti'],
+    emoji: '🪷',
+    palette: 'mahavir',
+    date: { on: 'moves', month: 4, day: 10, window: 'late March or April' },
+  },
+  {
+    id: 'easter',
+    name: 'Easter',
+    aka: ['easter sunday'],
+    emoji: '🌷',
+    palette: 'easter',
+    date: { on: 'moves', month: 4, day: 5, window: 'late March or April' },
   },
   {
     id: 'rama-navami',
     name: 'Rama Navami',
     aka: ['ramanavami', 'ram navami'],
     emoji: '🏹',
-    palette: 'community',
+    palette: 'puja',
     date: { on: 'moves', month: 4, day: 6, window: 'late March or April' },
+  },
+  {
+    id: 'buddha-purnima',
+    name: 'Buddha Purnima',
+    aka: ['buddha jayanti', 'vesak'],
+    emoji: '🪷',
+    palette: 'buddha',
+    date: { on: 'moves', month: 5, day: 12, window: 'late April or May' },
   },
   {
     id: 'raksha-bandhan',
     name: 'Raksha Bandhan',
     aka: ['rakhi'],
     emoji: '🪢',
-    palette: 'community',
+    palette: 'rakhi',
     date: { on: 'moves', month: 8, day: 19, window: 'August' },
+  },
+  {
+    id: 'navroz',
+    name: 'Navroz',
+    aka: ['parsi new year', 'nowruz', 'jamshedi navroz'],
+    emoji: '🌸',
+    palette: 'ugadi',
+    date: { on: 'moves', month: 8, day: 16, window: 'mid-August' },
   },
   {
     id: 'janmashtami',
@@ -236,6 +299,15 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     date: { on: 'moves', month: 10, day: 3, window: 'late September or October' },
   },
   {
+    id: 'bathukamma',
+    name: 'Bathukamma',
+    aka: ['saddula bathukamma'],
+    emoji: '🌼',
+    palette: 'bathukamma',
+    // Saddula Bathukamma, the big day, near the end of Navratri.
+    date: { on: 'moves', month: 10, day: 10, window: 'late September or October' },
+  },
+  {
     id: 'dussehra',
     name: 'Dussehra',
     aka: ['dasara', 'vijayadashami', 'ayudha puja'],
@@ -252,11 +324,19 @@ export const FESTIVAL_CALENDAR: readonly CalendarFestival[] = [
     date: { on: 'moves', month: 11, day: 1, window: 'late October or November' },
   },
   {
+    id: 'chhath',
+    name: 'Chhath Puja',
+    aka: ['chhath', 'surya shashti'],
+    emoji: '🌅',
+    palette: 'chhath',
+    date: { on: 'moves', month: 11, day: 7, window: 'late October or November' },
+  },
+  {
     id: 'guru-nanak-jayanti',
     name: 'Guru Nanak Jayanti',
     aka: ['gurpurab', 'gurpurb'],
     emoji: '🪯',
-    palette: 'community',
+    palette: 'gurpurab',
     date: { on: 'moves', month: 11, day: 15, window: 'November' },
   },
 
@@ -398,4 +478,24 @@ export function festivalEventDraft(entry: CalendarFestival, today: string) {
     exact: when.exact,
     window: when.window,
   };
+}
+
+/**
+ * What the society is heading towards, in words: the festival's name, or the
+ * event's own name when it is not a festival. A look is not a name — one look
+ * dresses Baisakhi and Bihu alike, and the fallback's label is only
+ * "Society", which made the home screen read "Arkala · Society next" over an
+ * event called Velocity vipers — so the festival is named from the calendar
+ * when the event's name has it, and from the look only when it does not.
+ */
+export function headingTowards(festival: Festival, eventName: string): string {
+  if (festival.kind !== 'festival' && festival.kind !== 'national') return eventName;
+  if (festival.id === DEFAULT_FESTIVAL.id) return eventName;
+  const words = normaliseWords(eventName);
+  const entry = FESTIVAL_CALENDAR.find(
+    (row) =>
+      row.palette === festival.id &&
+      [row.name, ...(row.aka ?? [])].some((name) => mentions(words, name)),
+  );
+  return entry?.name ?? festival.label;
 }
