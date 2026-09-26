@@ -96,7 +96,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                 {registrations.data.map((row) => (
                   <li key={row.id} className="px-5 py-3">
                     <p className="text-ink text-sm font-medium">
-                      {row.event_activities?.emoji} {row.event_activities?.name}
+                      {row.event_activities?.name}
                       {row.participant_name ? (
                         <span className="text-ink-muted font-normal">
                           {' '}
@@ -174,7 +174,7 @@ export default async function MyActivityPage(props: PageProps<'/app/[community]/
                   >
                     <p className="text-ink flex items-center gap-2 text-sm font-medium">
                       <Megaphone className="text-ink-muted size-4" aria-hidden="true" />
-                      {campaign.emoji} {campaign.name}
+                      {campaign.name}
                     </p>
                     <p className="text-ink-subtle mt-0.5 text-xs">
                       Target {formatMoney(campaign.fund_target, community.currency)}

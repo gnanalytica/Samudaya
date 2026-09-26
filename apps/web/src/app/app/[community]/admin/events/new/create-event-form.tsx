@@ -147,7 +147,7 @@ export function CreateEventForm({
   today: string;
 }) {
   const [state, action] = useActionState<EventFormState, FormData>(createEvent, EMPTY_STATE);
-  const [emoji, setEmoji] = useState('🎉');
+  const [emoji, setEmoji] = useState('');
   // Name and date are controlled because picking a festival fills both, and an
   // uncontrolled field cannot be filled from anywhere but the keyboard.
   const [name, setName] = useState('');
@@ -242,6 +242,8 @@ export function CreateEventForm({
   return (
     <form ref={form} action={action} className="space-y-5">
       <input type="hidden" name="slug" value={slug} />
+      {/* The type's emoji still goes with the event for the WhatsApp bot's
+          messages. The app itself shows none. */}
       <input type="hidden" name="emoji" value={emoji} />
 
       <Rail step={step} furthest={furthest} onPick={goTo} />
@@ -313,29 +315,11 @@ export function CreateEventForm({
             </Field>
 
             <MoreOptions title={COPY.moreOptions}>
-              <div className="grid gap-4 sm:grid-cols-[5rem_1fr]">
-                <Field label="Emoji" htmlFor="ne-emoji" hint="From the type.">
-                  {(control) => (
-                    <Input
-                      {...control}
-                      value={emoji}
-                      onChange={(event) => setEmoji(event.target.value)}
-                      maxLength={8}
-                      className="text-center"
-                    />
-                  )}
-                </Field>
-                <Field label="Organised by" htmlFor="ne-org">
-                  {(control) => (
-                    <Input
-                      {...control}
-                      name="organizer"
-                      defaultValue={societyName}
-                      maxLength={140}
-                    />
-                  )}
-                </Field>
-              </div>
+              <Field label="Organised by" htmlFor="ne-org">
+                {(control) => (
+                  <Input {...control} name="organizer" defaultValue={societyName} maxLength={140} />
+                )}
+              </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   label="Ends"
@@ -516,7 +500,6 @@ export function CreateEventForm({
                         <option value="">Other</option>
                         {pickers.activity_type.map((item) => (
                           <option key={item.id} value={item.id}>
-                            {item.emoji ? `${item.emoji} ` : ''}
                             {item.label}
                           </option>
                         ))}
@@ -557,7 +540,7 @@ export function CreateEventForm({
               onClick={() => {
                 setActivities((current) => [
                   ...current,
-                  { key: nextKey, typeId: '', name: '', emoji: '🎭' },
+                  { key: nextKey, typeId: '', name: '', emoji: '' },
                 ]);
                 setNextKey((key) => key + 1);
               }}
@@ -572,10 +555,7 @@ export function CreateEventForm({
       {/* ----------------------------------------------------- 4 · review */}
       <div {...panel(3)}>
         <Card>
-          <CardHeader
-            title={`${emoji} ${summary.name || 'Your event'}`}
-            description={STEPS[3].hint}
-          />
+          <CardHeader title={summary.name || 'Your event'} description={STEPS[3].hint} />
           <dl className="divide-border-base divide-y text-sm">
             <Row label="Date">
               {summary.ends_on ? `${summary.starts_on} → ${summary.ends_on}` : summary.starts_on}

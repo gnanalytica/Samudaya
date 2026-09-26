@@ -176,7 +176,6 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                             href={`/app/${slug}/events/${holding.slug}`}
                             className="hover:underline"
                           >
-                            {holding.emoji ? `${holding.emoji} ` : ''}
                             {holding.name}
                           </Link>
                         ) : (

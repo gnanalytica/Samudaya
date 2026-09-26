@@ -9,10 +9,20 @@ import {
   Settings2,
   Users,
 } from 'lucide-react';
-import { COPY, can, formatDate, formatMoney, fundBarSegments, inTheFund } from '@samudaya/core';
+import {
+  COPY,
+  can,
+  festivalFor,
+  formatDate,
+  formatMoney,
+  fundBarSegments,
+  inTheFund,
+} from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
 import { listEvents, getStatsFor } from '@/lib/events';
+import { getCatalogue } from '@/lib/catalogue';
+import { FestivalTile } from '@/components/festival';
 import { getTodoItems } from '@/lib/todo';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
@@ -33,15 +43,18 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
   const events = (await listEvents(community.id)).filter((event) => event.status !== 'proposed');
   const base = `/app/${community.slug}`;
 
-  const [stats, todo, members] = await Promise.all([
+  const [stats, todo, catalogue, members] = await Promise.all([
     getStatsFor(events.map((event) => event.id)),
     getTodoItems(community.id, role),
+    getCatalogue(community.id),
     supabase
       .from('memberships')
       .select('id', { count: 'exact', head: true })
       .eq('community_id', community.id)
       .eq('status', 'active'),
   ]);
+
+  const typeLabel = new Map(catalogue.event_type.map((item) => [item.id, item.label]));
 
   const links = [
     { href: `${base}/people`, label: 'People', icon: Users, show: true },
@@ -116,9 +129,11 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                   className="border-border-base bg-surface-raised hover:bg-surface-sunken block rounded-xl border p-5 transition-colors"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-ink truncate text-base font-semibold">
-                        <span className="mr-1.5">{event.emoji}</span>
+                    <FestivalTile
+                      festival={festivalFor(typeLabel.get(event.event_type_id ?? ''), event.name)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-ink truncate font-serif text-[17px] font-medium tracking-tight">
                         {event.name}
                       </p>
                       <p className="text-ink-muted mt-0.5 text-sm">

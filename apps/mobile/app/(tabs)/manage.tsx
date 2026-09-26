@@ -64,7 +64,7 @@ export default function Manage() {
               {running.map((event) => (
                 <LinkRow
                   key={event.id}
-                  label={`${event.emoji} ${event.name}`}
+                  label={event.name}
                   detail={`${formatDate(event.starts_on)}${
                     event.status === 'draft' ? ` · ${EVENT_STATUS_LABEL.draft}` : ''
                   }`}

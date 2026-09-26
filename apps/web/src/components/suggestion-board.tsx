@@ -135,7 +135,7 @@ export function SuggestionBoard({
         className="text-ink-subtle hover:text-ink text-xs underline underline-offset-2"
       >
         {sep}
-        {row.events.emoji} {row.events.name}
+        {row.events.name}
       </Link>
     );
   };

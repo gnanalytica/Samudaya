@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
+  CAMPAIGN_EMOJI,
   joinActivitySchema,
   paymentEvidenceProblem,
   reportPaymentSchema,
@@ -483,7 +484,7 @@ export async function proposeCampaign(
     slug: eventSlug,
     kind: 'campaign',
     status: 'proposed',
-    emoji: '🤝',
+    emoji: CAMPAIGN_EMOJI,
     name: parsed.data.name,
     description: parsed.data.description,
     fund_target: parsed.data.fund_target,

@@ -68,7 +68,7 @@ export async function MyContributions({
                           href={`/app/${slug}/events/${contribution.events.slug}`}
                           className="hover:underline"
                         >
-                          {contribution.events.emoji} {contribution.events.name}
+                          {contribution.events.name}
                         </Link>
                       ) : null}
                     </p>

@@ -31,14 +31,14 @@ export type TodoKind =
   | 'flat_change';
 
 /** Section headings and action labels for the To do queue. */
-export const TODO_KIND: Record<TodoKind, { section: string; action: string; emoji: string }> = {
-  join_request: { section: 'New residents', action: 'Review', emoji: '🙋' },
-  payment_to_confirm: { section: 'Payments to confirm', action: 'Confirm', emoji: '💰' },
-  bill_to_approve: { section: 'Bills to approve', action: 'Approve', emoji: '🧾' },
-  bill_sent_back: { section: 'Your bills sent back', action: 'Fix', emoji: '↩️' },
-  campaign_to_review: { section: 'Campaigns to review', action: 'Review', emoji: '📣' },
-  suggestion_to_review: { section: 'Suggestions to review', action: 'Review', emoji: '💡' },
-  flat_change: { section: 'Residents who moved', action: 'Approve', emoji: '🏠' },
+export const TODO_KIND: Record<TodoKind, { section: string; action: string }> = {
+  join_request: { section: 'New residents', action: 'Review' },
+  payment_to_confirm: { section: 'Payments to confirm', action: 'Confirm' },
+  bill_to_approve: { section: 'Bills to approve', action: 'Approve' },
+  bill_sent_back: { section: 'Your bills sent back', action: 'Fix' },
+  campaign_to_review: { section: 'Campaigns to review', action: 'Review' },
+  suggestion_to_review: { section: 'Suggestions to review', action: 'Review' },
+  flat_change: { section: 'Residents who moved', action: 'Approve' },
 };
 
 export const TODO_ORDER: TodoKind[] = [

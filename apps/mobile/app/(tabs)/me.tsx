@@ -113,7 +113,7 @@ export default function Me() {
             {data.registrations.map((row) => (
               <View key={row.id} style={{ gap: 2 }}>
                 <Body>
-                  {row.event_activities?.emoji} {row.event_activities?.name}
+                  {row.event_activities?.name}
                   {row.participant_name ? ` · ${row.participant_name}` : ''}
                 </Body>
                 <Caption>{row.event_activities?.events?.name}</Caption>

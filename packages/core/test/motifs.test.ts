@@ -51,6 +51,25 @@ describe('motifs', () => {
   it('draw nothing at all for a day of mourning', () => {
     expect(MOTIFS.none.layers).toHaveLength(0);
   });
+
+  /**
+   * Candy colours — pink powder, rainbow tiers, red and blue balloons — are
+   * what made a festival look drawn for children. Every drawing is a line, a
+   * wash and one gold light; the banner behind it carries the colour.
+   */
+  it('are drawn in one hand: line, wash and gold, the tricolour apart', () => {
+    const paints = new Set(['line', 'soft', 'light', undefined]);
+    const coloured = Object.values(MOTIFS)
+      .filter((motif) => motif.id !== 'tricolour')
+      .flatMap((motif) =>
+        motif.layers.flatMap((layer) =>
+          layer.paths
+            .filter((path) => !paints.has(path.fill) || !paints.has(path.stroke))
+            .map((path) => `${motif.id}: ${path.fill ?? path.stroke}`),
+        ),
+      );
+    expect(coloured).toEqual([]);
+  });
 });
 
 describe('colour', () => {

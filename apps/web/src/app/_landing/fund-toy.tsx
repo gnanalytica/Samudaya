@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Check, Hourglass, ReceiptIndianRupee, RotateCcw, Users } from 'lucide-react';
 import { formatMoney, fundBarSegments } from '@samudaya/core';
 import { FundBar } from '@/components/badges';
+import { Motif } from '@/components/motif';
 import { buttonClass } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useFestivalTheme } from './theme';
@@ -130,7 +131,13 @@ export function FundToy() {
     >
       <div className="from-accent to-ribbon text-accent-ink flex items-center justify-between gap-3 bg-linear-to-r px-5 py-3">
         <p className="font-display truncate text-lg leading-tight font-semibold">
-          <span aria-hidden="true">{wearing?.emoji ?? '🎉'} </span>
+          {wearing ? (
+            <Motif
+              id={wearing.palette.motif}
+              compact
+              className="mr-2 inline-block size-5 align-[-4px]"
+            />
+          ) : null}
           {name} fund
         </p>
         <span className="shrink-0 rounded-full bg-black/15 px-2.5 py-1 text-[11px] font-semibold tracking-wide uppercase">
@@ -159,8 +166,7 @@ export function FundToy() {
 
         {reached ? (
           <p className="landing-pop text-ink mt-4 rounded-xl bg-[var(--festival-wash)] px-3 py-2 text-sm font-medium">
-            <span aria-hidden="true">🎉 </span>Target reached. Every rupee has a name and a flat
-            beside it.
+            Target reached. Every rupee has a name and a flat beside it.
           </p>
         ) : (
           <p className="text-ink-muted mt-4 text-xs font-medium">

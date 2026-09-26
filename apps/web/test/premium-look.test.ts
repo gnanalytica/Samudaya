@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -152,5 +152,58 @@ describe('the phone', () => {
     expect(phone('src', 'components', 'motif.tsx')).toContain('const still = compact || reduced');
     expect(phone('src', 'components', 'event-ui.tsx')).toContain('useReducedMotion()');
     expect(phone('src', 'components', 'ui.tsx')).toContain('useReducedMotion()');
+  });
+});
+
+/**
+ * Emoji made a society's app read like a children's one — a 🏍️🚗 on a fund
+ * card, a 🔔 for the bell, a 👍 on a vote — and every phone draws them
+ * differently. Neither app shows any: an event wears its festival's colours
+ * and line drawing, a control its line icon. The emoji still stored with
+ * events and activities go only into the WhatsApp bot's messages.
+ */
+describe('emoji', () => {
+  const ROOTS = [
+    SRC,
+    join(import.meta.dirname, '..', '..', 'mobile', 'app'),
+    join(import.meta.dirname, '..', '..', 'mobile', 'src'),
+  ];
+  const screens = (dir: string): string[] =>
+    readdirSync(dir).flatMap((entry) => {
+      const path = join(dir, entry);
+      if (statSync(path).isDirectory()) return screens(path);
+      return entry.endsWith('.tsx') ? [path] : [];
+    });
+  const files = ROOTS.flatMap(screens);
+
+  const EMOJI = /\p{Emoji_Presentation}|\uFE0F/u;
+  // `{event.emoji}` as text, or `${event.emoji}` in a title or label. A hidden
+  // input carrying the stored one on to the bot is not showing it.
+  const SHOWN = /\.emoji\}|\$\{[^}]*\bemoji\b[^}]*\}/;
+  const offenders = (pattern: RegExp) =>
+    files.flatMap((file) =>
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .flatMap((line, index) =>
+          pattern.test(line) && !line.includes('type="hidden"') ? [`${file}:${index + 1}`] : [],
+        ),
+    );
+
+  it('are never written into either app', () => {
+    expect(offenders(EMOJI)).toEqual([]);
+  });
+
+  it('are never shown from an event, activity or catalogue item', () => {
+    expect(offenders(SHOWN)).toEqual([]);
+  });
+
+  it('would be caught if one came back, and a tick is not one', () => {
+    expect(EMOJI.test('<Text>🔔</Text>')).toBe(true);
+    expect(EMOJI.test("label={bill ? '📎 Bill attached' : ''}")).toBe(true);
+    expect(EMOJI.test('🗳️')).toBe(true);
+    expect(EMOJI.test('✓ Matched · ₹1,200')).toBe(false);
+    expect(SHOWN.test('{event.emoji} {event.name}')).toBe(true);
+    expect(SHOWN.test('label={`${option.emoji} ${option.name}`}')).toBe(true);
+    expect(files.length).toBeGreaterThan(150);
   });
 });

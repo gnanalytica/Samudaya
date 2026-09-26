@@ -70,6 +70,12 @@ export const FUND_RULES: FundRule[] = [
 ];
 
 export type BudgetLineSeed = { name: string; amount: number };
+/**
+ * The emoji a campaign carries into the WhatsApp bot's messages. The apps show
+ * none: a campaign wears its colours and a line drawing instead.
+ */
+export const CAMPAIGN_EMOJI = '🤝';
+
 export type ActivitySeed = { name: string; emoji: string };
 export type VolunteerRoleSeed = { name: string; emoji: string; target: number };
 

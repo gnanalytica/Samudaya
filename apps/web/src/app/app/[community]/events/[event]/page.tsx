@@ -263,9 +263,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                       <div>
                         <dt className="sr-only">Type</dt>
                         <dd className="text-ink">
-                          {isCampaign
-                            ? 'Fundraising campaign'
-                            : `${eventType?.emoji ? `${eventType.emoji} ` : ''}${eventType?.label}`}
+                          {isCampaign ? 'Fundraising campaign' : eventType?.label}
                         </dd>
                       </div>
                     </div>
@@ -547,10 +545,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                         <CardBody>
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-ink text-sm font-semibold">
-                                <span className="mr-1.5">{activity.emoji}</span>
-                                {activity.name}
-                              </p>
+                              <p className="text-ink text-sm font-semibold">{activity.name}</p>
                               {activity.description ? (
                                 <p className="text-ink-muted mt-1 text-sm">
                                   {activity.description}

@@ -76,7 +76,7 @@ export default function NewEvent() {
       const parsed = createActivitySchema.safeParse({
         event_id: activeCommunity.id,
         name: activity.name,
-        emoji: activity.emoji || '🎭',
+        emoji: activity.emoji || undefined,
       });
       if (!parsed.success) {
         setError(`Activity “${activity.name || 'untitled'}”: ${parsed.error.issues[0]?.message}`);
@@ -146,7 +146,7 @@ export default function NewEvent() {
           event_id: created.id,
           community_id: activeCommunity.id,
           name: activity.name.trim(),
-          emoji: activity.emoji || '🎭',
+          emoji: activity.emoji || undefined,
           activity_type_id: activity.typeId,
           position,
         })),
@@ -205,7 +205,7 @@ export default function NewEvent() {
                     key: Math.random().toString(36).slice(2),
                     typeId: item.id,
                     name: item.label,
-                    emoji: item.emoji ?? '🎭',
+                    emoji: item.emoji ?? '',
                   },
                 ])
               }
@@ -215,20 +215,6 @@ export default function NewEvent() {
                 key={activity.key}
                 style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' }}
               >
-                <View style={{ width: 64 }}>
-                  <Input
-                    label="Emoji"
-                    value={activity.emoji}
-                    maxLength={8}
-                    onChangeText={(emoji) =>
-                      setActivities((current) =>
-                        current.map((item) =>
-                          item.key === activity.key ? { ...item, emoji } : item,
-                        ),
-                      )
-                    }
-                  />
-                </View>
                 <View style={{ flex: 1 }}>
                   <Input
                     label="Activity name"

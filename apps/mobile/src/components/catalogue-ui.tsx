@@ -38,8 +38,7 @@ export function useCatalogue(kind: CatalogueKind) {
   });
 }
 
-export const itemText = (item: { label: string; emoji: string | null }) =>
-  item.emoji ? `${item.emoji} ${item.label}` : item.label;
+export const itemText = (item: { label: string }) => item.label;
 
 /** Friendly text for the unique-label constraint on catalogue_items. */
 export function catalogueError(

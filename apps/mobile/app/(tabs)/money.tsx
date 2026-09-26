@@ -142,9 +142,7 @@ function MyContributions() {
         return (
           <Card style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
             <View style={{ flex: 1, gap: 2 }}>
-              <Body>
-                {contribution.events?.emoji} {contribution.events?.name}
-              </Body>
+              <Body>{contribution.events?.name}</Body>
               <Caption>
                 {contribution.status === 'succeeded'
                   ? receiptRef(contribution.events?.slug, contribution.receipt_no)
@@ -347,10 +345,7 @@ function SocietyMoney() {
                   const row = (
                     <View style={{ flexDirection: 'row', gap: spacing.md }}>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Body>
-                          {holding.emoji ? `${holding.emoji} ` : ''}
-                          {holding.name ?? UNPUBLISHED_EVENT}
-                        </Body>
+                        <Body>{holding.name ?? UNPUBLISHED_EVENT}</Body>
                         {note ? <Caption>{note}</Caption> : null}
                       </View>
                       <Text

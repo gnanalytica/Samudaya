@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Check, Lightbulb, ThumbsUp } from 'lucide-react';
+import { Check, Lightbulb, ThumbsUp, Vote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/field';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
@@ -151,7 +151,10 @@ export function PollCard({
   return (
     <Card>
       <CardBody>
-        <p className="text-ink text-sm font-semibold">🗳️ {poll.question}</p>
+        <p className="text-ink flex items-start gap-2 text-sm font-semibold">
+          <Vote className="text-ink-muted mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {poll.question}
+        </p>
         {poll.detail ? <p className="text-ink-muted mt-1 text-sm">{poll.detail}</p> : null}
 
         <div className="mt-3 space-y-2">
@@ -171,7 +174,6 @@ export function PollCard({
                 >
                   <span className="flex items-center justify-between text-sm">
                     <span className={mine ? 'text-ink font-semibold' : 'text-ink-muted'}>
-                      {option.emoji ? `${option.emoji} ` : ''}
                       {option.label}
                       {mine ? ' · your vote' : ''}
                     </span>

@@ -3,6 +3,7 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { CalendarClock } from 'lucide-react';
 import {
+  festivalById,
   festivalEventDraft,
   formatDate,
   nextFestivalDate,
@@ -10,6 +11,7 @@ import {
   type CalendarFestival,
 } from '@samudaya/core';
 import { Field, Input } from '@/components/ui/field';
+import { FestivalTile } from '@/components/festival';
 
 export type FestivalDraft = ReturnType<typeof festivalEventDraft>;
 
@@ -141,7 +143,10 @@ export function FestivalNameField({
                       : 'hover:bg-surface-sunken flex w-full items-center gap-3 px-3 py-2 text-left pointer-coarse:min-h-11'
                   }
                 >
-                  <span aria-hidden="true">{entry.emoji}</span>
+                  <FestivalTile
+                    festival={festivalById(entry.palette)}
+                    className="size-8 rounded-[10px]"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="text-ink block truncate text-sm font-medium">
                       {entry.name}

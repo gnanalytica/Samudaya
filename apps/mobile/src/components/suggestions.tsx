@@ -161,13 +161,13 @@ export function Suggestions({
             {mayVote ? (
               <ChipRow>
                 <Chip
-                  label="👍 For"
+                  label="For"
                   selected={row.tally.mine === true}
                   onPress={() => void vote(row.id, true)}
                   disabled={busy !== null}
                 />
                 <Chip
-                  label="👎 Against"
+                  label="Against"
                   selected={row.tally.mine === false}
                   onPress={() => void vote(row.id, false)}
                   disabled={busy !== null}
@@ -183,9 +183,7 @@ export function Suggestions({
           <Caption>WAITING FOR THE COMMITTEE</Caption>
           {waiting.map((row) => (
             <View key={row.id} style={{ gap: 2 }}>
-              <Body muted>
-                {row.kind === 'idea' ? '💡' : '🎭'} {row.name}
-              </Body>
+              <Body muted>{row.name}</Body>
               <EventLine row={row} show={showEvent} onOpen={openEvent(router)} />
             </View>
           ))}
@@ -264,13 +262,10 @@ function EventLine({
 }) {
   if (!show) return null;
   if (!row.events) return <Caption>For the society</Caption>;
-  const { slug, name, emoji } = row.events;
+  const { slug, name } = row.events;
   return (
     <Pressable accessibilityRole="link" onPress={() => onOpen(slug)}>
-      <Caption>
-        {emoji ? `${emoji} ` : ''}
-        {name} ›
-      </Caption>
+      <Caption>{name} ›</Caption>
     </Pressable>
   );
 }
