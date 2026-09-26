@@ -9,8 +9,9 @@
 export const APPEARANCE_KEY = 'samudaya-theme';
 
 /**
- * The browser's own toolbar, matched to the app header (the raised surface) in
- * each appearance. The root layout renders one tag per device appearance for
+ * The browser's own toolbar, matched to the app header in each appearance: the
+ * page's ivory, which the see-through header shows. The root layout renders
+ * one tag per device appearance for
  * System, as its own <meta> tags rather than through Next's viewport export,
  * which re-creates them on every client-side navigation.
  *
@@ -18,7 +19,7 @@ export const APPEARANCE_KEY = 'samudaya-theme';
  * theme-color whose media matches, so it wins without the layout's own tags
  * ever being edited, which React would otherwise put back as duplicates.
  */
-export const THEME_COLOR = { light: '#ffffff', dark: '#221d17' } as const;
+export const THEME_COLOR = { light: '#f8f5f1', dark: '#100e0c' } as const;
 
 /** The id of the tag Light or Dark adds; System removes it. */
 export const CHOSEN_THEME_COLOR_ID = 'theme-color-chosen';

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -7,18 +7,22 @@ import {
   TextInput,
   View,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { radius, spacing } from '../lib/theme';
+import { formatMoney } from '@samudaya/core';
+import { cardShadow, fonts, radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
+import { useReducedMotion } from './motif';
 
 export function Screen({ children, style }: { children: ReactNode; style?: ViewStyle }) {
   const { colors } = useTheme();
   return <View style={[{ flex: 1, backgroundColor: colors.surface }, style]}>{children}</View>;
 }
 
+/** White on ivory, lifted by a hairline and a long, soft shadow. */
 export function Card({ children, style }: { children: ReactNode; style?: ViewStyle }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   return (
     <View
       style={[
@@ -26,8 +30,9 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
           backgroundColor: colors.surfaceRaised,
           borderColor: colors.border,
           borderWidth: StyleSheet.hairlineWidth,
-          borderRadius: radius.md,
+          borderRadius: radius.lg,
           padding: spacing.lg,
+          ...cardShadow(isDark),
         },
         style,
       ]}
@@ -37,18 +42,116 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
   );
 }
 
+/** A screen's title, in the serif. */
 export function Title({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
   return (
-    <Text style={{ color: colors.ink, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 }}>
+    <Text
+      accessibilityRole="header"
+      style={{
+        color: colors.ink,
+        fontFamily: fonts.serif,
+        fontSize: 28,
+        lineHeight: 32,
+        letterSpacing: -0.4,
+      }}
+    >
       {children}
     </Text>
   );
 }
 
+/** A card's title, in the serif. */
 export function Heading({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
-  return <Text style={{ color: colors.ink, fontSize: 15, fontWeight: '600' }}>{children}</Text>;
+  return (
+    <Text style={{ color: colors.ink, fontFamily: fonts.serif, fontSize: 17, lineHeight: 22 }}>
+      {children}
+    </Text>
+  );
+}
+
+/**
+ * A section's name in small gold capitals with a hairline running off to its
+ * right, as the web's SectionLabel draws it.
+ */
+export function SectionLabel({ children }: { children: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+      <Text
+        accessibilityRole="header"
+        style={{
+          color: colors.gold,
+          fontSize: 11,
+          fontWeight: '600',
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+        }}
+      >
+        {children}
+      </Text>
+      <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border }} />
+    </View>
+  );
+}
+
+/**
+ * An amount in the serif that counts up to its value as it arrives, and
+ * straight to it for anybody whose phone is set to reduce motion. Screen
+ * readers only ever get the final figure.
+ */
+export function Amount({
+  value,
+  currency,
+  size = 30,
+  style,
+}: {
+  value: number;
+  currency: string;
+  size?: number;
+  style?: TextStyle;
+}) {
+  const { colors } = useTheme();
+  const reduced = useReducedMotion();
+  const [shown, setShown] = useState(reduced ? value : 0);
+  const from = useRef(0);
+  useEffect(() => {
+    if (reduced) {
+      from.current = value;
+      return;
+    }
+    const start = from.current;
+    const began = Date.now();
+    let frame = 0;
+    const step = () => {
+      const t = Math.min(1, (Date.now() - began) / 900);
+      const eased = 1 - (1 - t) ** 3;
+      setShown(Math.round(start + (value - start) * eased));
+      if (t < 1) frame = requestAnimationFrame(step);
+      else from.current = value;
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value, reduced]);
+  return (
+    <Text
+      accessibilityLabel={formatMoney(value, currency)}
+      style={[
+        {
+          color: colors.ink,
+          fontFamily: fonts.serif,
+          fontSize: size,
+          lineHeight: size * 1.15,
+          letterSpacing: -0.5,
+          fontVariant: ['tabular-nums', 'lining-nums'],
+        },
+        style,
+      ]}
+    >
+      {formatMoney(reduced ? value : shown, currency)}
+    </Text>
+  );
 }
 
 export function Body({ children, muted = false }: { children: ReactNode; muted?: boolean }) {
@@ -67,51 +170,66 @@ export function Caption({ children, tone }: { children: ReactNode; tone?: 'dange
   );
 }
 
+/**
+ * Primary is ink, not colour: with a festival's colour on every button there
+ * would be none left for the festival. `festive` wears it; `inverse` and
+ * `glass` are for a festival's banner, where ink would vanish. A press sinks a
+ * little, so it is felt before the next screen answers.
+ */
 export function Button({
   label,
   onPress,
   variant = 'primary',
   loading = false,
   disabled = false,
+  compact = false,
 }: {
   label: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'festive' | 'inverse' | 'glass';
   loading?: boolean;
   disabled?: boolean;
+  /** A smaller button, for a banner or a row. Its touch target stays 44. */
+  compact?: boolean;
 }) {
   const { colors } = useTheme();
-  const isPrimary = variant === 'primary';
   const inactive = disabled || loading;
+  const look = {
+    primary: { fill: colors.ink, text: colors.surface, border: 'transparent' },
+    secondary: { fill: colors.surfaceRaised, text: colors.ink, border: colors.border },
+    festive: { fill: colors.accent, text: colors.accentInk, border: 'transparent' },
+    inverse: { fill: '#ffffff', text: '#1b1611', border: 'transparent' },
+    glass: {
+      fill: 'rgba(255,255,255,0.16)',
+      text: '#ffffff',
+      border: 'rgba(255,255,255,0.3)',
+    },
+  }[variant];
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
       onPress={inactive ? undefined : onPress}
+      hitSlop={compact ? { top: 6, bottom: 6 } : undefined}
       style={({ pressed }) => ({
-        backgroundColor: isPrimary ? colors.accent : colors.surfaceRaised,
-        borderColor: colors.border,
-        borderWidth: isPrimary ? 0 : StyleSheet.hairlineWidth,
-        borderRadius: radius.sm,
-        paddingVertical: 13,
-        paddingHorizontal: spacing.lg,
+        backgroundColor: look.fill,
+        borderColor: look.border,
+        borderWidth: look.border === 'transparent' ? 0 : StyleSheet.hairlineWidth,
+        borderRadius: compact ? radius.sm : radius.md,
+        paddingVertical: compact ? 8 : 13,
+        paddingHorizontal: compact ? 14 : spacing.lg,
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: inactive ? 0.55 : pressed ? 0.85 : 1,
-        minHeight: 48,
+        opacity: inactive ? 0.55 : 1,
+        transform: [{ scale: pressed && !inactive ? 0.97 : 1 }],
+        minHeight: compact ? 34 : 48,
       })}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? colors.accentInk : colors.ink} />
+        <ActivityIndicator color={look.text} />
       ) : (
-        <Text
-          style={{
-            color: isPrimary ? colors.accentInk : colors.ink,
-            fontWeight: '600',
-            fontSize: 15,
-          }}
-        >
+        <Text style={{ color: look.text, fontWeight: '600', fontSize: compact ? 13 : 15 }}>
           {label}
         </Text>
       )}

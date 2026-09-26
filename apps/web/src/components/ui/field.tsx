@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils';
 // to be scrolled sideways to read. The size only looks different on a phone,
 // where the field is full-width anyway; `sm` and up is unchanged at 14px.
 const control =
-  'w-full rounded-lg border border-border-base bg-surface-raised px-3 py-2 text-base sm:text-sm text-ink ' +
+  'w-full rounded-xl border border-border-base bg-surface-raised px-3 py-2 text-base sm:text-sm text-ink ' +
+  'transition-[border-color,box-shadow] focus:border-border-strong ' +
   'placeholder:text-ink-subtle disabled:opacity-60 disabled:cursor-not-allowed ' +
   'aria-[invalid=true]:border-danger';
 

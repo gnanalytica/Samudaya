@@ -26,9 +26,8 @@
  * a `dark:` variant on every element.
  */
 @theme {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif;
+  /* One curve for everything that arrives: fast out, long settle. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* A calm green — communal, not corporate, and distinct from the red/amber
      used for overdue bills and urgent tickets. */
@@ -69,50 +68,79 @@
   }
 }
 
+/*
+ * Samudaya's look: ivory paper, warm ink and a little gold, with the colour
+ * left to the festival. Cards are white on ivory rather than grey on white,
+ * the one strong colour on a page is whatever the society is celebrating, and
+ * the primary button is ink — a festival colour on every button would leave
+ * nothing for the festival.
+ */
+
 :root {
-  --surface: oklch(0.993 0.005 85);
+  --surface: oklch(0.972 0.007 84);
   --surface-raised: oklch(1 0 0);
-  --surface-sunken: oklch(0.964 0.008 85);
-  --border: oklch(0.898 0.009 85);
-  --border-strong: oklch(0.818 0.013 85);
-  --ink: oklch(0.235 0.014 75);
-  --ink-muted: oklch(0.515 0.013 75);
-  --ink-subtle: oklch(0.635 0.011 75);
-  --accent: var(--color-brand-600);
-  --accent-ink: oklch(1 0 0);
+  --surface-sunken: oklch(0.945 0.011 82);
+  --border: oklch(0.905 0.014 80);
+  --border-strong: oklch(0.83 0.02 78);
+  --ink: oklch(0.205 0.012 70);
+  --ink-muted: oklch(0.47 0.02 72);
+  --ink-subtle: oklch(0.56 0.02 74);
+  /* Section labels and hairlines: the one ornament that is not the festival's. */
+  --gold: oklch(0.53 0.075 75);
   /* Re-pointed per festival; these are the society's own colours. */
-  --ribbon: oklch(0.6 0.13 250);
-  --festival-wash: oklch(0.975 0.02 166);
-  --danger: oklch(0.58 0.2 25);
-  --warning: oklch(0.72 0.16 70);
-  --success: oklch(0.6 0.15 150);
-  --info: oklch(0.6 0.13 250);
+  --accent: oklch(0.48 0.09 165);
+  --accent-ink: oklch(1 0 0);
+  --ribbon: oklch(0.62 0.09 80);
+  --festival-wash: oklch(0.975 0.012 150);
+  --danger: oklch(0.53 0.19 27);
+  --warning: oklch(0.56 0.13 60);
+  --success: oklch(0.5 0.12 158);
+  --info: oklch(0.52 0.11 250);
+  /* A card lifts off the page by a hairline and a long, soft shadow. */
+  --shadow-card: 0 1px 2px oklch(0.3 0.03 70 / 0.05), 0 12px 28px -18px oklch(0.3 0.04 70 / 0.28);
+  --shadow-float: 0 1px 2px oklch(0.3 0.03 70 / 0.06), 0 18px 40px -20px oklch(0.3 0.05 70 / 0.4);
+  /* What a motif draws a flame, a star or a lantern in. */
+  --motif-light: #ffd98a;
 
   @variant dark {
-    --surface: oklch(0.188 0.011 70);
-    --surface-raised: oklch(0.233 0.013 70);
-    --surface-sunken: oklch(0.153 0.009 70);
-    --border: oklch(0.318 0.013 70);
-    --border-strong: oklch(0.418 0.015 70);
-    --ink: oklch(0.958 0.005 80);
-    --ink-muted: oklch(0.728 0.011 80);
-    --ink-subtle: oklch(0.598 0.011 80);
-    --accent: var(--color-brand-400);
-    --accent-ink: oklch(0.18 0.03 168);
-    --ribbon: oklch(0.74 0.12 250);
-    --festival-wash: oklch(0.235 0.026 166);
-    --danger: oklch(0.68 0.18 25);
-    --warning: oklch(0.8 0.14 75);
-    --success: oklch(0.72 0.14 155);
-    --info: oklch(0.7 0.12 250);
+    --surface: oklch(0.165 0.006 70);
+    --surface-raised: oklch(0.205 0.008 70);
+    --surface-sunken: oklch(0.14 0.005 70);
+    --border: oklch(0.29 0.012 70);
+    --border-strong: oklch(0.38 0.014 70);
+    --ink: oklch(0.955 0.01 80);
+    --ink-muted: oklch(0.74 0.018 78);
+    --ink-subtle: oklch(0.62 0.018 75);
+    --gold: oklch(0.8 0.08 80);
+    --accent: oklch(0.76 0.1 165);
+    --accent-ink: oklch(0.18 0.02 70);
+    --ribbon: oklch(0.8 0.09 82);
+    --festival-wash: oklch(0.235 0.018 160);
+    --danger: oklch(0.7 0.17 25);
+    --warning: oklch(0.8 0.13 75);
+    --success: oklch(0.75 0.13 158);
+    --info: oklch(0.73 0.1 250);
+    --shadow-card: 0 1px 0 oklch(1 0 0 / 0.03) inset, 0 16px 32px -20px oklch(0 0 0 / 0.8);
+    --shadow-float: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 20px 44px -18px oklch(0 0 0 / 0.9);
   }
 }
 
 @theme inline {
-  /* The front page's display face (app/_landing/font.ts). Inline, so the
-     variable is read where it is used — it is only defined on the landing
-     page's root — and anywhere else this falls back to a rounded system face. */
-  --font-display: var(--font-baloo, ui-rounded), ui-rounded, system-ui, sans-serif;
+  /* The app's faces (app/fonts.ts), set on <html>. Inline, so the variables
+     are read where they are used rather than baked in at build time. */
+  --font-sans:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans',
+    sans-serif;
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, 'Noto Serif', serif;
+  /* The front page's display face: the app's serif, with Baloo 2
+     (app/_landing/font.ts) behind it for the Devanagari the serif does not
+     draw — "समुदाय" beside "Samudaya". Inline, so the variables are read where
+     they are used; Baloo is only defined on the landing page's root. */
+  --font-display:
+    var(--font-fraunces), var(--font-baloo, ui-serif), ui-serif, Georgia, 'Noto Serif', serif;
+  --color-gold: var(--gold);
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
   --color-surface-sunken: var(--surface-sunken);
@@ -151,6 +179,13 @@ body {
   background-color: var(--surface);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Figures that line up in a column and do not jump as they count. */
+.font-serif,
+.tabular {
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 /* Visible focus for keyboard users on every interactive element, without
@@ -288,5 +323,258 @@ body {
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 450ms;
+  }
+}
+
+/*
+ * The app's motion. Everything arrives rather than appears: cards rise into
+ * place a beat apart, bars fill from nothing, and a festival's motif moves the
+ * way the thing it draws does — a flame flickers, a lantern swings. Each
+ * animation ends where the element is meant to be, so the reduced-motion rule
+ * above leaves the page exactly as it looks once the motion is over, and the
+ * loops below are not run at all.
+ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bar-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes roll-digit {
+  from {
+    transform: translateY(0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 560ms var(--ease-out-soft) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+.bar-fill {
+  transform-origin: left center;
+  animation: bar-fill 1100ms var(--ease-out-soft) both;
+  animation-delay: 150ms;
+}
+
+/* An amount's digits roll up to their value (components/rolling-amount.tsx). */
+.roll-digit {
+  animation: roll-digit 1300ms var(--ease-out-soft) both;
+  animation-delay: calc(120ms + var(--i, 0) * 45ms);
+}
+
+/* A press sinks a little, so a tap is felt before the page answers. */
+.pressable {
+  transition: transform 160ms var(--ease-out-soft);
+}
+
+.pressable:active {
+  transform: scale(0.98);
+}
+
+/* A festival's motif (components/motif.tsx). Each layer turns about its own
+   point on the drawing's 120 × 120 canvas. */
+.motif g {
+  transform-box: view-box;
+}
+
+.motif .motif-soft {
+  fill-opacity: var(--motif-soft, 0.16);
+}
+
+/* A calm look — a vigil, a fast, a day of reflection — moves at half the pace. */
+.motif-calm {
+  --motif-pace: 2;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .motif-flicker {
+    animation: motif-flicker calc(1.7s * var(--motif-pace, 1)) ease-in-out infinite;
+  }
+  .motif-twinkle {
+    animation: motif-twinkle calc(2.8s * var(--motif-pace, 1)) ease-in-out infinite;
+  }
+  .motif-sway {
+    animation: motif-sway calc(5.5s * var(--motif-pace, 1)) ease-in-out infinite alternate;
+  }
+  .motif-swing {
+    animation: motif-swing calc(3.8s * var(--motif-pace, 1)) ease-in-out infinite alternate;
+  }
+  .motif-drift {
+    animation: motif-drift calc(7s * var(--motif-pace, 1)) ease-in-out infinite alternate;
+  }
+  .motif-bloom {
+    animation: motif-bloom calc(3.3s * var(--motif-pace, 1)) var(--ease-out-soft) infinite;
+  }
+  .motif-float {
+    animation: motif-float calc(4.2s * var(--motif-pace, 1)) ease-in-out infinite alternate;
+  }
+  .motif-turn {
+    animation: motif-turn calc(120s * var(--motif-pace, 1)) linear infinite;
+  }
+  .motif-rise {
+    animation: motif-rise calc(3.4s * var(--motif-pace, 1)) ease-out infinite;
+  }
+  .motif-wave {
+    animation: motif-wave calc(6s * var(--motif-pace, 1)) ease-in-out infinite alternate;
+  }
+  .motif-pulse {
+    animation: motif-pulse calc(3.2s * var(--motif-pace, 1)) ease-in-out infinite alternate;
+  }
+  .motif-fall {
+    animation: motif-fall calc(6.5s * var(--motif-pace, 1)) linear infinite;
+  }
+}
+
+@keyframes motif-flicker {
+  0%,
+  100% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  25% {
+    transform: scale(0.97, 1.06) skewX(-2deg);
+  }
+  50% {
+    transform: scale(1.02, 0.96) skewX(1deg);
+  }
+  75% {
+    transform: scale(0.98, 1.04) skewX(2deg);
+  }
+}
+
+@keyframes motif-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes motif-sway {
+  from {
+    transform: rotate(-2.5deg);
+  }
+  to {
+    transform: rotate(2.5deg);
+  }
+}
+
+@keyframes motif-swing {
+  from {
+    transform: rotate(-6deg);
+  }
+  to {
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes motif-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(2px, -4px) scale(1.05);
+  }
+}
+
+@keyframes motif-bloom {
+  0% {
+    opacity: 0;
+    transform: scale(0.35);
+  }
+  35% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes motif-float {
+  from {
+    transform: translateY(0) rotate(0deg);
+  }
+  to {
+    transform: translateY(-5px) rotate(1.5deg);
+  }
+}
+
+@keyframes motif-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes motif-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  30% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+@keyframes motif-wave {
+  from {
+    transform: translate(-2px, 0) rotate(-0.8deg);
+  }
+  to {
+    transform: translate(2px, -2px) rotate(0.8deg);
+  }
+}
+
+@keyframes motif-pulse {
+  from {
+    opacity: 0.75;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes motif-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(26px) rotate(160deg);
   }
 }

@@ -103,7 +103,7 @@ export function FundBar({
   const pending = Math.min(100 - confirmed, Math.max(0, pendingPercent));
   return (
     <div
-      className="bg-surface-sunken flex h-2 overflow-hidden rounded-full"
+      className="bg-surface-sunken flex h-[7px] overflow-hidden rounded-full"
       role="progressbar"
       aria-valuenow={confirmed}
       aria-valuemin={0}
@@ -116,13 +116,22 @@ export function FundBar({
         .filter(Boolean)
         .join(', ')}
     >
-      <div className="bg-success h-full transition-[width]" style={{ width: `${confirmed}%` }} />
-      {pending > 0 ? (
+      {/* One strip that fills from nothing, so the solid and striped parts
+          arrive together rather than one after the other. */}
+      <div className="bar-fill flex h-full" style={{ width: `${confirmed + pending}%` }}>
         <div
-          className="h-full transition-[width]"
-          style={{ width: `${pending}%`, backgroundImage: stripes('var(--color-success)') }}
+          className="bg-success h-full rounded-full"
+          style={{
+            width: confirmed + pending ? `${(confirmed / (confirmed + pending)) * 100}%` : 0,
+          }}
         />
-      ) : null}
+        {pending > 0 ? (
+          <div
+            className="h-full flex-1"
+            style={{ backgroundImage: stripes('var(--color-success)') }}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -215,19 +224,19 @@ export function StatTile({
   tone?: 'success' | 'danger';
 }) {
   return (
-    <div className="border-border-base bg-surface-raised rounded-xl border px-3 py-3 text-center">
+    <div className="border-border-base bg-surface-raised rounded-2xl border px-3.5 py-3">
       <div
         className={cn(
           // A notch smaller on a phone, where the tile is narrower than the
           // screen it sits on. `break-words` is the backstop: a number too long
           // even for two-up wraps inside its tile instead of pushing the page.
-          'text-base font-semibold tracking-tight break-words tabular-nums sm:text-lg',
+          'font-serif text-lg font-medium tracking-tight break-words sm:text-xl',
           tone === 'success' ? 'text-success' : tone === 'danger' ? 'text-danger' : 'text-ink',
         )}
       >
         {value}
       </div>
-      <div className="text-ink-subtle mt-0.5 text-[11px] font-medium tracking-wide uppercase">
+      <div className="text-ink-subtle mt-0.5 text-[10.5px] font-medium tracking-[0.08em] uppercase">
         {label}
       </div>
     </div>

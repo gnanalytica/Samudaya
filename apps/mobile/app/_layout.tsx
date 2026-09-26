@@ -1,4 +1,11 @@
+import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
+import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
+// Each weight from its own path: the package's index requires all eighteen
+// cuts, and every one of them would ship in the app.
+import { Fraunces_500Medium } from '@expo-google-fonts/fraunces/500Medium';
+import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces/600SemiBold';
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +17,7 @@ import { usePushTapHandler } from '../src/lib/notifications';
 import { useTheme } from '../src/lib/use-theme';
 import { initErrorReporting } from '../src/lib/observability';
 import { applySavedAppearance } from '../src/lib/appearance';
+import { fonts } from '../src/lib/theme';
 
 // Before the first render, so a crash while the tree is mounting is still
 // reported. Inert without a DSN — see lib/observability.
@@ -19,6 +27,11 @@ initErrorReporting();
 // storage, and starting now lets it land while the app is still loading rather
 // than after the first real screen has drawn.
 applySavedAppearance();
+
+// The splash stays up until the serif has loaded, so no title is ever drawn in
+// the system face and then swapped. In global scope, as the SDK asks: inside a
+// component it can run after the splash has already gone.
+void SplashScreen.preventAutoHideAsync();
 
 function RootStack() {
   const { colors, isDark } = useTheme();
@@ -35,9 +48,12 @@ function RootStack() {
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.surfaceRaised },
+          // The header is the page's own ivory, not a white bar across it,
+          // and its title is set in the serif like every title in the app.
+          headerStyle: { backgroundColor: colors.surface },
+          headerShadowVisible: false,
           headerTintColor: colors.ink,
-          headerTitleStyle: { fontWeight: '600' },
+          headerTitleStyle: { fontFamily: fonts.serif, fontSize: 18 },
           contentStyle: { backgroundColor: colors.surface },
         }}
       >
@@ -46,7 +62,8 @@ function RootStack() {
         <Stack.Screen name="auth-callback" options={{ headerShown: false }} />
         <Stack.Screen name="join" options={{ title: 'Join your community' }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="event/[slug]" options={{ title: 'Event' }} />
+        {/* The event's banner carries its name. */}
+        <Stack.Screen name="event/[slug]" options={{ title: '' }} />
         <Stack.Screen name="contribute" options={{ title: 'Contribute', presentation: 'modal' }} />
         <Stack.Screen name="campaign/new" options={{ title: 'New campaign' }} />
         <Stack.Screen name="admin/requests" options={{ title: 'Join requests' }} />
@@ -109,6 +126,16 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({ Fraunces_500Medium, Fraunces_600SemiBold });
+  // A font that fails to load is not worth a blank app: fall back and go on.
+  const ready = fontsLoaded || Boolean(fontError);
+
+  useEffect(() => {
+    if (ready) SplashScreen.hide();
+  }, [ready]);
+
+  if (!ready) return null;
+
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>

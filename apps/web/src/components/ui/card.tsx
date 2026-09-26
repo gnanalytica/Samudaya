@@ -14,7 +14,10 @@ export function Card({
   return (
     <div
       id={id}
-      className={cn('border-border-base bg-surface-raised rounded-xl border shadow-sm', className)}
+      className={cn(
+        'border-border-base bg-surface-raised shadow-card rounded-2xl border',
+        className,
+      )}
     >
       {children}
     </div>
@@ -40,7 +43,9 @@ export function CardHeader({
       )}
     >
       <div className="min-w-0">
-        <h2 className="text-ink text-sm font-semibold tracking-tight">{title}</h2>
+        <h2 className="text-ink font-serif text-[17px] leading-snug font-medium tracking-tight">
+          {title}
+        </h2>
         {description ? <p className="text-ink-muted mt-1 text-sm">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}

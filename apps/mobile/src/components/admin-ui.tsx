@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { minTapTarget, radius, spacing } from '../lib/theme';
+import { cardShadow, minTapTarget, radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
 /** A small selectable pill, used for role and title pickers. */
@@ -93,21 +93,32 @@ export function Segmented<T extends string>({
   options,
   value,
   onChange,
+  tone = 'raised',
 }: {
   options: readonly { id: T; label: string }[];
   value: T;
   onChange: (next: T) => void;
+  /**
+   * `raised`: a white segment on a sunken track, for switching views.
+   * `ink`: an ink pill on a white bar that floats over the page, for the
+   * event page's pinned sections, as the web draws them.
+   */
+  tone?: 'raised' | 'ink';
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const ink = tone === 'ink';
   return (
     <View
       accessibilityRole="tablist"
       style={{
         flexDirection: 'row',
-        backgroundColor: colors.surfaceSunken,
-        borderRadius: radius.sm,
-        padding: 3,
+        backgroundColor: ink ? colors.surfaceRaised : colors.surfaceSunken,
+        borderRadius: ink ? radius.lg : radius.md,
+        borderColor: ink ? colors.border : 'transparent',
+        borderWidth: ink ? StyleSheet.hairlineWidth : 0,
+        padding: ink ? 4 : 3,
         gap: 3,
+        ...(ink ? cardShadow(isDark) : null),
       }}
     >
       {options.map((option) => {
@@ -124,18 +135,17 @@ export function Segmented<T extends string>({
               justifyContent: 'center',
               paddingVertical: 8,
               minHeight: minTapTarget,
-              borderRadius: radius.sm - 2,
-              backgroundColor: selected ? colors.surfaceRaised : 'transparent',
-              borderColor: selected ? colors.border : 'transparent',
-              borderWidth: StyleSheet.hairlineWidth,
+              borderRadius: ink ? radius.md : radius.sm,
+              backgroundColor: selected ? (ink ? colors.ink : colors.surfaceRaised) : 'transparent',
               opacity: pressed ? 0.8 : 1,
+              ...(selected && !ink ? cardShadow(isDark) : null),
             })}
           >
             <Text
               style={{
-                color: selected ? colors.ink : colors.inkMuted,
+                color: selected ? (ink ? colors.surface : colors.ink) : colors.inkMuted,
                 fontSize: 13,
-                fontWeight: '600',
+                fontWeight: selected ? '600' : '500',
               }}
             >
               {option.label}

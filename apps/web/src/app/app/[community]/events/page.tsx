@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Lightbulb, Megaphone, Plus } from 'lucide-react';
 import {
@@ -12,7 +13,8 @@ import {
 import { requireCommunity } from '@/lib/auth';
 import { listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
-import { festivalVars } from '@/components/festival';
+import { FestivalTile, festivalVars } from '@/components/festival';
+import { SectionLabel } from '@/components/section-label';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
@@ -45,7 +47,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
     .filter((event) => event.status === 'completed' || event.status === 'cancelled')
     .filter((event) => event.kind === 'event' || event.status === 'completed');
 
-  const card = (event: (typeof events)[number]) => {
+  const card = (event: (typeof events)[number], index: number) => {
     const s = stats.get(event.id);
     const bar = fundBarSegments(
       s?.fundRaised ?? 0,
@@ -56,19 +58,20 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
     const funded = bar.confirmed;
     const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0);
     // A list of events should look like a year, not like a spreadsheet: each
-    // card carries its own festival's colour down its edge.
+    // card leads with its own festival — its colour and what it is decorated
+    // with — the way a calendar marks its days.
     const festival = festivalFor(typeLabel.get(event.event_type_id ?? ''), event.name);
     return (
       <Link
         key={event.id}
         href={`/app/${slug}/events/${event.slug}`}
-        style={{ ...festivalVars(festival), borderLeftColor: 'var(--accent)' }}
-        className="border-border-base bg-surface-raised hover:bg-surface-sunken block rounded-xl border border-l-4 p-5 transition-colors"
+        style={{ ...festivalVars(festival), '--i': index } as CSSProperties}
+        className="rise-in pressable border-border-base bg-surface-raised shadow-card hover:border-border-strong block rounded-2xl border p-4 transition-colors sm:p-5"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-ink truncate text-base font-semibold">
-              <span className="mr-1.5">{event.emoji}</span>
+        <div className="flex items-start gap-3.5">
+          <FestivalTile festival={festival} className="size-12" />
+          <div className="min-w-0 flex-1">
+            <p className="text-ink truncate font-serif text-lg leading-snug font-medium tracking-tight">
               {event.name}
             </p>
             <p className="text-ink-muted mt-0.5 text-sm">
@@ -139,7 +142,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
       />
       <PageBody>
         {justProposed ? (
-          <div className="border-success/30 bg-success/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
+          <div className="border-success/30 bg-success/10 mb-5 flex items-start gap-3 rounded-2xl border p-4 text-sm">
             <CheckCircle2 className="text-success mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink">
               Campaign sent to the committee. Once approved, every resident can see it and
@@ -150,9 +153,9 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
 
         {mine.length ? (
           <>
-            <h2 className="text-ink-soft mb-3 text-sm font-semibold">
+            <SectionLabel className="mb-3">
               Proposed by you <Badge tone="warning">Awaiting committee</Badge>
-            </h2>
+            </SectionLabel>
             <div className="mb-8 space-y-3">{mine.map(card)}</div>
           </>
         ) : null}
@@ -173,7 +176,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
 
         {live.length ? (
           <>
-            <h2 className="text-ink-soft mb-3 text-sm font-semibold">Upcoming and open</h2>
+            <SectionLabel className="mb-3">Upcoming and open</SectionLabel>
             <div className="space-y-3">
               {live.sort((a, b) => a.starts_on.localeCompare(b.starts_on)).map(card)}
             </div>
@@ -181,7 +184,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
         ) : null}
         {past.length ? (
           <>
-            <h2 className="text-ink-soft mt-8 mb-3 text-sm font-semibold">Past</h2>
+            <SectionLabel className="mt-8 mb-3">Past</SectionLabel>
             <div className="space-y-3">{past.map(card)}</div>
           </>
         ) : null}

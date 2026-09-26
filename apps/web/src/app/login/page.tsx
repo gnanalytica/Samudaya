@@ -13,10 +13,10 @@ export default async function LoginPage(props: { searchParams: Promise<{ next?: 
         <span className="bg-accent text-accent-ink grid size-8 place-items-center rounded-lg text-sm font-bold">
           स
         </span>
-        <span className="text-lg font-semibold tracking-tight">Samudaya</span>
+        <span className="font-serif text-lg font-medium tracking-tight">Samudaya</span>
       </Link>
 
-      <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      <h1 className="font-serif text-3xl font-medium tracking-tight">Sign in</h1>
       <p className="text-ink-muted mt-1.5 mb-8 text-sm">
         New here? Sign in first, then join with your society code or start your society.
       </p>

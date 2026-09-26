@@ -1,6 +1,7 @@
-import { normalizeStats } from '@samudaya/core';
+import { DEFAULT_FESTIVAL, festivalFor, normalizeStats } from '@samudaya/core';
 import { today as localToday } from '../components/date-field';
 import { supabase } from './supabase';
+import { useCommunityData } from './use-community-data';
 
 /**
  * Event reads for the mobile app. Every query goes through row-level security,
@@ -10,9 +11,11 @@ import { supabase } from './supabase';
  */
 
 // A single string literal: supabase-js infers the row type from the select
-// text, and `+` concatenation widens it to `string`.
+// text, and `+` concatenation widens it to `string`. The type's label comes
+// along so an event takes the same festival look as it does on the web, which
+// reads the type before the name (festivalFor).
 const EVENT_FIELDS =
-  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, event_type_id, description, status, kind, fund_target, suggested_amount, fund_rule, fund_rule_note, closed_at, created_by';
+  'id, slug, emoji, name, starts_on, ends_on, venue, organizer, event_type_id, description, status, kind, fund_target, suggested_amount, fund_rule, fund_rule_note, closed_at, created_by, event_type:catalogue_items!event_type_id(label)';
 
 export async function fetchEvents(communityId: string) {
   const { data } = await supabase
@@ -300,4 +303,24 @@ export async function fetchSocietyBalance(communityId: string) {
     .eq('community_id', communityId)
     .maybeSingle();
   return { balance: Number(data?.balance ?? 0), movements: data?.movements_in ?? 0 };
+}
+
+/**
+ * The look an event wears (core/festivals.ts): its type first, as the society
+ * filed it, then its name.
+ */
+export function lookOf(event: { name: string; event_type?: { label: string } | null }) {
+  return festivalFor(event.event_type?.label, event.name);
+}
+
+/**
+ * What the society is heading towards next, and the look it wears. The tab
+ * bar's Contribute button takes its colour, as the web's shell does.
+ */
+export function useSeason() {
+  const { data } = useCommunityData('season', async (communityId) => {
+    const next = pickNextEvent(await fetchEvents(communityId));
+    return next ? lookOf(next) : DEFAULT_FESTIVAL;
+  });
+  return data ?? DEFAULT_FESTIVAL;
 }

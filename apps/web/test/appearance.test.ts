@@ -100,7 +100,7 @@ describe('the web head script', () => {
     // viewport export would re-create them on every client-side navigation.
     expect(head.indexOf('name="theme-color"')).toBeLessThan(head.indexOf('APPEARANCE_SCRIPT'));
     expect(layout).not.toContain('themeColor');
-    expect(layout).toMatch(/<html lang="en" suppressHydrationWarning>/);
+    expect(layout).toMatch(/<html lang="en" suppressHydrationWarning[\s>]/);
     expect(layout).not.toContain('next/headers');
   });
 });

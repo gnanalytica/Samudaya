@@ -1,27 +1,41 @@
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { COPY, can } from '@samudaya/core';
 import { Pressable, Text, View, type ColorValue } from 'react-native';
+import {
+  CalendarDays,
+  House,
+  LayoutGrid,
+  Plus,
+  UserRound,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useAuth } from '../../src/lib/auth';
+import { useSeason } from '../../src/lib/events';
 import { useTodoItems } from '../../src/lib/todo';
 import { NotificationBell } from '../../src/components/notification-bell';
 import { Loading, Screen } from '../../src/components/ui';
+import { fonts, lookColours } from '../../src/lib/theme';
 import { useTheme } from '../../src/lib/use-theme';
 
-/**
- * Simple glyphs instead of an icon package: one less dependency to keep in
- * step with the SDK, and they render identically on both platforms.
- */
-function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
-  return <Text style={{ fontSize: 20, color }}>{glyph}</Text>;
+/** A line icon, a touch heavier when its tab is the one open. */
+function tabIcon(Icon: LucideIcon) {
+  function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
+    return <Icon color={String(color)} size={23} strokeWidth={focused ? 2 : 1.6} />;
+  }
+  return TabIcon;
 }
 
 /**
  * Contribute is the thing a resident most often opens the app to do, so it is
  * a raised button in the middle of the bar rather than a tab. It opens what is
- * collecting money over the tabs, or the one event that is.
+ * collecting money over the tabs, or the one event that is. It wears the
+ * colour of whatever the society is heading towards, ringed in the bar's own
+ * white and a hairline of gold.
  */
 function ContributeButton({ onPress }: { onPress: () => void }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const accent = lookColours(useSeason(), isDark).accent;
   return (
     <Pressable
       accessibilityRole="button"
@@ -29,29 +43,44 @@ function ContributeButton({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={{ flex: 1, alignItems: 'center' }}
     >
-      <View
-        style={{
-          marginTop: -14,
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          borderWidth: 3,
-          borderColor: colors.surfaceRaised,
-          backgroundColor: colors.accent,
-          alignItems: 'center',
-          justifyContent: 'center',
-          elevation: 4,
-          shadowColor: '#000',
-          shadowOpacity: 0.18,
-          shadowRadius: 4,
-          shadowOffset: { width: 0, height: 2 },
-        }}
-      >
-        <Text style={{ color: colors.accentInk, fontSize: 26, lineHeight: 28, fontWeight: '600' }}>
-          +
-        </Text>
-      </View>
-      <Text style={{ color: colors.inkSubtle, fontSize: 10, marginTop: 2 }}>Contribute</Text>
+      {({ pressed }) => (
+        <>
+          <View
+            style={{
+              marginTop: -20,
+              padding: 3,
+              borderRadius: 32,
+              borderWidth: 1,
+              borderColor: `${colors.gold}8c`,
+              backgroundColor: colors.surfaceRaised,
+              transform: [{ scale: pressed ? 0.94 : 1 }],
+            }}
+          >
+            <View
+              style={{
+                width: 50,
+                height: 50,
+                borderRadius: 25,
+                backgroundColor: accent,
+                alignItems: 'center',
+                justifyContent: 'center',
+                elevation: 6,
+                shadowColor: accent,
+                shadowOpacity: 0.45,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 6 },
+              }}
+            >
+              <Plus color={isDark ? colors.surface : '#ffffff'} size={24} strokeWidth={2.2} />
+            </View>
+          </View>
+          <Text
+            style={{ color: colors.inkSubtle, fontSize: 10.5, fontWeight: '500', marginTop: 2 }}
+          >
+            Contribute
+          </Text>
+        </>
+      )}
     </Pressable>
   );
 }
@@ -85,16 +114,21 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surfaceRaised },
+        // The header is the page's own ivory, its title in the serif.
+        headerStyle: { backgroundColor: colors.surface },
+        headerShadowVisible: false,
         headerTintColor: colors.ink,
-        headerTitleStyle: { fontWeight: '600' },
+        headerTitleStyle: { fontFamily: fonts.serif, fontSize: 18 },
         // Visible, so the Contribute button can rise above the bar's edge.
         tabBarStyle: {
           backgroundColor: colors.surfaceRaised,
           borderTopColor: colors.border,
           overflow: 'visible',
         },
-        tabBarActiveTintColor: colors.accent,
+        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '500' },
+        // Ink, not colour, for the tab that is open: the colour is the
+        // festival's, and it is on the Contribute button.
+        tabBarActiveTintColor: colors.ink,
         tabBarInactiveTintColor: colors.inkSubtle,
         sceneStyle: { backgroundColor: colors.surface },
       }}
@@ -103,7 +137,9 @@ export default function TabsLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <TabIcon glyph="⌂" color={color} />,
+          // The screen greets by name instead; the header keeps the bell.
+          headerTitle: '',
+          tabBarIcon: tabIcon(House),
           headerRight: () => <NotificationBell />,
         }}
       />
@@ -111,7 +147,7 @@ export default function TabsLayout() {
         name="events"
         options={{
           title: 'Events',
-          tabBarIcon: ({ color }) => <TabIcon glyph="◈" color={color} />,
+          tabBarIcon: tabIcon(CalendarDays),
           headerRight: () => <NotificationBell />,
         }}
       />
@@ -134,7 +170,7 @@ export default function TabsLayout() {
         options={{
           title: 'Money',
           href: staffView ? null : undefined,
-          tabBarIcon: ({ color }) => <TabIcon glyph="₹" color={color} />,
+          tabBarIcon: tabIcon(Wallet),
           headerRight: () => <NotificationBell />,
         }}
       />
@@ -144,14 +180,11 @@ export default function TabsLayout() {
         options={{
           title: COPY.manage,
           href: staffView ? undefined : null,
-          tabBarIcon: ({ color }) => <TabIcon glyph="☰" color={color} />,
+          tabBarIcon: tabIcon(LayoutGrid),
           tabBarBadge: todoCount > 0 ? (todoCount > 99 ? '99+' : todoCount) : undefined,
         }}
       />
-      <Tabs.Screen
-        name="me"
-        options={{ title: 'Me', tabBarIcon: ({ color }) => <TabIcon glyph="◉" color={color} /> }}
-      />
+      <Tabs.Screen name="me" options={{ title: 'Me', tabBarIcon: tabIcon(UserRound) }} />
       {/* Notices and polls are switched off for the pilot; the screen stays in
           the codebase but is kept out of the tab bar. */}
       <Tabs.Screen name="community" options={{ href: null }} />

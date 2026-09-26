@@ -1,11 +1,16 @@
 'use client';
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type CSSProperties, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { Sparkles as SparklesIcon } from 'lucide-react';
-import type { Festival } from '@samudaya/core';
-import { Rangoli, festivalVars } from '@/components/festival';
+import { wearsGarland, type Festival } from '@samudaya/core';
+import { FestivalTile, Rangoli, festivalVars } from '@/components/festival';
+import { Motif } from '@/components/motif';
 import { cn } from '@/lib/utils';
+import { Garland } from '../festive';
+
+/** A motif drawn on the page's pale wash, where the banner's pale gold would vanish. */
+const ON_WASH = { '--motif-light': 'oklch(0.78 0.14 80)' } as CSSProperties;
 
 /**
  * The front page can try on any festival's colours.
@@ -82,7 +87,11 @@ export function FestivalTheme({
   );
 }
 
-/** A kolam with however many petals the festival being worn has. */
+/**
+ * A kolam with however many petals the festival being worn has — or, for a
+ * festival nobody draws a kolam for, that festival's own motif: a star for
+ * Christmas, a crescent and lanterns for Eid.
+ */
 export function ThemedRangoli({
   fallbackPetals,
   className,
@@ -95,13 +104,54 @@ export function ThemedRangoli({
   mono?: boolean;
 }) {
   const { wearing } = useFestivalTheme();
+  const look = wearing?.palette;
+  if (look && !wearsGarland(look)) {
+    return (
+      <Motif
+        id={look.motif}
+        // A kolam turns; a star or a lantern moves the way it does instead.
+        className={cn(
+          className?.replace('motion-safe:animate-rangoli', ''),
+          !mono && 'text-accent',
+        )}
+        style={mono ? undefined : ON_WASH}
+      />
+    );
+  }
   return (
     <Rangoli
-      petals={wearing?.palette.petals ?? fallbackPetals}
+      petals={look?.petals ?? fallbackPetals}
       className={className}
       strokeWidth={strokeWidth}
       mono={mono}
     />
+  );
+}
+
+/**
+ * What hangs along the top and foot of the page: a marigold garland for the
+ * festivals a doorway is dressed that way for, and a string of the festival's
+ * own motif for the rest — stars at Christmas, crescents at Eid, the three
+ * colours on a national day.
+ */
+export function SeasonTrim({ id }: { id: string }) {
+  const { wearing } = useFestivalTheme();
+  const look = wearing?.palette;
+  if (!look || wearsGarland(look)) return <Garland id={id} />;
+  return (
+    <div
+      aria-hidden="true"
+      className="text-accent flex h-[46px] items-center justify-center gap-5 overflow-hidden"
+      style={ON_WASH}
+    >
+      {Array.from({ length: 40 }, (_, index) =>
+        index % 2 ? (
+          <span key={index} className="bg-ribbon/50 size-1 shrink-0 rounded-full" />
+        ) : (
+          <Motif key={index} id={look.motif} compact className="size-6 shrink-0" />
+        ),
+      )}
+    </div>
   );
 }
 
@@ -135,19 +185,21 @@ export function FestivalPicker() {
                 aria-hidden="true"
                 className="from-accent to-ribbon absolute inset-x-0 top-0 h-1 bg-linear-to-r"
               />
-              <Rangoli
-                petals={option.palette.petals}
-                strokeWidth={1.6}
-                className="pointer-events-none absolute -top-8 -right-8 -z-10 size-24 opacity-30 transition-transform duration-700 group-hover:rotate-45 group-hover:opacity-50"
-              />
-              <span
-                aria-hidden="true"
-                className="from-accent to-ribbon block size-11 rounded-full bg-linear-to-br p-[2px] shadow-sm"
-              >
-                <span className="bg-surface-raised grid size-full place-items-center rounded-full text-xl">
-                  {option.emoji}
-                </span>
-              </span>
+              {wearsGarland(option.palette) ? (
+                <Rangoli
+                  petals={option.palette.petals}
+                  strokeWidth={1.6}
+                  className="pointer-events-none absolute -top-8 -right-8 -z-10 size-24 opacity-30 transition-transform duration-700 group-hover:rotate-45 group-hover:opacity-50"
+                />
+              ) : (
+                <Motif
+                  id={option.palette.motif}
+                  compact
+                  className="text-accent pointer-events-none absolute -top-5 -right-5 -z-10 size-20 opacity-30 transition-opacity duration-700 group-hover:opacity-50"
+                  style={ON_WASH}
+                />
+              )}
+              <FestivalTile festival={option.palette} className="size-11" />
               <span className="text-ink mt-3 font-semibold">{option.name}</span>
               <span className="text-ink-muted mt-0.5 text-sm">{option.when}</span>
               <span

@@ -53,8 +53,9 @@ describe('stat tiles', () => {
 
   it('go through StatTiles on every page that shows them', () => {
     const users = sourceFiles(SRC).filter((f) => readFileSync(f, 'utf8').includes('<StatTiles'));
-    // Home, Me, Money, My contributions, Admin, Admin event, Reconcile, Event.
-    expect(users).toHaveLength(8);
+    // Home, Me, My contributions, Admin, Admin event, Reconcile, Event. Money
+    // leads with its balance instead, on a card whose figures wrap.
+    expect(users).toHaveLength(7);
   });
 
   it('would catch a bare three-up grid if one came back', () => {

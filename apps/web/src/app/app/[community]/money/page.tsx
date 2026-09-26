@@ -21,7 +21,7 @@ import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatTile, StatTiles } from '@/components/badges';
+import { RollingAmount } from '@/components/rolling-amount';
 import { LedgerRow } from '@/components/ledger-row';
 import { cn } from '@/lib/utils';
 import { MyContributions } from './my-contributions';
@@ -122,21 +122,33 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
       />
       <PageBody>
         {views}
-        <StatTiles>
-          <StatTile
-            label="Collected"
-            value={formatMoney(Number(totals.data?.total_in ?? 0), community.currency)}
+        {/* The one number everybody asks the committee for, as large as the
+            page allows, with what came in and went out beneath it. */}
+        <Card className="rise-in px-5 py-5">
+          <p className="text-gold text-[11px] font-semibold tracking-[0.14em] uppercase">Balance</p>
+          <RollingAmount
+            value={balance}
+            currency={community.currency}
+            className={cn(
+              'mt-2 font-serif text-4xl leading-none font-medium tracking-tight md:text-5xl',
+              balance < 0 ? 'text-danger' : 'text-ink',
+            )}
           />
-          <StatTile
-            label="Spent"
-            value={formatMoney(Number(totals.data?.total_out ?? 0), community.currency)}
-          />
-          <StatTile
-            label="Balance"
-            value={formatMoney(balance, community.currency)}
-            tone={balance < 0 ? 'danger' : 'success'}
-          />
-        </StatTiles>
+          <dl className="text-ink-muted mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+            <div className="flex gap-1.5">
+              <dt>Collected</dt>
+              <dd className="text-ink font-medium">
+                {formatMoney(Number(totals.data?.total_in ?? 0), community.currency)}
+              </dd>
+            </div>
+            <div className="flex gap-1.5">
+              <dt>Spent</dt>
+              <dd className="text-ink font-medium">
+                {formatMoney(Number(totals.data?.total_out ?? 0), community.currency)}
+              </dd>
+            </div>
+          </dl>
+        </Card>
 
         {/* Where the balance is: each event still holding money, and what the
             society kept outside any event, adding up to the Balance tile. It
@@ -336,13 +348,15 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
 function MoneyViews({ slug, mine }: { slug: string; mine: boolean }) {
   const tab = (active: boolean) =>
     cn(
-      'rounded-md px-3 py-1.5 whitespace-nowrap',
-      active ? 'bg-surface-sunken text-ink font-medium' : 'text-ink-muted hover:text-ink',
+      'flex-1 rounded-[10px] px-4 py-2 text-center whitespace-nowrap transition-colors sm:flex-none',
+      active
+        ? 'bg-surface-raised text-ink shadow-card font-medium'
+        : 'text-ink-muted hover:text-ink',
     );
   return (
     <nav
       aria-label="Whose money"
-      className="border-border-base bg-surface-raised mb-5 flex w-fit gap-1 rounded-lg border p-1 text-sm"
+      className="bg-surface-sunken mb-5 flex w-full gap-1 rounded-xl p-1 text-sm sm:w-fit"
     >
       <Link
         href={`/app/${slug}/money`}

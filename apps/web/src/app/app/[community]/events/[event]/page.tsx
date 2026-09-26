@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Check,
   Clock,
+  Lock,
   MapPin,
   Receipt,
   Settings2,
@@ -41,7 +42,8 @@ import {
 } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { PageBody } from '@/components/page-header';
-import { FestivalHeader, festivalVars } from '@/components/festival';
+import { FestivalHero, festivalVars } from '@/components/festival';
+import { RollingAmount } from '@/components/rolling-amount';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -164,54 +166,61 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
 
   return (
     <div style={festivalVars(festival)}>
-      <FestivalHeader
+      <FestivalHero
         festival={festival}
-        title={`${event.emoji} ${event.name}`}
-        description={[
-          isCampaign ? 'Fundraising campaign' : null,
+        back={
+          <Link
+            href={`${base}/events`}
+            className="inline-flex items-center gap-1.5 hover:text-white"
+          >
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            All events
+          </Link>
+        }
+        eyebrow={[
+          isCampaign
+            ? 'Fundraising campaign'
+            : festival.kind === 'festival'
+              ? 'Festival'
+              : festival.kind === 'national'
+                ? 'National day'
+                : festival.kind === 'occasion'
+                  ? festival.label
+                  : 'Event',
           formatDate(event.starts_on),
-          event.venue,
-          countdown(event.starts_on),
-        ]
-          .filter(Boolean)
-          .join(' · ')}
+        ].join(' · ')}
+        title={event.name}
+        meta={[event.venue, countdown(event.starts_on)].filter(Boolean).join(' · ') || null}
         action={
-          <div className="flex flex-wrap items-center gap-2">
+          <>
             <EventStatusBadge status={event.status} />
             {canContribute ? (
-              <ButtonLink href={`${here}/contribute`} size="sm">
+              <ButtonLink href={`${here}/contribute`} size="sm" variant="inverse">
                 Contribute
               </ButtonLink>
             ) : null}
             {isStaff && event.status !== 'proposed' ? (
-              <ButtonLink href={`${base}/admin/events/${event.slug}`} size="sm" variant="secondary">
+              <ButtonLink href={`${base}/admin/events/${event.slug}`} size="sm" variant="glass">
                 <Settings2 className="size-4" aria-hidden="true" />
                 Manage
               </ButtonLink>
             ) : null}
-          </div>
+          </>
         }
       />
 
       <PageBody>
-        <Link
-          href={`${base}/events`}
-          className="text-ink-muted hover:text-ink mb-4 inline-flex items-center gap-1.5 text-sm"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          All events
-        </Link>
+        {/* Pulled up over the banner's lower edge, then pinned as it scrolls. */}
+        <SectionBar sections={sections} links={organiserPages} className="-mt-11 md:-mt-12" />
 
         {event.status === 'proposed' ? (
-          <div className="border-warning/40 bg-warning/10 mb-5 flex items-start gap-3 rounded-xl border p-4 text-sm">
+          <div className="border-warning/40 bg-warning/10 mb-5 flex items-start gap-3 rounded-2xl border p-4 text-sm">
             <Clock className="text-warning mt-0.5 size-5 shrink-0" aria-hidden="true" />
             <p className="text-ink">
               Waiting for the committee. Once approved, residents can see it and contribute.
             </p>
           </div>
         ) : null}
-
-        <SectionBar sections={sections} links={organiserPages} />
 
         <div className="space-y-10">
           {/* ---------------------------------------------------------- about */}
@@ -302,9 +311,11 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               <CardBody>
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
-                    <p className="text-ink text-2xl font-semibold tracking-tight">
-                      {formatMoney(held, community.currency)}
-                    </p>
+                    <RollingAmount
+                      value={held}
+                      currency={community.currency}
+                      className="text-ink font-serif text-[30px] leading-tight font-medium tracking-tight"
+                    />
                     <p className="text-ink-muted text-sm">
                       of {formatMoney(stats.fundTarget, community.currency)} · {stats.contributors}{' '}
                       {stats.contributors === 1 ? 'household' : COPY.households.toLowerCase()} gave
@@ -494,10 +505,15 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
               </Card>
             ) : null}
 
-            <div className="border-border-base bg-surface-sunken text-ink-muted rounded-lg border px-4 py-3 text-sm">
-              🔒 <span className="text-ink font-medium">If money is left over:</span>{' '}
-              {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}
-              <p className="text-ink-subtle mt-1 text-xs">Fixed before any money was collected.</p>
+            <div className="border-border-base bg-surface-sunken text-ink-muted flex gap-3 rounded-2xl border px-4 py-3 text-sm">
+              <Lock className="text-gold mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <div>
+                <span className="text-ink font-medium">If money is left over:</span>{' '}
+                {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}
+                <p className="text-ink-subtle mt-1 text-xs">
+                  Fixed before any money was collected.
+                </p>
+              </div>
             </div>
           </section>
 
@@ -681,4 +697,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
  * measure instead.
  */
 const SECTION = 'scroll-mt-36 space-y-5 md:scroll-mt-16';
-const HEADING = 'text-ink text-lg font-semibold tracking-tight';
+/** Gold small capitals with a hairline, as SectionLabel draws them. */
+const HEADING =
+  'text-gold flex flex-1 items-center gap-3 text-[11px] font-semibold tracking-[0.14em] uppercase ' +
+  'after:h-px after:flex-1 after:bg-gradient-to-r after:from-border-base after:to-transparent';

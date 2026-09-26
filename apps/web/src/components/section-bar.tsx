@@ -19,12 +19,17 @@ export type PageSection = { id: string; label: string; count?: number };
 export function SectionBar({
   sections,
   links = [],
+  className,
 }: {
   sections: PageSection[];
   links?: { href: string; label: string; count?: number }[];
+  className?: string;
 }) {
   const bar = useRef<HTMLElement>(null);
   const [current, setCurrent] = useState(sections[0]?.id ?? '');
+  // The ink pill under the section being read, measured so it can slide from
+  // one to the next. Until it is measured the lit link paints its own.
+  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
   // Pinned just under the phone header, whatever height a touch screen gives
   // it; the header is hidden on a desktop, and the bar sits near the top.
   const [top, setTop] = useState<number | null>(null);
@@ -78,11 +83,17 @@ export function SectionBar({
     };
   }, [ids]);
 
-  // Keep the lit section visible in a strip that scrolls sideways on a phone.
+  // Keep the lit section visible in a strip that scrolls sideways on a phone,
+  // and move the pill under it.
   useEffect(() => {
-    bar.current
-      ?.querySelector('[aria-current="location"]')
-      ?.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    const lit = bar.current?.querySelector<HTMLElement>('[aria-current="location"]');
+    if (!lit) return;
+    lit.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    const measure = () => setPill({ left: lit.offsetLeft, width: lit.offsetWidth });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(lit);
+    return () => observer.disconnect();
   }, [current]);
 
   const jump = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -109,29 +120,47 @@ export function SectionBar({
       ref={bar}
       aria-label="Event sections"
       style={top === null ? undefined : { top }}
-      className="border-border-base bg-surface-raised sticky top-16 z-20 mb-5 flex gap-1 overflow-x-auto rounded-lg border p-1 text-sm shadow-sm md:top-2"
+      className={cn(
+        'border-border-base bg-surface-raised/95 shadow-float sticky top-16 z-20 mb-6 flex gap-0.5 overflow-x-auto rounded-2xl border p-1 text-sm backdrop-blur-xl md:top-2',
+        '[scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        className,
+      )}
     >
-      {sections.map((section) => (
-        <a
-          key={section.id}
-          href={`#${section.id}`}
-          onClick={(event) => jump(event, section.id)}
-          aria-current={current === section.id ? 'location' : undefined}
-          className={cn(
-            'rounded-md px-3 py-1.5 whitespace-nowrap',
-            current === section.id
-              ? 'bg-surface-sunken text-ink font-medium'
-              : 'text-ink-muted hover:text-ink',
-          )}
-        >
-          {section.label}
-          {section.count ? (
-            <span className="bg-accent/15 text-accent ml-1.5 rounded-full px-1.5 text-xs">
-              {section.count}
-            </span>
-          ) : null}
-        </a>
-      ))}
+      {pill ? (
+        <span
+          aria-hidden="true"
+          className="bg-ink absolute top-1 bottom-1 rounded-xl transition-[left,width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]"
+          style={{ left: pill.left, width: pill.width }}
+        />
+      ) : null}
+      {sections.map((section) => {
+        const lit = current === section.id;
+        return (
+          <a
+            key={section.id}
+            href={`#${section.id}`}
+            onClick={(event) => jump(event, section.id)}
+            aria-current={lit ? 'location' : undefined}
+            className={cn(
+              'relative flex-1 rounded-xl px-3.5 py-2 text-center whitespace-nowrap transition-colors duration-300',
+              lit ? 'text-surface font-medium' : 'text-ink-muted hover:text-ink',
+              lit && !pill && 'bg-ink',
+            )}
+          >
+            {section.label}
+            {section.count ? (
+              <span
+                className={cn(
+                  'ml-1.5 rounded-full px-1.5 text-xs',
+                  lit ? 'bg-surface/20 text-surface' : 'bg-accent/15 text-accent',
+                )}
+              >
+                {section.count}
+              </span>
+            ) : null}
+          </a>
+        );
+      })}
       {links.length ? (
         <>
           <span className="bg-border-base mx-1 h-5 w-px shrink-0 self-center" aria-hidden="true" />
