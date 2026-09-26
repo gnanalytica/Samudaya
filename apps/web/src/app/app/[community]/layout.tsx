@@ -65,7 +65,10 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-border-base bg-surface-raised/95 sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur md:hidden">
+        <header
+          id="app-header"
+          className="border-border-base bg-surface-raised/95 sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur md:hidden"
+        >
           {/* The society name used to link to Home, which the bottom bar
               already reaches. It opens the rest of the app instead. */}
           <MobileNavSheet societyName={community.name}>

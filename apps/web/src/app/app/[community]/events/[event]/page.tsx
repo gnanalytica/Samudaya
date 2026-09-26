@@ -675,6 +675,10 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   );
 }
 
-/** Sections sit under the pinned bar when jumped to: the phone header and the bar, or just the bar. */
-const SECTION = 'scroll-mt-28 space-y-5 md:scroll-mt-16';
+/**
+ * A link from another page (#money) lands a section under the pinned bar: the
+ * phone header and the bar, or just the bar on a desktop. The bar's own jumps
+ * measure instead.
+ */
+const SECTION = 'scroll-mt-36 space-y-5 md:scroll-mt-16';
 const HEADING = 'text-ink text-lg font-semibold tracking-tight';

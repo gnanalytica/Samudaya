@@ -25,7 +25,18 @@ export function SectionBar({
 }) {
   const bar = useRef<HTMLElement>(null);
   const [current, setCurrent] = useState(sections[0]?.id ?? '');
+  // Pinned just under the phone header, whatever height a touch screen gives
+  // it; the header is hidden on a desktop, and the bar sits near the top.
+  const [top, setTop] = useState<number | null>(null);
   const ids = sections.map((section) => section.id).join(' ');
+
+  useEffect(() => {
+    const header = document.getElementById('app-header');
+    if (!header) return;
+    const observer = new ResizeObserver(() => setTop(header.offsetHeight || 8));
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const order = ids.split(' ');
@@ -35,8 +46,11 @@ export function SectionBar({
       // Whichever section has scrolled up to the bar's lower edge is the one
       // being read; at the very bottom a short last section can never get
       // there, so it wins outright.
-      // A jump leaves the section a scroll-margin below the bar, so allow that.
-      const edge = (bar.current?.getBoundingClientRect().bottom ?? 0) + 32;
+      // A jump leaves a section a little under the bar, and a link from
+      // another page (#money) leaves it at its scroll-margin; either counts.
+      const first = order[0] ? document.getElementById(order[0]) : null;
+      const margin = first ? parseFloat(getComputedStyle(first).scrollMarginTop) || 0 : 0;
+      const edge = Math.max((bar.current?.getBoundingClientRect().bottom ?? 0) + 32, margin + 8);
       const atBottom =
         window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
       let next = order[0] ?? '';
@@ -75,7 +89,18 @@ export function SectionBar({
     const target = document.getElementById(id);
     if (!target) return;
     event.preventDefault();
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // Measured rather than left to scroll-margin, so the section starts just
+    // under the bar however tall it and the header above it are. Where the bar
+    // will be once pinned, not where it is: from the top of the page it has
+    // not pinned yet.
+    const pinned = bar.current;
+    const under = pinned
+      ? (parseFloat(getComputedStyle(pinned).top) || 0) + pinned.offsetHeight + 12
+      : 12;
+    window.scrollTo({
+      top: target.getBoundingClientRect().top + window.scrollY - under,
+      behavior: 'smooth',
+    });
     history.replaceState(null, '', `#${id}`);
   };
 
@@ -83,8 +108,8 @@ export function SectionBar({
     <nav
       ref={bar}
       aria-label="Event sections"
-      // Under the phone header, which is itself pinned; at the top on a desktop.
-      className="border-border-base bg-surface-raised sticky top-14 z-20 mb-5 flex gap-1 overflow-x-auto rounded-lg border p-1 text-sm shadow-sm md:top-2"
+      style={top === null ? undefined : { top }}
+      className="border-border-base bg-surface-raised sticky top-16 z-20 mb-5 flex gap-1 overflow-x-auto rounded-lg border p-1 text-sm shadow-sm md:top-2"
     >
       {sections.map((section) => (
         <a
