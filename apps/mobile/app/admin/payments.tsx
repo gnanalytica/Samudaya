@@ -155,7 +155,7 @@ export default function Payments() {
               {events.map((event) => (
                 <Chip
                   key={event.id}
-                  label={`${event.emoji} ${event.name}`}
+                  label={event.name}
                   selected={current?.id === event.id}
                   onPress={() => {
                     setSlug(event.slug);
@@ -171,9 +171,7 @@ export default function Payments() {
           {current ? (
             <>
               <Card style={{ gap: spacing.xs }}>
-                <Heading>
-                  {current.emoji} {current.name}
-                </Heading>
+                <Heading>{current.name}</Heading>
                 <KeyValue label="Collected" value={formatMoney(total, currency)} />
                 <KeyValue label="Payments" value={String(rows.length)} />
                 <KeyValue label="Waiting for confirmation" value={String(waiting.length)} />

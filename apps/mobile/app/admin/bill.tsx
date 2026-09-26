@@ -312,7 +312,7 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
                   {events.map((event) => (
                     <Chip
                       key={event.id}
-                      label={`${event.emoji} ${event.name}`}
+                      label={event.name}
                       selected={eventId === event.id}
                       onPress={() => setEventId(event.id)}
                     />

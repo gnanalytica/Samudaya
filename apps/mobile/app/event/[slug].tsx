@@ -540,9 +540,7 @@ function Activities({
               style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
             >
               <View style={{ flex: 1, gap: 2 }}>
-                <Body>
-                  {activity.emoji} {activity.name}
-                </Body>
+                <Body>{activity.name}</Body>
                 {activity.description ? <Caption>{activity.description}</Caption> : null}
                 <Caption>
                   {activity.registered} registered

@@ -216,9 +216,7 @@ function BillCard({
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Body>{bill.name}</Body>
-          <Caption>
-            {bill.events?.emoji} {bill.events?.name}
-          </Caption>
+          <Caption>{bill.events?.name}</Caption>
         </View>
         <Heading>{formatMoney(bill.amount, currency)}</Heading>
       </View>
@@ -237,7 +235,7 @@ function BillCard({
       ) : null}
       <View style={{ flexDirection: 'row', gap: spacing.xs }}>
         <Badge
-          label={bill.bill_url ? '📎 Bill attached' : 'No bill attached'}
+          label={bill.bill_url ? 'Bill attached' : 'No bill attached'}
           tone={bill.bill_url ? 'success' : 'warning'}
         />
         {bill.status !== 'pending' ? (

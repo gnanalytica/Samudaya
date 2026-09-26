@@ -29,7 +29,6 @@ const ON_WASH = { '--motif-light': 'oklch(0.78 0.14 80)' } as CSSProperties;
 export type ThemeOption = {
   id: string;
   name: string;
-  emoji: string;
   /** A date for a fixed festival, the usual window for one that moves. */
   when: string;
   palette: Festival;
@@ -235,7 +234,11 @@ export function ThemeToast() {
       {away ? (
         <div className="border-border-base bg-surface-raised/95 text-ink pointer-events-auto flex items-center gap-3 rounded-full border py-1.5 pr-1.5 pl-4 text-sm shadow-lg backdrop-blur-md">
           <span className="min-w-0">
-            <span aria-hidden="true">{wearing.emoji} </span>
+            <Motif
+              id={wearing.palette.motif}
+              compact
+              className="text-accent mr-1.5 inline-block size-4 align-[-3px]"
+            />
             <span className="max-sm:sr-only">Wearing </span>
             {wearing.name}&rsquo;s colours
           </span>

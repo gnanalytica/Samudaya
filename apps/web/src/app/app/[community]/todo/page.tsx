@@ -96,7 +96,7 @@ export default async function TodoPage(props: PageProps<'/app/[community]/todo'>
             {sections.map((section) => (
               <Card key={section.kind} id={section.kind}>
                 <CardHeader
-                  title={`${TODO_KIND[section.kind].emoji} ${TODO_KIND[section.kind].section}`}
+                  title={TODO_KIND[section.kind].section}
                   description={`${section.items.length} waiting`}
                 />
                 <ul className="divide-border-base divide-y">

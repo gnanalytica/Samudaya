@@ -179,7 +179,7 @@ export default async function ManageEventPage(
   return (
     <>
       <PageHeader
-        title={`${event.emoji} ${event.name}`}
+        title={event.name}
         description={[
           event.kind === 'campaign' ? 'Fundraising campaign' : null,
           formatDate(event.starts_on),
@@ -432,7 +432,7 @@ export default async function ManageEventPage(
                 return (
                   <Card key={activity.id}>
                     <CardHeader
-                      title={`${activity.emoji} ${activity.name}`}
+                      title={activity.name}
                       description={
                         <>
                           {`${people.length} registered${

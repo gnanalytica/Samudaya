@@ -257,12 +257,6 @@ export default function Catalogue() {
                   onChangeText={(label) => setDraft({ ...draft, label })}
                   autoFocus
                 />
-                <Input
-                  label="Emoji (optional)"
-                  value={draft.emoji}
-                  onChangeText={(emoji) => setDraft({ ...draft, emoji })}
-                  placeholder="🎈"
-                />
                 {kind === 'vendor' ? (
                   <>
                     <Input

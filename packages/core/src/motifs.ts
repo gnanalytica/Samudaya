@@ -54,8 +54,12 @@ export type MotifId =
  * How a path is painted. `line` is the motif's own colour (white on a hero,
  * the festival colour on a pale tile), `soft` a faint wash of it, and `light`
  * a warm glow for anything that gives light: a flame, a star, a lantern.
- * A hex value is a colour that is part of the thing itself — Holi's powders,
- * the tricolour's bands — and is the same on every background.
+ *
+ * Those three are the whole palette. Every drawing is a fine line, a faint
+ * wash and one gold light, the way an invitation card is printed, so a
+ * festival looks dressed rather than drawn for children; the colour belongs
+ * to the banner behind it. The one hex value is the tricolour's bands, which
+ * cannot be any other colours.
  */
 export type MotifPaint = 'line' | 'soft' | 'light' | `#${string}`;
 
@@ -302,7 +306,7 @@ const diya: Motif = {
     {
       paths: [
         { d: flame(60, 66, 36, 9), fill: 'light' },
-        { d: flame(60, 63, 19, 4.6), fill: '#fff6dc' },
+        { d: flame(60, 63, 19, 4.6), fill: 'line', opacity: 0.85 },
       ],
       motion: 'flicker',
       origin: [60, 66],
@@ -321,20 +325,35 @@ const gulal: Motif = {
   layers: [
     {
       paths: [
-        { d: blob(46, 50, 23, [1, 0.86, 1.08, 0.9, 1.04, 0.84, 1.1, 0.92]), fill: '#ffd23f' },
+        {
+          d: blob(46, 50, 23, [1, 0.86, 1.08, 0.9, 1.04, 0.84, 1.1, 0.92]),
+          stroke: 'line',
+          fill: 'soft',
+        },
       ],
       motion: 'drift',
       origin: [46, 50],
     },
     {
-      paths: [{ d: blob(84, 40, 17, [0.9, 1.08, 0.86, 1.02, 0.92, 1.1, 0.88]), fill: '#29c4b0' }],
+      paths: [
+        {
+          d: blob(84, 40, 17, [0.9, 1.08, 0.86, 1.02, 0.92, 1.1, 0.88]),
+          stroke: 'line',
+          fill: 'light',
+          opacity: 0.9,
+        },
+      ],
       motion: 'drift',
       origin: [84, 40],
       delay: 1.6,
     },
     {
       paths: [
-        { d: blob(76, 82, 21, [1.04, 0.88, 1, 1.1, 0.86, 0.98, 1.06, 0.9]), fill: '#ff5fa2' },
+        {
+          d: blob(76, 82, 21, [1.04, 0.88, 1, 1.1, 0.86, 0.98, 1.06, 0.9]),
+          stroke: 'line',
+          fill: 'soft',
+        },
       ],
       motion: 'drift',
       origin: [76, 82],
@@ -342,16 +361,22 @@ const gulal: Motif = {
     },
     {
       paths: [
-        { d: blob(36, 88, 11, [1, 0.84, 1.1, 0.9, 1.02, 0.88]), fill: '#8f6bff' },
+        { d: blob(36, 88, 11, [1, 0.84, 1.1, 0.9, 1.02, 0.88]), stroke: 'line', fill: 'soft' },
         {
           d: circle(20, 30, 2.4) + circle(68, 18, 1.8) + circle(106, 62, 2.2) + circle(22, 66, 1.6),
-          fill: '#ffd23f',
+          fill: 'light',
         },
         {
-          d: circle(100, 20, 2) + circle(56, 104, 2.2) + circle(104, 100, 1.6),
-          fill: '#ff5fa2',
+          d:
+            circle(100, 20, 2) +
+            circle(56, 104, 2.2) +
+            circle(104, 100, 1.6) +
+            circle(60, 30, 1.6) +
+            circle(96, 88, 2.4) +
+            circle(14, 46, 1.8),
+          fill: 'line',
+          opacity: 0.8,
         },
-        { d: circle(60, 30, 1.6) + circle(96, 88, 2.4) + circle(14, 46, 1.8), fill: '#29c4b0' },
       ],
       motion: 'drift',
       origin: [60, 60],
@@ -361,10 +386,10 @@ const gulal: Motif = {
   ],
 };
 
-/** A marigold: an orange disc with a deeper heart. */
+/** A marigold: a gold bead with a darker heart. */
 const marigold = (x: number, y: number, size: number): MotifPath[] => [
-  { d: circle(x, y, size), fill: '#ffb238' },
-  { d: circle(x, y, size * 0.48), fill: '#f47c20' },
+  { d: circle(x, y, size), fill: 'light' },
+  { d: circle(x, y, size * 0.48), stroke: 'line', opacity: 0.55, width: 1 },
 ];
 
 function strand(x: number, top: number, beads: number, gap: number, size: number): MotifLayer {
@@ -455,9 +480,9 @@ const modak: Motif = {
     },
     {
       paths: [
-        { d: ring(26, 30, 5, 2.5, 11, 0.62, -90), fill: '#ff4d5e' },
-        { d: `M26 30L${pt(...polar(26, 30, 14, -40))}`, stroke: '#ffd98a', width: 1.2 },
-        { d: circle(...polar(26, 30, 14, -40), 1.5), fill: '#ffd98a' },
+        { d: ring(26, 30, 5, 2.5, 11, 0.62, -90), stroke: 'line', fill: 'soft' },
+        { d: `M26 30L${pt(...polar(26, 30, 14, -40))}`, stroke: 'light', width: 1.2 },
+        { d: circle(...polar(26, 30, 14, -40), 1.5), fill: 'light' },
       ],
       motion: 'sway',
       origin: [26, 30],
@@ -480,12 +505,12 @@ const pookalam: Motif = {
       paths: [
         { d: circle(60, 60, 55), stroke: 'line', opacity: 0.8 },
         { d: dotRing(60, 60, 28, 51, 1.3), fill: 'line' },
-        { d: ring(60, 60, 20, 38, 12, 0.16, 9), fill: '#ffd23f' },
-        { d: ring(60, 60, 16, 26, 13, 0.2), fill: '#e8552f' },
-        { d: ring(60, 60, 12, 15, 12, 0.26, 15), fill: '#ff9a3c' },
-        { d: ring(60, 60, 8, 5, 11, 0.36), fill: '#fff1b8' },
-        { d: circle(60, 60, 5), fill: '#7cc36a' },
-        { d: circle(60, 60, 2), fill: '#fff6dc' },
+        { d: ring(60, 60, 20, 38, 12, 0.16, 9), fill: 'light', opacity: 0.9 },
+        { d: ring(60, 60, 16, 26, 13, 0.2), stroke: 'line', fill: 'soft' },
+        { d: ring(60, 60, 12, 15, 12, 0.26, 15), stroke: 'line', opacity: 0.8 },
+        { d: ring(60, 60, 8, 5, 11, 0.36), fill: 'soft' },
+        { d: circle(60, 60, 5), fill: 'light' },
+        { d: circle(60, 60, 2), fill: 'line' },
       ],
       motion: 'turn',
       origin: [60, 60],
@@ -527,7 +552,7 @@ const pot: Motif = {
         {
           d: 'M44 56C41 48 49 45 52 49C54 41 65 41 67 47C71 42 80 46 76 56',
           stroke: 'line',
-          fill: '#fffaf0',
+          fill: 'soft',
         },
       ],
     },
@@ -582,12 +607,12 @@ const kite: Motif = {
       detail: true,
     },
     {
-      paths: kiteShape(44, 16, 1, '#ffd166', '#ef476f'),
+      paths: kiteShape(44, 16, 1, 'light', 'soft'),
       motion: 'float',
       origin: [44, 44],
     },
     {
-      paths: kiteShape(88, 58, 0.66, '#06d6a0', '#118ab2'),
+      paths: kiteShape(88, 58, 0.66, 'soft', 'light'),
       motion: 'float',
       origin: [88, 76],
       delay: 1.3,
@@ -633,7 +658,7 @@ const bonfire: Motif = {
         { d: flame(60, 96, 56, 16), fill: 'light' },
         { d: flame(44, 96, 32, 9), fill: 'light', opacity: 0.85 },
         { d: flame(77, 96, 36, 10), fill: 'light', opacity: 0.85 },
-        { d: flame(60, 94, 28, 7), fill: '#fff4d6' },
+        { d: flame(60, 94, 28, 7), fill: 'line', opacity: 0.85 },
       ],
       motion: 'flicker',
       origin: [60, 96],
@@ -751,9 +776,9 @@ function featherPaths(): MotifPath[] {
     { d: 'M55 14C80 24 82 60 66 92C44 62 40 30 55 14Z', fill: 'soft' },
     { d: barbs, stroke: 'line', opacity: 0.55 },
     { d: 'M67 110C65 82 61 52 55 18', stroke: 'line' },
-    { d: ellipse(57, 36, 13, 16, -10), fill: '#1fb59f' },
-    { d: ellipse(57.6, 38, 9, 11, -10), fill: '#2e6fe0' },
-    { d: ellipse(58, 40, 4.6, 5.8, -10), fill: '#101f52' },
+    { d: ellipse(57, 36, 13, 16, -10), fill: 'soft' },
+    { d: ellipse(57.6, 38, 9, 11, -10), fill: 'light', opacity: 0.9 },
+    { d: ellipse(58, 40, 4.6, 5.8, -10), stroke: 'line', fill: 'soft' },
     { d: ellipse(57, 36, 13, 16, -10), stroke: 'light', width: 1 },
   ];
 }
@@ -782,9 +807,9 @@ const rakhi: Motif = {
     {
       paths: [
         { d: dotRing(60, 63, 14, 29, 1.6), fill: 'light' },
-        { d: ring(60, 63, 12, 11, 15, 0.22), fill: '#ff5d73' },
+        { d: ring(60, 63, 12, 11, 15, 0.22), stroke: 'line', fill: 'soft' },
         { d: ring(60, 63, 8, 5, 10, 0.34, 22.5), fill: 'light' },
-        { d: circle(60, 63, 5), fill: '#fff6dc' },
+        { d: circle(60, 63, 5), fill: 'line' },
         { d: circle(60, 63, 7.5), stroke: 'line' },
       ],
       motion: 'turn',
@@ -865,12 +890,13 @@ const toran: Motif = {
 };
 
 function bathukammaPaths(): MotifPath[] {
+  // Tiers of flowers, alternately gold and a wash, as the real ones alternate.
   const tiers: { y: number; w: number; color: MotifPaint }[] = [
-    { y: 94, w: 36, color: '#f0527a' },
-    { y: 81, w: 29, color: '#ffd84a' },
-    { y: 68, w: 22, color: '#f7954a' },
-    { y: 55, w: 15.5, color: '#a974e8' },
-    { y: 43, w: 9.5, color: '#ffd84a' },
+    { y: 94, w: 36, color: 'soft' },
+    { y: 81, w: 29, color: 'light' },
+    { y: 68, w: 22, color: 'soft' },
+    { y: 55, w: 15.5, color: 'light' },
+    { y: 43, w: 9.5, color: 'soft' },
   ];
   const paths: MotifPath[] = [];
   tiers.forEach(({ y, w, color }, index) => {
@@ -886,8 +912,8 @@ function bathukammaPaths(): MotifPath[] {
     const shape =
       `M${pt(60 - w, y)}Q${pt(60, y + 6)} ${pt(60 + w, y)}` +
       `L${pt(60 + topW, y - 7)}${top}L${pt(60 - w, y)}Z`;
-    paths.push({ d: shape, fill: color });
-    paths.push({ d: shape, stroke: 'line', opacity: 0.5 });
+    paths.push({ d: shape, fill: color, opacity: color === 'light' ? 0.85 : undefined });
+    paths.push({ d: shape, stroke: 'line', opacity: 0.8 });
   });
   paths.push({ d: 'M55.5 37L60 25L64.5 37Z', fill: 'light' });
   paths.push({ d: ellipse(60, 101, 44, 5), stroke: 'line' });
@@ -905,10 +931,10 @@ const bathukamma: Motif = {
     },
     { paths: bathukammaPaths(), motion: 'float', origin: [60, 100] },
     ...[
-      [22, 24, '#ffd84a', 0],
-      [98, 30, '#f0527a', 1.5],
-      [16, 70, '#a974e8', 3],
-      [104, 76, '#ffd84a', 4.2],
+      [22, 24, 'light', 0],
+      [98, 30, 'line', 1.5],
+      [16, 70, 'line', 3],
+      [104, 76, 'light', 4.2],
     ].map(([x, y, color, delay]): MotifLayer => ({
       paths: [{ d: petal(x as number, y as number, 60, 0, 7, 0.5), fill: color as MotifPaint }],
       motion: 'fall',
@@ -1021,7 +1047,6 @@ function bulbs(
   control: readonly [number, number],
   to: readonly [number, number],
   count: number,
-  colors: readonly MotifPaint[],
   start: number,
 ): MotifLayer[] {
   return Array.from({ length: count }, (_, index) => {
@@ -1029,7 +1054,7 @@ function bulbs(
     return {
       paths: [
         { d: `M${pt(x, y)}V${r2(y + 3)}`, stroke: 'line' },
-        { d: ellipse(x, y + 7, 3, 4.4), fill: colors[index % colors.length]! },
+        { d: ellipse(x, y + 7, 3, 4.4), fill: 'light' },
       ],
       motion: 'twinkle' as const,
       origin: [x, y + 7] as const,
@@ -1051,18 +1076,14 @@ const christmasStar: Motif = {
       paths: [
         { d: star(60, 44, 5, 25, 10.5), fill: 'light' },
         { d: star(60, 44, 5, 25, 10.5), stroke: 'line' },
-        { d: star(60, 44, 5, 10, 4.2), fill: '#fff6dc' },
+        { d: star(60, 44, 5, 10, 4.2), fill: 'line', opacity: 0.85 },
       ],
       motion: 'pulse',
       origin: [60, 44],
     },
     { paths: [{ d: 'M-2 84Q30 108 60 92Q90 76 122 98', stroke: 'line' }], detail: true },
-    ...bulbs([-2, 84], [30, 108], [60, 92], 4, ['#ff5a5a', '#ffd166', '#39c47a'], 0).map(
-      (layer) => ({ ...layer, detail: true }),
-    ),
-    ...bulbs([60, 92], [90, 76], [122, 98], 4, ['#4dabf7', '#ff5a5a', '#ffd166'], 1.4).map(
-      (layer) => ({ ...layer, detail: true }),
-    ),
+    ...bulbs([-2, 84], [30, 108], [60, 92], 4, 0).map((layer) => ({ ...layer, detail: true })),
+    ...bulbs([60, 92], [90, 76], [122, 98], 4, 1.4).map((layer) => ({ ...layer, detail: true })),
     ...SPARKLES([
       [22, 26, 4],
       [100, 20, 3.4],
@@ -1202,15 +1223,15 @@ function burst(cx: number, cy: number, count: number, radius: number, color: Mot
 const fireworks: Motif = {
   id: 'fireworks',
   layers: [
-    { paths: burst(42, 42, 14, 26, '#ffd166'), motion: 'bloom', origin: [42, 42] },
+    { paths: burst(42, 42, 14, 26, 'light'), motion: 'bloom', origin: [42, 42] },
     {
-      paths: burst(88, 30, 11, 18, '#ff7ac0'),
+      paths: burst(88, 30, 11, 18, 'line'),
       motion: 'bloom',
       origin: [88, 30],
       delay: 1.1,
     },
     {
-      paths: burst(80, 78, 16, 27, '#7fd8ff'),
+      paths: burst(80, 78, 16, 27, 'line'),
       motion: 'bloom',
       origin: [80, 78],
       delay: 2.2,
@@ -1312,23 +1333,11 @@ const trophy: Motif = {
         { d: star(60, 40, 5, 8, 3.4), fill: 'light' },
       ],
     },
-    ...[
-      [18, 18, '#ffd166', 0],
-      [98, 14, '#ff6b8b', 1],
-      [28, 44, '#4dd4ac', 2.1],
-      [104, 46, '#7fb6ff', 3],
-    ].map(([x, y, color, delay]): MotifLayer => ({
-      paths: [
-        {
-          d: `M${pt(x as number, y as number)}h5v3h-5Z`,
-          fill: color as MotifPaint,
-        },
-      ],
-      motion: 'fall',
-      origin: [(x as number) + 2.5, (y as number) + 1.5],
-      delay: delay as number,
-      detail: true,
-    })),
+    ...SPARKLES([
+      [20, 22, 4.2],
+      [100, 18, 3.4],
+      [104, 58, 2.6],
+    ]),
   ],
 };
 
@@ -1401,12 +1410,16 @@ function balloon(x: number, y: number, rx: number, ry: number, color: MotifPaint
       stroke: 'line',
       opacity: 0.7,
     },
-    { d: ellipse(x, y, rx, ry), fill: color },
-    { d: `M${pt(x - 3, y + ry + 3)}L${pt(x, y + ry - 1)}L${pt(x + 3, y + ry + 3)}Z`, fill: color },
+    { d: ellipse(x, y, rx, ry), stroke: 'line', fill: color },
+    {
+      d: `M${pt(x - 3, y + ry + 3)}L${pt(x, y + ry - 1)}L${pt(x + 3, y + ry + 3)}Z`,
+      stroke: 'line',
+      fill: color,
+    },
     {
       d: ellipse(x - rx * 0.4, y - ry * 0.4, rx * 0.22, ry * 0.3, -30),
-      fill: '#ffffff',
-      opacity: 0.55,
+      fill: 'line',
+      opacity: 0.45,
     },
   ];
 }
@@ -1414,15 +1427,15 @@ function balloon(x: number, y: number, rx: number, ry: number, color: MotifPaint
 const balloons: Motif = {
   id: 'balloons',
   layers: [
-    { paths: balloon(42, 44, 15, 18, '#ff6b6b'), motion: 'float', origin: [42, 44] },
+    { paths: balloon(42, 44, 15, 18, 'soft'), motion: 'float', origin: [42, 44] },
     {
-      paths: balloon(76, 34, 13.5, 16.5, '#ffd93d'),
+      paths: balloon(76, 34, 13.5, 16.5, 'light'),
       motion: 'float',
       origin: [76, 34],
       delay: 1.1,
     },
     {
-      paths: balloon(62, 62, 12.5, 15.5, '#4dd4ac'),
+      paths: balloon(62, 62, 12.5, 15.5, 'soft'),
       motion: 'float',
       origin: [62, 62],
       delay: 2.2,
@@ -1516,15 +1529,14 @@ const thali: Motif = {
         { d: circle(60, 64, 44), stroke: 'line', fill: 'soft' },
         { d: circle(60, 64, 39), stroke: 'line', opacity: 0.45 },
         { d: circle(42, 44, 10) + circle(74, 40, 9) + circle(88, 64, 9.5), stroke: 'line' },
-        { d: circle(42, 44, 7.6), fill: '#ffd166' },
-        { d: circle(74, 40, 6.8), fill: '#f08c3a' },
-        { d: circle(88, 64, 7.2), fill: '#fff4e0' },
+        { d: circle(42, 44, 7.6), fill: 'light', opacity: 0.9 },
+        { d: circle(74, 40, 6.8) + circle(88, 64, 7.2), fill: 'soft' },
         { d: circle(50, 76, 15), stroke: 'line', fill: 'light', opacity: 0.9 },
         {
           d: circle(45, 72, 1) + circle(54, 70, 1) + circle(50, 80, 1) + circle(57, 79, 1),
           fill: 'line',
         },
-        { d: 'M70 82C70 74 88 73 88 83C88 89 70 89 70 82Z', fill: '#ffffff', stroke: 'line' },
+        { d: 'M70 82C70 74 88 73 88 83C88 89 70 89 70 82Z', fill: 'soft', stroke: 'line' },
       ],
     },
     ...[
@@ -1589,14 +1601,14 @@ const confetti: Motif = {
   layers: [
     ...(
       [
-        [18, 16, '#ffd166', 0, 20],
-        [44, 30, '#ff6b8b', 0.8, -30],
-        [74, 12, '#4dd4ac', 1.6, 45],
-        [98, 34, '#7fb6ff', 2.4, -15],
-        [30, 62, '#b388ff', 3.1, 60],
-        [62, 50, '#ffd166', 3.8, -40],
-        [90, 74, '#ff6b8b', 4.5, 25],
-        [52, 88, '#4dd4ac', 5.2, -60],
+        [18, 16, 'light', 0, 20],
+        [44, 30, 'line', 0.8, -30],
+        [74, 12, 'light', 1.6, 45],
+        [98, 34, 'line', 2.4, -15],
+        [30, 62, 'light', 3.1, 60],
+        [62, 50, 'line', 3.8, -40],
+        [90, 74, 'light', 4.5, 25],
+        [52, 88, 'line', 5.2, -60],
       ] as const
     ).map(([x, y, color, delay, turn]): MotifLayer => ({
       paths: [

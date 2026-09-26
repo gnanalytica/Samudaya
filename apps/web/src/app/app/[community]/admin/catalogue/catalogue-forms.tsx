@@ -45,7 +45,7 @@ type ItemDraft = {
 const str = (value: unknown) =>
   typeof value === 'string' || typeof value === 'number' ? String(value) : '';
 
-/** Label and emoji for every kind; phone and UPI ID for vendors; capacity for venues. */
+/** A label for every kind; phone and UPI ID for vendors; capacity for venues. */
 function ItemFields({
   kind,
   item,
@@ -59,19 +59,9 @@ function ItemFields({
 }) {
   return (
     <>
-      <div className="w-20">
-        <Field label="Emoji" htmlFor={`${prefix}-emoji`}>
-          {(control) => (
-            <Input
-              {...control}
-              name="emoji"
-              defaultValue={item?.emoji ?? ''}
-              maxLength={8}
-              className="text-center"
-            />
-          )}
-        </Field>
-      </div>
+      {/* An item's emoji only reaches the WhatsApp bot's messages now, so it
+          is kept as it was rather than asked for. */}
+      <input type="hidden" name="emoji" value={item?.emoji ?? ''} />
       <div className="min-w-44 flex-1">
         <Field label="Name" htmlFor={`${prefix}-label`} error={state.fieldErrors?.label} required>
           {(control) => (

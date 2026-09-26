@@ -38,7 +38,6 @@ import { legible } from '@/lib/contrast';
 export type Upcoming = {
   id: string;
   name: string;
-  emoji: string;
   palette: Festival;
   /** A real date for a fixed festival; the usual window for one that moves. */
   when: string;
@@ -52,7 +51,6 @@ export function season(today: string = todayIn(), count = 5) {
     return {
       id: entry.id,
       name: entry.name,
-      emoji: entry.emoji,
       palette: legible(paletteFor(entry) ?? DEFAULT_FESTIVAL),
       when: when.exact ? formatDate(when.startsOn) : (when.window ?? 'date varies'),
     };

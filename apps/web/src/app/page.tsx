@@ -13,6 +13,7 @@ import {
 import { todayIn } from '@samudaya/core';
 import { ButtonLink } from '@/components/ui/button';
 import { festivalVars } from '@/components/festival';
+import { Motif } from '@/components/motif';
 import { getCurrentUser } from '@/lib/auth';
 import { season } from '@/lib/season';
 import { cn } from '@/lib/utils';
@@ -179,15 +180,14 @@ export default async function LandingPage(props: PageProps<'/'>) {
   // event in the app wears its own. See lib/season.ts. The festivals after it
   // can be tried on further down (_landing/theme.tsx).
   const { next, palette, upcoming } = season(todayIn(), 6);
-  const options: ThemeOption[] = upcoming.map(({ id, name, emoji, when, palette: colours }) => ({
+  const options: ThemeOption[] = upcoming.map(({ id, name, when, palette: colours }) => ({
     id,
     name,
-    emoji,
     when,
     palette: colours,
   }));
   const current: ThemeOption | null = next
-    ? { id: next.id, name: next.name, emoji: next.emoji, when: next.when, palette: next.palette }
+    ? { id: next.id, name: next.name, when: next.when, palette: next.palette }
     : null;
 
   return (
@@ -266,7 +266,11 @@ export default async function LandingPage(props: PageProps<'/'>) {
 
                 {next ? (
                   <p className="landing-pop border-accent/25 bg-surface-raised/80 text-ink inline-flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-2xl border px-3.5 py-1.5 text-sm shadow-sm backdrop-blur-sm sm:rounded-full">
-                    <span aria-hidden="true">{next.emoji}</span>
+                    <Motif
+                      id={next.palette.motif}
+                      compact
+                      className="text-accent size-5 shrink-0"
+                    />
                     <span className="font-medium">Getting ready for {next.name},</span>
                     <span className="text-ink-muted">{next.when}</span>
                   </p>

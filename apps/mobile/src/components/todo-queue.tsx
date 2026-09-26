@@ -22,7 +22,7 @@ export function TodoQueue({ items, currency }: { items: TodoItem[]; currency: st
       {groups.map((group) => (
         <View key={group.kind} style={{ gap: spacing.sm }}>
           <Heading>
-            {TODO_KIND[group.kind].emoji} {TODO_KIND[group.kind].section} ({group.items.length})
+            {TODO_KIND[group.kind].section} ({group.items.length})
           </Heading>
           {group.items.map((item) => (
             <TodoCard key={`${item.kind}:${item.id}`} item={item} currency={currency} />

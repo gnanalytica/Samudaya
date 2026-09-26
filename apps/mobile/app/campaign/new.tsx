@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { can, formatMoney, eventSlug } from '@samudaya/core';
+import { CAMPAIGN_EMOJI, can, formatMoney, eventSlug } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import {
@@ -16,10 +16,8 @@ import {
   Title,
 } from '../../src/components/ui';
 import { DateField, today } from '../../src/components/date-field';
-import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
+import { ErrorText } from '../../src/components/admin-ui';
 import { spacing } from '../../src/lib/theme';
-
-const EMOJIS = ['🙏', '🌳', '🏏', '📚', '🩺', '🛠️', '🎁', '🐾'];
 
 /**
  * A resident proposes a fundraising campaign. It is saved as 'proposed' and
@@ -32,7 +30,6 @@ export default function NewCampaign() {
   const { role, user, activeCommunity } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
-  const [emoji, setEmoji] = useState(EMOJIS[0] ?? '🙏');
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
   const [target, setTarget] = useState('');
@@ -78,7 +75,7 @@ export default function NewCampaign() {
       community_id: activeCommunity.id,
       // A short random suffix keeps two campaigns with the same name apart.
       slug: eventSlug(name, Math.random().toString(36).slice(2, 6)),
-      emoji,
+      emoji: CAMPAIGN_EMOJI,
       name: name.trim(),
       description: purpose.trim(),
       starts_on: date,
@@ -131,19 +128,6 @@ export default function NewCampaign() {
           </View>
 
           <Card style={{ gap: spacing.lg }}>
-            <View style={{ gap: spacing.sm }}>
-              <Body>Icon</Body>
-              <ChipRow>
-                {EMOJIS.map((value) => (
-                  <Chip
-                    key={value}
-                    label={value}
-                    selected={emoji === value}
-                    onPress={() => setEmoji(value)}
-                  />
-                ))}
-              </ChipRow>
-            </View>
             <Input
               label="Campaign name"
               value={name}

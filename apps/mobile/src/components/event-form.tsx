@@ -47,7 +47,7 @@ export const FUND_RULE_PLAIN = FUND_RULE_LABEL;
 
 /** A new event's starting values; the organiser defaults to the society. */
 export const emptyDetails = (organizer = ''): EventDetails => ({
-  emoji: '🎉',
+  emoji: '',
   name: '',
   eventType: { id: null, label: null },
   venue: { id: null, label: null },
@@ -73,7 +73,7 @@ export function validateDetails(
   const parsed = createEventSchema.safeParse({
     community_id: communityId,
     slug: 'placeholder-slug',
-    emoji: details.emoji || '🎉',
+    emoji: details.emoji || undefined,
     name: details.name,
     starts_on: details.startsOn.trim(),
     ends_on: details.endsOn.trim() || null,
@@ -104,10 +104,9 @@ export function validateDetails(
 }
 
 /**
- * The event's details. The few fields every event needs come first; emoji,
+ * The event's details. The few fields every event needs come first;
  * organiser, end date, attendance and the fund rule sit under "More options"
- * with sensible defaults (the type's emoji, the society, one day, the
- * society's event fund).
+ * with sensible defaults (the society, one day, the society's event fund).
  */
 export function DetailsFields({
   details,
@@ -142,7 +141,8 @@ export function DetailsFields({
         valueId={details.eventType.id}
         valueLabel={details.eventType.label}
         onChange={(next) => {
-          // The type's emoji stands in until someone picks their own.
+          // The type's emoji goes with the event for the WhatsApp bot's
+          // messages; the app itself shows none.
           const emoji = types?.find((item) => item.id === next.id)?.emoji;
           onChange({ ...details, eventType: next, emoji: emoji ?? details.emoji });
         }}
@@ -178,7 +178,6 @@ export function DetailsFields({
       <Disclosure
         label={COPY.moreOptions}
         summary={[
-          details.emoji,
           details.organizer.trim() || null,
           details.endsOn ? 'several days' : 'one day',
           FUND_RULE_PLAIN[details.fundRule],
@@ -186,12 +185,6 @@ export function DetailsFields({
           .filter(Boolean)
           .join(' · ')}
       >
-        <Input
-          label="Emoji"
-          value={details.emoji}
-          onChangeText={(value) => set('emoji', value)}
-          maxLength={8}
-        />
         <Input
           label="Organiser"
           value={details.organizer}
@@ -355,7 +348,7 @@ export function budgetProblem(lines: DraftBudgetLine[]): string | null {
 export type DraftActivity = { key: string; typeId: string | null; name: string; emoji: string };
 
 /**
- * Starts an activity from a catalogue type, which fills in its name and emoji,
+ * Starts an activity from a catalogue type, which fills in its name,
  * or from Other, which starts blank. Other is always offered: not everything is
  * in the catalogue, and an empty catalogue must not stop anyone adding one.
  */
@@ -376,11 +369,7 @@ export function ActivityTypeChips({
       </Caption>
       <ChipRow>
         {(types ?? []).map((item) => (
-          <Chip
-            key={item.id}
-            label={item.emoji ? `${item.emoji} ${item.label}` : item.label}
-            onPress={() => onPick(item)}
-          />
+          <Chip key={item.id} label={item.label} onPress={() => onPick(item)} />
         ))}
         <Chip label="Other" onPress={() => onPick({ id: null, label: '', emoji: null })} />
       </ChipRow>

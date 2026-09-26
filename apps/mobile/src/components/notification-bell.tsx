@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Bell } from 'lucide-react-native';
 import { useUnreadCount } from '../lib/notifications';
 import { radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
@@ -23,7 +24,7 @@ export function NotificationBell() {
         opacity: pressed ? 0.7 : 1,
       })}
     >
-      <Text style={{ fontSize: 20, color: colors.ink }}>🔔</Text>
+      <Bell size={22} color={colors.ink} strokeWidth={1.8} />
       {unread > 0 ? (
         <View
           style={{

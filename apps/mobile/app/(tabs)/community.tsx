@@ -180,7 +180,6 @@ export default function Community() {
                       >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                           <Caption>
-                            {option.emoji ? `${option.emoji} ` : ''}
                             {option.label}
                             {mine ? ' · your vote' : ''}
                           </Caption>
@@ -217,7 +216,7 @@ export default function Community() {
               const interested = data.mine.has(suggestion.id);
               return (
                 <Card key={suggestion.id} style={{ gap: spacing.sm }}>
-                  <Body>💡 {suggestion.name}</Body>
+                  <Body>{suggestion.name}</Body>
                   {suggestion.description ? <Caption>{suggestion.description}</Caption> : null}
                   <Caption>
                     {suggestion.memberships?.profiles?.full_name ?? 'A resident'} ·{' '}

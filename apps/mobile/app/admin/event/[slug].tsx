@@ -267,9 +267,7 @@ function StatusCard({ data, onChange }: { data: Loaded; onChange: () => void }) 
     <Card style={{ gap: spacing.md }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Title>
-            {event.emoji} {event.name}
-          </Title>
+          <Title>{event.name}</Title>
           <Caption>
             {formatMoney(Number(data.stats?.fund_raised ?? 0), currency)} raised ·{' '}
             {formatMoney(Number(data.stats?.spent ?? 0), currency)} spent ·{' '}
@@ -578,7 +576,7 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
     const parsed = createActivitySchema.safeParse({
       event_id: event.id,
       name: draft.name,
-      emoji: draft.emoji || '🎭',
+      emoji: draft.emoji || undefined,
       description: draft.description.trim() || undefined,
       capacity: draft.places.trim() || null,
     });
@@ -649,9 +647,7 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
             <View key={activity.id} style={{ gap: spacing.xs }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
                 <View style={{ flex: 1 }}>
-                  <Body>
-                    {activity.emoji} {activity.name}
-                  </Body>
+                  <Body>{activity.name}</Body>
                 </View>
                 {!locked ? <Chip label="Edit" onPress={() => setEditing(activity.id)} /> : null}
               </View>
@@ -702,23 +698,11 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
       {!locked ? (
         draft ? (
           <View style={{ gap: spacing.sm }}>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <View style={{ width: 64 }}>
-                <Input
-                  label="Emoji"
-                  value={draft.emoji}
-                  maxLength={8}
-                  onChangeText={(emoji) => setDraft({ ...draft, emoji })}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Input
-                  label="Activity name"
-                  value={draft.name}
-                  onChangeText={(name) => setDraft({ ...draft, name })}
-                />
-              </View>
-            </View>
+            <Input
+              label="Activity name"
+              value={draft.name}
+              onChangeText={(name) => setDraft({ ...draft, name })}
+            />
             <Input
               label="Places"
               value={draft.places}
@@ -744,7 +728,7 @@ function ActivitiesCard({ data, onChange }: { data: Loaded; onChange: () => void
               setDraft({
                 typeId: item.id,
                 name: item.label,
-                emoji: item.emoji ?? '🎭',
+                emoji: item.emoji ?? '',
                 places: '',
                 description: '',
               })
@@ -833,7 +817,7 @@ function ActivityEditor({
     const parsed = updateActivitySchema.safeParse({
       id: activity.id,
       name: form.name,
-      emoji: form.emoji || '🎭',
+      emoji: form.emoji || undefined,
       description: form.description,
       capacity: form.places.trim() || null,
       coordinator_id: form.coordinatorId,
@@ -881,23 +865,7 @@ function ActivityEditor({
 
   return (
     <View style={{ gap: spacing.md }}>
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <View style={{ width: 64 }}>
-          <Input
-            label="Emoji"
-            value={form.emoji}
-            maxLength={8}
-            onChangeText={(value) => set('emoji', value)}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Input
-            label="Activity name"
-            value={form.name}
-            onChangeText={(value) => set('name', value)}
-          />
-        </View>
-      </View>
+      <Input label="Activity name" value={form.name} onChangeText={(value) => set('name', value)} />
       <Input
         label="Places"
         value={form.places}
@@ -1099,7 +1067,7 @@ function SurplusCard({ data, onChange }: { data: Loaded; onChange: () => void })
             {data.openEvents.map((option) => (
               <Chip
                 key={option.id}
-                label={`${option.emoji} ${option.name}`}
+                label={option.name}
                 selected={target === option.id}
                 onPress={() => setTarget(option.id)}
               />

@@ -115,7 +115,6 @@ export function CatalogueSelect({
         ) : null}
         {options.map((item) => (
           <option key={item.id} value={item.id}>
-            {item.emoji ? `${item.emoji} ` : ''}
             {item.label}
           </option>
         ))}

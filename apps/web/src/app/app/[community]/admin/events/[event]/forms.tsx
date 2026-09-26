@@ -150,22 +150,11 @@ export function EventDetailsForm({
   return (
     <form action={action} className="space-y-4">
       <Hidden slug={slug} eventSlug={event.slug} />
-      <div className="grid gap-4 sm:grid-cols-[5rem_1fr]">
-        <Field label="Emoji" htmlFor="ev-emoji">
-          {(control) => (
-            <Input
-              {...control}
-              name="emoji"
-              defaultValue={event.emoji}
-              maxLength={4}
-              className="text-center"
-            />
-          )}
-        </Field>
-        <Field label="Name" htmlFor="ev-name" error={state.fieldErrors?.name} required>
-          {(control) => <Input {...control} name="name" defaultValue={event.name} required />}
-        </Field>
-      </div>
+      {/* Kept as it was for the WhatsApp bot's messages; the app shows none. */}
+      <input type="hidden" name="emoji" value={event.emoji} />
+      <Field label="Name" htmlFor="ev-name" error={state.fieldErrors?.name} required>
+        {(control) => <Input {...control} name="name" defaultValue={event.name} required />}
+      </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Starts" htmlFor="ev-start" error={state.fieldErrors?.starts_on} required>
           {(control) => (
@@ -314,14 +303,14 @@ export function AddActivityForm({
 }) {
   const { state, action, ref, version } = useResettingAction(addActivity);
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState('🎭');
+  const [emoji, setEmoji] = useState('');
   return (
     <form
       ref={ref}
       action={async (formData) => {
         await action(formData);
         setName('');
-        setEmoji('🎭');
+        setEmoji('');
       }}
       className="space-y-3"
     >
@@ -334,7 +323,7 @@ export function AddActivityForm({
         label="Type"
         items={pickers.activity_type}
         placeholder="Choose a type (optional)"
-        hint="Fills in the name and emoji."
+        hint="Fills in the name."
         manageHref={pickers.manageHref}
         onPick={(item) => {
           if (!item) return;
@@ -342,21 +331,8 @@ export function AddActivityForm({
           if (item.emoji) setEmoji(item.emoji);
         }}
       />
+      <input type="hidden" name="emoji" value={emoji} />
       <div className="flex flex-wrap items-end gap-2">
-        <div className="w-20">
-          <Field label="Emoji" htmlFor="act-emoji">
-            {(control) => (
-              <Input
-                {...control}
-                name="emoji"
-                value={emoji}
-                onChange={(event) => setEmoji(event.target.value)}
-                maxLength={8}
-                className="text-center"
-              />
-            )}
-          </Field>
-        </div>
         <div className="min-w-40 flex-1">
           <Field label="Activity" htmlFor="act-name" error={state.fieldErrors?.name}>
             {(control) => (
@@ -445,26 +421,10 @@ export function EditActivityForm({
     >
       <Hidden slug={slug} eventSlug={eventSlug} />
       <input type="hidden" name="activity_id" value={id} />
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="w-20">
-          <Field label="Emoji" htmlFor={`act-emoji-${id}`}>
-            {(control) => (
-              <Input
-                {...control}
-                name="emoji"
-                defaultValue={activity.emoji}
-                maxLength={8}
-                className="text-center"
-              />
-            )}
-          </Field>
-        </div>
-        <div className="min-w-40 flex-1">
-          <Field label="Activity" htmlFor={`act-name-${id}`} error={state.fieldErrors?.name}>
-            {(control) => <Input {...control} name="name" defaultValue={activity.name} required />}
-          </Field>
-        </div>
-      </div>
+      <input type="hidden" name="emoji" value={activity.emoji} />
+      <Field label="Activity" htmlFor={`act-name-${id}`} error={state.fieldErrors?.name}>
+        {(control) => <Input {...control} name="name" defaultValue={activity.name} required />}
+      </Field>
       <div className="grid gap-3 sm:grid-cols-2">
         <Field
           label="Places"
@@ -1100,7 +1060,7 @@ export function AllocateSurplusForm({
                   </option>
                   {openEvents.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.emoji} {option.name} · {formatDate(option.starts_on)}
+                      {option.name} · {formatDate(option.starts_on)}
                     </option>
                   ))}
                   <option value={NEW_EDITION}>Create {nextEdition} as a draft</option>

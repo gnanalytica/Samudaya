@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View } from 'react-native';
+import { Paperclip } from 'lucide-react-native';
 import { Body, Button, Caption } from './ui';
 import { Chip, ChipRow, ErrorText } from './admin-ui';
 import {
@@ -10,6 +11,7 @@ import {
   type PickedFile,
 } from '../lib/storage';
 import { spacing } from '../lib/theme';
+import { useTheme } from '../lib/use-theme';
 
 /**
  * Take a photo, choose an image, or choose a PDF. The file is only held here;
@@ -30,6 +32,7 @@ export function FilePickerField({
   existingLabel?: string | null;
   allowPdf?: boolean;
 }) {
+  const { colors } = useTheme();
   const [error, setError] = useState<string | null>(null);
 
   const choose = async (source: PickSource) => {
@@ -48,8 +51,11 @@ export function FilePickerField({
       <Body>{label}</Body>
       {file ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-          <View style={{ flex: 1 }}>
-            <Caption>📎 {file.name}</Caption>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Paperclip size={14} color={colors.inkMuted} strokeWidth={1.8} />
+            <View style={{ flexShrink: 1 }}>
+              <Caption>{file.name}</Caption>
+            </View>
           </View>
           <Chip label="Remove" onPress={() => onChange(null)} />
         </View>

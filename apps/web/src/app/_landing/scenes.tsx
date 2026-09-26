@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 
 export const SCENE = { width: 360, height: 560, fps: 30, frames: 210 } as const;
 
-export type SceneProps = { festival: string; emoji: string };
+export type SceneProps = { festival: string };
 
 const clamp = { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' } as const;
 const ease = Easing.bezier(0.2, 0.8, 0.2, 1);
@@ -178,7 +178,7 @@ const JOBS: { label: string; owner: string | null; at: number | null }[] = [
   { label: 'Clean-up crew', owner: null, at: null },
 ];
 
-export function PlanScene({ festival, emoji }: SceneProps) {
+export function PlanScene({ festival }: SceneProps) {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const done = JOBS.map((job) =>
@@ -192,7 +192,7 @@ export function PlanScene({ festival, emoji }: SceneProps) {
   const rangoliTeam = 2 + (frame >= 60 ? 1 : 0) + (frame >= 140 ? 1 : 0);
 
   return (
-    <Screen kicker="Plan" title={`${emoji} ${festival}`}>
+    <Screen kicker="Plan" title={festival}>
       <Card>
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold">Ready for the day</span>
@@ -290,14 +290,14 @@ function LedgerLine({
   );
 }
 
-export function CollectScene({ festival, emoji }: SceneProps) {
+export function CollectScene({ festival }: SceneProps) {
   const frame = useCurrentFrame();
   const settled = rise(frame, 62, 16);
   const raised = interpolate(frame, [74, 112], [24500, 26501], { ...clamp, easing: ease });
   const arrived = rise(frame, 90, 18);
 
   return (
-    <Screen kicker="Collect" title={`${emoji} ${festival} fund`}>
+    <Screen kicker="Collect" title={`${festival} fund`}>
       <Card>
         <p className="text-ink-muted text-[11px] font-semibold tracking-wider uppercase">
           Payment to confirm
@@ -365,12 +365,12 @@ const LINES = [
   { label: 'Food', spent: 9600, planned: 12000, at: 92 },
 ];
 
-export function SpendScene({ festival, emoji }: SceneProps) {
+export function SpendScene({ festival }: SceneProps) {
   const frame = useCurrentFrame();
   const approved = rise(frame, 46, 12);
 
   return (
-    <Screen kicker="Spend" title={`${emoji} ${festival} budget`}>
+    <Screen kicker="Spend" title={`${festival} budget`}>
       <Card>
         <div className="flex items-start justify-between gap-3">
           <span>
@@ -445,14 +445,14 @@ const STATEMENT = [
   { line: 'UPI · unknown sender', amount: 500, at: 66, flag: true },
 ];
 
-export function ProveScene({ festival, emoji }: SceneProps) {
+export function ProveScene({ festival }: SceneProps) {
   const frame = useCurrentFrame();
   const closing = rise(frame, 98, 16);
   const kept = rise(frame, 128, 10);
   const signed = rise(frame, 142, 12);
 
   return (
-    <Screen kicker="Prove" title={`${emoji} ${festival}, closed`}>
+    <Screen kicker="Prove" title={`${festival}, closed`}>
       <Card>
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold">Bank statement</span>

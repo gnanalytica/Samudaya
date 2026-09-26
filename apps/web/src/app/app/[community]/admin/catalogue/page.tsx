@@ -155,10 +155,7 @@ export default async function CataloguePage(props: PageProps<'/app/[community]/a
                             <input type="hidden" name="slug" value={community.slug} />
                             <input type="hidden" name="item_id" value={item.id} />
                             <input type="hidden" name="active" value="1" />
-                            <Badge>
-                              {item.emoji ? `${item.emoji} ` : ''}
-                              {item.label}
-                            </Badge>
+                            <Badge>{item.label}</Badge>
                             <Button type="submit" size="sm" variant="ghost">
                               Restore
                             </Button>

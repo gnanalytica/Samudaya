@@ -144,12 +144,7 @@ export function Tour({ chapters }: { chapters: Chapter[] }) {
         <div className="border-ink/85 bg-ink/85 rounded-[2.4rem] border-[6px] shadow-2xl">
           <div className="overflow-hidden rounded-[2rem]">
             {near ? (
-              <ScenePlayer
-                scene={chapter.id}
-                festival={wearing?.name ?? 'Festival'}
-                emoji={wearing?.emoji ?? '🎉'}
-                calm={calm}
-              />
+              <ScenePlayer scene={chapter.id} festival={wearing?.name ?? 'Festival'} calm={calm} />
             ) : (
               <PhonePlaceholder />
             )}

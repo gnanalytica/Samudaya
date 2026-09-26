@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
+import { CalendarDays } from 'lucide-react-native';
 import { radius, spacing, tapSlop } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 import { Button } from './ui';
@@ -116,9 +117,12 @@ export function DateField({
             opacity: pressed ? 0.85 : 1,
           })}
         >
-          <Text style={{ color: shown ? colors.ink : colors.inkSubtle, fontSize: 15 }}>
-            📅 {shown ?? placeholder}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+            <CalendarDays size={18} color={colors.inkMuted} strokeWidth={1.8} />
+            <Text style={{ color: shown ? colors.ink : colors.inkSubtle, fontSize: 15 }}>
+              {shown ?? placeholder}
+            </Text>
+          </View>
         </Pressable>
         {clearable && value ? (
           <Pressable
