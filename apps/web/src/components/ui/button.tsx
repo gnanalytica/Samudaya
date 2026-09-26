@@ -2,15 +2,24 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'festive' | 'inverse' | 'glass';
 type Size = 'sm' | 'md' | 'lg';
 
+/**
+ * Primary is ink, not colour: with a festival's colour on every button there
+ * would be none left for the festival. `festive` is the one that wears it —
+ * the Contribute button in the bar, say. `inverse` and `glass` are for a
+ * festival banner, where ink on a dark gradient would vanish.
+ */
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-accent-ink hover:opacity-90 shadow-sm',
+  primary: 'bg-ink text-surface hover:bg-ink/88 shadow-sm',
   secondary:
     'bg-surface-raised text-ink border border-border-base hover:bg-surface-sunken shadow-sm',
   ghost: 'text-ink-muted hover:bg-surface-sunken hover:text-ink',
   danger: 'bg-danger text-white hover:opacity-90 shadow-sm',
+  festive: 'bg-accent text-accent-ink hover:opacity-90 shadow-sm',
+  inverse: 'bg-white text-[oklch(0.205_0.012_70)] hover:bg-white/90 shadow-sm',
+  glass: 'border border-white/25 bg-white/15 text-white hover:bg-white/25 backdrop-blur-sm',
 };
 
 /**
@@ -33,8 +42,9 @@ const SIZES: Record<Size, string> = {
 };
 
 const base =
-  'inline-flex items-center justify-center rounded-lg font-medium transition-[opacity,background-color] ' +
-  'disabled:pointer-events-none disabled:opacity-50 whitespace-nowrap';
+  'inline-flex items-center justify-center rounded-xl font-medium whitespace-nowrap ' +
+  'transition-[opacity,background-color,transform] duration-150 active:scale-[0.97] ' +
+  'disabled:pointer-events-none disabled:opacity-50';
 
 export function buttonClass(variant: Variant = 'primary', size: Size = 'md', className?: string) {
   return cn(base, VARIANTS[variant], SIZES[size], className);

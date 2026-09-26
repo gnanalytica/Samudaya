@@ -44,7 +44,6 @@ export type Upcoming = {
   when: string;
 };
 
-
 export function season(today: string = todayIn(), count = 5) {
   // Every festival, soonest first — the page colour may need to look past the
   // first few to find one that is a festival rather than a day.

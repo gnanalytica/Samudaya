@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { APPEARANCE_SCRIPT, THEME_COLOR } from '@/lib/appearance';
+import { sans, serif } from './fonts';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -34,7 +35,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // The script marks <html> with the chosen appearance before React hydrates it.
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${serif.variable}`}>
       <head>
         {/* One per device appearance, for System. Light or Dark adds a tag of
             its own ahead of these (lib/appearance.ts). */}

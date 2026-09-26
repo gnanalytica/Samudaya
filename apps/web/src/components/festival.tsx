@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { Festival } from '@samudaya/core';
+import { heroGradient, type Festival } from '@samudaya/core';
 import { cn } from '@/lib/utils';
+import { Motif } from './motif';
 
 /**
  * Hands a subtree the festival's colours by re-pointing the same tokens the
@@ -120,78 +121,94 @@ export function Rangoli({
 }
 
 /**
- * The toran over a doorway: mango leaves on a string, with a marigold between
- * them. One SVG tile, repeated across whatever it is put on top of.
+ * How a motif sits on a banner: in a column of its own to the right of the
+ * words, like the illustration on an invitation card, never under them. Its
+ * lines are a little faint so the lights and colours carry it.
  */
-export function Toran({
-  className,
-  patternId = 'toran',
-}: {
-  className?: string;
-  patternId?: string;
-}) {
-  return (
-    <svg className={className} aria-hidden="true" focusable="false" width="100%" height="14">
-      <defs>
-        {/* The colours come from this pattern's own classes, so two torans in
-            different festivals need two ids — otherwise the second borrows the
-            first one's palette. */}
-        <pattern id={patternId} width="48" height="14" patternUnits="userSpaceOnUse">
-          <path
-            d="M0 2 Q 12 6 24 2 Q 36 6 48 2"
-            className="stroke-ribbon"
-            fill="none"
-            strokeWidth="1"
-          />
-          <path d="M8 3 Q 5 8 8 12 Q 11 8 8 3 Z" className="fill-accent" />
-          <path d="M40 3 Q 37 8 40 12 Q 43 8 40 3 Z" className="fill-accent" />
-          <circle cx="24" cy="6.5" r="3" className="fill-ribbon" />
-          <circle cx="24" cy="6.5" r="1.2" className="fill-accent" />
-        </pattern>
-      </defs>
-      <rect width="100%" height="14" fill={`url(#${patternId})`} />
-    </svg>
-  );
+export const HERO_MOTIF = 'text-white/60 opacity-80 md:opacity-90';
+
+/** The width the words on a banner keep to, leaving the motif its column. */
+export const HERO_TEXT = 'max-w-[62%] sm:max-w-[64%] md:max-w-2xl';
+
+/** The banner behind an event's title: its festival's colour, lit from a corner. */
+export function heroBackground(festival: Festival, from = '92% 0%') {
+  const [glow, middle, deep] = heroGradient(festival);
+  return `radial-gradient(130% 125% at ${from}, ${glow} 0%, ${middle} 46%, ${deep} 100%)`;
 }
 
 /**
- * A page header dressed for its festival: the wash behind it, the toran along
- * the top, and the kolam bleeding off the right-hand edge.
+ * An event's banner: its festival's colour, and the thing the festival is
+ * decorated with drawn large and faint across the corner — a lamp for
+ * Deepavali, lanterns for Eid, a star for Christmas — moving the way it does.
+ * White type on it, set in the serif. A day of mourning gets the colour and
+ * nothing else.
  */
-export function FestivalHeader({
+export function FestivalHero({
   festival,
+  eyebrow,
   title,
-  description,
+  meta,
+  back,
   action,
   className,
 }: {
   festival: Festival;
+  eyebrow?: ReactNode;
   title: ReactNode;
-  description?: ReactNode;
+  meta?: ReactNode;
+  /** A link back, above everything else. */
+  back?: ReactNode;
   action?: ReactNode;
   className?: string;
 }) {
   return (
     <div
-      style={festivalVars(festival)}
-      className={cn(
-        'border-border-base relative isolate overflow-hidden border-b',
-        'bg-[var(--festival-wash)]',
-        className,
-      )}
+      className={cn('relative isolate overflow-hidden text-white', className)}
+      style={{ background: heroBackground(festival) }}
     >
-      <Toran patternId={`toran-${festival.id}`} className="absolute inset-x-0 top-0 opacity-70" />
-      <Rangoli
-        petals={festival.petals}
-        className="pointer-events-none absolute -top-10 -right-12 size-52 opacity-[0.13] sm:-right-6 sm:size-60"
+      <Motif
+        id={festival.motif}
+        calm={festival.mood !== 'festive'}
+        className={cn(
+          'pointer-events-none absolute top-10 -right-3 size-44 sm:top-6 sm:size-56 md:right-8 md:size-64',
+          HERO_MOTIF,
+        )}
+        style={{ '--motif-soft': 0.4 } as CSSProperties}
       />
-      <div className="relative flex flex-wrap items-start justify-between gap-3 px-4 pt-7 pb-5 md:px-6">
-        <div className="min-w-0">
-          <h1 className="text-ink text-xl font-semibold tracking-tight">{title}</h1>
-          {description ? <p className="text-ink-muted mt-1 text-sm">{description}</p> : null}
+      <div className="relative px-4 pt-5 pb-12 md:px-6 md:pt-7 md:pb-14">
+        {back ? <div className="text-sm text-white/80">{back}</div> : null}
+        <div className={HERO_TEXT}>
+          {eyebrow ? (
+            <p className="mt-7 text-[10.5px] font-semibold tracking-[0.16em] text-white/75 uppercase md:mt-9">
+              {eyebrow}
+            </p>
+          ) : null}
+          <h1 className="mt-1.5 font-serif text-3xl leading-tight font-medium tracking-tight text-balance md:text-4xl">
+            {title}
+          </h1>
+          {meta ? <p className="mt-1.5 text-sm text-white/80">{meta}</p> : null}
         </div>
-        {action ? <div className="shrink-0">{action}</div> : null}
+        {action ? <div className="mt-4 flex flex-wrap items-center gap-2">{action}</div> : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * A small square of the festival: its banner colour and its motif, whole and
+ * still. What an event looks like in a list.
+ */
+export function FestivalTile({ festival, className }: { festival: Festival; className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-[14px] text-white shadow-sm',
+        className,
+      )}
+      style={{ background: heroBackground(festival, '100% 0%') }}
+    >
+      <Motif id={festival.motif} compact className="size-[76%]" />
+    </span>
   );
 }

@@ -8,6 +8,9 @@ import { ProfileMenu } from '@/components/profile-menu';
 import { ResidentViewBanner, ViewSwitch } from '@/components/view-switch';
 import { getSupabase } from '@/lib/supabase/server';
 import { getTodoCount } from '@/lib/todo';
+import { getSeason } from '@/lib/events';
+import { festivalVars } from '@/components/festival';
+import { todayIn } from '@samudaya/core';
 
 export default async function CommunityLayout(props: LayoutProps<'/app/[community]'>) {
   const { community: slug } = await props.params;
@@ -20,7 +23,7 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
 
   // RLS limits this to the member's own notifications. The badge only needs a
   // number, so it asks todo_count() rather than building the whole queue.
-  const [memberships, { count: unread }, todoCount] = await Promise.all([
+  const [memberships, { count: unread }, todoCount, season] = await Promise.all([
     membershipsPromise,
     supabase
       .from('notifications')
@@ -28,6 +31,7 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
       .eq('community_id', community.id)
       .is('read_at', null),
     getTodoCount(community.id, viewRole),
+    getSeason(community.id, todayIn(community.timezone)),
   ]);
   const counts = { todo: todoCount };
   const name = profile?.full_name ?? 'You';
@@ -46,9 +50,12 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
   const viewSwitch = viewMode ? <ViewSwitch slug={community.slug} mode={viewMode} /> : null;
 
   return (
-    <div className="flex min-h-dvh">
+    // The whole app wears whatever the society is heading towards next — the
+    // Contribute button, the links, the focus rings — and an event's own page
+    // wears its own festival on top.
+    <div className="flex min-h-dvh" style={festivalVars(season.festival)}>
       <DismissMenus />
-      <aside className="border-border-base bg-surface-raised sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r px-3 py-4 md:flex">
+      <aside className="border-border-base bg-surface sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r px-3 py-4 md:flex">
         {switcher}
         {viewSwitch ? <div className="mt-3 px-1">{viewSwitch}</div> : null}
 
@@ -67,7 +74,7 @@ export default async function CommunityLayout(props: LayoutProps<'/app/[communit
       <div className="flex min-w-0 flex-1 flex-col">
         <header
           id="app-header"
-          className="border-border-base bg-surface-raised/95 sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur md:hidden"
+          className="border-border-base/70 bg-surface/85 sticky top-0 z-30 flex items-center justify-between gap-3 border-b px-4 py-3 backdrop-blur-xl md:hidden"
         >
           {/* The society name used to link to Home, which the bottom bar
               already reaches. It opens the rest of the app instead. */}

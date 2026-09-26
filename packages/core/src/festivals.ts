@@ -845,6 +845,38 @@ export function festivalFor(...text: (string | null | undefined)[]): Festival {
 }
 
 /**
+ * The looks a marigold garland and a kolam belong to: the Hindu, Sikh and
+ * Jain festivals and the harvest days, where both are what a doorway and a
+ * courtyard are actually dressed in. Eid, Christmas, Easter, Buddha Purnima,
+ * New Year and the national days are not, and on those the front page hangs
+ * the look's own motif instead.
+ */
+const GARLANDED = new Set<FestivalId>([
+  'deepavali',
+  'holi',
+  'dasara',
+  'ganesh',
+  'onam',
+  'pongal',
+  'sankranti',
+  'lohri',
+  'harvest',
+  'krishna',
+  'rakhi',
+  'shivratri',
+  'chhath',
+  'bathukamma',
+  'ugadi',
+  'puja',
+  'gurpurab',
+  'mahavir',
+]);
+
+export function wearsGarland(festival: Festival): boolean {
+  return GARLANDED.has(festival.id);
+}
+
+/**
  * The banner behind an event's title, glow to deepest: the festival's own hue,
  * from a lit corner down to a colour dark enough that white text on it reads.
  * The same in both themes, like a printed banner. Calm looks are quieter.

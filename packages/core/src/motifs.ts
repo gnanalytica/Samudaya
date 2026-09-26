@@ -271,10 +271,7 @@ function smallDiya(x: number, y: number, scale: number): MotifPath[] {
 
 // ------------------------------------------------------------------ motifs
 
-const SPARKLES = (
-  spots: readonly (readonly [number, number, number])[],
-  start = 0,
-): MotifLayer[] =>
+const SPARKLES = (spots: readonly (readonly [number, number, number])[], start = 0): MotifLayer[] =>
   spots.map(([x, y, size], index) => ({
     paths: [{ d: sparkle(x, y, size), fill: 'line' }],
     motion: 'twinkle',
@@ -538,21 +535,19 @@ const pot: Motif = {
       [52, 0],
       [60, 1.1],
       [68, 2.2],
-    ].map(
-      ([x, delay]): MotifLayer => ({
-        paths: [
-          {
-            d: `M${pt(x!, 40)}C${pt(x! - 4, 34)} ${pt(x! + 4, 30)} ${pt(x!, 24)}`,
-            stroke: 'line',
-            opacity: 0.7,
-          },
-        ],
-        motion: 'rise',
-        origin: [x!, 32],
-        delay,
-        detail: true,
-      }),
-    ),
+    ].map(([x, delay]): MotifLayer => ({
+      paths: [
+        {
+          d: `M${pt(x!, 40)}C${pt(x! - 4, 34)} ${pt(x! + 4, 30)} ${pt(x!, 24)}`,
+          stroke: 'line',
+          opacity: 0.7,
+        },
+      ],
+      motion: 'rise',
+      origin: [x!, 32],
+      delay,
+      detail: true,
+    })),
   ],
 };
 
@@ -648,15 +643,13 @@ const bonfire: Motif = {
       [70, 24, 0.9],
       [80, 42, 1.8],
       [40, 48, 2.6],
-    ].map(
-      ([x, y, delay]): MotifLayer => ({
-        paths: [{ d: circle(x!, y!, 1.8), fill: 'light' }],
-        motion: 'rise',
-        origin: [x!, y!],
-        delay,
-        detail: true,
-      }),
-    ),
+    ].map(([x, y, delay]): MotifLayer => ({
+      paths: [{ d: circle(x!, y!, 1.8), fill: 'light' }],
+      motion: 'rise',
+      origin: [x!, y!],
+      delay,
+      detail: true,
+    })),
   ],
 };
 
@@ -916,15 +909,13 @@ const bathukamma: Motif = {
       [98, 30, '#f0527a', 1.5],
       [16, 70, '#a974e8', 3],
       [104, 76, '#ffd84a', 4.2],
-    ].map(
-      ([x, y, color, delay]): MotifLayer => ({
-        paths: [{ d: petal(x as number, y as number, 60, 0, 7, 0.5), fill: color as MotifPaint }],
-        motion: 'fall',
-        origin: [x as number, y as number],
-        delay: delay as number,
-        detail: true,
-      }),
-    ),
+    ].map(([x, y, color, delay]): MotifLayer => ({
+      paths: [{ d: petal(x as number, y as number, 60, 0, 7, 0.5), fill: color as MotifPaint }],
+      motion: 'fall',
+      origin: [x as number, y as number],
+      delay: delay as number,
+      detail: true,
+    })),
   ],
 };
 
@@ -1151,14 +1142,12 @@ const lights: Motif = {
       }),
     ),
     { paths: [30, 60, 90].flatMap((x) => smallDiya(x, 100, 1.35)) },
-    ...[30, 60, 90].map(
-      (x, index): MotifLayer => ({
-        paths: [{ d: flame(x, 98, 19, 4.8), fill: 'light' }],
-        motion: 'flicker',
-        origin: [x, 98],
-        delay: index * 0.3,
-      }),
-    ),
+    ...[30, 60, 90].map((x, index): MotifLayer => ({
+      paths: [{ d: flame(x, 98, 19, 4.8), fill: 'light' }],
+      motion: 'flicker',
+      origin: [x, 98],
+      delay: index * 0.3,
+    })),
   ],
   frame: [14, 70, 92, 42],
 };
@@ -1227,9 +1216,7 @@ const fireworks: Motif = {
       delay: 2.2,
     },
     {
-      paths: [
-        { d: 'M42 118Q40 90 42 72M80 118Q82 110 80 108', stroke: 'line', opacity: 0.5 },
-      ],
+      paths: [{ d: 'M42 118Q40 90 42 72M80 118Q82 110 80 108', stroke: 'line', opacity: 0.5 }],
       detail: true,
     },
     ...SPARKLES([
@@ -1330,20 +1317,18 @@ const trophy: Motif = {
       [98, 14, '#ff6b8b', 1],
       [28, 44, '#4dd4ac', 2.1],
       [104, 46, '#7fb6ff', 3],
-    ].map(
-      ([x, y, color, delay]): MotifLayer => ({
-        paths: [
-          {
-            d: `M${pt(x as number, y as number)}h5v3h-5Z`,
-            fill: color as MotifPaint,
-          },
-        ],
-        motion: 'fall',
-        origin: [(x as number) + 2.5, (y as number) + 1.5],
-        delay: delay as number,
-        detail: true,
-      }),
-    ),
+    ].map(([x, y, color, delay]): MotifLayer => ({
+      paths: [
+        {
+          d: `M${pt(x as number, y as number)}h5v3h-5Z`,
+          fill: color as MotifPaint,
+        },
+      ],
+      motion: 'fall',
+      origin: [(x as number) + 2.5, (y as number) + 1.5],
+      delay: delay as number,
+      detail: true,
+    })),
   ],
 };
 
@@ -1418,7 +1403,11 @@ function balloon(x: number, y: number, rx: number, ry: number, color: MotifPaint
     },
     { d: ellipse(x, y, rx, ry), fill: color },
     { d: `M${pt(x - 3, y + ry + 3)}L${pt(x, y + ry - 1)}L${pt(x + 3, y + ry + 3)}Z`, fill: color },
-    { d: ellipse(x - rx * 0.4, y - ry * 0.4, rx * 0.22, ry * 0.3, -30), fill: '#ffffff', opacity: 0.55 },
+    {
+      d: ellipse(x - rx * 0.4, y - ry * 0.4, rx * 0.22, ry * 0.3, -30),
+      fill: '#ffffff',
+      opacity: 0.55,
+    },
   ];
 }
 
@@ -1474,15 +1463,13 @@ const heart: Motif = {
       [24, 40, 0.24, 0],
       [96, 30, 0.2, 1.3],
       [100, 86, 0.16, 2.4],
-    ].map(
-      ([x, y, s, delay]): MotifLayer => ({
-        paths: [{ d: heartShape(x!, y!, s!), fill: 'line', opacity: 0.8 }],
-        motion: 'rise',
-        origin: [x!, y!],
-        delay,
-        detail: true,
-      }),
-    ),
+    ].map(([x, y, s, delay]): MotifLayer => ({
+      paths: [{ d: heartShape(x!, y!, s!), fill: 'line', opacity: 0.8 }],
+      motion: 'rise',
+      origin: [x!, y!],
+      delay,
+      detail: true,
+    })),
   ],
 };
 
@@ -1505,21 +1492,19 @@ const leaf: Motif = {
     ...[
       [22, 28, 0],
       [98, 72, 2],
-    ].map(
-      ([x, y, delay]): MotifLayer => ({
-        paths: [
-          {
-            d: `M${pt(x!, y!)}C${pt(x! + 6, y! - 2)} ${pt(x! + 9, y! + 4)} ${pt(x! + 8, y! + 8)}C${pt(x! + 2, y! + 8)} ${pt(x! - 2, y! + 4)} ${pt(x!, y!)}Z`,
-            fill: 'soft',
-            stroke: 'line',
-          },
-        ],
-        motion: 'fall',
-        origin: [x! + 4, y! + 4],
-        delay,
-        detail: true,
-      }),
-    ),
+    ].map(([x, y, delay]): MotifLayer => ({
+      paths: [
+        {
+          d: `M${pt(x!, y!)}C${pt(x! + 6, y! - 2)} ${pt(x! + 9, y! + 4)} ${pt(x! + 8, y! + 8)}C${pt(x! + 2, y! + 8)} ${pt(x! - 2, y! + 4)} ${pt(x!, y!)}Z`,
+          fill: 'soft',
+          stroke: 'line',
+        },
+      ],
+      motion: 'fall',
+      origin: [x! + 4, y! + 4],
+      delay,
+      detail: true,
+    })),
   ],
 };
 
@@ -1535,28 +1520,29 @@ const thali: Motif = {
         { d: circle(74, 40, 6.8), fill: '#f08c3a' },
         { d: circle(88, 64, 7.2), fill: '#fff4e0' },
         { d: circle(50, 76, 15), stroke: 'line', fill: 'light', opacity: 0.9 },
-        { d: circle(45, 72, 1) + circle(54, 70, 1) + circle(50, 80, 1) + circle(57, 79, 1), fill: 'line' },
+        {
+          d: circle(45, 72, 1) + circle(54, 70, 1) + circle(50, 80, 1) + circle(57, 79, 1),
+          fill: 'line',
+        },
         { d: 'M70 82C70 74 88 73 88 83C88 89 70 89 70 82Z', fill: '#ffffff', stroke: 'line' },
       ],
     },
     ...[
       [42, 0],
       [74, 1.2],
-    ].map(
-      ([x, delay]): MotifLayer => ({
-        paths: [
-          {
-            d: `M${pt(x!, 30)}C${pt(x! - 4, 24)} ${pt(x! + 4, 20)} ${pt(x!, 14)}`,
-            stroke: 'line',
-            opacity: 0.7,
-          },
-        ],
-        motion: 'rise',
-        origin: [x!, 22],
-        delay,
-        detail: true,
-      }),
-    ),
+    ].map(([x, delay]): MotifLayer => ({
+      paths: [
+        {
+          d: `M${pt(x!, 30)}C${pt(x! - 4, 24)} ${pt(x! + 4, 20)} ${pt(x!, 14)}`,
+          stroke: 'line',
+          opacity: 0.7,
+        },
+      ],
+      motion: 'rise',
+      origin: [x!, 22],
+      delay,
+      detail: true,
+    })),
   ],
 };
 
@@ -1612,19 +1598,17 @@ const confetti: Motif = {
         [90, 74, '#ff6b8b', 4.5, 25],
         [52, 88, '#4dd4ac', 5.2, -60],
       ] as const
-    ).map(
-      ([x, y, color, delay, turn]): MotifLayer => ({
-        paths: [
-          {
-            d: ellipse(x, y, 5, 2.4, turn),
-            fill: color,
-          },
-        ],
-        motion: 'fall',
-        origin: [x, y],
-        delay,
-      }),
-    ),
+    ).map(([x, y, color, delay, turn]): MotifLayer => ({
+      paths: [
+        {
+          d: ellipse(x, y, 5, 2.4, turn),
+          fill: color,
+        },
+      ],
+      motion: 'fall',
+      origin: [x, y],
+      delay,
+    })),
     {
       paths: [
         {

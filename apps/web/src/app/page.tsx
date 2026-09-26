@@ -17,13 +17,14 @@ import { getCurrentUser } from '@/lib/auth';
 import { season } from '@/lib/season';
 import { cn } from '@/lib/utils';
 import { DemoVideo } from './demo-video';
-import { Garland, Sparkles } from './festive';
+import { Sparkles } from './festive';
 import { display } from './_landing/font';
 import { FundToy } from './_landing/fund-toy';
 import {
   FestivalPicker,
   FestivalTheme,
   ThemeToast,
+  SeasonTrim,
   ThemedRangoli,
   type ThemeOption,
 } from './_landing/theme';
@@ -197,7 +198,7 @@ export default async function LandingPage(props: PageProps<'/'>) {
     >
       <FestivalTheme season={current} options={options}>
         <div className="bg-[var(--festival-wash)]">
-          <Garland id="garland-top" />
+          <SeasonTrim id="garland-top" />
         </div>
         <header className="border-border-base/60 sticky top-0 z-30 border-b bg-[var(--festival-wash)]/85 backdrop-blur-md">
           <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-2.5">
@@ -450,7 +451,7 @@ export default async function LandingPage(props: PageProps<'/'>) {
         </main>
 
         <footer className="bg-[var(--festival-wash)]">
-          <Garland id="garland-foot" />
+          <SeasonTrim id="garland-foot" />
           <div className="text-ink-muted mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 pt-6 pb-10 text-sm">
             <span className="font-display text-ink font-semibold">Samudaya</span>
             <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">

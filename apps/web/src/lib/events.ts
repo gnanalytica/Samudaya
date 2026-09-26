@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import { notFound } from 'next/navigation';
-import { normalizeStats } from '@samudaya/core';
+import { festivalFor, normalizeStats } from '@samudaya/core';
+import { getCatalogue } from './catalogue';
 import { getSupabase } from './supabase/server';
 import { rowsOf } from './rows';
 
@@ -58,6 +59,27 @@ export const listEvents = cache(async (communityId: string) => {
     .order('starts_on', { ascending: false })
     .limit(100);
   return data ?? [];
+});
+
+/**
+ * What the society is heading towards: the next published event — the soonest
+ * still to come, else any — and the look it wears. The app's shell takes that
+ * look, so opening the app in October looks like October, and the home page
+ * leads with the event.
+ */
+export const getSeason = cache(async (communityId: string, today: string) => {
+  const published = (await listEvents(communityId)).filter((event) => event.status === 'published');
+  const next =
+    published
+      .filter((event) => event.kind === 'event' && event.starts_on >= today)
+      .sort((a, b) => a.starts_on.localeCompare(b.starts_on))[0] ??
+    published.find((event) => event.kind === 'event') ??
+    published[0] ??
+    null;
+  const type = next?.event_type_id
+    ? (await getCatalogue(communityId)).event_type.find((item) => item.id === next.event_type_id)
+    : undefined;
+  return { next, published, festival: festivalFor(type?.label, next?.name) };
 });
 
 /** Stats for a list of events in one round trip, keyed by event id. */

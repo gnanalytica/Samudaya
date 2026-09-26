@@ -9,6 +9,7 @@ import {
   headingTowards,
   heroGradient,
   parseOklch,
+  wearsGarland,
 } from '../src';
 
 describe('festivalFor', () => {
@@ -212,6 +213,24 @@ describe('every look', () => {
       expect(contrastRatio('oklch(1 0 0)', middle), festival.id).toBeGreaterThanOrEqual(4.5);
       expect(parseOklch(deep)[0]).toBeLessThan(parseOklch(middle)[0]);
       expect(parseOklch(middle)[0]).toBeLessThan(parseOklch(glow)[0]);
+    }
+  });
+});
+
+describe('the garland', () => {
+  it('is hung for the festivals a doorway is dressed that way for, and no others', () => {
+    for (const name of ['Deepavali', 'Ganesh Chaturthi', 'Onam', 'Guru Nanak Jayanti', 'Navroz']) {
+      expect(wearsGarland(festivalFor(null, name)), name).toBe(true);
+    }
+    for (const name of [
+      'Eid',
+      'Christmas',
+      'Easter',
+      'Buddha Purnima',
+      'Republic Day',
+      'New Year',
+    ]) {
+      expect(wearsGarland(festivalFor(null, name)), name).toBe(false);
     }
   });
 });
