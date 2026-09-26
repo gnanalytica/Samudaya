@@ -3,14 +3,12 @@ import { today as localToday } from '../../src/components/date-field';
 import { useRouter } from 'expo-router';
 import {
   EVENT_STATUS_LABEL,
-  alreadyInFundLine,
-  awaitingLine,
   can,
   countdown,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { fetchEvents, fetchStats } from '../../src/lib/events';
@@ -26,7 +24,7 @@ import {
   Loading,
   Screen,
 } from '../../src/components/ui';
-import { Meter } from '../../src/components/event-ui';
+import { FundKey, Meter } from '../../src/components/event-ui';
 import { spacing } from '../../src/lib/theme';
 
 export default function Events() {
@@ -117,15 +115,15 @@ export default function Events() {
           </View>
         )}
         renderItem={({ item }) => {
+          const target = item.stats?.fundTarget ?? item.fund_target;
           const fundBar = fundBarSegments(
             item.stats?.fundRaised ?? 0,
             item.stats?.fundPending ?? 0,
-            item.stats?.fundTarget ?? 0,
+            target,
             item.stats?.fundCarried ?? 0,
           );
           const funded = fundBar.confirmed;
-          const waiting = awaitingLine(item.stats?.fundPending ?? 0, currency);
-          const inFund = alreadyInFundLine(item.stats?.fundCarried ?? 0, null, currency);
+          const held = inTheFund(item.stats?.fundRaised ?? 0, item.stats?.fundCarried ?? 0);
           return (
             <Pressable
               accessibilityRole="button"
@@ -169,14 +167,7 @@ export default function Events() {
                   <View style={{ gap: 2 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Caption>
-                        {formatMoney(item.stats?.fundRaised ?? 0, currency)} of{' '}
-                        {formatMoney(
-                          fundAsk(
-                            item.stats?.fundTarget ?? item.fund_target,
-                            item.stats?.fundCarried ?? 0,
-                          ),
-                          currency,
-                        )}
+                        {formatMoney(held, currency)} of {formatMoney(target, currency)}
                       </Caption>
                       <Caption>{funded}%</Caption>
                     </View>
@@ -186,10 +177,11 @@ export default function Events() {
                       tone="success"
                       label="Fund progress"
                     />
-                    {/* The headline counts confirmed money only; say what the
-                        paler segment is, and that money carried in is there. */}
-                    {waiting ? <Caption>{waiting}</Caption> : null}
-                    {inFund ? <Caption>{inFund}</Caption> : null}
+                    <FundKey
+                      confirmed={held}
+                      pending={item.stats?.fundPending ?? 0}
+                      currency={currency}
+                    />
                   </View>
                 ) : item.status === 'proposed' ? (
                   <Caption>Target {formatMoney(item.fund_target, currency)}</Caption>

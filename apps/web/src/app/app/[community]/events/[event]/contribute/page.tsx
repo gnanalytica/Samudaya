@@ -1,13 +1,19 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { notFound } from 'next/navigation';
-import { can, formatDate, formatMoney, fundAsk, fundBarSegments, unitLabel } from '@samudaya/core';
+import {
+  can,
+  formatDate,
+  formatMoney,
+  fundBarSegments,
+  inTheFund,
+  unitLabel,
+} from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getSupabase } from '@/lib/supabase/server';
-import { getCarriedInto, getEventStats, requireEvent } from '@/lib/events';
-import { CarriedIn } from '@/components/carried-in';
+import { getEventStats, requireEvent } from '@/lib/events';
 import { PageBody, PageHeader } from '@/components/page-header';
-import { FundBar, PaymentStatusBadge } from '@/components/badges';
+import { FundBar, FundKey, PaymentStatusBadge } from '@/components/badges';
 import { Card, CardBody, CardHeader } from '@/components/ui/card';
 import { ContributeForm } from './contribute-form';
 
@@ -25,7 +31,7 @@ export default async function ContributePage(
   if (event.status !== 'published' || !can(role, 'contribute')) notFound();
 
   const supabase = await getSupabase();
-  const [stats, flat, allFlats, mine, carriedIn] = await Promise.all([
+  const [stats, flat, allFlats, mine] = await Promise.all([
     getEventStats(event.id),
     unitIds[0]
       ? supabase.from('units').select('block, number').eq('id', unitIds[0]).maybeSingle()
@@ -49,7 +55,6 @@ export default async function ContributePage(
       .eq('event_id', event.id)
       .eq('membership_id', membership.id)
       .order('paid_at', { ascending: false }),
-    getCarriedInto(event.id),
   ]);
   const bar = fundBarSegments(
     stats.fundRaised,
@@ -58,6 +63,7 @@ export default async function ContributePage(
     stats.fundCarried,
   );
   const funded = bar.confirmed;
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
 
   const suggested = Number.parseInt(typeof amount === 'string' ? amount : '', 10);
 
@@ -80,33 +86,20 @@ export default async function ContributePage(
           <div className="border-border-base bg-surface-sunken mb-5 rounded-xl border p-4">
             <div className="text-ink-muted flex justify-between text-sm font-medium">
               <span>
-                {formatMoney(stats.fundRaised, community.currency)} of{' '}
-                {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), community.currency)}
+                {formatMoney(held, community.currency)} of{' '}
+                {formatMoney(stats.fundTarget, community.currency)}
               </span>
               <span>{funded}%</span>
             </div>
             <div className="mt-2">
               <FundBar percent={funded} pendingPercent={bar.pending} />
             </div>
-            <CarriedIn
-              target={stats.fundTarget}
-              carried={stats.fundCarried}
-              movements={carriedIn}
+            <FundKey
+              confirmed={held}
+              pending={stats.fundPending}
               currency={community.currency}
+              className="mt-2"
             />
-            <p className="text-ink-subtle mt-2 text-xs">
-              Confirmed payments only, from {stats.contributors}{' '}
-              {stats.contributors === 1 ? 'household' : 'households'}.
-              {stats.fundPending > 0 ? (
-                <>
-                  {' '}
-                  {formatMoney(stats.fundPending, community.currency)} more reported by{' '}
-                  {stats.pendingContributors}{' '}
-                  {stats.pendingContributors === 1 ? 'household' : 'households'}, waiting to be
-                  confirmed.
-                </>
-              ) : null}
-            </p>
           </div>
 
           {community.upi_vpa && community.upi_payee_name ? (

@@ -13,22 +13,20 @@ import {
 } from 'lucide-react';
 import {
   COPY,
-  alreadyInFundLine,
-  awaitingLine,
   can,
-  carriedDeciders,
   countdown,
   festivalFor,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  fundKey,
   headingTowards,
+  inTheFund,
   todayIn,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { getTodoItems } from '@/lib/todo';
-import { getCarriedInto, getSocietyBalance, getIdeas, listEvents, getStatsFor } from '@/lib/events';
+import { getSocietyBalance, getIdeas, listEvents, getStatsFor } from '@/lib/events';
 import { getCatalogue } from '@/lib/catalogue';
 import { bottomNavItems } from '@/components/nav-items';
 import { FestivalHeader, Rangoli, festivalVars } from '@/components/festival';
@@ -37,7 +35,7 @@ import { PageBody } from '@/components/page-header';
 import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
-import { StatTile, StatTiles } from '@/components/badges';
+import { FundKey, StatTile, StatTiles, stripes } from '@/components/badges';
 import { WelcomeCard } from '@/components/welcome-card';
 
 export default async function DashboardPage(props: PageProps<'/app/[community]'>) {
@@ -102,15 +100,9 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     next?.name,
   );
   const balance = await getSocietyBalance(community.id);
-  // Who put money behind the next event, named on its card: moving the
-  // society's money is one committee member's decision, and the card that
-  // shows its effect says whose.
-  const carriedBy =
-    next && (s?.fundCarried ?? 0) > 0 ? carriedDeciders(await getCarriedInto(next.id)) : null;
-  // The card leads with confirmed money only. Without these it read "₹0 of
-  // ₹1,93,010 raised" over an event holding ₹6,990 with ₹20,500 more reported.
-  const waiting = awaitingLine(s?.fundPending ?? 0, community.currency);
-  const inFund = alreadyInFundLine(s?.fundCarried ?? 0, carriedBy, community.currency);
+  // What the fund holds, carried money included: the card's headline, and the
+  // bar's solid part. Where carried money came from is a row on the event.
+  const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0);
   // Every idea in the society, an event's as much as its own: a vote you have
   // not cast is a vote you have not cast, and this used to count only half of
   // them because the other half lived on their event's page.
@@ -225,12 +217,10 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                 </p>
                 <div className="relative mt-4 flex justify-between text-xs font-medium text-white/80">
                   <span>
-                    {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
-                    {formatMoney(
-                      fundAsk(s?.fundTarget ?? 0, s?.fundCarried ?? 0),
-                      community.currency,
-                    )}{' '}
-                    raised
+                    <span className="text-sm font-semibold text-white">
+                      {formatMoney(held, community.currency)}
+                    </span>{' '}
+                    of {formatMoney(s?.fundTarget ?? 0, community.currency)}
                   </span>
                   <span>{funded}%</span>
                 </div>
@@ -243,23 +233,30 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   aria-label="Fund progress"
                   aria-valuetext={[
                     `${funded}% confirmed`,
-                    bar.pending > 0 ? `${bar.pending}% waiting to be confirmed` : null,
+                    bar.pending > 0 ? `${bar.pending}% to be confirmed` : null,
                   ]
                     .filter(Boolean)
                     .join(', ')}
                 >
-                  <div className="h-full bg-white/85" style={{ width: `${funded}%` }} />
-                  {/* Reported and not yet confirmed, paler, as FundBar draws it. */}
+                  <div className="h-full bg-white/90" style={{ width: `${funded}%` }} />
+                  {/* Reported and not yet confirmed: striped, as FundBar draws it. */}
                   {bar.pending > 0 ? (
-                    <div className="h-full bg-white/40" style={{ width: `${bar.pending}%` }} />
+                    <div
+                      className="h-full"
+                      style={{
+                        width: `${bar.pending}%`,
+                        backgroundImage: stripes('rgb(255 255 255 / 0.9)'),
+                      }}
+                    />
                   ) : null}
                 </div>
-                {waiting || inFund ? (
-                  <div className="relative mt-1.5 space-y-0.5 text-xs text-white/75">
-                    {waiting ? <p>{waiting}</p> : null}
-                    {inFund ? <p>{inFund}</p> : null}
-                  </div>
-                ) : null}
+                <FundKey
+                  confirmed={held}
+                  pending={s?.fundPending ?? 0}
+                  currency={community.currency}
+                  onColor
+                  className="relative mt-2"
+                />
                 <div className="relative mt-4 flex flex-wrap gap-2">
                   <ButtonLink
                     href={`${base}/events/${next.slug}`}
@@ -344,12 +341,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   cs?.fundTarget ?? 0,
                   cs?.fundCarried ?? 0,
                 ).confirmed;
-                const note = [
-                  awaitingLine(cs?.fundPending ?? 0, community.currency),
-                  alreadyInFundLine(cs?.fundCarried ?? 0, null, community.currency),
-                ]
-                  .filter(Boolean)
-                  .join(' · ');
+                const note = fundKey(0, cs?.fundPending ?? 0, community.currency).pending;
                 return (
                   <Link
                     key={campaign.id}
@@ -363,11 +355,11 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                       <span className="text-ink-muted">{pct}%</span>
                     </div>
                     <p className="text-ink-subtle mt-1 text-xs">
-                      {formatMoney(cs?.fundRaised ?? 0, community.currency)} of{' '}
                       {formatMoney(
-                        fundAsk(cs?.fundTarget ?? 0, cs?.fundCarried ?? 0),
+                        inTheFund(cs?.fundRaised ?? 0, cs?.fundCarried ?? 0),
                         community.currency,
-                      )}
+                      )}{' '}
+                      of {formatMoney(cs?.fundTarget ?? 0, community.currency)}
                     </p>
                     {note ? <p className="text-ink-subtle mt-0.5 text-xs">{note}</p> : null}
                   </Link>

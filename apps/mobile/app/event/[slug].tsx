@@ -6,16 +6,14 @@ import {
   COPY,
   EVENT_STATUS_LABEL,
   EVENT_TABS,
-  awaitingLine,
   can,
   carriedFromLine,
-  carriedInLine,
   correctionNote,
   countdown,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
   type EventTab,
   type FundRule,
 } from '@samudaya/core';
@@ -38,7 +36,7 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, Segmented } from '../../src/components/admin-ui';
 import { FUND_RULE_PLAIN } from '../../src/components/event-form';
-import { KeyValue, Meter, StatTile } from '../../src/components/event-ui';
+import { FundKey, KeyValue, Meter, StatTile } from '../../src/components/event-ui';
 import { Suggestions } from '../../src/components/suggestions';
 import { ViewFileButton } from '../../src/components/file-ui';
 import { spacing } from '../../src/lib/theme';
@@ -77,17 +75,12 @@ export default function EventDetail() {
   }
 
   const { event, stats } = data;
-  const fundBar = fundBarSegments(
-    stats.fundRaised,
-    stats.fundPending,
-    stats.fundTarget,
-    stats.fundCarried,
-  );
-  const funded = fundBar.confirmed;
-  // What residents are asked for, which is what the fund card leads with: the
-  // target less anything the committee carried across (see fundAsk).
   const target = stats.fundTarget || event.fund_target;
-  const carried = carriedInLine(target, stats.fundCarried, currency);
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, target, stats.fundCarried);
+  const funded = fundBar.confirmed;
+  // What the fund holds, carried money included: the headline, against the
+  // event's target. Carried sums are rows under the bar, with who moved them.
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const open = event.status === 'published';
 
   const changed = () => {
@@ -140,22 +133,18 @@ export default function EventDetail() {
           <>
             <Card style={{ gap: spacing.md }}>
               <Heading>Fund</Heading>
-              <Title>{formatMoney(stats.fundRaised, currency)}</Title>
-              <Caption>
-                raised of {formatMoney(fundAsk(target, stats.fundCarried), currency)}
-              </Caption>
+              <Title>{formatMoney(held, currency)}</Title>
+              <Caption>of {formatMoney(target, currency)}</Caption>
               <Meter
                 percent={funded}
                 pendingPercent={fundBar.pending}
                 tone="success"
                 label="Fund progress"
               />
-              {carried ? <Caption>{carried}</Caption> : null}
-              {carried
-                ? data.carriedIn.map((movement) => (
-                    <Caption key={movement.id}>{carriedFromLine(movement, currency)}</Caption>
-                  ))
-                : null}
+              <FundKey confirmed={held} pending={stats.fundPending} currency={currency} />
+              {data.carriedIn.map((movement) => (
+                <Caption key={movement.id}>+ {carriedFromLine(movement, currency)}</Caption>
+              ))}
               <View style={{ gap: spacing.xs }}>
                 <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
                 <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
@@ -216,14 +205,9 @@ function About({
   onMoney: () => void;
 }) {
   const { event, stats } = data;
-  const fundBar = fundBarSegments(
-    stats.fundRaised,
-    stats.fundPending,
-    stats.fundTarget,
-    stats.fundCarried,
-  );
   const target = stats.fundTarget || event.fund_target;
-  const carried = carriedInLine(target, stats.fundCarried, currency);
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, target, stats.fundCarried);
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const dates =
     event.ends_on && event.ends_on !== event.starts_on
       ? `${formatDate(event.starts_on)} – ${formatDate(event.ends_on)}`
@@ -262,8 +246,7 @@ function About({
             <Caption>See where it went ›</Caption>
           </View>
           <Caption>
-            {formatMoney(stats.fundRaised, currency)} raised of{' '}
-            {formatMoney(fundAsk(target, stats.fundCarried), currency)}
+            {formatMoney(held, currency)} of {formatMoney(target, currency)}
           </Caption>
           <Meter
             percent={fundBar.confirmed}
@@ -271,20 +254,7 @@ function About({
             tone="success"
             label="Fund progress"
           />
-          {stats.fundPending > 0 ? (
-            <Caption>{awaitingLine(stats.fundPending, currency)}</Caption>
-          ) : null}
-          {/* Money the society already had, moved here by the committee. Said
-              out loud rather than folded into the raised figure: "sixty flats
-              gave ₹30,000" and "the committee moved ₹10,000 across from last
-              year" are different sentences — and each sum carries the name of
-              the committee member who moved it. */}
-          {carried ? <Caption>{carried}</Caption> : null}
-          {carried
-            ? data.carriedIn.map((movement) => (
-                <Caption key={movement.id}>{carriedFromLine(movement, currency)}</Caption>
-              ))
-            : null}
+          <FundKey confirmed={held} pending={stats.fundPending} currency={currency} />
         </Card>
       </Pressable>
     </>

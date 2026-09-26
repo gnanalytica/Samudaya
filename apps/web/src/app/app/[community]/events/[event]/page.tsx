@@ -21,8 +21,8 @@ import {
   formatDate,
   festivalFor,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
   receiptRef,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
@@ -49,6 +49,7 @@ import {
   EventStatusBadge,
   ExpenseStatusBadge,
   FundBar,
+  FundKey,
   PaymentStatusBadge,
   StatTile,
   StatTiles,
@@ -115,9 +116,9 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
     stats.fundCarried,
   );
   const funded = bar.confirmed;
-  // What residents are asked for, which is what the fund cards lead with: the
-  // target less anything the committee carried across (see fundAsk).
-  const ask = fundAsk(stats.fundTarget, stats.fundCarried);
+  // What the fund holds, carried money included: what every fund card leads
+  // with, against the event's target.
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
@@ -277,19 +278,19 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
             >
               <div className="text-ink-muted flex justify-between text-sm font-medium">
                 <span>
-                  {formatMoney(stats.fundRaised, community.currency)} of{' '}
-                  {formatMoney(ask, community.currency)} raised
+                  {formatMoney(held, community.currency)} of{' '}
+                  {formatMoney(stats.fundTarget, community.currency)}
                 </span>
                 <span>{funded}%</span>
               </div>
               <div className="mt-2">
                 <FundBar percent={funded} pendingPercent={bar.pending} />
               </div>
-              <CarriedIn
-                target={stats.fundTarget}
-                carried={stats.fundCarried}
-                movements={carriedIn}
+              <FundKey
+                confirmed={held}
+                pending={stats.fundPending}
                 currency={community.currency}
+                className="mt-2"
               />
               <p className="text-accent mt-2 text-xs">See where the money goes</p>
             </Link>
@@ -334,10 +335,10 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <p className="text-ink text-2xl font-semibold tracking-tight">
-                      {formatMoney(stats.fundRaised, community.currency)}
+                      {formatMoney(held, community.currency)}
                     </p>
                     <p className="text-ink-muted text-sm">
-                      raised of {formatMoney(ask, community.currency)} · {stats.contributors}{' '}
+                      of {formatMoney(stats.fundTarget, community.currency)} · {stats.contributors}{' '}
                       {stats.contributors === 1 ? 'household' : COPY.households.toLowerCase()} gave
                     </p>
                   </div>
@@ -354,23 +355,17 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <div className="mt-3">
                   <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
-                {stats.fundPending > 0 ? (
-                  <p className="text-ink-subtle mt-2 text-xs">
-                    {formatMoney(stats.fundPending, community.currency)} more reported, waiting to
-                    be confirmed.
-                  </p>
-                ) : null}
-                {/* Money the society already had, moved here by the committee,
-                    and who moved it. */}
-                <CarriedIn
-                  target={stats.fundTarget}
-                  carried={stats.fundCarried}
-                  movements={carriedIn}
+                <FundKey
+                  confirmed={held}
+                  pending={stats.fundPending}
                   currency={community.currency}
+                  className="mt-2"
                 />
+                {/* Money the committee carried in: a row each, with who moved it. */}
+                <CarriedIn movements={carriedIn} currency={community.currency} />
                 <StatTiles className="mt-4 gap-2">
                   <StatTile
-                    label="Raised"
+                    label="From residents"
                     value={formatMoney(stats.fundRaised, community.currency)}
                   />
                   <StatTile label="Spent" value={formatMoney(stats.spent, community.currency)} />

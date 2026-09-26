@@ -13,16 +13,11 @@ import {
   fundAsk,
   fundBarSegments,
   fundedPercent,
+  inTheFund,
   normalizeStats,
   stillNeeded,
 } from '../src/events';
-import {
-  alreadyInFundLine,
-  awaitingLine,
-  carriedDeciders,
-  carriedFromLine,
-  carriedInLine,
-} from '../src/funds';
+import { carriedFromLine, fundKey } from '../src/funds';
 
 /**
  * Two things a resident sees on the way to paying: what the bar says has been
@@ -54,24 +49,22 @@ describe('fundBarSegments', () => {
     expect(fundBarSegments(5_000, 1_000, 0)).toEqual({ confirmed: 0, pending: 0 });
   });
 
-  it('agrees with its own percentage when money has been carried in', () => {
-    // The event Arkala's committee reported: ₹6,990 carried into a ₹2,00,000
-    // target and nothing contributed yet. The bar used to draw the carry as a
-    // sliver over a "0%"; measured against what residents are asked for, the
-    // bar and the percentage are the same number.
-    expect(fundBarSegments(0, 0, 200_000, 6_990)).toEqual({ confirmed: 0, pending: 0 });
-  });
-
-  it('measures contributions against what residents are asked for, not the target', () => {
-    // ₹10,000 carried into ₹1,00,000 leaves ₹90,000 to ask for; ₹30,000 of
-    // that is a third, not 30%. The carry itself is never a contribution.
-    const bar = fundBarSegments(30_000, 0, 100_000, 10_000);
-    expect(bar).toEqual({ confirmed: 33, pending: 0 });
+  it('counts money carried in as confirmed, and measures against the target', () => {
+    // Velocity vipers: ₹6,990 carried into a ₹2,00,000 target, nothing
+    // confirmed from residents, ₹20,500 reported. The card reads "₹6,990 of
+    // ₹2,00,000", so the bar's solid part is the same 3%, and the striped
+    // part after it is the ₹20,500.
+    expect(fundBarSegments(0, 20_500, 200_000, 6_990)).toEqual({ confirmed: 3, pending: 10 });
+    expect(fundBarSegments(30_000, 0, 100_000, 10_000)).toEqual({ confirmed: 40, pending: 0 });
   });
 
   it('keeps both inside the bar when carried money and contributions pass the target', () => {
     const bar = fundBarSegments(90_000, 30_000, 100_000, 40_000);
     expect(bar).toEqual({ confirmed: 100, pending: 0 });
+  });
+
+  it('does not count money the event carried out', () => {
+    expect(fundBarSegments(30_000, 0, 100_000, -10_000)).toEqual({ confirmed: 30, pending: 0 });
   });
 
   it('fills the bar when money carried across covers the whole target', () => {
@@ -306,28 +299,6 @@ describe('what residents are asked for', () => {
   it('is nothing rather than negative when the carry covers the target', () => {
     expect(fundAsk(5_000, 10_000)).toBe(0);
   });
-
-  it('says in words how the card reached the figure it leads with', () => {
-    expect(carriedInLine(200_000, 6_990)).toBe(
-      '₹6,990 of the ₹2,00,000 target was carried across by the committee, so residents are asked for ₹1,93,010.',
-    );
-  });
-
-  it('says so when the carry covers the whole target', () => {
-    expect(carriedInLine(5_000, 10_000)).toBe(
-      '₹10,000 carried across by the committee covers the whole ₹5,000 target, so residents are not asked for anything.',
-    );
-  });
-
-  it('says nothing about an event that nothing was carried into', () => {
-    expect(carriedInLine(200_000, 0)).toBeNull();
-    expect(carriedInLine(200_000, -6_990)).toBeNull();
-  });
-
-  it('does not guess where money came from when the event has no target', () => {
-    // It can come from the society's kept balance as well as a closed event.
-    expect(carriedInLine(0, 6_990)).toBe('₹6,990 was carried across by the committee.');
-  });
 });
 
 /**
@@ -367,57 +338,30 @@ describe('carriedFromLine', () => {
   });
 });
 
-describe('carriedDeciders', () => {
-  const by = (full_name: string | null) => ({
-    kind: 'from_balance' as const,
-    amount: 1000,
-    decider: { profiles: { full_name } },
+/**
+ * What a fund card leads with and what its key says: money in the fund,
+ * carried money included, and what is still to be confirmed.
+ */
+describe('what the fund holds', () => {
+  it('is confirmed contributions plus money carried in', () => {
+    expect(inTheFund(0, 6_990)).toBe(6_990);
+    expect(inTheFund(20_500, 6_990)).toBe(27_490);
   });
 
-  it('names one member once, however many sums they moved', () => {
-    expect(carriedDeciders([by('Pranav Aditya'), by('Pranav Aditya')])).toBe('Pranav Aditya');
-  });
-
-  it('joins several as a sentence would', () => {
-    expect(carriedDeciders([by('Pranav Aditya'), by('Chitra Rao'), by('Bala Krishnan')])).toBe(
-      'Pranav Aditya, Chitra Rao and Bala Krishnan',
-    );
-  });
-
-  it('says nothing when nobody is recorded', () => {
-    expect(carriedDeciders([by(null)])).toBeNull();
-    expect(carriedDeciders([])).toBeNull();
+  it('does not take off money the event carried out', () => {
+    expect(inTheFund(30_000, -10_000)).toBe(30_000);
   });
 });
 
-/**
- * What a compact fund card says under its bar. It leads with confirmed money
- * only, so without these two lines an event with money reported and money
- * carried in read "₹0 of ₹1,93,010 raised" and looked empty.
- */
-describe('the lines under a fund card', () => {
-  it('says what has been reported and is waiting to be confirmed', () => {
-    expect(awaitingLine(20_500)).toBe('₹20,500 more reported, waiting to be confirmed');
+describe('fundKey', () => {
+  it('names both parts of the bar', () => {
+    expect(fundKey(6_990, 20_500)).toEqual({
+      confirmed: '₹6,990 confirmed',
+      pending: '₹20,500 to be confirmed',
+    });
   });
 
-  it('says nothing when nothing is waiting', () => {
-    expect(awaitingLine(0)).toBeNull();
-  });
-
-  it('says money carried across is already in the fund, and whose decision it was', () => {
-    expect(alreadyInFundLine(6_990, 'Pranav Aditya')).toBe(
-      '₹6,990 already in the fund, carried across by the committee · decided by Pranav Aditya',
-    );
-  });
-
-  it('leaves the name out when the card does not know it', () => {
-    expect(alreadyInFundLine(6_990)).toBe(
-      '₹6,990 already in the fund, carried across by the committee',
-    );
-  });
-
-  it('says nothing about an event that nothing was carried into, or that gave money away', () => {
-    expect(alreadyInFundLine(0, 'Pranav Aditya')).toBeNull();
-    expect(alreadyInFundLine(-6_990)).toBeNull();
+  it('leaves the striped half out when nothing is waiting', () => {
+    expect(fundKey(27_490, 0)).toEqual({ confirmed: '₹27,490 confirmed', pending: null });
   });
 });

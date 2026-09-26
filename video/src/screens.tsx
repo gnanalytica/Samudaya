@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Easing, interpolate, useCurrentFrame } from 'remotion';
 import { color, fontFamily, sec } from './theme';
 import { Rangoli, Toran, festive } from './festive';
@@ -16,7 +16,7 @@ import { Rangoli, Toran, festive } from './festive';
  *
  * The rule that keeps it from becoming a lie: every figure, label and rule
  * below is the one in `capture/harness/society/demo-data.ts`, which is the
- * data the filmed cut used. ₹24,500 of ₹27,200 here is ₹24,500 of ₹27,200
+ * data the filmed cut used. ₹32,300 of ₹35,000 here is ₹32,300 of ₹35,000
  * there. The layout is the app's mobile layout — a festival header, a scroll,
  * and the four-tab bar from `apps/web/src/components/sidebar-nav.tsx`. Nothing
  * here is a screen the product does not have or a number it would not show.
@@ -363,18 +363,38 @@ function Card({ children, style }: { children: ReactNode; style?: React.CSSPrope
  * carrying a meaning — under budget, short of volunteers — and a two-colour
  * bar says a full row is half one thing and half another.
  */
+/** The app's striped segment: money reported and not yet confirmed. */
+const stripes = (tone: string) =>
+  `repeating-linear-gradient(-45deg, ${tone} 0 4px, color-mix(in oklch, ${tone} 30%, transparent) 4px 8px)`;
+
+/** A fund key's swatch, beside its label. */
+const KEY_SWATCH: CSSProperties = {
+  display: 'inline-block',
+  width: 12,
+  height: 8,
+  borderRadius: 2,
+  marginRight: 6,
+  verticalAlign: 'middle',
+};
+
 function Bar({
   fraction,
+  pending = 0,
   tone = festive.accent,
   blend = false,
 }: {
   fraction: number;
+  /** Striped, after the solid part, as the app's fund bar draws it. */
+  pending?: number;
   tone?: string;
   blend?: boolean;
 }) {
+  const solid = Math.max(0, Math.min(1, fraction));
+  const waiting = Math.max(0, Math.min(1 - solid, pending));
   return (
     <div
       style={{
+        display: 'flex',
         height: 8,
         borderRadius: 999,
         backgroundColor: color.surfaceSunken,
@@ -383,12 +403,17 @@ function Bar({
     >
       <div
         style={{
-          width: `${Math.max(0, Math.min(1, fraction)) * 100}%`,
+          width: `${solid * 100}%`,
           height: '100%',
-          borderRadius: 999,
+          borderRadius: waiting > 0 ? '999px 0 0 999px' : 999,
           background: blend ? `linear-gradient(90deg, ${festive.ribbon}, ${tone})` : tone,
         }}
       />
+      {waiting > 0 ? (
+        <div
+          style={{ width: `${waiting * 100}%`, height: '100%', backgroundImage: stripes(tone) }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -461,21 +486,35 @@ export function HomeScreen() {
         style={{ opacity: rise(frame, 0), transform: `translateY(${(1 - rise(frame, 0)) * 12}px)` }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <span style={{ fontSize: 13, color: muted }}>Collected so far</span>
-          <span style={{ fontSize: 12, color: muted }}>of {rupees(27200)}</span>
+          <span style={{ fontSize: 13, color: muted }}>In the fund</span>
+          <span style={{ fontSize: 12, color: muted }}>of {rupees(35000)}</span>
         </div>
         <div
           style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.03em', margin: '2px 0 10px' }}
         >
-          {rupees(counted(frame, 24500))}
+          {rupees(counted(frame, 32300))}
         </div>
-        <Bar fraction={ramp(frame, sec(0.2), sec(1.3)) * (24500 / 27200)} blend />
-        <div style={{ fontSize: 12.5, color: muted, marginTop: 9 }}>18 of 24 flats have paid</div>
-        {/* The app's own line (app/app/[community]/page.tsx): the ₹35,000
-            target less the ₹7,800 the Balance shot moves in from Summer Camp,
-            so nobody is asked twice for money that is already there. */}
-        <div style={{ fontSize: 11.5, color: subtle, marginTop: 3 }}>
-          {rupees(7800)} already in the fund, carried across by the committee
+        {/* The app's card (app/app/[community]/page.tsx): what the fund holds,
+            the ₹7,800 the Balance shot moves in from Summer Camp included,
+            against the event's own target; striped, what is still to be
+            confirmed; a key in place of sentences. */}
+        <Bar
+          fraction={ramp(frame, sec(0.2), sec(1.3)) * (32300 / 35000)}
+          pending={ramp(frame, sec(0.8), sec(1.5)) * (2002 / 35000)}
+          blend
+        />
+        <div style={{ display: 'flex', gap: 12, fontSize: 11.5, color: subtle, marginTop: 9 }}>
+          <span>
+            <span style={{ ...KEY_SWATCH, background: festive.accent }} />
+            {rupees(32300)} confirmed
+          </span>
+          <span>
+            <span style={{ ...KEY_SWATCH, backgroundImage: stripes(festive.accent) }} />
+            {rupees(2002)} to be confirmed
+          </span>
+        </div>
+        <div style={{ fontSize: 12.5, color: muted, marginTop: 3 }}>
+          {rupees(24500)} from 18 of 24 flats
         </div>
       </Card>
       <div style={{ display: 'flex', gap: 10 }}>

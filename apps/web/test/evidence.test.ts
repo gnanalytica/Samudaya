@@ -168,55 +168,43 @@ describe('what the society kept', () => {
 describe('money moved behind an event', () => {
   /**
    * Only a committee member can move the society's money, and the database
-   * records who (fund_movements.decided_by). The Money page's history always
-   * named them; the event the money landed in said only "the committee", so a
-   * resident asked for ₹1,93,010 instead of ₹2,00,000 could not see on the
-   * event whose decision that was. Every screen that says money was carried
-   * in now says who carried it, and when.
+   * records who (fund_movements.decided_by). Money carried into an event is
+   * money in its fund like any other, so no card singles it out; the event
+   * gives it a row, with where it came from, who moved it and when.
    */
-  it('names who moved it, on every screen that says it was moved', () => {
+  it('gives each carried sum a row, with who moved it, on the event', () => {
     const component = read('web', 'src', 'components', 'carried-in.tsx');
     expect(component).toContain('carriedFromLine');
     for (const parts of [
       ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'page.tsx'],
-      ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'contribute', 'page.tsx'],
       ['web', 'src', 'app', 'app', '[community]', 'admin', 'events', '[event]', 'page.tsx'],
     ]) {
       const screen = read(...parts);
       expect(screen, parts.join('/')).toContain('<CarriedIn');
       expect(screen, parts.join('/')).toContain('getCarriedInto');
-      // The bare sentence, without the name, would be the old gap back.
-      expect(screen, parts.join('/')).not.toContain('carriedInLine(');
     }
     expect(read('mobile', 'app', 'event', '[slug].tsx')).toContain('carriedFromLine');
   });
 
-  it('names them on the home card of both apps too', () => {
-    expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain(
-      'carriedDeciders',
-    );
-    expect(read('mobile', 'app', '(tabs)', 'index.tsx')).toContain('carriedDeciders');
-  });
-
-  it('says on every compact fund card what is already in the fund and what is waiting', () => {
-    // Velocity vipers read "₹0 of ₹1,93,010 raised · After ₹6,990 carried
-    // across by the committee" while ₹6,990 sat in its fund and two households
-    // had reported ₹20,500 more. The ₹0 was true — confirmed money only — and
-    // the card said nothing about either sum being there.
+  it('counts it in the fund on every card, instead of a line of its own', () => {
+    // Velocity vipers read "₹0 of ₹1,93,010 raised", then two sentences about
+    // ₹6,990 carried in and ₹20,500 reported. A card now leads with what the
+    // fund holds against the event's own target, and a key says what the
+    // bar's solid and striped parts are.
     for (const parts of [
       ['web', 'src', 'app', 'app', '[community]', 'page.tsx'],
       ['web', 'src', 'app', 'app', '[community]', 'events', 'page.tsx'],
+      ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'page.tsx'],
+      ['web', 'src', 'app', 'app', '[community]', 'events', '[event]', 'contribute', 'page.tsx'],
       ['mobile', 'app', '(tabs)', 'index.tsx'],
       ['mobile', 'app', '(tabs)', 'events.tsx'],
+      ['mobile', 'app', 'event', '[slug].tsx'],
     ]) {
       const screen = read(...parts);
-      expect(screen, parts.join('/')).toContain('awaitingLine(');
-      expect(screen, parts.join('/')).toContain('alreadyInFundLine(');
-      expect(screen, parts.join('/')).not.toContain('After {formatMoney');
+      expect(screen, parts.join('/')).toContain('inTheFund(');
+      expect(screen, parts.join('/')).toContain('<FundKey');
+      expect(screen, parts.join('/')).not.toContain('carried across by');
     }
-    // The web home card draws its own bar on the festival colour; it has to
-    // draw the paler waiting segment the shared FundBar draws everywhere else.
-    expect(read('web', 'src', 'app', 'app', '[community]', 'page.tsx')).toContain('bar.pending');
   });
 });
 
@@ -244,12 +232,14 @@ describe('the fund bar', () => {
     expect(missing.map((parts) => parts.join('/'))).toEqual([]);
   });
 
-  it('leads with what residents are asked for, not the target, everywhere it is drawn', () => {
-    // An event holding ₹6,990 of a ₹2,00,000 target read "Target ₹2,00,000 ·
-    // 0%" over a bar with a sliver in it. The figure is fundAsk: the target
-    // less the carry, with the carry said in words beside it.
-    const missing = CALLERS.filter((parts) => !read(...parts).includes('fundAsk'));
+  it('leads with what the fund holds against the target, everywhere it is drawn', () => {
+    // Measured against the target less the carried money, a card put a figure
+    // like ₹1,93,010 on screen that was nobody's goal, and led with "₹0" over
+    // a fund holding ₹6,990. What the fund holds is inTheFund.
+    const missing = CALLERS.filter((parts) => !read(...parts).includes('inTheFund'));
     expect(missing.map((parts) => parts.join('/'))).toEqual([]);
+    const asking = CALLERS.filter((parts) => read(...parts).includes('fundAsk('));
+    expect(asking.map((parts) => parts.join('/'))).toEqual([]);
   });
 
   it('draws only what residents gave, never the carry as a segment of its own', () => {

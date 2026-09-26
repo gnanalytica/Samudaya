@@ -5,8 +5,8 @@ import {
   can,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
   nextEditionName,
   receiptRef,
   stillNeeded,
@@ -43,6 +43,7 @@ import {
   EventStatusBadge,
   ExpenseStatusBadge,
   FundBar,
+  FundKey,
   PaymentStatusBadge,
   StatTile,
   StatTiles,
@@ -138,6 +139,7 @@ export default async function ManageEventPage(
     stats.fundCarried,
   );
   const funded = bar.confirmed;
+  const held = inTheFund(stats.fundRaised, stats.fundCarried);
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
   const open = expenses.filter((e) => e.status === 'pending' || e.status === 'changes_requested');
@@ -211,37 +213,31 @@ export default async function ManageEventPage(
             </div>
             <Card>
               <CardBody>
-                {/* Leads with what residents are asked for, not the target:
-                    money the committee carried across has already come off
-                    it. It is never a contribution either, so the line under
-                    the bar says in words where the difference went. */}
+                {/* What the fund holds, carried money included, against the
+                    event's target; striped, what is still to be confirmed. */}
                 <div className="text-ink-muted flex justify-between text-sm font-medium">
                   <span>
-                    {formatMoney(stats.fundRaised, community.currency)} of{' '}
-                    {formatMoney(fundAsk(stats.fundTarget, stats.fundCarried), community.currency)}{' '}
-                    raised
+                    {formatMoney(held, community.currency)} of{' '}
+                    {formatMoney(stats.fundTarget, community.currency)}
                   </span>
                   <span>{funded}%</span>
                 </div>
                 <div className="mt-2">
                   <FundBar percent={funded} pendingPercent={bar.pending} />
                 </div>
-                {stats.fundCarried > 0 ? (
-                  <CarriedIn
-                    target={stats.fundTarget}
-                    carried={stats.fundCarried}
-                    movements={carriedIn}
-                    currency={community.currency}
-                  />
-                ) : stats.fundCarried < 0 ? (
+                <FundKey
+                  confirmed={held}
+                  pending={stats.fundPending}
+                  currency={community.currency}
+                  className="mt-2"
+                />
+                <CarriedIn movements={carriedIn} currency={community.currency} />
+                {stats.fundCarried < 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
                     {`${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
                   </p>
                 ) : null}
-                {/* With money carried in and nothing raised yet, the line above
-                    has just said what residents are asked for; saying the same
-                    figure again as "still to raise" reads as a second number. */}
-                {!closed && (stats.fundCarried <= 0 || stats.fundRaised > 0) ? (
+                {!closed ? (
                   <p className="text-ink-subtle mt-1 text-xs">
                     {formatMoney(
                       stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),

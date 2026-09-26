@@ -1,15 +1,13 @@
 import Link from 'next/link';
 import { CalendarDays, CheckCircle2, Megaphone, Plus } from 'lucide-react';
 import {
-  alreadyInFundLine,
-  awaitingLine,
   can,
   countdown,
   festivalFor,
   formatDate,
   formatMoney,
-  fundAsk,
   fundBarSegments,
+  inTheFund,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
 import { listEvents, getStatsFor } from '@/lib/events';
@@ -20,7 +18,7 @@ import { Card } from '@/components/ui/card';
 import { ButtonLink } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { EventStatusBadge, FundBar } from '@/components/badges';
+import { EventStatusBadge, FundBar, FundKey } from '@/components/badges';
 
 export const metadata = { title: 'Events' };
 
@@ -56,8 +54,7 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
       s?.fundCarried ?? 0,
     );
     const funded = bar.confirmed;
-    const waiting = awaitingLine(s?.fundPending ?? 0, community.currency);
-    const inFund = alreadyInFundLine(s?.fundCarried ?? 0, null, community.currency);
+    const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0);
     // A list of events should look like a year, not like a spreadsheet: each
     // card carries its own festival's colour down its edge.
     const festival = festivalFor(typeLabel.get(event.event_type_id ?? ''), event.name);
@@ -88,17 +85,19 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
           <div className="mt-4">
             <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
               <span>
-                {formatMoney(s?.fundRaised ?? 0, community.currency)} of{' '}
-                {formatMoney(fundAsk(s?.fundTarget ?? 0, s?.fundCarried ?? 0), community.currency)}{' '}
-                raised · {formatMoney(s?.spent ?? 0, community.currency)} spent
+                {formatMoney(held, community.currency)} of{' '}
+                {formatMoney(s?.fundTarget ?? 0, community.currency)} ·{' '}
+                {formatMoney(s?.spent ?? 0, community.currency)} spent
               </span>
               <span>{funded}%</span>
             </div>
             <FundBar percent={funded} pendingPercent={bar.pending} />
-            {/* The headline counts confirmed money only; say what the paler
-                segment is, and that money carried in is already there. */}
-            {waiting ? <p className="text-ink-subtle mt-2 text-xs">{waiting}</p> : null}
-            {inFund ? <p className="text-ink-subtle mt-2 text-xs">{inFund}</p> : null}
+            <FundKey
+              confirmed={held}
+              pending={s?.fundPending ?? 0}
+              currency={community.currency}
+              className="mt-2"
+            />
             <p className="text-ink-subtle mt-2 text-xs">
               {s?.contributors ?? 0} households contributed · {s?.participants ?? 0} registered for
               activities
