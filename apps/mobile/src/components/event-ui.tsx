@@ -1,7 +1,17 @@
-import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useMemo } from 'react';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { fundKey } from '@samudaya/core';
 import { Body, Caption, Card } from './ui';
-import { radius, spacing } from '../lib/theme';
+import { useReducedMotion } from './motif';
+import { fonts, radius, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
 /**
@@ -51,26 +61,60 @@ export function Meter({
   label: string;
 }) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
   const clamped = Math.min(100, Math.max(0, percent));
   const pending = Math.min(100 - clamped, Math.max(0, pendingPercent));
   const fill = colors[tone];
+  // The filled part grows from nothing as the bar arrives, on the native
+  // thread; with reduced motion it is simply there.
+  const grow = useMemo(() => new Animated.Value(0), []);
+  useEffect(() => {
+    if (reduced) {
+      grow.setValue(1);
+      return;
+    }
+    const animation = Animated.timing(grow, {
+      toValue: 1,
+      duration: 1000,
+      delay: 150,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [grow, reduced]);
+  const filled = clamped + pending;
   return (
     <View
       accessibilityRole="progressbar"
       accessibilityLabel={label}
       accessibilityValue={{ min: 0, max: 100, now: clamped }}
       style={{
-        height: 8,
-        flexDirection: 'row',
+        height: 7,
         borderRadius: radius.pill,
         backgroundColor: colors.surfaceSunken,
         overflow: 'hidden',
       }}
     >
-      <View style={{ width: `${clamped}%`, height: '100%', backgroundColor: fill }} />
-      {pending > 0 ? (
-        <Stripes color={fill} style={{ width: `${pending}%`, height: '100%' }} />
-      ) : null}
+      <Animated.View
+        style={{
+          width: `${filled}%`,
+          height: '100%',
+          flexDirection: 'row',
+          transformOrigin: 'left',
+          transform: [{ scaleX: grow }],
+        }}
+      >
+        <View
+          style={{
+            width: filled ? `${(clamped / filled) * 100}%` : 0,
+            height: '100%',
+            backgroundColor: fill,
+            borderRadius: radius.pill,
+          }}
+        />
+        {pending > 0 ? <Stripes color={fill} style={{ flex: 1, height: '100%' }} /> : null}
+      </Animated.View>
     </View>
   );
 }
@@ -120,10 +164,10 @@ export function StatTile({
   const color =
     tone === 'success' ? colors.success : tone === 'danger' ? colors.danger : colors.ink;
   return (
-    <Card style={{ flex: 1, gap: 2, paddingVertical: spacing.md, alignItems: 'center' }}>
+    <Card style={{ flex: 1, gap: 2, paddingVertical: spacing.md, paddingHorizontal: spacing.md }}>
       {/* Not Heading: it fixes its own colour, and a toned tile needs its own. */}
       <Text
-        style={{ color, fontSize: 15, fontWeight: '600' }}
+        style={{ color, fontFamily: fonts.serif, fontSize: 19, letterSpacing: -0.3 }}
         // A balance is the one figure people read at a glance, and it can be
         // long. Let it shrink rather than wrap mid-number or clip.
         numberOfLines={1}
@@ -132,7 +176,18 @@ export function StatTile({
       >
         {value}
       </Text>
-      <Caption>{label}</Caption>
+      <Text
+        numberOfLines={1}
+        style={{
+          color: colors.inkSubtle,
+          fontSize: 10.5,
+          fontWeight: '500',
+          letterSpacing: 0.8,
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </Text>
     </Card>
   );
 }

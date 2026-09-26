@@ -93,3 +93,64 @@ describe('motion', () => {
     expect(amount).toContain('<span className="sr-only">{text}</span>');
   });
 });
+
+describe('the tokens', () => {
+  it('are the ones the phone reads, so the two apps cannot drift apart', async () => {
+    const { TOKENS } = await import('@samudaya/core');
+    const css = read('app', 'globals.css');
+    const name = (key: string) =>
+      key === 'wash'
+        ? 'festival-wash'
+        : key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+    const light = css.slice(css.indexOf(':root {'), css.indexOf('@variant dark {'));
+    const dark = css.slice(css.indexOf('@variant dark {'), css.indexOf('@theme inline'));
+    for (const [key, value] of Object.entries(TOKENS.light)) {
+      expect(light, key).toContain(`--${name(key)}: ${value};`);
+    }
+    for (const [key, value] of Object.entries(TOKENS.dark)) {
+      expect(dark, key).toContain(`--${name(key)}: ${value};`);
+    }
+  });
+});
+
+describe('the phone', () => {
+  const MOBILE = join(import.meta.dirname, '..', '..', 'mobile');
+  const phone = (...parts: string[]) => readFileSync(join(MOBILE, ...parts), 'utf8');
+
+  it('reads the same tokens as the web, converted rather than copied', () => {
+    const theme = phone('src', 'lib', 'theme.ts');
+    expect(theme).toContain('toHex(TOKENS.light)');
+    expect(theme).toContain('toHex(TOKENS.dark)');
+  });
+
+  it('loads only the two cuts of the serif it uses, before the splash goes', () => {
+    const layout = phone('app', '_layout.tsx');
+    expect(layout).toContain("from '@expo-google-fonts/fraunces/500Medium'");
+    expect(layout).toContain("from '@expo-google-fonts/fraunces/600SemiBold'");
+    expect(layout).not.toContain("from '@expo-google-fonts/fraunces';");
+    expect(layout).toContain('SplashScreen.preventAutoHideAsync()');
+  });
+
+  it('leads home and the event with the festival’s banner, and lists with its tile', () => {
+    expect(phone('app', '(tabs)', 'index.tsx')).toContain('<FestivalHero');
+    expect(phone('app', 'event', '[slug].tsx')).toContain('<FestivalHero');
+    expect(phone('app', '(tabs)', 'events.tsx')).toContain('<FestivalTile');
+    expect(phone('app', 'contribute.tsx')).toContain('<FestivalTile');
+  });
+
+  it('matches an event to the same look as the web, type first', () => {
+    const events = phone('src', 'lib', 'events.ts');
+    expect(events).toContain('event_type:catalogue_items!event_type_id(label)');
+    expect(events).toContain('festivalFor(event.event_type?.label, event.name)');
+  });
+
+  it('puts the season’s colour on the Contribute button', () => {
+    expect(phone('app', '(tabs)', '_layout.tsx')).toContain('lookColours(useSeason(), isDark)');
+  });
+
+  it('stills every loop, bar and count for somebody who asked for less motion', () => {
+    expect(phone('src', 'components', 'motif.tsx')).toContain('const still = compact || reduced');
+    expect(phone('src', 'components', 'event-ui.tsx')).toContain('useReducedMotion()');
+    expect(phone('src', 'components', 'ui.tsx')).toContain('useReducedMotion()');
+  });
+});

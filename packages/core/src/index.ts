@@ -15,6 +15,7 @@ export * from './copy';
 export * from './festivals';
 export * from './motifs';
 export * from './colour';
+export * from './design';
 export * from './calendar';
 export * from './statement';
 export * from './ledger';

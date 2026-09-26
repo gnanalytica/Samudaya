@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Alert, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Lock } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -22,9 +23,10 @@ import {
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
-import { budgetVsSpent, fetchEventDetail } from '../../src/lib/events';
+import { budgetVsSpent, fetchEventDetail, lookOf } from '../../src/lib/events';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
+  Amount,
   Badge,
   Body,
   Button,
@@ -35,8 +37,10 @@ import {
   Input,
   Loading,
   Screen,
-  Title,
+  SectionLabel,
 } from '../../src/components/ui';
+import { FestivalHero } from '../../src/components/festival';
+import { useTheme } from '../../src/lib/use-theme';
 import { Chip, ChipRow } from '../../src/components/admin-ui';
 import { FUND_RULE_PLAIN } from '../../src/components/event-form';
 import { FundKey, KeyValue, Meter, StatTile } from '../../src/components/event-ui';
@@ -62,6 +66,7 @@ export default function EventDetail() {
   );
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { colors } = useTheme();
   const { activeCommunity, membershipId, viewRole: role } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
@@ -109,6 +114,17 @@ export default function EventDetail() {
         : true,
   );
   const has = (id: string) => sections.some((section) => section.id === id);
+  const look = lookOf(event);
+  const kind =
+    event.kind === 'campaign'
+      ? 'Fundraising campaign'
+      : look.kind === 'festival'
+        ? 'Festival'
+        : look.kind === 'national'
+          ? 'National day'
+          : look.kind === 'occasion'
+            ? look.label
+            : 'Event';
 
   return (
     <Screen>
@@ -122,40 +138,39 @@ export default function EventDetail() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={{ gap: 2 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <Body>{event.emoji}</Body>
-            <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-              {event.kind === 'campaign' ? <Badge label="Campaign" tone="info" /> : null}
-              <Badge
-                label={EVENT_STATUS_LABEL[event.status]}
-                tone={event.status === 'proposed' ? 'warning' : 'neutral'}
-              />
-            </View>
-          </View>
-          <Title>{event.name}</Title>
-          {can(role, 'events:manage') ? (
-            <View style={{ flexDirection: 'row', marginTop: spacing.xs }}>
-              <Chip
+        {/* The festival's banner, edge to edge: its colour, and the thing it
+            is decorated with moving beside the name. */}
+        <View style={{ marginHorizontal: -spacing.lg, marginTop: -spacing.lg }}>
+          <FestivalHero
+            festival={look}
+            eyebrow={`${kind} · ${formatDate(event.starts_on)}`}
+            title={event.name}
+            meta={
+              [event.venue, countdown(event.starts_on)].filter(Boolean).join(' · ') || undefined
+            }
+            bottom={spacing.xxl + spacing.lg}
+          >
+            <HeroPill label={EVENT_STATUS_LABEL[event.status]} />
+            {can(role, 'events:manage') ? (
+              <Button
                 label="Manage event"
+                variant="glass"
+                compact
                 onPress={() =>
                   router.push({ pathname: '/admin/event/[slug]', params: { slug: event.slug } })
                 }
               />
-            </View>
-          ) : null}
-          <Caption>
-            {formatDate(event.starts_on)}
-            {countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''}
-          </Caption>
+            ) : null}
+          </FestivalHero>
         </View>
 
+        {/* Pulled up over the banner's lower edge, then pinned as it scrolls. */}
         <SectionBar
           sections={sections}
           current={current}
           onJump={jump}
           onLayout={onBarLayout}
-          style={{ marginHorizontal: -spacing.lg, paddingHorizontal: spacing.lg }}
+          style={{ marginTop: -(spacing.lg + spacing.xxl) }}
         />
 
         <View {...sectionProps('about')} style={{ gap: spacing.lg }}>
@@ -163,11 +178,13 @@ export default function EventDetail() {
         </View>
 
         <View {...sectionProps('money')} style={{ gap: spacing.lg }}>
-          <Heading>{COPY.money}</Heading>
+          <SectionLabel>{COPY.money}</SectionLabel>
           <Card style={{ gap: spacing.md }}>
             <Heading>Fund</Heading>
-            <Title>{formatMoney(held, currency)}</Title>
-            <Caption>of {formatMoney(target, currency)}</Caption>
+            <View style={{ gap: 2 }}>
+              <Amount value={held} currency={currency} />
+              <Caption>of {formatMoney(target, currency)}</Caption>
+            </View>
             <Meter
               percent={funded}
               pendingPercent={fundBar.pending}
@@ -196,10 +213,15 @@ export default function EventDetail() {
                 onPress={() => router.push(`/admin/payments?event=${event.slug}`)}
               />
             ) : null}
-            <Caption>
-              🔒 If money is left over:{' '}
-              {event.fund_rule_note ?? FUND_RULE_PLAIN[event.fund_rule as FundRule]}
-            </Caption>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Lock color={colors.gold} size={14} strokeWidth={1.8} style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Caption>
+                  If money is left over:{' '}
+                  {event.fund_rule_note ?? FUND_RULE_PLAIN[event.fund_rule as FundRule]}
+                </Caption>
+              </View>
+            </View>
           </Card>
 
           {data.myPayments.length ? <YourPayments data={data} currency={currency} /> : null}
@@ -625,5 +647,24 @@ function Activities({
         );
       })}
     </Card>
+  );
+}
+
+/** A status on the festival's banner: white on a veil of it. */
+function HeroPill({ label }: { label: string }) {
+  return (
+    <View
+      style={{
+        borderRadius: 999,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        backgroundColor: 'rgba(255,255,255,0.16)',
+        borderColor: 'rgba(255,255,255,0.3)',
+        borderWidth: 1,
+        justifyContent: 'center',
+      }}
+    >
+      <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>{label}</Text>
+    </View>
   );
 }

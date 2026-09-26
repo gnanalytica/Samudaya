@@ -1,4 +1,4 @@
-import { RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   ROLE_LABEL,
@@ -8,19 +8,27 @@ import {
   formatDate,
   formatMoney,
   fundBarSegments,
+  headingTowards,
   inTheFund,
   normalizeRole,
   normalizeStats,
   setupProgress,
   setupSteps,
+  type Festival,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
-import { fetchEvents, fetchSocietyBalance, fetchStats, pickNextEvent } from '../../src/lib/events';
+import {
+  fetchEvents,
+  fetchSocietyBalance,
+  fetchStats,
+  lookOf,
+  pickNextEvent,
+} from '../../src/lib/events';
 import { fetchSetupFacts } from '../../src/lib/setup';
 import { groupTodo, useTodoItems } from '../../src/lib/todo';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
-  Badge,
+  Amount,
   Body,
   Button,
   Caption,
@@ -29,16 +37,43 @@ import {
   Heading,
   Loading,
   Screen,
+  SectionLabel,
   Title,
 } from '../../src/components/ui';
 import { LinkRow } from '../../src/components/admin-ui';
 import { ResidentViewBanner } from '../../src/components/view-switch';
+import { FestivalHero } from '../../src/components/festival';
 import { FundKey, Meter, StatTile } from '../../src/components/event-ui';
 import { todoTitle } from '../../src/components/todo-queue';
 import { spacing } from '../../src/lib/theme';
+import { useTheme } from '../../src/lib/use-theme';
+
+/** Morning, afternoon or evening, by the phone's own clock. */
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+}
+
+/** "Ganesh Chaturthi is in 12 days." — or on a date, or was. */
+function whenLine(name: string, startsOn: string) {
+  const when = countdown(startsOn);
+  if (!when) return `${name} is on ${formatDate(startsOn)}.`;
+  if (when === 'yesterday' || when.endsWith('ago')) return `${name} was ${when}.`;
+  return `${name} is ${when}.`;
+}
+
+/** What kind of day the banner's small capitals announce. */
+function kindOf(festival: Festival, isCampaign: boolean) {
+  if (isCampaign) return 'Fundraising campaign';
+  if (festival.kind === 'festival') return 'Festival';
+  if (festival.kind === 'national') return 'National day';
+  if (festival.kind === 'occasion') return festival.label;
+  return 'Event';
+}
 
 export default function Home() {
   const router = useRouter();
+  const { colors } = useTheme();
   // The committee's resident view renders Home exactly as residents see it.
   const { profile, activeCommunity, viewRole: role } = useAuth();
   const staffView = can(role, 'events:manage');
@@ -95,43 +130,39 @@ export default function Home() {
   const heldBySociety = data?.society.balance ?? 0;
   const balanceMovements = data?.society.movements ?? 0;
   const normalized = normalizeRole(role);
+  const look = next ? lookOf(next) : null;
 
   return (
     <Screen>
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg, paddingBottom: spacing.xxl }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
       >
-        <View style={{ gap: 2 }}>
-          <Title>{firstName ? `Hello, ${firstName}` : 'Home'}</Title>
-          <Caption>
+        {/* A greeting, not a banner: the colour is saved for what the
+            society is heading towards, a little further down. */}
+        <View style={{ gap: 4 }}>
+          <Text
+            style={{
+              color: colors.gold,
+              fontSize: 11,
+              fontWeight: '600',
+              letterSpacing: 1.5,
+              textTransform: 'uppercase',
+            }}
+          >
             {activeCommunity?.name ?? ''}
             {normalized ? ` · ${ROLE_LABEL[normalized]}` : ''}
-          </Caption>
+          </Text>
+          <Title>{firstName ? `${greeting()}, ${firstName}` : greeting()}</Title>
+          {next && look ? (
+            <Body muted>{whenLine(headingTowards(look, next.name), next.starts_on)}</Body>
+          ) : null}
         </View>
 
         <ResidentViewBanner />
 
         {setupOpen && setup.data ? (
           <SetupCard steps={setupSteps(setup.data)} onOpen={() => router.push('/admin/setup')} />
-        ) : null}
-
-        {/* Money the society is holding that is not behind any event: what a
-            closed event had left, once the committee decided to keep it. On
-            everybody's home screen, resident and committee alike, because it
-            is the one figure a society is most often asked about and least
-            often able to answer. Tapping it shows where every rupee came
-            from. */}
-        {heldBySociety > 0 ? (
-          <Card style={{ gap: spacing.xs }}>
-            <LinkRow
-              label={`Kept for the society · ${formatMoney(heldBySociety, currency)}`}
-              detail={`Left over from ${balanceMovements} closed ${
-                balanceMovements === 1 ? 'event' : 'events'
-              }`}
-              onPress={() => router.push('/money')}
-            />
-          </Card>
         ) : null}
 
         {staffView ? (
@@ -141,7 +172,7 @@ export default function Home() {
               todoGroups.map((group) => (
                 <LinkRow
                   key={group.kind}
-                  label={`${TODO_KIND[group.kind].emoji} ${TODO_KIND[group.kind].section} (${group.items.length})`}
+                  label={`${TODO_KIND[group.kind].section} (${group.items.length})`}
                   onPress={() => router.push('/manage')}
                 />
               ))
@@ -151,28 +182,45 @@ export default function Home() {
           </Card>
         ) : null}
 
-        {next ? (
+        {next && look ? (
           <>
-            <Card style={{ gap: spacing.md }}>
-              <View style={{ gap: 2 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Body>{next.emoji}</Body>
-                  {next.kind === 'campaign' ? <Badge label="Campaign" tone="info" /> : null}
-                </View>
-                <Heading>{next.name}</Heading>
-                <Caption>
-                  {formatDate(next.starts_on)}
-                  {next.venue ? ` · ${next.venue}` : ''}
-                  {countdown(next.starts_on) ? ` · ${countdown(next.starts_on)}` : ''}
-                </Caption>
-              </View>
-
-              <View style={{ gap: spacing.xs }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Caption>
-                    {formatMoney(held, currency)} of {formatMoney(stats.fundTarget, currency)}
-                  </Caption>
-                  <Caption>{funded}%</Caption>
+            <SectionLabel>Coming up</SectionLabel>
+            <Card style={{ padding: 0, overflow: 'hidden' }}>
+              {/* The festival's banner: its colour, and the thing it is
+                  decorated with, moving the way it does. */}
+              <Pressable
+                accessibilityRole="link"
+                accessibilityLabel={`Open ${next.name}`}
+                onPress={() => router.push(`/event/${next.slug}`)}
+              >
+                <FestivalHero
+                  festival={look}
+                  eyebrow={`${kindOf(look, next.kind === 'campaign')} · ${formatDate(next.starts_on)}`}
+                  title={next.name}
+                  meta={
+                    [next.venue, countdown(next.starts_on)].filter(Boolean).join(' · ') || undefined
+                  }
+                  bottom={spacing.lg}
+                  motifSize={132}
+                  titleSize={24}
+                />
+              </Pressable>
+              <View style={{ padding: spacing.lg, gap: spacing.md }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'baseline',
+                    justifyContent: 'space-between',
+                    gap: spacing.md,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                    <Amount value={held} currency={currency} />
+                    <Caption>of {formatMoney(stats.fundTarget, currency)}</Caption>
+                  </View>
+                  <Text style={{ color: colors.success, fontSize: 13, fontWeight: '600' }}>
+                    {funded}%
+                  </Text>
                 </View>
                 <Meter
                   percent={funded}
@@ -181,31 +229,31 @@ export default function Home() {
                   label="Fund progress"
                 />
                 <FundKey confirmed={held} pending={stats.fundPending} currency={currency} />
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <View style={{ flex: 1 }}>
-                  <Button
-                    label="View event"
-                    variant={can(role, 'contribute') ? 'secondary' : 'primary'}
-                    onPress={() => router.push(`/event/${next.slug}`)}
-                  />
-                </View>
-                {can(role, 'contribute') ? (
+                <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xs }}>
                   <View style={{ flex: 1 }}>
                     <Button
-                      label="Contribute"
-                      onPress={() => router.push(`/contribute?event=${next.slug}`)}
+                      label="View event"
+                      variant={can(role, 'contribute') ? 'secondary' : 'primary'}
+                      onPress={() => router.push(`/event/${next.slug}`)}
                     />
                   </View>
-                ) : null}
+                  {can(role, 'contribute') ? (
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        label="Contribute"
+                        onPress={() => router.push(`/contribute?event=${next.slug}`)}
+                      />
+                    </View>
+                  ) : null}
+                </View>
               </View>
             </Card>
 
-            <View style={{ flexDirection: 'row', gap: spacing.md }}>
-              <StatTile label="SPENT" value={formatMoney(stats.spent, currency)} />
-              <StatTile label="HOUSEHOLDS" value={String(stats.contributors)} />
-              <StatTile label="REGISTERED" value={String(stats.participants)} />
+            <SectionLabel>{look.kind === 'festival' ? 'This festival' : 'This event'}</SectionLabel>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <StatTile label="Spent" value={formatMoney(stats.spent, currency)} />
+              <StatTile label="Households" value={String(stats.contributors)} />
+              <StatTile label="Registered" value={String(stats.participants)} />
             </View>
           </>
         ) : (
@@ -213,6 +261,27 @@ export default function Home() {
             <EmptyState title="Nothing planned yet" description="New events will show up here." />
           </Card>
         )}
+
+        {/* Money the society is holding that is not behind any event: what a
+            closed event had left, once the committee decided to keep it. On
+            everybody's home screen, resident and committee alike, because it
+            is the one figure a society is most often asked about and least
+            often able to answer. Tapping it shows where every rupee came
+            from. */}
+        {heldBySociety > 0 ? (
+          <>
+            <SectionLabel>Kept for the society</SectionLabel>
+            <Card style={{ paddingVertical: spacing.sm }}>
+              <LinkRow
+                label={formatMoney(heldBySociety, currency)}
+                detail={`Left over from ${balanceMovements} closed ${
+                  balanceMovements === 1 ? 'event' : 'events'
+                }`}
+                onPress={() => router.push('/money')}
+              />
+            </Card>
+          </>
+        ) : null}
 
         {can(role, 'campaigns:propose') ? (
           <Card style={{ gap: spacing.sm }}>

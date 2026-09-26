@@ -26,6 +26,7 @@ import { supabase } from '../../src/lib/supabase';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import { reportHandled } from '../../src/lib/observability';
 import {
+  Amount,
   Badge,
   Body,
   Button,
@@ -307,15 +308,31 @@ function SocietyMoney() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         ListHeaderComponent={
           <View style={{ gap: spacing.md, marginBottom: spacing.sm }}>
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <StatTile label="COLLECTED" value={formatMoney(totals?.total_in ?? 0, currency)} />
-              <StatTile label="SPENT" value={formatMoney(totals?.total_out ?? 0, currency)} />
-            </View>
-            <StatTile
-              label="BALANCE"
-              value={formatMoney(balance, currency)}
-              tone={balance < 0 ? 'danger' : 'success'}
-            />
+            {/* The one number everybody asks the committee for, as large as
+                the screen allows, with what came in and went out beneath it. */}
+            <Card style={{ gap: spacing.sm, paddingVertical: spacing.xl }}>
+              <Text
+                style={{
+                  color: colors.gold,
+                  fontSize: 11,
+                  fontWeight: '600',
+                  letterSpacing: 1.5,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Balance
+              </Text>
+              <Amount
+                value={balance}
+                currency={currency}
+                size={38}
+                style={balance < 0 ? { color: colors.danger } : undefined}
+              />
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.xl }}>
+                <Caption>Collected {formatMoney(totals?.total_in ?? 0, currency)}</Caption>
+                <Caption>Spent {formatMoney(totals?.total_out ?? 0, currency)}</Caption>
+              </View>
+            </Card>
 
             {/* Where the balance is: each event still holding money, and what
                 the society kept outside any event, adding up to the balance

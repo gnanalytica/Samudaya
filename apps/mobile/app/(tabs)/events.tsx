@@ -1,4 +1,4 @@
-import { Pressable, RefreshControl, SectionList, View } from 'react-native';
+import { Pressable, RefreshControl, SectionList, Text, View } from 'react-native';
 import { today as localToday } from '../../src/components/date-field';
 import { useRouter } from 'expo-router';
 import {
@@ -11,24 +11,26 @@ import {
   inTheFund,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
-import { fetchEvents, fetchStats } from '../../src/lib/events';
+import { fetchEvents, fetchStats, lookOf } from '../../src/lib/events';
 import { useCommunityData } from '../../src/lib/use-community-data';
 import {
   Badge,
-  Body,
   Button,
   Caption,
   Card,
   EmptyState,
-  Heading,
   Loading,
   Screen,
+  SectionLabel,
 } from '../../src/components/ui';
 import { FundKey, Meter } from '../../src/components/event-ui';
-import { spacing } from '../../src/lib/theme';
+import { FestivalTile } from '../../src/components/festival';
+import { fonts, spacing } from '../../src/lib/theme';
+import { useTheme } from '../../src/lib/use-theme';
 
 export default function Events() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { activeCommunity, viewRole: role, user } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
@@ -119,8 +121,8 @@ export default function Events() {
           <EmptyState title="No events yet" description="New events will show up here." />
         }
         renderSectionHeader={({ section }) => (
-          <View style={{ paddingTop: spacing.md, paddingBottom: spacing.xs }}>
-            <Heading>{section.title}</Heading>
+          <View style={{ paddingTop: spacing.md, paddingBottom: spacing.sm }}>
+            <SectionLabel>{section.title}</SectionLabel>
           </View>
         )}
         renderItem={({ item }) => {
@@ -137,7 +139,10 @@ export default function Events() {
             <Pressable
               accessibilityRole="button"
               onPress={() => router.push(`/event/${item.slug}`)}
-              style={{ marginBottom: spacing.md }}
+              style={({ pressed }) => ({
+                marginBottom: spacing.md,
+                transform: [{ scale: pressed ? 0.985 : 1 }],
+              })}
             >
               <Card style={{ gap: spacing.md }}>
                 <View
@@ -148,10 +153,16 @@ export default function Events() {
                     gap: spacing.md,
                   }}
                 >
+                  {/* A list of events should look like a year: each leads with
+                      its festival's colour and what it is decorated with. */}
+                  <FestivalTile festival={lookOf(item)} size={46} />
                   <View style={{ flex: 1, gap: 2 }}>
-                    <Body>
-                      {item.emoji} {item.name}
-                    </Body>
+                    <Text
+                      numberOfLines={2}
+                      style={{ color: colors.ink, fontFamily: fonts.serif, fontSize: 18 }}
+                    >
+                      {item.name}
+                    </Text>
                     <Caption>
                       {formatDate(item.starts_on)}
                       {item.venue ? ` · ${item.venue}` : ''}

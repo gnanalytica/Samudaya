@@ -33,7 +33,7 @@ import {
 } from '@samudaya/core';
 import { useAuth } from '../src/lib/auth';
 import { supabase } from '../src/lib/supabase';
-import { fetchEventBySlug, fetchEvents, fetchStats } from '../src/lib/events';
+import { fetchEventBySlug, fetchEvents, fetchStats, lookOf } from '../src/lib/events';
 import { uploadFile, type PickedFile } from '../src/lib/storage';
 import { useCommunityData } from '../src/lib/use-community-data';
 import {
@@ -51,7 +51,8 @@ import {
 import { Chip, ChipRow, ErrorText } from '../src/components/admin-ui';
 import { FilePickerField } from '../src/components/file-ui';
 import { Meter } from '../src/components/event-ui';
-import { radius, spacing } from '../src/lib/theme';
+import { FestivalTile } from '../src/components/festival';
+import { fonts, radius, spacing } from '../src/lib/theme';
 import { useTheme } from '../src/lib/use-theme';
 
 /**
@@ -77,6 +78,7 @@ export default function Contribute() {
  */
 function ChooseEvent() {
   const router = useRouter();
+  const { colors } = useTheme();
   const { activeCommunity, role } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
@@ -139,15 +141,21 @@ function ChooseEvent() {
                   }
                 >
                   <Card style={{ gap: spacing.sm }}>
-                    <View style={{ gap: 2 }}>
-                      <Body>
-                        {event.emoji} {event.name}
-                      </Body>
-                      <Caption>
-                        {event.kind === 'campaign' ? 'Fundraising campaign · ' : ''}
-                        {formatDate(event.starts_on)}
-                        {countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''}
-                      </Caption>
+                    <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+                      <FestivalTile festival={lookOf(event)} size={46} />
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text
+                          numberOfLines={2}
+                          style={{ color: colors.ink, fontFamily: fonts.serif, fontSize: 18 }}
+                        >
+                          {event.name}
+                        </Text>
+                        <Caption>
+                          {event.kind === 'campaign' ? 'Fundraising campaign · ' : ''}
+                          {formatDate(event.starts_on)}
+                          {countdown(event.starts_on) ? ` · ${countdown(event.starts_on)}` : ''}
+                        </Caption>
+                      </View>
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                       <Caption>

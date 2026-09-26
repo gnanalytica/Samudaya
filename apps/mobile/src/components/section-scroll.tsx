@@ -9,7 +9,6 @@ import {
 } from 'react-native';
 import { Segmented } from './admin-ui';
 import { spacing } from '../lib/theme';
-import { useTheme } from '../lib/use-theme';
 
 /**
  * A long screen read top to bottom, with its sections' names pinned above it:
@@ -90,22 +89,16 @@ export function SectionBar<T extends string>({
   /** E.g. a negative margin, so the pinned bar reaches the screen's edges. */
   style?: ViewStyle;
 }) {
-  const { colors } = useTheme();
   const value = current ?? sections[0]?.id;
   if (value === undefined) return null;
   return (
+    // No band of its own behind it: the bar is a white pill with a shadow that
+    // floats over the page as it scrolls, as the web's does.
     <View
       onLayout={onLayout}
-      style={[
-        {
-          backgroundColor: colors.surface,
-          paddingVertical: spacing.sm,
-          marginVertical: -spacing.sm,
-        },
-        style,
-      ]}
+      style={[{ paddingVertical: spacing.sm, marginVertical: -spacing.sm }, style]}
     >
-      <Segmented options={sections} value={value} onChange={onJump} />
+      <Segmented options={sections} value={value} onChange={onJump} tone="ink" />
     </View>
   );
 }
