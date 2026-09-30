@@ -75,6 +75,22 @@ export function paymentEvidenceProblem(
   return 'Add the UPI transaction ID or a screenshot of the payment.';
 }
 
+/**
+ * The same rule for a payment staff record on a flat's behalf, where cash is
+ * the one exception: nobody gets a transaction ID for a note handed over at
+ * the door. A UPI transfer, a bank transfer or a cheque has a number, or a
+ * screenshot showing it, and without one the entry is a claim.
+ */
+export function recordedPaymentEvidenceProblem(
+  method: string,
+  reference: string | null | undefined,
+  hasProof: boolean,
+): string | null {
+  if (method === 'cash') return null;
+  if (reference?.trim() || hasProof) return null;
+  return 'Add the transaction ID or a screenshot. Only cash can be recorded without one.';
+}
+
 export type UpiPaymentLink = {
   vpa: string;
   payeeName: string;
@@ -270,6 +286,14 @@ export const billPath = (communityId: string, eventId: string, fileName: string)
 
 export const paymentProofPath = (communityId: string, membershipId: string, fileName: string) =>
   `${communityId}/${membershipId}/${safeFileName(fileName)}`;
+
+/**
+ * The receipt for money the society paid from its own balance — a repair, or
+ * paying somebody back — in the bills bucket, under the society rather than
+ * an event. Every member can open it once a row points at it.
+ */
+export const societyProofPath = (communityId: string, fileName: string) =>
+  `${communityId}/society/${safeFileName(fileName)}`;
 
 /** Unique, URL-safe file name that keeps the extension. */
 export function safeFileName(original: string): string {

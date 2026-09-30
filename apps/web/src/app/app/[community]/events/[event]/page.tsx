@@ -19,6 +19,7 @@ import {
   can,
   correctionNote,
   countdown,
+  eventMoney,
   formatDate,
   festivalFor,
   formatMoney,
@@ -54,9 +55,10 @@ import {
   FundBar,
   FundKey,
   PaymentStatusBadge,
-  StatTile,
-  StatTiles,
+  SpendBar,
+  SpendKey,
 } from '@/components/badges';
+import { EventBalanceCard, EventMoneyTiles } from '@/components/event-balance';
 import { getSupabase } from '@/lib/supabase/server';
 import { BillLink } from '@/components/bill-link';
 import { BudgetBars } from '@/components/budget-bars';
@@ -124,6 +126,9 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
   // What the fund holds, carried money included: what every fund card leads
   // with, against the event's target.
   const held = inTheFund(stats.fundRaised, stats.fundCarried);
+  // Collected, spent and left, adding up: the Fund card's tiles and, for staff
+  // and the committee, the balance at the top of the page.
+  const money = eventMoney(stats);
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
   const isStaff = can(role, 'events:manage');
@@ -225,6 +230,15 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
         <div className="space-y-10">
           {/* ---------------------------------------------------------- about */}
           <section id="about" aria-label="About" className={SECTION}>
+            {/* Staff and the committee see what is left before anything else,
+                so nobody commits to a bill the event cannot pay. */}
+            {isStaff && event.status !== 'proposed' ? (
+              <EventBalanceCard
+                money={money}
+                currency={community.currency}
+                todoHref={can(role, 'expenses:approve') ? `${base}/todo#overspent` : undefined}
+              />
+            ) : null}
             <Card>
               <CardBody className="space-y-4">
                 {event.description ? (
@@ -340,18 +354,21 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 />
                 {/* Money the committee carried in: a row each, with who moved it. */}
                 <CarriedIn movements={carriedIn} currency={community.currency} />
-                <StatTiles className="mt-4 gap-2">
-                  <StatTile
-                    label="From residents"
-                    value={formatMoney(stats.fundRaised, community.currency)}
-                  />
-                  <StatTile label="Spent" value={formatMoney(stats.spent, community.currency)} />
-                  <StatTile
-                    label="Balance"
-                    value={formatMoney(stats.available, community.currency)}
-                    tone={stats.available < 0 ? 'danger' : 'success'}
-                  />
-                </StatTiles>
+                {/* What the approved bills have used of it, in its own colour. */}
+                <div className="mt-4">
+                  <SpendBar percent={money.spentPercent} over={money.overBy > 0} />
+                </div>
+                <SpendKey
+                  spent={money.spent}
+                  balance={money.balance}
+                  currency={community.currency}
+                  className="mt-2"
+                />
+                <EventMoneyTiles
+                  money={money}
+                  currency={community.currency}
+                  className="mt-4 gap-2"
+                />
               </CardBody>
             </Card>
 

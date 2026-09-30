@@ -61,7 +61,27 @@ function detailRoute(item: TodoItem): Href {
     // they are already thinking about flats.
     case 'flat_change':
       return '/admin/society';
+    // Paying somebody back needs the screenshot of the transfer, so it has a
+    // screen of its own rather than a button here.
+    case 'overspent':
+      return {
+        pathname: '/admin/pay-back',
+        params: {
+          event: item.id,
+          name: item.title,
+          over: String(item.amount ?? 0),
+          payer: payerOf(item) ?? '',
+        },
+      };
   }
+}
+
+/**
+ * Who paid, off an overspent item's subtitle, to start the pay-back with.
+ * todo_items() writes it as "Paid by <name> · society balance ₹<n>".
+ */
+function payerOf(item: TodoItem): string | null {
+  return /^Paid by (.+?)(?: · |$)/.exec(item.subtitle ?? '')?.[1] ?? null;
 }
 
 type Action = {
@@ -232,8 +252,10 @@ function actionsFor(kind: TodoKind, id: string): Action[] {
             supabase.from('activity_suggestions').update({ status: 'declined' }).eq('id', id),
         },
       ];
+    // Both need a screen of their own — fixing a bill, and paying somebody
+    // back with the screenshot of the transfer — so the card opens it.
     case 'bill_sent_back':
-      // Fixing a bill needs the form; the card opens it.
+    case 'overspent':
       return [];
   }
 }

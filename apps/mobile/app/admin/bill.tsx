@@ -179,6 +179,12 @@ function Form({ events, existing }: { events: EventOption[]; existing: Existing 
       setError('Pick the budget category this bill belongs to.');
       return;
     }
+    // The committee approves a bill on everybody's behalf, and cannot without
+    // knowing who was paid.
+    if (!vendor.label) {
+      setError('Pick the vendor this bill is from.');
+      return;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(spentOn)) {
       setError('Pick the date on the bill.');
       return;

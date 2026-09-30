@@ -251,6 +251,60 @@ export function fundBarSegments(
 }
 
 /**
+ * An event's own money, as the Fund card's tiles show it: what it collected,
+ * what it spent, and what is left, adding up on screen.
+ *
+ * Collected is everything this event has to spend — residents' confirmed
+ * payments plus whatever the committee carried in from a closed event or the
+ * society balance. Carried money is this event's money once it arrives, so it
+ * counts; the society's balance, and every other event's, never do.
+ *
+ * Balance is collected less approved bills (event_stats.available, the
+ * database's own figure). Pending bills are not spending until they are
+ * approved. Below zero, somebody paid the difference out of their own pocket,
+ * and `overBy` is what they are owed.
+ */
+export type EventMoney = {
+  fromResidents: number;
+  carriedIn: number;
+  /** Money this event carried on to another after it closed. */
+  movedOut: number;
+  collected: number;
+  spent: number;
+  balance: number;
+  overBy: number;
+  /** Spent as a share of collected, clamped for the spent bar. */
+  spentPercent: number;
+};
+
+export function eventMoney(stats: {
+  fundRaised: number;
+  fundCarried: number;
+  spent: number;
+  available: number;
+}): EventMoney {
+  const carriedIn = Math.max(0, stats.fundCarried);
+  const movedOut = Math.max(0, -stats.fundCarried);
+  const collected = stats.fundRaised + carriedIn;
+  const spentPercent =
+    collected > 0
+      ? Math.min(100, Math.round((stats.spent / collected) * 100))
+      : stats.spent > 0
+        ? 100
+        : 0;
+  return {
+    fromResidents: stats.fundRaised,
+    carriedIn,
+    movedOut,
+    collected,
+    spent: stats.spent,
+    balance: stats.available,
+    overBy: Math.max(0, -stats.available),
+    spentPercent,
+  };
+}
+
+/**
  * What the event still has to ask residents for.
  *
  * Money carried across counts, which is the whole point of carrying it: a

@@ -20,6 +20,7 @@ import {
   optionalWhatsappGroup,
   paymentMethodSchema,
   placesProblem,
+  recordedPaymentEvidenceProblem,
   reviewExpenseSchema,
   spendBalanceSchema,
   updateActivitySchema,
@@ -800,6 +801,21 @@ export async function recordPayment(_prev: ActionState, formData: FormData): Pro
   });
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) };
 
+  // A screenshot staff attached lives in the society's payment-proofs folder;
+  // anything pointing elsewhere is not one this form uploaded.
+  const proof = String(formData.get('proof_path') ?? '').trim();
+  if (proof && !proof.startsWith(`${context.community.id}/`)) {
+    return { error: 'That screenshot could not be attached. Please upload it again.' };
+  }
+  // Cash is the one kind of payment with nothing to show for it. Anything else
+  // carries its transaction ID or a screenshot, the same rule residents meet.
+  const missing = recordedPaymentEvidenceProblem(
+    parsed.data.method,
+    parsed.data.reference,
+    Boolean(proof),
+  );
+  if (missing) return { fieldErrors: { reference: missing } };
+
   const supabase = await getSupabase();
   const { error } = await supabase.from('contributions').insert({
     event_id: event.id,
@@ -808,6 +824,7 @@ export async function recordPayment(_prev: ActionState, formData: FormData): Pro
     amount: parsed.data.amount,
     method: parsed.data.method,
     reference: parsed.data.reference ?? null,
+    proof_path: proof || null,
     status: 'succeeded',
     channel: 'system',
     paid_at: new Date(`${parsed.data.paid_on}T12:00:00+05:30`).toISOString(),

@@ -102,6 +102,14 @@ export function ledgerFlat(row: LedgerEntry): LedgerFlat | null {
  * money was for on a bill — `detail` carries the category out, and the flat
  * and method it used to carry in are their own fields now.
  */
+/**
+ * Money the society spent from its own balance rather than an event's: a
+ * repair, damage. It has no event, and says so instead of leaving a gap.
+ */
+export function isSocietySpending(row: LedgerEntry): boolean {
+  return row.direction === 'out' && !row.event_slug;
+}
+
 export function ledgerMeta(row: LedgerEntry): string | null {
   return (row.direction === 'in' ? (row.method ?? null) : row.detail) ?? null;
 }

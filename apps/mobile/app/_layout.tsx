@@ -73,6 +73,8 @@ function RootStack() {
         <Stack.Screen name="admin/bills" options={{ title: 'Bills' }} />
         <Stack.Screen name="admin/bill" options={{ title: 'Bill' }} />
         <Stack.Screen name="admin/payments" options={{ title: 'Payments' }} />
+        <Stack.Screen name="admin/pay-back" options={{ title: 'Pay back' }} />
+        <Stack.Screen name="admin/society-spend" options={{ title: 'Society balance' }} />
         <Stack.Screen name="admin/reconcile" options={{ title: 'Reconcile' }} />
         <Stack.Screen name="admin/upi" options={{ title: 'UPI ID' }} />
         {/* Old link for committee decisions; redirects to the To do queue. */}

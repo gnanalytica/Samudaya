@@ -214,7 +214,7 @@ export const getFundMovements = cache(async (communityId: string) => {
   const { data } = await supabase
     .from('fund_movements')
     .select(
-      'id, kind, amount, note, decided_at, from_event:events!fund_movements_from_event_id_fkey(name, slug), to_event:events!fund_movements_to_event_id_fkey(name, slug), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+      'id, kind, amount, note, decided_at, paid_to, proof_path, from_event:events!fund_movements_from_event_id_fkey(name, slug), to_event:events!fund_movements_to_event_id_fkey(name, slug), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
     )
     .eq('community_id', communityId)
     .order('decided_at', { ascending: false })
@@ -232,7 +232,7 @@ export const getCarriedInto = cache(async (eventId: string) => {
   const { data } = await supabase
     .from('fund_movements')
     .select(
-      'id, kind, amount, decided_at, from_event:events!fund_movements_from_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+      'id, kind, amount, decided_at, paid_to, proof_path, from_event:events!fund_movements_from_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
     )
     .eq('to_event_id', eventId)
     .order('decided_at', { ascending: true });

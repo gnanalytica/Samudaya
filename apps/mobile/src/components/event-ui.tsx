@@ -8,7 +8,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { fundKey } from '@samudaya/core';
+import { formatMoney, fundKey, type EventMoney } from '@samudaya/core';
 import { Body, Caption, Card } from './ui';
 import { useReducedMotion } from './motif';
 import { fonts, radius, spacing } from '../lib/theme';
@@ -214,5 +214,134 @@ export function KeyValue({ label, value }: { label: string; value: string }) {
       <Body muted>{label}</Body>
       <Body>{value}</Body>
     </View>
+  );
+}
+
+/** The line under the spend bar: what was spent, and what is left or owed. */
+export function SpendKey({
+  spent,
+  balance,
+  currency,
+}: {
+  spent: number;
+  balance: number;
+  currency: string;
+}) {
+  const { colors } = useTheme();
+  const over = balance < 0;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: 2 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <View
+          style={{
+            width: 12,
+            height: 8,
+            borderRadius: 2,
+            backgroundColor: over ? colors.danger : colors.warning,
+          }}
+        />
+        <Caption>{formatMoney(spent, currency)} spent</Caption>
+      </View>
+      <Caption tone={over ? 'danger' : undefined}>
+        {over
+          ? `${formatMoney(-balance, currency)} more than was collected`
+          : `${formatMoney(balance, currency)} left`}
+      </Caption>
+    </View>
+  );
+}
+
+/** A balance, with a minus sign a person can read when it is below zero. */
+export function balanceText(balance: number, currency: string): string {
+  return balance < 0 ? `−${formatMoney(-balance, currency)}` : formatMoney(balance, currency);
+}
+
+/**
+ * The Fund card's three tiles, which add up: what this event collected —
+ * carried-in money included, since it is this event's once it arrives — less
+ * what it spent, is its balance. Where the collected figure came from is
+ * spelt out underneath, because it is the one that surprises people.
+ */
+export function EventMoneyTiles({ money, currency }: { money: EventMoney; currency: string }) {
+  return (
+    <View style={{ gap: spacing.xs }}>
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <StatTile label="Collected" value={formatMoney(money.collected, currency)} />
+        <StatTile label="Spent" value={formatMoney(money.spent, currency)} />
+        <StatTile
+          label="Balance"
+          value={balanceText(money.balance, currency)}
+          tone={money.balance < 0 ? 'danger' : 'success'}
+        />
+      </View>
+      <Caption>
+        {money.carriedIn > 0
+          ? `Collected is ${formatMoney(money.fromResidents, currency)} from residents and ${formatMoney(money.carriedIn, currency)} carried in. `
+          : ''}
+        Balance is collected less approved bills
+        {money.movedOut > 0 ? `, after ${formatMoney(money.movedOut, currency)} moved on` : ''}.
+      </Caption>
+    </View>
+  );
+}
+
+/**
+ * What staff and the committee see first on an event: how much of its money
+ * is left, so nobody commits to a bill the event cannot pay. Below zero it
+ * says somebody paid the difference and is owed it.
+ */
+export function EventBalanceCard({
+  money,
+  currency,
+  onPayBack,
+}: {
+  money: EventMoney;
+  currency: string;
+  /** Where the committee pays an overspend back; absent for staff. */
+  onPayBack?: () => void;
+}) {
+  const { colors } = useTheme();
+  const over = money.overBy > 0;
+  return (
+    <Card style={{ gap: spacing.sm }}>
+      <Text
+        style={{
+          color: colors.gold,
+          fontSize: 10.5,
+          fontWeight: '600',
+          letterSpacing: 1.4,
+          textTransform: 'uppercase',
+        }}
+      >
+        {over ? 'Over its fund' : 'Left to spend'}
+      </Text>
+      <Text
+        style={{
+          color: over ? colors.danger : colors.ink,
+          fontFamily: fonts.serif,
+          fontSize: 28,
+          letterSpacing: -0.4,
+        }}
+      >
+        {balanceText(money.balance, currency)}
+      </Text>
+      <Caption>
+        {formatMoney(money.spent, currency)} spent of {formatMoney(money.collected, currency)}{' '}
+        collected
+      </Caption>
+      <Meter percent={money.spentPercent} tone={over ? 'danger' : 'warning'} label="Spent" />
+      <SpendKey spent={money.spent} balance={money.balance} currency={currency} />
+      {over ? (
+        <Body muted>
+          Somebody paid the difference out of their own pocket.
+          {onPayBack ? ' ' : ' The committee pays them back.'}
+          {onPayBack ? (
+            <Text style={{ color: colors.danger, fontWeight: '600' }} onPress={onPayBack}>
+              Pay them back
+            </Text>
+          ) : null}
+        </Body>
+      ) : null}
+    </Card>
   );
 }

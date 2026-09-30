@@ -11,6 +11,8 @@ import {
 } from '@samudaya/core';
 import { requireCapability } from '@/lib/auth';
 import { getTodoItems, type TodoItem } from '@/lib/todo';
+import { getSocietyBalance } from '@/lib/events';
+import { CoverOverspendForm } from '../money/money-forms';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Card, CardHeader } from '@/components/ui/card';
 import { Button, ButtonLink } from '@/components/ui/button';
@@ -46,6 +48,8 @@ function detailHref(base: string, item: TodoItem): string | null {
     // A suggestion belongs either to an event or to the society itself.
     case 'suggestion_to_review':
       return event ? `${base}/events/${event}#vote` : `${base}/suggest`;
+    case 'overspent':
+      return event ? `${base}/events/${event}#money` : null;
   }
 }
 
@@ -57,7 +61,16 @@ const DETAIL_LABEL: Record<TodoKind, string> = {
   campaign_to_review: 'See the campaign',
   suggestion_to_review: 'See the event',
   flat_change: 'See everyone and their flats',
+  overspent: 'See the event’s money',
 };
+
+/**
+ * Who paid, off an overspent item's subtitle, to start the pay-back form with.
+ * todo_items() writes it as "Paid by <name> · society balance ₹<n>".
+ */
+function payerOf(item: TodoItem): string | null {
+  return /^Paid by (.+?)(?: · |$)/.exec(item.subtitle ?? '')?.[1] ?? null;
+}
 
 function detailLabel(item: TodoItem): string {
   if (item.kind === 'suggestion_to_review' && !item.eventSlug) return 'See all ideas';
@@ -71,7 +84,10 @@ function detailLabel(item: TodoItem): string {
 export default async function TodoPage(props: PageProps<'/app/[community]/todo'>) {
   const { community: slug } = await props.params;
   const { community, role } = await requireCapability(slug, 'events:manage');
-  const items = await getTodoItems(community.id, role);
+  const [items, society] = await Promise.all([
+    getTodoItems(community.id, role),
+    getSocietyBalance(community.id),
+  ]);
   const base = `/app/${community.slug}`;
   const committee = can(role, 'roles:manage');
 
@@ -122,6 +138,8 @@ export default async function TodoPage(props: PageProps<'/app/[community]/todo'>
 
                         <TodoActions
                           slug={community.slug}
+                          communityId={community.id}
+                          societyBalance={society.balance}
                           item={item}
                           committee={committee}
                           currency={community.currency}
@@ -161,6 +179,8 @@ export default async function TodoPage(props: PageProps<'/app/[community]/todo'>
 
 function TodoActions({
   slug,
+  communityId,
+  societyBalance,
   item,
   committee,
   currency,
@@ -168,6 +188,8 @@ function TodoActions({
   fixHref,
 }: {
   slug: string;
+  communityId: string;
+  societyBalance: number;
   item: TodoItem;
   committee: boolean;
   currency: string;
@@ -264,6 +286,21 @@ function TodoActions({
             </Button>
           </form>
         </div>
+      ) : null;
+
+    // Somebody paid the difference out of their own pocket; the committee pays
+    // them back from the society balance, as far as it goes.
+    case 'overspent':
+      return can(role, 'expenses:approve') ? (
+        <CoverOverspendForm
+          slug={slug}
+          communityId={communityId}
+          eventId={item.id}
+          overBy={item.amount ?? 0}
+          balance={societyBalance}
+          payer={payerOf(item)}
+          currency={currency}
+        />
       ) : null;
 
     case 'bill_sent_back':

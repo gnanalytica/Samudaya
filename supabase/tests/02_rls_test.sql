@@ -499,9 +499,9 @@ select 'dddddddd-0000-4000-8000-000000000001', 'cccccccc-0000-4000-8000-00000000
        app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001');
 
 select test.raises(
-  $q$insert into public.expenses (event_id, community_id, name, amount, status, requested_by)
+  $q$insert into public.expenses (event_id, community_id, name, amount, vendor, bill_url, status, requested_by)
      select 'cccccccc-0000-4000-8000-000000000001', 'aaaaaaaa-0000-4000-8000-000000000001',
-            'Sneaky', 1000, 'approved',
+            'Sneaky', 1000, 'Anybody', 'aaaaaaaa-0000-4000-8000-000000000001/sneaky.pdf', 'approved',
             app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001')$q$,
   'an expense cannot be filed pre-approved');
 
@@ -523,9 +523,10 @@ select test.raises(
 
 reset role;
 select test.act_as('11111111-1111-4111-8111-111111111111');
-insert into public.expenses (id, event_id, community_id, name, amount, vendor, requested_by)
+insert into public.expenses (id, event_id, community_id, name, amount, vendor, bill_url, requested_by)
 select 'dddddddd-0000-4000-8000-000000000009', 'cccccccc-0000-4000-8000-000000000001',
        'aaaaaaaa-0000-4000-8000-000000000001', 'Own claim', 4000, 'Self',
+       'aaaaaaaa-0000-4000-8000-000000000001/cccccccc-0000-4000-8000-000000000001/own-claim.pdf',
        app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001');
 select test.raises(
   $q$select public.review_expense('dddddddd-0000-4000-8000-000000000009', 'approved')$q$,
@@ -802,9 +803,9 @@ select test.eq(test.visible($q$select id from public.contributions where event_i
 -- Bills: staff raise them, only committee decides.
 reset role;
 select test.act_as('99999999-9999-4999-8999-999999999999');
-insert into public.expenses (id, event_id, community_id, name, category, amount, vendor, requested_by)
+insert into public.expenses (id, event_id, community_id, name, category, amount, vendor, bill_url, requested_by)
 select 'dddddddd-0000-4000-8000-0000000000aa', 'cccccccc-0000-4000-8000-0000000000aa', m.community_id,
-       'Diyas', 'decoration', 2500, 'Clay Crafts', m.id
+       'Diyas', 'decoration', 2500, 'Clay Crafts', 'bills/diyas.pdf', m.id
   from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999';
 update public.expenses set amount = 2400, bill_url = 'bills/diyas-corrected.pdf'
  where id = 'dddddddd-0000-4000-8000-0000000000aa';
@@ -1191,8 +1192,9 @@ select m.community_id, 'cccccccc-0000-4000-8000-0000000000aa', 'idea', 'Glow sti
 
 reset role;
 select test.act_as('99999999-9999-4999-8999-999999999999');
-insert into public.expenses (event_id, community_id, name, category, amount, vendor, requested_by)
-select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, 'Sweets', 'Food & catering', 3200, 'Anand Sweets', m.id
+insert into public.expenses (event_id, community_id, name, category, amount, vendor, bill_url, requested_by)
+select 'cccccccc-0000-4000-8000-0000000000aa', m.community_id, 'Sweets', 'Food & catering', 3200, 'Anand Sweets',
+       'bills/sweets.pdf', m.id
   from public.memberships m where m.user_id = '99999999-9999-4999-8999-999999999999';
 select test.eq(
   (select array_agg(distinct kind order by kind) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
@@ -1201,10 +1203,12 @@ select test.eq(
 
 reset role;
 select test.act_as('88888888-8888-4888-8888-888888888888');
+-- Hill Crest's event has an approved bill and nothing collected yet, so it is
+-- also overspent: somebody paid for the diyas and nobody has paid them back.
 select test.eq(
   (select array_agg(distinct kind order by kind) from public.todo_items((select id from public.communities where slug = 'hill-crest'))),
-  array['bill_to_approve', 'join_request', 'payment_to_confirm', 'suggestion_to_review'],
-  'the committee also sees bills, campaigns and suggestions to decide');
+  array['bill_to_approve', 'join_request', 'overspent', 'payment_to_confirm', 'suggestion_to_review'],
+  'the committee also sees bills, campaigns, suggestions and overspent events to decide');
 
 reset role;
 select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
@@ -2955,9 +2959,9 @@ select test.raises(
 -- Hill Crest has nobody else. A rule that cannot be satisfied is not a control.
 reset role;
 select test.act_as('88888888-8888-4888-8888-888888888888');
-insert into public.expenses (id, event_id, community_id, name, amount, vendor, requested_by)
+insert into public.expenses (id, event_id, community_id, name, amount, vendor, bill_url, requested_by)
 select 'dddddddd-0000-4000-8000-0000000000f2', 'cccccccc-0000-4000-8000-0000000000aa',
-       c.id, 'Marquee', 9000, 'Tent House', app.my_membership_id(c.id)
+       c.id, 'Marquee', 9000, 'Tent House', 'bills/marquee.pdf', app.my_membership_id(c.id)
   from public.communities c where c.slug = 'hill-crest';
 select test.eq(
   (select count(*) from public.todo_items((select c.id from public.communities c where c.slug = 'hill-crest'))
@@ -3322,3 +3326,246 @@ select test.eq(
     where schemaname = 'public' and policyname = 'expenses_update_own_pending_or_committee'),
   '(app.is_committee(community_id) OR ((requested_by = app.my_membership_id(community_id)) AND (status = ANY (ARRAY[''pending''::expense_status, ''changes_requested''::expense_status]))))'::text,
   'and the committee, or the filer while it is still open, may still edit one');
+
+-- ============================================================================
+-- 0930.0100 — money out has a reason
+-- ============================================================================
+-- Green Valley's society balance stands at ₹1,500 here, and Pongal (…f3) is
+-- holding ₹3,500 it was given and has spent none of.
+
+-- A bill names its vendor and carries a copy.
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+select test.raises(
+  $q$insert into public.expenses (event_id, community_id, name, amount, bill_url, requested_by)
+     select 'cccccccc-0000-4000-8000-0000000000f3', 'aaaaaaaa-0000-4000-8000-000000000001',
+            'Rope', 300,
+            'aaaaaaaa-0000-4000-8000-000000000001/cccccccc-0000-4000-8000-0000000000f3/rope.pdf',
+            app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001')$q$,
+  'a bill that does not name its vendor is refused');
+select test.raises(
+  $q$insert into public.expenses (event_id, community_id, name, amount, vendor, requested_by)
+     select 'cccccccc-0000-4000-8000-0000000000f3', 'aaaaaaaa-0000-4000-8000-000000000001',
+            'Rope', 300, 'Hardware store',
+            app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001')$q$,
+  'and so is one without a copy of the bill');
+
+-- The society spends its own balance: staff may, with everything filled in.
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.raises(
+  $q$select public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 200,
+       'Gate motor repair', 'Sri Ram Electricals',
+       'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg')$q$,
+  'a resident cannot spend the society balance');
+
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+select test.raises(
+  $q$select public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 200,
+       'Gate motor repair', 'Sri Ram Electricals', '')$q$,
+  'staff cannot record spending without the bill or a screenshot');
+select test.raises(
+  $q$select public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 200,
+       ' ', 'Sri Ram Electricals', 'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg')$q$,
+  'nor without saying what it was for');
+select test.raises(
+  $q$select public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 200,
+       'Gate motor repair', 'Sri Ram Electricals', 'bbbbbbbb-0000-4000-8000-000000000001/gate.jpg')$q$,
+  'nor with a receipt filed under another society');
+select test.raises(
+  $q$select public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 200,
+       'Gate motor repair', 'Sri Ram Electricals',
+       'aaaaaaaa-0000-4000-8000-000000000001/cccccccc-0000-4000-8000-0000000000f3/bill.jpg')$q$,
+  'nor with an event''s bill as the receipt, which would show it to every resident');
+select test.raises(
+  $q$select public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 2000,
+       'Gate motor repair', 'Sri Ram Electricals',
+       'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg')$q$,
+  'nor spend more than the society holds');
+select test.eq(
+  (select amount from public.record_society_expense('aaaaaaaa-0000-4000-8000-000000000001', 500,
+     'Gate motor repair', 'Sri Ram Electricals',
+     'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg', '2026-09-28')),
+  500::numeric(12,2), 'but can record a repair paid from it');
+insert into storage.objects (bucket_id, name)
+values ('bills', 'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg');
+
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.eq(
+  (select balance from public.society_balance
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  1000::numeric(12,2), 'which comes off the balance every resident sees');
+select test.eq(
+  (select concat_ws(' | ', direction, amount::text, counterpart, detail, confirmed_by)
+     from public.society_ledger
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001' and event_id is null),
+  'out | -500.00 | Sri Ram Electricals | Gate motor repair | Esha Patil',
+  'and sits in the ledger: who was paid, what for, and who recorded it');
+select test.eq(
+  test.visible($q$select 1 from storage.objects
+                  where bucket_id = 'bills'
+                    and name = 'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg'$q$),
+  1::bigint, 'with a receipt the resident can open');
+select test.eq(
+  (select count(*) from public.notifications
+    where kind = 'society_spent' and user_id = '33333333-3333-4333-8333-333333333333'),
+  1::bigint, 'and a notification saying so');
+
+-- Nothing gets in or changes except through the function.
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select test.raises(
+  $q$insert into public.society_expenses (community_id, amount, reason, paid_to, proof_path)
+     values ('aaaaaaaa-0000-4000-8000-000000000001', 1, 'x', 'y',
+             'aaaaaaaa-0000-4000-8000-000000000001/society/x.jpg')$q$,
+  'nobody writes a society expense directly, the committee included');
+delete from public.society_expenses;
+update public.society_expenses set amount = 1;
+reset role;
+select test.eq(
+  (select amount from public.society_expenses
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  500::numeric(12,2), 'and nobody can delete or rewrite one');
+
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+delete from storage.objects
+ where bucket_id = 'bills' and name = 'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg';
+reset role;
+select test.eq(
+  (select count(*) from storage.objects
+    where bucket_id = 'bills' and name = 'aaaaaaaa-0000-4000-8000-000000000001/society/gate.jpg'),
+  1::bigint, 'nor quietly remove the receipt behind it');
+
+-- An event spends more than it collected: Esha paid for a ₹5,000 sound system
+-- on an event holding ₹3,500.
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+insert into public.expenses
+  (id, event_id, community_id, name, category, amount, vendor, bill_url, paid_by, requested_by)
+select 'dddddddd-0000-4000-8000-0000000001a1', 'cccccccc-0000-4000-8000-0000000000f3',
+       'aaaaaaaa-0000-4000-8000-000000000001', 'Sound system', 'Sound & lighting', 5000,
+       'Beat Box Audio',
+       'aaaaaaaa-0000-4000-8000-000000000001/cccccccc-0000-4000-8000-0000000000f3/sound.pdf',
+       app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001')::text,
+       app.my_membership_id('aaaaaaaa-0000-4000-8000-000000000001');
+
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select test.eq(
+  (select subtitle from public.todo_items('aaaaaaaa-0000-4000-8000-000000000001')
+    where kind = 'bill_to_approve' and id = 'dddddddd-0000-4000-8000-0000000001a1'),
+  'Sound & lighting · Beat Box Audio · takes the event ₹1,500 over what it collected',
+  'before approving, the committee is warned the bill is more than the event has left');
+select public.review_expense('dddddddd-0000-4000-8000-0000000001a1', 'approved');
+select test.eq(
+  (select available from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  -1500::numeric(12,2), 'the approval leaves the event ₹1,500 over');
+
+reset role;
+select test.eq(
+  (select title || ' — ' || body from public.notifications
+    where kind = 'overspent' and user_id = '22222222-2222-4222-8222-222222222222'
+      and data ->> 'event_slug' = (select slug from public.events
+                                    where id = 'cccccccc-0000-4000-8000-0000000000f3')),
+  (select name from public.events where id = 'cccccccc-0000-4000-8000-0000000000f3')
+    || ' is ₹1,500 over what it collected — Esha Patil paid ₹5,000 for Sound system'
+    || ' (Sound & lighting). The society balance cannot cover it yet, so it stays in To do.',
+  'the rest of the committee hears who paid, how much, and whether the balance can pay them back');
+select test.eq(
+  (select count(*) from public.notifications
+    where kind = 'overspent' and user_id = '33333333-3333-4333-8333-333333333333'),
+  0::bigint, 'residents are not told; it is the committee''s to settle');
+
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select test.eq(
+  (select amount from public.todo_items('aaaaaaaa-0000-4000-8000-000000000001')
+    where kind = 'overspent' and id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  1500::numeric, 'and it waits in their To do for what is owed');
+
+reset role;
+select test.act_as('55555555-5555-4555-8555-555555555555');
+select test.eq(
+  (select count(*) from public.todo_items('aaaaaaaa-0000-4000-8000-000000000001')
+    where kind = 'overspent'),
+  0::bigint, 'not in staff''s, who cannot settle it');
+select test.raises(
+  $q$select public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 1000, 'Esha Patil',
+       'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png')$q$,
+  'staff cannot pay it back either');
+
+-- The committee pays Esha back, as far as the balance goes.
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select test.raises(
+  $q$select public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 1000, 'Esha Patil', '')$q$,
+  'not without the screenshot of the transfer');
+select test.raises(
+  $q$select public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 1000, ' ',
+       'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png')$q$,
+  'nor without saying who was paid');
+select test.raises(
+  $q$select public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 1000, 'Esha Patil',
+       'aaaaaaaa-0000-4000-8000-000000000001/cccccccc-0000-4000-8000-0000000000f3/esha.png')$q$,
+  'nor with a screenshot filed outside the society''s folder');
+select test.raises(
+  $q$select public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 1500, 'Esha Patil',
+       'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png')$q$,
+  'nor for more than the society balance holds');
+select test.eq(
+  (select amount from public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 1000,
+     'Esha Patil', 'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png', 'Sound system')),
+  1000::numeric(12,2), 'but can pay back what the balance holds');
+insert into storage.objects (bucket_id, name)
+values ('bills', 'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png');
+select test.eq(
+  (select available from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  -500::numeric(12,2), 'which leaves the event ₹500 over');
+select test.eq(
+  (select amount from public.todo_items('aaaaaaaa-0000-4000-8000-000000000001')
+    where kind = 'overspent' and id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  500::numeric, 'still in To do for the rest');
+select test.raises(
+  $q$select public.cover_overspend('cccccccc-0000-4000-8000-0000000000f3', 500, 'Esha Patil',
+       'aaaaaaaa-0000-4000-8000-000000000001/society/esha-2.png')$q$,
+  'until the balance has it: it is empty now');
+
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.eq(
+  (select paid_to from public.fund_movements
+    where proof_path = 'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png'),
+  'Esha Patil', 'every resident sees who was paid back');
+select test.eq(
+  test.visible($q$select 1 from storage.objects
+                  where bucket_id = 'bills'
+                    and name = 'aaaaaaaa-0000-4000-8000-000000000001/society/esha.png'$q$),
+  1::bigint, 'and can open the screenshot of the transfer');
+select test.eq(
+  (select title from public.notifications
+    where kind = 'fund_moved' and user_id = '33333333-3333-4333-8333-333333333333'
+      and title like '%paid back%'),
+  '₹1,000 paid back from the society balance', 'and is told the committee paid it back');
+select test.eq(
+  (select balance from public.society_balance
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  0::numeric(12,2), 'which comes off the balance like any other movement');
+
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(test.visible('select id from public.society_expenses'), 0::bigint,
+  'another society sees none of this society''s spending');
+
+reset role;
+select test.ok(
+  not has_function_privilege('anon',
+    'public.record_society_expense(uuid,numeric,text,text,text,date)', 'EXECUTE'),
+  'a stranger cannot spend a society balance');
+select test.ok(
+  not has_function_privilege('anon',
+    'public.cover_overspend(uuid,numeric,text,text,text)', 'EXECUTE'),
+  'nor pay anybody back from it');

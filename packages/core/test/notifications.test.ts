@@ -21,6 +21,15 @@ describe('notification targets', () => {
     expect(notificationWebPath(null)).toBe('/app');
   });
 
+  it('sends the society’s own money to Money, and an overspend to To do', () => {
+    expect(notificationWebPath({ screen: 'money', community_slug: 'wc' })).toBe('/app/wc/money');
+    expect(
+      notificationWebPath({ screen: 'todo', community_slug: 'wc', event_slug: 'diwali' }),
+    ).toBe('/app/wc/todo');
+    expect(notificationAppRoute({ screen: 'money' })).toBe('/(tabs)/money');
+    expect(notificationAppRoute({ screen: 'todo' })).toBe('/manage');
+  });
+
   it('opens the right app screen', () => {
     expect(notificationAppRoute({ screen: 'payments' })).toBe('/admin/payments');
     expect(notificationAppRoute({ screen: 'event', event_slug: 'diwali' })).toBe('/event/diwali');

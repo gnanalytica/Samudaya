@@ -30,6 +30,12 @@ export function notificationWebPath(data: NotificationData | null | undefined): 
       return event ? `${base}/events/${event}` : `${base}/events`;
     case 'events':
       return `${base}/events`;
+    // The society's own money: kept, spent, or paid back.
+    case 'money':
+      return `${base}/money`;
+    // Something only the committee can settle, such as an overspent event.
+    case 'todo':
+      return `${base}/todo`;
     case 'join':
       return '/onboarding';
     default:
@@ -53,6 +59,10 @@ export function notificationAppRoute(data: NotificationData | null | undefined):
       return event ? `/event/${event}` : '/(tabs)/events';
     case 'events':
       return '/(tabs)/events';
+    case 'money':
+      return '/(tabs)/money';
+    case 'todo':
+      return '/manage';
     case 'join':
       return '/join';
     default:

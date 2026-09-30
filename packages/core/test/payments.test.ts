@@ -7,6 +7,8 @@ import {
   newTransactionRef,
   parseUpiResponse,
   paymentProofPath,
+  recordedPaymentEvidenceProblem,
+  societyProofPath,
   upiCaptureNote,
   upiNote,
   upiPayUri,
@@ -159,5 +161,28 @@ describe('myPaymentTotals', () => {
 
   it('is zero for somebody who has not paid yet', () => {
     expect(myPaymentTotals([])).toEqual({ confirmed: 0, pending: 0 });
+  });
+});
+
+describe('recordedPaymentEvidenceProblem', () => {
+  it('lets staff record cash with nothing more', () => {
+    expect(recordedPaymentEvidenceProblem('cash', null, false)).toBeNull();
+  });
+
+  it('asks for a transaction ID or a screenshot for anything else', () => {
+    expect(recordedPaymentEvidenceProblem('upi', null, false)).toMatch(
+      /transaction ID or a screenshot/,
+    );
+    expect(recordedPaymentEvidenceProblem('bank_transfer', '  ', false)).not.toBeNull();
+    expect(recordedPaymentEvidenceProblem('upi', '412345678901', false)).toBeNull();
+    expect(recordedPaymentEvidenceProblem('cheque', null, true)).toBeNull();
+  });
+});
+
+describe('societyProofPath', () => {
+  it('files a receipt under the society, where storage lets every member read it', () => {
+    const path = societyProofPath('aaaaaaaa-0000-4000-8000-000000000001', 'Gate repair.JPG');
+    expect(path.startsWith('aaaaaaaa-0000-4000-8000-000000000001/society/')).toBe(true);
+    expect(path.endsWith('.jpg')).toBe(true);
   });
 });
