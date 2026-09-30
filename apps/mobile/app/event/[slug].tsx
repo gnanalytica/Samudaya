@@ -16,6 +16,7 @@ import {
   countdown,
   formatDate,
   formatMoney,
+  eventMoney,
   fundBarSegments,
   inTheFund,
   practiceDatesLine,
@@ -43,7 +44,15 @@ import { FestivalHero } from '../../src/components/festival';
 import { useTheme } from '../../src/lib/use-theme';
 import { Chip, ChipRow } from '../../src/components/admin-ui';
 import { FUND_RULE_PLAIN } from '../../src/components/event-form';
-import { FundKey, KeyValue, Meter, StatTile } from '../../src/components/event-ui';
+import {
+  EventBalanceCard,
+  EventMoneyTiles,
+  FundKey,
+  KeyValue,
+  Meter,
+  SpendKey,
+  StatTile,
+} from '../../src/components/event-ui';
 import { Suggestions } from '../../src/components/suggestions';
 import { ViewFileButton } from '../../src/components/file-ui';
 import { SectionBar, useSectionScroll } from '../../src/components/section-scroll';
@@ -98,6 +107,9 @@ export default function EventDetail() {
   // What the fund holds, carried money included: the headline, against the
   // event's target. Carried sums are rows under the bar, with who moved them.
   const held = inTheFund(stats.fundRaised, stats.fundCarried);
+  // Collected, spent and left, adding up: the Fund card's tiles, and for staff
+  // and the committee the balance at the top of the page.
+  const money = eventMoney(stats);
   const open = event.status === 'published';
 
   const changed = () => {
@@ -174,6 +186,15 @@ export default function EventDetail() {
         />
 
         <View {...sectionProps('about')} style={{ gap: spacing.lg }}>
+          {/* Staff and the committee see what is left before anything else,
+              so nobody commits to a bill the event cannot pay. */}
+          {can(role, 'events:manage') && event.status !== 'proposed' ? (
+            <EventBalanceCard
+              money={money}
+              currency={currency}
+              onPayBack={can(role, 'expenses:approve') ? () => router.push('/manage') : undefined}
+            />
+          ) : null}
           <About data={data} />
         </View>
 
@@ -183,7 +204,10 @@ export default function EventDetail() {
             <Heading>Fund</Heading>
             <View style={{ gap: 2 }}>
               <Amount value={held} currency={currency} />
-              <Caption>of {formatMoney(target, currency)}</Caption>
+              <Caption>
+                of {formatMoney(target, currency)} · {stats.contributors}{' '}
+                {stats.contributors === 1 ? 'household' : COPY.households.toLowerCase()} gave
+              </Caption>
             </View>
             <Meter
               percent={funded}
@@ -195,11 +219,14 @@ export default function EventDetail() {
             {data.carriedIn.map((movement) => (
               <Caption key={movement.id}>+ {carriedFromLine(movement, currency)}</Caption>
             ))}
-            <View style={{ gap: spacing.xs }}>
-              <KeyValue label="Spent" value={formatMoney(stats.spent, currency)} />
-              <KeyValue label="Available" value={formatMoney(stats.available, currency)} />
-              <KeyValue label={COPY.households} value={String(stats.contributors)} />
-            </View>
+            {/* What the approved bills have used of it, in its own colour. */}
+            <Meter
+              percent={money.spentPercent}
+              tone={money.overBy > 0 ? 'danger' : 'warning'}
+              label="Spent"
+            />
+            <SpendKey spent={money.spent} balance={money.balance} currency={currency} />
+            <EventMoneyTiles money={money} currency={currency} />
             {open && can(role, 'contribute') ? (
               <Button
                 label="Contribute"

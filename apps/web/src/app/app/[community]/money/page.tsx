@@ -11,6 +11,7 @@ import {
   holdingNote,
   ledgerFilterFrom,
   relativeTime,
+  todayIn,
   whereTheBalanceIs,
 } from '@samudaya/core';
 import { requireCommunity } from '@/lib/auth';
@@ -23,8 +24,10 @@ import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RollingAmount } from '@/components/rolling-amount';
 import { LedgerRow } from '@/components/ledger-row';
+import { StoredFileLink } from '@/components/bill-link';
 import { cn } from '@/lib/utils';
 import { MyContributions } from './my-contributions';
+import { SocietyExpenseForm } from './money-forms';
 
 export const metadata = { title: 'Money' };
 
@@ -225,7 +228,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
           <Card className="mt-5">
             <CardHeader
               title="Where money has moved"
-              description="What the committee did with money left over from closed events."
+              description="What the committee did with money left over from closed events, and who the society paid back."
             />
             <ul className="divide-border-base divide-y">
               {movements.map((movement) => (
@@ -240,16 +243,46 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                       : ''}
                     {movement.note ? ` · ${movement.note}` : ''}
                   </p>
+                  {/* A pay-back carries the screenshot of the transfer, for
+                      every resident: they should know people get paid back. */}
+                  {movement.proof_path ? (
+                    <StoredFileLink
+                      bucket="bills"
+                      path={movement.proof_path}
+                      label="View screenshot"
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>
           </Card>
         ) : null}
 
+        {/* Staff and the committee spend the society's own balance here: a
+            repair, damage, anything that is not an event's. The receipt is
+            required and every resident sees the entry in the list below. */}
+        {can(role, 'expenses:submit') ? (
+          <Card className="mt-5" id="spend-society">
+            <CardHeader
+              title="Spend from the society balance"
+              description="For a repair, damage or anything that is not an event's."
+            />
+            <CardBody>
+              <SocietyExpenseForm
+                slug={slug}
+                communityId={community.id}
+                balance={society.balance}
+                currency={community.currency}
+                today={todayIn(community.timezone)}
+              />
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card className="mt-5">
           <CardHeader
             title="Every transaction"
-            description="Confirmed payments in, approved bills out. A payment appears once staff confirm it."
+            description="Confirmed payments in; approved bills and the society's own spending out. A payment appears once staff confirm it."
           />
           <CardBody className="border-border-base border-b">
             {/* A GET form, so a filtered ledger is a link somebody can send to

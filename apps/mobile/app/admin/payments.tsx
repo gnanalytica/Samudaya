@@ -7,6 +7,8 @@ import {
   correctionNoteForStaff,
   formatDate,
   formatMoney,
+  paymentProofPath,
+  recordedPaymentEvidenceProblem,
   unitLabel,
   upiCaptureNote,
 } from '@samudaya/core';
@@ -26,7 +28,8 @@ import {
 } from '../../src/components/ui';
 import { Chip, ChipRow, ErrorText } from '../../src/components/admin-ui';
 import { KeyValue } from '../../src/components/event-ui';
-import { ViewFileButton } from '../../src/components/file-ui';
+import { FilePickerField, ViewFileButton } from '../../src/components/file-ui';
+import { uploadFile, type PickedFile } from '../../src/lib/storage';
 import { AuditTrail } from '../../src/components/audit-trail';
 import { spacing } from '../../src/lib/theme';
 
@@ -458,8 +461,9 @@ function RecordPayment({
   onCancel: () => void;
   onDone: () => void;
 }) {
-  const { activeCommunity } = useAuth();
+  const { activeCommunity, membershipId } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
+  const [proof, setProof] = useState<PickedFile | null>(null);
   const [flatQuery, setFlatQuery] = useState('');
   const [unitId, setUnitId] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
@@ -488,13 +492,30 @@ function RecordPayment({
       setError('Enter the amount received.');
       return;
     }
-    if (method !== 'cash' && !reference.trim()) {
-      setError('Add the UPI or bank reference so the payment can be matched.');
+    // Cash is the one kind of payment with nothing to show for it; anything
+    // else carries its transaction ID or a screenshot.
+    const missing = recordedPaymentEvidenceProblem(method, reference, Boolean(proof));
+    if (missing) {
+      setError(missing);
       return;
     }
-    if (!activeCommunity) return;
+    if (!activeCommunity || !membershipId) return;
     setBusy(true);
     setError(null);
+    let proofPath: string | null = null;
+    if (proof && method !== 'cash') {
+      const uploaded = await uploadFile(
+        'payment-proofs',
+        paymentProofPath(activeCommunity.id, membershipId, proof.name),
+        proof,
+      );
+      if ('error' in uploaded) {
+        setBusy(false);
+        setError(uploaded.error);
+        return;
+      }
+      proofPath = uploaded.path;
+    }
     const { error: insertError } = await supabase.from('contributions').insert({
       event_id: eventId,
       community_id: activeCommunity.id,
@@ -502,11 +523,13 @@ function RecordPayment({
       amount: value,
       method,
       reference: reference.trim() || null,
+      proof_path: proofPath,
       status: 'succeeded',
       channel: 'mobile',
     });
     setBusy(false);
     if (insertError) {
+      if (proofPath) void supabase.storage.from('payment-proofs').remove([proofPath]);
       setError(insertError.message);
       return;
     }
@@ -564,6 +587,15 @@ function RecordPayment({
         onChangeText={setReference}
         autoCapitalize="characters"
       />
+      {method !== 'cash' ? (
+        <FilePickerField
+          label="Or a screenshot of the payment"
+          file={proof}
+          onChange={setProof}
+          existingLabel="Either the reference or a screenshot. Cash needs neither."
+          allowPdf={false}
+        />
+      ) : null}
       <ErrorText message={error} />
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1 }}>

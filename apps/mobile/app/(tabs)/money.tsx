@@ -13,6 +13,7 @@ import {
   receiptRef,
   fundMovementLine,
   holdingNote,
+  isSocietySpending,
   ledgerEvidence,
   ledgerFilterFrom,
   ledgerMeta,
@@ -185,7 +186,7 @@ function PaymentStatus({ status }: { status: string }) {
 function SocietyMoney() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { activeCommunity } = useAuth();
+  const { activeCommunity, role } = useAuth();
   const [direction, setDirection] = useState<string>('all');
   const [eventSlug, setEventSlug] = useState('');
 
@@ -215,7 +216,7 @@ function SocietyMoney() {
         supabase
           .from('fund_movements')
           .select(
-            'id, kind, amount, note, decided_at, from_event:events!fund_movements_from_event_id_fkey(name), to_event:events!fund_movements_to_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+            'id, kind, amount, note, decided_at, paid_to, proof_path, from_event:events!fund_movements_from_event_id_fkey(name), to_event:events!fund_movements_to_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
           )
           .eq('community_id', communityId)
           .order('decided_at', { ascending: false })
@@ -409,6 +410,15 @@ function SocietyMoney() {
                         : ''}
                       {movement.note ? ` · ${movement.note}` : ''}
                     </Caption>
+                    {/* A pay-back carries the screenshot of the transfer, for
+                        every resident: they should know people get paid back. */}
+                    {movement.proof_path ? (
+                      <ViewFileButton
+                        bucket="bills"
+                        value={movement.proof_path}
+                        label="View screenshot"
+                      />
+                    ) : null}
                   </View>
                 ))}
               </Card>
@@ -443,8 +453,19 @@ function SocietyMoney() {
               </ChipRow>
             ) : null}
 
+            {/* Staff and the committee spend the society's own balance from
+                here: a repair, damage, anything that is not an event's. */}
+            {can(role, 'expenses:submit') ? (
+              <Button
+                label="Spend from the society balance"
+                variant="secondary"
+                onPress={() => router.push('/admin/society-spend')}
+              />
+            ) : null}
+
             <Caption>
-              Confirmed payments in, approved bills out. Payments show here once confirmed.
+              Confirmed payments in; approved bills and the society&rsquo;s own spending out.
+              Payments show here once confirmed.
             </Caption>
           </View>
         }
@@ -476,6 +497,7 @@ function SocietyMoney() {
           const when = item.happened_at ? formatDate(item.happened_at.slice(0, 10)) : null;
           const flat = ledgerFlat(item);
           const evidence = ledgerEvidence(item);
+          const societySpending = isSocietySpending(item);
           return (
             <Card style={{ gap: spacing.xs, marginBottom: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
@@ -500,11 +522,15 @@ function SocietyMoney() {
                       </Text>
                     ) : null}
                   </Body>
-                  <Caption>{[ledgerMeta(item), when].filter(Boolean).join(' · ')}</Caption>
+                  <Caption>
+                    {[ledgerMeta(item), when, societySpending ? 'from the society balance' : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </Caption>
                   {item.confirmed_at ? (
                     <Caption>
-                      {incoming ? 'Confirmed' : 'Approved'} by {item.confirmed_by ?? 'the society'}{' '}
-                      · {relativeTime(item.confirmed_at)}
+                      {incoming ? 'Confirmed' : societySpending ? 'Recorded' : 'Approved'} by{' '}
+                      {item.confirmed_by ?? 'the society'} · {relativeTime(item.confirmed_at)}
                     </Caption>
                   ) : null}
                 </View>

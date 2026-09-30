@@ -3,6 +3,7 @@ import { ArrowLeft, FileText, Receipt, Sparkles, Wallet } from 'lucide-react';
 import {
   COPY,
   can,
+  eventMoney,
   formatDate,
   formatMoney,
   fundBarSegments,
@@ -49,6 +50,7 @@ import {
   StatTile,
   StatTiles,
 } from '@/components/badges';
+import { EventBalanceCard } from '@/components/event-balance';
 import { BillLink, StoredFileLink } from '@/components/bill-link';
 import { AuditTrail } from '@/components/audit-trail';
 import {
@@ -150,6 +152,7 @@ export default async function ManageEventPage(
   );
   const funded = bar.confirmed;
   const held = inTheFund(stats.fundRaised, stats.fundCarried);
+  const money = eventMoney(stats);
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
   // As on the phone: an event's activities stop changing once it is closed or
@@ -230,8 +233,18 @@ export default async function ManageEventPage(
 
         {active === 'overview' ? (
           <div className="space-y-5">
+            {/* What is left to spend, first: nobody should commit to a bill
+                without knowing whether this event can pay it. */}
+            <EventBalanceCard
+              money={money}
+              currency={community.currency}
+              todoHref={isCommittee ? `${base}/todo#overspent` : undefined}
+            />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label="Raised" value={formatMoney(stats.fundRaised, community.currency)} />
+              <StatTile
+                label="Collected"
+                value={formatMoney(money.collected, community.currency)}
+              />
               <StatTile label="Spent" value={formatMoney(stats.spent, community.currency)} />
               <StatTile label="Flats paid" value={String(flatsPaid)} />
               <StatTile label="Registered" value={String(registrations.length)} />
@@ -831,6 +844,8 @@ export default async function ManageEventPage(
                   <RecordPaymentForm
                     slug={slug}
                     eventSlug={event.slug}
+                    communityId={community.id}
+                    membershipId={membership.id}
                     units={(units.data ?? []).map((unit) => ({
                       id: unit.id,
                       label: unitLabel(unit),

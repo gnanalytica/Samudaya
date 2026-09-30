@@ -557,8 +557,10 @@ const METHODS = [
 
 /**
  * Upload a new bill, or correct and re-upload one that is pending or sent back.
- * What, amount, category and the photo come first; the rest has sensible
- * defaults (today, UPI, paid by the society) and sits under "More details".
+ * What, amount, category, vendor and the photo come first, and the last two
+ * are required: the committee approves a bill on everybody's behalf, and
+ * cannot without knowing who was paid and seeing the bill. The rest has
+ * sensible defaults (today, UPI, paid by the society) under "More details".
  */
 export function ExpenseForm({
   slug,
@@ -642,38 +644,45 @@ export function ExpenseForm({
         hint="Same categories as the budget."
         manageHref={pickers.manageHref}
       />
-      <FileUpload
-        key={creating ? `new-${created.version}` : expense.id}
-        bucket="bills"
-        folder={`${communityId}/${eventId}`}
-        name="bill_url"
-        label="Photo of the bill"
-        hint="A photo or PDF, up to 10 MB. Residents see it once the committee approves."
-        maxBytes={10 * 1_048_576}
-        defaultPath={expense?.bill_url}
-        onUploadingChange={setUploading}
+      <CatalogueSelect
+        key={creating ? `ven-${created.version}` : `ven-${expense.id}`}
+        slug={slug}
+        kind="vendor"
+        name="vendor"
+        label="Vendor"
+        items={pickers.vendor}
+        defaultId={expense?.vendor_id}
+        defaultLabel={expense?.vendor}
+        placeholder="Choose a vendor"
+        error={state.fieldErrors?.vendor}
+        required
+        allowQuickAdd
       />
+      <div className="space-y-1.5">
+        <FileUpload
+          key={creating ? `new-${created.version}` : expense.id}
+          bucket="bills"
+          folder={`${communityId}/${eventId}`}
+          name="bill_url"
+          label="Photo of the bill (required)"
+          hint="A photo or PDF, up to 10 MB. Residents see it once the committee approves."
+          maxBytes={10 * 1_048_576}
+          defaultPath={expense?.bill_url}
+          onUploadingChange={setUploading}
+        />
+        {state.fieldErrors?.bill_url ? (
+          <p className="text-danger text-sm">{state.fieldErrors.bill_url}</p>
+        ) : null}
+      </div>
 
       <details className="group border-border-base rounded-lg border" open={!creating}>
         <summary className="text-ink flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
           {COPY.moreDetails}
           <span className="text-ink-subtle text-xs font-normal group-open:hidden">
-            Vendor, paid by, method, date
+            Paid by, method, date
           </span>
         </summary>
         <div className="border-border-base space-y-4 border-t px-4 py-4">
-          <CatalogueSelect
-            key={creating ? `ven-${created.version}` : `ven-${expense.id}`}
-            slug={slug}
-            kind="vendor"
-            name="vendor"
-            label="Vendor"
-            items={pickers.vendor}
-            defaultId={expense?.vendor_id}
-            defaultLabel={expense?.vendor}
-            placeholder="Choose a vendor"
-            allowQuickAdd
-          />
           <div className="grid gap-4 sm:grid-cols-3">
             <Field
               label="Paid by"
@@ -872,12 +881,18 @@ export function RecordPaymentForm({
   slug,
   eventSlug,
   units,
+  communityId,
+  membershipId,
 }: {
   slug: string;
   eventSlug: string;
   units: { id: string; label: string }[];
+  communityId: string;
+  /** Whoever is recording it: screenshots go in their own folder. */
+  membershipId: string;
 }) {
-  const { state, action, ref } = useResettingAction(recordPayment);
+  const { state, action, ref, version } = useResettingAction(recordPayment);
+  const [uploading, setUploading] = useState(false);
   const today = todayIn();
   return (
     <form ref={ref} action={action} className="space-y-4">
@@ -921,13 +936,24 @@ export function RecordPaymentForm({
         <Field
           label="Reference"
           htmlFor="pay-ref"
-          hint="UPI transaction ID, cheque or receipt number."
+          error={state.fieldErrors?.reference}
+          hint="UPI transaction ID or cheque number. Needed for anything but cash, unless you attach a screenshot."
         >
           {(control) => <Input {...control} name="reference" />}
         </Field>
       </div>
+      <FileUpload
+        key={`proof-${version}`}
+        bucket="payment-proofs"
+        folder={`${communityId}/${membershipId}`}
+        name="proof_path"
+        label="Screenshot of the payment"
+        hint="For UPI, bank transfer or cheque, if there is no reference to type. Not needed for cash."
+        maxBytes={5 * 1_048_576}
+        onUploadingChange={setUploading}
+      />
       <Feedback state={state} />
-      <Submit label="Record payment" busy="Recording…" />
+      <Submit label="Record payment" busy="Recording…" disabled={uploading} />
     </form>
   );
 }

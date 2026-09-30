@@ -277,13 +277,49 @@ export const createExpenseSchema = z.object({
   name: z.string().trim().min(2, 'Name the expense').max(140),
   category: z.string().trim().max(60).optional(),
   amount: z.coerce.number().positive('Enter an amount greater than zero').max(10_000_000),
-  vendor: z.string().trim().max(140).optional(),
+  // Both required: a bill that does not say who was paid, or that nobody can
+  // look at, is not something the committee can approve on anybody's behalf.
+  vendor: z.string({ error: 'Name the vendor' }).trim().min(1, 'Name the vendor').max(140),
   paid_by: z.string().trim().max(140).optional(),
   method: paymentMethodSchema.default('upi'),
-  bill_url: z.string().trim().max(500).optional(),
+  bill_url: z
+    .string({ error: 'Attach a photo or PDF of the bill' })
+    .trim()
+    .min(1, 'Attach a photo or PDF of the bill')
+    .max(500),
   spent_on: isoDate.optional(),
 });
 export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;
+
+/**
+ * The society spending its own balance: a repair, damage, anything that is no
+ * event's. Every field is required, the receipt included; the database checks
+ * the same things again, and that the balance has the money.
+ */
+export const societyExpenseSchema = z.object({
+  amount: z.coerce
+    .number()
+    .positive('Enter an amount greater than zero')
+    .max(10_000_000, 'That amount is too large'),
+  reason: z.string().trim().min(3, 'Say what the money was spent on').max(200),
+  paid_to: z.string().trim().min(2, 'Say who was paid').max(140),
+  spent_on: isoDate,
+});
+
+/**
+ * Paying back whoever covered an event's overspend, from the society balance.
+ * The screenshot of the transfer is required too; it is checked where the
+ * file is.
+ */
+export const coverOverspendSchema = z.object({
+  event_id: uuid,
+  amount: z.coerce
+    .number()
+    .positive('Enter an amount greater than zero')
+    .max(10_000_000, 'That amount is too large'),
+  paid_to: z.string().trim().min(2, 'Say who was paid back').max(140),
+  note: z.string().trim().max(300).optional(),
+});
 
 export const reviewExpenseSchema = z.object({
   expense_id: uuid,

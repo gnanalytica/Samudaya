@@ -1,5 +1,6 @@
 import { carriedFromLine, type CarriedInRow } from '@samudaya/core';
 import { cn } from '@/lib/utils';
+import { StoredFileLink } from '@/components/bill-link';
 
 /**
  * Money the committee carried into this event, one row per sum: where it came
@@ -20,7 +21,13 @@ export function CarriedIn({
   return (
     <ul className={cn('text-ink-subtle mt-2 space-y-0.5 text-xs', className)}>
       {movements.map((movement) => (
-        <li key={movement.id}>+ {carriedFromLine(movement, currency)}</li>
+        <li key={movement.id}>
+          + {carriedFromLine(movement, currency)}
+          {/* A pay-back carries the screenshot of the transfer, for anyone. */}
+          {movement.proof_path ? (
+            <StoredFileLink bucket="bills" path={movement.proof_path} label="View screenshot" />
+          ) : null}
+        </li>
       ))}
     </ul>
   );

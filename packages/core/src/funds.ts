@@ -110,6 +110,10 @@ export type FundMovementRow = {
   decided_at?: string | null;
   from_event?: { name: string | null } | null;
   to_event?: { name: string | null } | null;
+  /** Who the society paid back, when the movement covered an overspend. */
+  paid_to?: string | null;
+  /** The screenshot of that transfer, in the bills bucket. */
+  proof_path?: string | null;
 };
 
 /**
@@ -128,6 +132,12 @@ export function fundMovementLine(movement: FundMovementRow, currency = 'INR'): s
   const money = formatMoney(Number(movement.amount ?? 0), currency);
   const from = movement.from_event?.name ?? 'a closed event';
   const to = movement.to_event?.name ?? 'an event';
+
+  // Somebody covered an event's overspend out of their own pocket, and the
+  // society paid them back.
+  if (movement.paid_to) {
+    return `${money} from the society balance, paid back to ${movement.paid_to} for ${to}`;
+  }
 
   switch (movement.kind) {
     case 'society_balance':
@@ -158,8 +168,9 @@ export type CarriedInRow = FundMovementRow & {
  */
 export function carriedFromLine(movement: CarriedInRow, currency = 'INR'): string {
   const money = formatMoney(Number(movement.amount ?? 0), currency);
-  const source =
-    movement.kind === 'from_balance'
+  const source = movement.paid_to
+    ? `from the society balance, paid back to ${movement.paid_to}`
+    : movement.kind === 'from_balance'
       ? 'from what the society had kept'
       : `left over from ${movement.from_event?.name ?? 'a closed event'}`;
   const who = movement.decider?.profiles?.full_name;

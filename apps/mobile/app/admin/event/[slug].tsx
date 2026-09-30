@@ -19,11 +19,13 @@ import {
   SURPLUS_ANSWER_LABEL,
   can,
   createActivitySchema,
+  eventMoney,
   eventSlug as makeEventSlug,
   formatDate,
   formatMoney,
   nextEditionDate,
   nextEditionName,
+  normalizeStats,
   placesProblem,
   practiceDatesLine,
   type FundRule,
@@ -32,6 +34,7 @@ import {
   updateActivitySchema,
 } from '@samudaya/core';
 import { useAuth } from '../../../src/lib/auth';
+import { EventBalanceCard } from '../../../src/components/event-ui';
 import { supabase } from '../../../src/lib/supabase';
 import { useCommunityData } from '../../../src/lib/use-community-data';
 import {
@@ -129,7 +132,8 @@ type Loaded = NonNullable<Awaited<ReturnType<typeof loadEvent>>>;
 /** Staff and the committee run an event from the phone. */
 export default function ManageEvent() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  const { role } = useAuth();
+  const { role, activeCommunity } = useAuth();
+  const router = useRouter();
   const { data, loading, refreshing, refresh } = useCommunityData(
     `admin:event:${slug}`,
     (communityId) => loadEvent(communityId, String(slug)),
@@ -169,6 +173,15 @@ export default function ManageEvent() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
         >
           <StatusCard data={data} onChange={refresh} />
+          {/* What is left to spend, where nobody can miss it: nobody should
+              commit to a bill without knowing whether the event can pay it. */}
+          {data.event.status !== 'proposed' ? (
+            <EventBalanceCard
+              money={eventMoney(normalizeStats(data.stats))}
+              currency={activeCommunity?.currency ?? 'INR'}
+              onPayBack={can(role, 'expenses:approve') ? () => router.push('/manage') : undefined}
+            />
+          ) : null}
           <SurplusCard data={data} onChange={refresh} />
           <BringInBalanceCard data={data} onChange={refresh} />
           <DetailsCard key={`details:${data.event.id}`} data={data} onChange={refresh} />

@@ -4,6 +4,7 @@ import {
   EVENT_STATUS_LABEL,
   EXPENSE_STATUS_LABEL,
   TASK_STATUS_LABEL,
+  formatMoney,
   fundKey,
 } from '@samudaya/core';
 import { cn } from '@/lib/utils';
@@ -218,10 +219,13 @@ export function StatTile({
   label,
   value,
   tone,
+  hint,
 }: {
   label: string;
   value: string;
   tone?: 'success' | 'danger';
+  /** A line under the label saying where the number comes from. */
+  hint?: string;
 }) {
   return (
     <div className="border-border-base bg-surface-raised rounded-2xl border px-3.5 py-3">
@@ -239,6 +243,64 @@ export function StatTile({
       <div className="text-ink-subtle mt-0.5 text-[10.5px] font-medium tracking-[0.08em] uppercase">
         {label}
       </div>
+      {hint ? <p className="text-ink-muted mt-1 text-xs leading-snug">{hint}</p> : null}
     </div>
+  );
+}
+
+/**
+ * Spending, in its own colour so it never reads as the fund bar above it:
+ * approved bills as a share of what the event collected. A full bar in the
+ * danger colour means the bills came to more than that, and somebody paid the
+ * difference out of their own pocket.
+ */
+export function SpendBar({ percent, over = false }: { percent: number; over?: boolean }) {
+  const width = Math.min(100, Math.max(0, percent));
+  return (
+    <div
+      className="bg-surface-sunken flex h-[7px] overflow-hidden rounded-full"
+      role="progressbar"
+      aria-valuenow={width}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label="Spent"
+      aria-valuetext={over ? 'More than was collected' : `${width}% of what was collected`}
+    >
+      <div
+        className={cn('bar-fill h-full rounded-full', over ? 'bg-danger' : 'bg-warning')}
+        style={{ width: `${width}%` }}
+      />
+    </div>
+  );
+}
+
+/** The line under the spend bar: what was spent, and what is left or owed. */
+export function SpendKey({
+  spent,
+  balance,
+  currency,
+  className,
+}: {
+  spent: number;
+  balance: number;
+  currency: string;
+  className?: string;
+}) {
+  const over = balance < 0;
+  return (
+    <p className={cn('text-ink-muted flex flex-wrap gap-x-3 gap-y-1 text-xs', className)}>
+      <span className="inline-flex items-center gap-1.5">
+        <span
+          aria-hidden="true"
+          className={cn('inline-block h-2 w-3 rounded-sm', over ? 'bg-danger' : 'bg-warning')}
+        />
+        {formatMoney(spent, currency)} spent
+      </span>
+      <span className={over ? 'text-danger font-medium' : undefined}>
+        {over
+          ? `${formatMoney(-balance, currency)} more than was collected`
+          : `${formatMoney(balance, currency)} left`}
+      </span>
+    </p>
   );
 }

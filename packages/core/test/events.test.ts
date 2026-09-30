@@ -7,6 +7,7 @@ import {
   TASK_STATUS_DOT,
   budgetBar,
   budgetTotal,
+  eventMoney,
   fundedPercent,
   normalizeStats,
   surplus,
@@ -136,5 +137,45 @@ describe('vocabulary', () => {
     for (const activity of DEFAULT_ACTIVITIES) {
       expect(activity.emoji.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('eventMoney', () => {
+  it('counts money carried in as this event’s, so the three tiles add up', () => {
+    // Velocity vipers: ₹2,37,500 from residents, ₹6,990 carried from Challenge,
+    // ₹1,53,000 of approved bills.
+    const money = eventMoney({
+      fundRaised: 237500,
+      fundCarried: 6990,
+      spent: 153000,
+      available: 91490,
+    });
+    expect(money.collected).toBe(244490);
+    expect(money.collected - money.spent).toBe(money.balance);
+    expect(money.balance).toBe(91490);
+    expect(money.overBy).toBe(0);
+    expect(money.spentPercent).toBe(63);
+  });
+
+  it('says what an event is over by when bills outrun what it collected', () => {
+    const money = eventMoney({ fundRaised: 3000, fundCarried: 500, spent: 5000, available: -1500 });
+    expect(money.overBy).toBe(1500);
+    expect(money.spentPercent).toBe(100);
+  });
+
+  it('keeps money moved on after closing out of what was collected', () => {
+    const money = eventMoney({ fundRaised: 5000, fundCarried: -2000, spent: 3000, available: 0 });
+    expect(money.collected).toBe(5000);
+    expect(money.movedOut).toBe(2000);
+    expect(money.collected - money.spent - money.movedOut).toBe(money.balance);
+  });
+
+  it('shows a full spent bar for spending with nothing collected, and an empty one for neither', () => {
+    expect(
+      eventMoney({ fundRaised: 0, fundCarried: 0, spent: 800, available: -800 }).spentPercent,
+    ).toBe(100);
+    expect(eventMoney({ fundRaised: 0, fundCarried: 0, spent: 0, available: 0 }).spentPercent).toBe(
+      0,
+    );
   });
 });

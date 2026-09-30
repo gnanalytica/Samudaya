@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import {
   formatDate,
   formatMoney,
+  isSocietySpending,
   ledgerEvidence,
   ledgerMeta,
   ledgerFlat,
@@ -46,6 +47,7 @@ export function LedgerRow({
   currency: string;
 }) {
   const incoming = row.direction === 'in';
+  const societySpending = isSocietySpending(row);
   const flat = ledgerFlat(row);
   const evidence = ledgerEvidence(row);
 
@@ -101,12 +103,14 @@ export function LedgerRow({
                   {row.event_name}
                 </Link>
               </>
+            ) : societySpending ? (
+              ' · from the society balance'
             ) : null}
           </p>
           {row.confirmed_at ? (
             <p className="text-ink-subtle mt-0.5 text-xs">
-              {incoming ? 'Confirmed' : 'Approved'} by {row.confirmed_by ?? 'the society'} ·{' '}
-              {relativeTime(row.confirmed_at)}
+              {incoming ? 'Confirmed' : societySpending ? 'Recorded' : 'Approved'} by{' '}
+              {row.confirmed_by ?? 'the society'} · {relativeTime(row.confirmed_at)}
             </p>
           ) : null}
           {/* Every row that has evidence offers it: the bill for money out, the

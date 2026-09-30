@@ -1491,6 +1491,8 @@ export type Database = {
           decided_by: string | null
           decided_at: string
           created_at: string
+          paid_to: string | null
+          proof_path: string | null
         }
         Insert: {
           id?: string
@@ -1503,6 +1505,8 @@ export type Database = {
           decided_by?: string | null
           decided_at?: string
           created_at?: string
+          paid_to?: string | null
+          proof_path?: string | null
         }
         Update: {
           id?: string
@@ -1515,6 +1519,8 @@ export type Database = {
           decided_by?: string | null
           decided_at?: string
           created_at?: string
+          paid_to?: string | null
+          proof_path?: string | null
         }
         Relationships: [
           {
@@ -2107,6 +2113,57 @@ export type Database = {
             columns: ["id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      society_expenses: {
+        Row: {
+          id: string
+          community_id: string
+          amount: number
+          reason: string
+          paid_to: string
+          proof_path: string
+          spent_on: string
+          recorded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          community_id: string
+          amount: number
+          reason: string
+          paid_to: string
+          proof_path: string
+          spent_on?: string
+          recorded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          community_id?: string
+          amount?: number
+          reason?: string
+          paid_to?: string
+          proof_path?: string
+          spent_on?: string
+          recorded_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_expenses_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "society_expenses_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "memberships"
             referencedColumns: ["id"]
           }
         ]
@@ -2734,6 +2791,16 @@ export type Database = {
       }
         Returns: Database["public"]["Tables"]["activity_suggestions"]["Row"]
       }
+      cover_overspend: {
+        Args: {
+        p_event_id: string
+        p_amount: number
+        p_paid_to: string
+        p_proof_path: string
+        p_note?: string
+      }
+        Returns: Database["public"]["Tables"]["fund_movements"]["Row"]
+      }
       create_invite_code: {
         Args: {
         p_community_id: string
@@ -2858,6 +2925,17 @@ export type Database = {
         p_take_bank_amount?: boolean
       }
         Returns: Database["public"]["Tables"]["contributions"]["Row"]
+      }
+      record_society_expense: {
+        Args: {
+        p_community_id: string
+        p_amount: number
+        p_reason: string
+        p_paid_to: string
+        p_proof_path: string
+        p_spent_on?: string
+      }
+        Returns: Database["public"]["Tables"]["society_expenses"]["Row"]
       }
       redeem_invite_code: {
         Args: {

@@ -28,7 +28,8 @@ export type TodoKind =
   | 'bill_sent_back'
   | 'campaign_to_review'
   | 'suggestion_to_review'
-  | 'flat_change';
+  | 'flat_change'
+  | 'overspent';
 
 /** Section headings and action labels for the To do queue. */
 export const TODO_KIND: Record<TodoKind, { section: string; action: string }> = {
@@ -39,12 +40,15 @@ export const TODO_KIND: Record<TodoKind, { section: string; action: string }> = 
   campaign_to_review: { section: 'Campaigns to review', action: 'Review' },
   suggestion_to_review: { section: 'Suggestions to review', action: 'Review' },
   flat_change: { section: 'Residents who moved', action: 'Approve' },
+  overspent: { section: 'Events that spent more than they collected', action: 'Pay back' },
 };
 
 export const TODO_ORDER: TodoKind[] = [
   'payment_to_confirm',
   'join_request',
   'bill_to_approve',
+  // Somebody is out of pocket for the society; that waits on nothing else.
+  'overspent',
   'bill_sent_back',
   'campaign_to_review',
   'suggestion_to_review',
