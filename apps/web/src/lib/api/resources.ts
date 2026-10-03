@@ -216,20 +216,38 @@ export async function getLedger(principal: ApiPrincipal, eventId: string) {
   const event = await getEvent(principal, eventId);
   if (!event) return null;
 
-  const { data, error } = await principal.db
-    .from('expenses')
-    .select(
-      'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
-    )
-    .eq('community_id', withCommunity(principal))
-    .eq('event_id', event.id)
-    .order('spent_on', { ascending: false });
+  const [expenses, moved] = await Promise.all([
+    principal.db
+      .from('expenses')
+      .select(
+        'id, name, category, amount, vendor, paid_by, method, status, bill_url, spent_on, requester:memberships!expenses_requested_by_fkey(profiles(full_name)), approver:memberships!expenses_approved_by_fkey(profiles(full_name))',
+      )
+      .eq('community_id', withCommunity(principal))
+      .eq('event_id', event.id)
+      .order('spent_on', { ascending: false }),
+    // Money the committee moved into the event (a closed event's leftover,
+    // the society balance, an overspend paid back) or out of it when it
+    // closed. With these the ledger adds up to what the event holds.
+    principal.db
+      .from('fund_movements')
+      .select(
+        'id, kind, amount, note, decided_at, paid_to, from_event_id, to_event_id, from_event:events!fund_movements_from_event_id_fkey(slug, name), to_event:events!fund_movements_to_event_id_fkey(slug, name)',
+      )
+      .eq('community_id', withCommunity(principal))
+      .or(`from_event_id.eq.${event.id},to_event_id.eq.${event.id}`)
+      .order('decided_at', { ascending: false }),
+  ]);
 
-  if (error) throw error;
+  if (expenses.error) throw expenses.error;
+  if (moved.error) throw moved.error;
   return {
     event: { id: event.id, slug: event.slug, name: event.name },
     stats: event.stats,
-    expenses: data,
+    expenses: expenses.data,
+    movements: (moved.data ?? []).map(({ from_event_id: _from, to_event_id, ...movement }) => ({
+      ...movement,
+      direction: to_event_id === event.id ? ('in' as const) : ('out' as const),
+    })),
   };
 }
 

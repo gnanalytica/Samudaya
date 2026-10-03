@@ -23,3 +23,4 @@ export * from './funds';
 export * from './audit';
 export * from './account';
 export * from './activities';
+export * from './comments';

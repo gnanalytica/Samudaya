@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { PiggyBank, Scale, Wallet } from 'lucide-react';
 import {
   LEDGER_FILTERS,
+  SOCIETY_BALANCE_LEDGER,
   UNPUBLISHED_EVENT,
   can,
   filterLedger,
@@ -10,6 +11,8 @@ import {
   fundMovementLine,
   holdingNote,
   ledgerFilterFrom,
+  ledgerScopes,
+  ledgerTotals,
   relativeTime,
   todayIn,
   whereTheBalanceIs,
@@ -75,7 +78,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
     supabase
       .from('society_ledger')
       .select(
-        'id, direction, happened_at, amount, counterpart, detail, payer_name, unit_label, method, receipt_no, document_url, confirmed_by, confirmed_at, event_slug, event_name',
+        'id, kind, direction, happened_at, amount, counterpart, detail, payer_name, unit_label, method, receipt_no, document_url, confirmed_by, confirmed_at, event_id, event_slug, event_name',
       )
       .eq('community_id', community.id)
       .order('happened_at', { ascending: false })
@@ -88,7 +91,9 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
     // UNPUBLISHED_EVENT rather than a row that silently goes missing.
     supabase
       .from('event_stats')
-      .select('event_id, available, fund_carried')
+      .select(
+        'event_id, available, fund_carried, fund_carried_in, fund_raised, spent, fund_moved_out',
+      )
       .eq('community_id', community.id),
     supabase
       .from('events')
@@ -103,10 +108,26 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
   const visible = filterLedger(rows, filter, eventFilter);
 
   // Built from the ledger rather than from events, so the filter only ever
-  // offers a year that has something in it.
-  const events = [...new Map(rows.map((row) => [row.event_slug, row.event_name])).entries()]
-    .filter(([value]) => value)
-    .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  // offers a year that has something in it — and the society balance, once it
+  // has rows of its own.
+  const scopes = ledgerScopes(rows);
+  const scope = scopes.find((option) => option.value === eventFilter);
+  // One event's ledger, or the society balance's, adds up to what it holds:
+  // say so under the list, so nobody has to add it up to check. An event's
+  // figures come from its own numbers rather than the rows on screen, which
+  // stop at the newest 500; the society balance's rows are few.
+  const totalsFor = (value: string) => {
+    if (value === SOCIETY_BALANCE_LEDGER) return ledgerTotals(visible);
+    const id = (eventNames.data ?? []).find((row) => row.slug === value)?.id;
+    const stats = (eventStats.data ?? []).find((row) => row.event_id === id);
+    if (!stats) return ledgerTotals(visible);
+    return {
+      in: Number(stats.fund_raised ?? 0) + Number(stats.fund_carried_in ?? 0),
+      out: Number(stats.spent ?? 0) + Number(stats.fund_moved_out ?? 0),
+      left: Number(stats.available ?? 0),
+    };
+  };
+  const scopeTotals = !scope || filter !== 'all' ? null : totalsFor(eventFilter);
 
   const balance = Number(totals.data?.balance ?? 0);
   const holdings = whereTheBalanceIs(
@@ -282,7 +303,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
         <Card className="mt-5">
           <CardHeader
             title="Every transaction"
-            description="Confirmed payments in; approved bills and the society's own spending out. A payment appears once staff confirm it."
+            description="Confirmed payments in; approved bills and the society's own spending out. A payment appears once staff confirm it. Pick an event to see the money the committee moved in or out of it too."
           />
           <CardBody className="border-border-base border-b">
             {/* A GET form, so a filtered ledger is a link somebody can send to
@@ -305,7 +326,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                   ))}
                 </select>
               </div>
-              {events.length > 1 ? (
+              {scopes.length ? (
                 <div>
                   <label htmlFor="event" className="text-ink-subtle mb-1 block text-xs font-medium">
                     Event
@@ -317,9 +338,9 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
                     className="border-border-base bg-surface-raised text-ink rounded-lg border px-3 py-2 pr-8 text-base sm:text-sm"
                   >
                     <option value="">Every event</option>
-                    {events.map(([value, label]) => (
-                      <option key={value} value={value ?? ''}>
-                        {label}
+                    {scopes.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
                       </option>
                     ))}
                   </select>
@@ -351,6 +372,34 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
               }
             />
           )}
+          {scope && scopeTotals && visible.length ? (
+            <div className="border-border-base bg-surface-sunken space-y-1 border-t px-5 py-3 text-sm">
+              <div className="text-ink-muted flex justify-between gap-3">
+                <span>Money in</span>
+                <span className="tabular-nums">
+                  +{formatMoney(scopeTotals.in, community.currency)}
+                </span>
+              </div>
+              <div className="text-ink-muted flex justify-between gap-3">
+                <span>Money out</span>
+                <span className="tabular-nums">
+                  −{formatMoney(scopeTotals.out, community.currency)}
+                </span>
+              </div>
+              <div className="text-ink flex justify-between gap-3 font-semibold">
+                <span>
+                  {eventFilter === SOCIETY_BALANCE_LEDGER
+                    ? 'Kept for the society'
+                    : `Left in ${scope.label}`}
+                </span>
+                <span
+                  className={cn('tabular-nums', scopeTotals.left < 0 ? 'text-danger' : undefined)}
+                >
+                  {formatMoney(scopeTotals.left, community.currency)}
+                </span>
+              </div>
+            </div>
+          ) : null}
         </Card>
 
         <p className="text-ink-subtle mt-4 flex items-start gap-2 text-xs">
@@ -366,7 +415,7 @@ export default async function MoneyPage(props: PageProps<'/app/[community]/money
           </span>
         </p>
 
-        {visible.length >= 500 ? (
+        {rows.length >= 500 ? (
           <p className="text-ink-subtle mt-2 text-xs">
             <Badge tone="neutral">Showing the most recent 500</Badge>
           </p>

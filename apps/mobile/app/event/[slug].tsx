@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { Lock } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -19,8 +18,8 @@ import {
   eventMoney,
   fundBarSegments,
   inTheFund,
+  movedOnSummary,
   practiceDatesLine,
-  type FundRule,
 } from '@samudaya/core';
 import { useAuth } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
@@ -41,9 +40,7 @@ import {
   SectionLabel,
 } from '../../src/components/ui';
 import { FestivalHero } from '../../src/components/festival';
-import { useTheme } from '../../src/lib/use-theme';
 import { Chip, ChipRow } from '../../src/components/admin-ui';
-import { FUND_RULE_PLAIN } from '../../src/components/event-form';
 import {
   EventBalanceCard,
   EventMoneyTiles,
@@ -75,7 +72,6 @@ export default function EventDetail() {
   );
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { colors } = useTheme();
   const { activeCommunity, membershipId, viewRole: role } = useAuth();
   const currency = activeCommunity?.currency ?? 'INR';
 
@@ -102,13 +98,13 @@ export default function EventDetail() {
 
   const { event, stats } = data;
   const target = stats.fundTarget || event.fund_target;
-  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, target, stats.fundCarried);
+  const fundBar = fundBarSegments(stats.fundRaised, stats.fundPending, target, stats.fundCarriedIn);
   const funded = fundBar.confirmed;
   // What the fund holds, carried money included: the headline, against the
   // event's target. Carried sums are rows under the bar, with who moved them.
-  const held = inTheFund(stats.fundRaised, stats.fundCarried);
-  // Collected, spent and left, adding up: the Fund card's tiles, and for staff
-  // and the committee the balance at the top of the page.
+  const held = inTheFund(stats.fundRaised, stats.fundCarriedIn);
+  // Collected, spent, moved on and left, adding up: the Fund card's tiles, and
+  // for staff and the committee the balance at the top of the page.
   const money = eventMoney(stats);
   const open = event.status === 'published';
 
@@ -219,14 +215,25 @@ export default function EventDetail() {
             {data.carriedIn.map((movement) => (
               <Caption key={movement.id}>+ {carriedFromLine(movement, currency)}</Caption>
             ))}
-            {/* What the approved bills have used of it, in its own colour. */}
+            {/* What the approved bills have used of it, in its own colour,
+                then what was handed on when the event closed. */}
             <Meter
               percent={money.spentPercent}
+              nextPercent={money.overBy > 0 ? 0 : money.movedPercent}
               tone={money.overBy > 0 ? 'danger' : 'warning'}
               label="Spent"
             />
-            <SpendKey spent={money.spent} balance={money.balance} currency={currency} />
-            <EventMoneyTiles money={money} currency={currency} />
+            <SpendKey
+              spent={money.spent}
+              movedOut={money.movedOut}
+              balance={money.balance}
+              currency={currency}
+            />
+            <EventMoneyTiles
+              money={money}
+              currency={currency}
+              movedTo={data.movedFrom.length ? movedOnSummary(data.movedFrom) : undefined}
+            />
             {open && can(role, 'contribute') ? (
               <Button
                 label="Contribute"
@@ -240,15 +247,6 @@ export default function EventDetail() {
                 onPress={() => router.push(`/admin/payments?event=${event.slug}`)}
               />
             ) : null}
-            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-              <Lock color={colors.gold} size={14} strokeWidth={1.8} style={{ marginTop: 1 }} />
-              <View style={{ flex: 1 }}>
-                <Caption>
-                  If money is left over:{' '}
-                  {event.fund_rule_note ?? FUND_RULE_PLAIN[event.fund_rule as FundRule]}
-                </Caption>
-              </View>
-            </View>
           </Card>
 
           {data.myPayments.length ? <YourPayments data={data} currency={currency} /> : null}
@@ -267,11 +265,22 @@ export default function EventDetail() {
         {has('vote') ? (
           <View {...sectionProps('vote')} style={{ gap: spacing.lg }}>
             {/* One target, so no picker: on an event's own page there is only
-                one thing a suggestion could be about. */}
+                one thing a suggestion could be about. Once the event is over,
+                that one thing is the society, for next time. */}
             <Suggestions
               rows={data.suggestions}
-              targets={[{ id: data.event.id, label: data.event.name }]}
-              open={open}
+              targets={
+                open
+                  ? [{ id: data.event.id, label: data.event.name }]
+                  : [{ id: null, label: 'The society' }]
+              }
+              open
+              suggestLabel={open ? undefined : 'SUGGEST AN IDEA FOR NEXT TIME'}
+              suggestHint={
+                open
+                  ? undefined
+                  : `${data.event.name} is over, so your idea goes to the society's Ideas.`
+              }
               onChange={changed}
             />
           </View>
@@ -457,7 +466,7 @@ function BudgetAndSpending({ data, currency }: { data: Detail; currency: string 
 
       <Card style={{ gap: spacing.md }}>
         <Heading>Where the money went</Heading>
-        {data.expenses.length ? (
+        {data.expenses.length || data.movedFrom.length ? (
           data.expenses.map((expense) => (
             <View
               key={expense.id}
@@ -479,6 +488,34 @@ function BudgetAndSpending({ data, currency }: { data: Detail; currency: string 
         ) : (
           <Caption>Nothing spent yet. Approved bills appear here, itemised.</Caption>
         )}
+        {/* What was left when the event closed, and where the committee sent
+            it: the last entries in its ledger, so every rupee is accounted for. */}
+        {data.movedFrom.map((movement) => (
+          <View
+            key={movement.id}
+            style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <Body>
+                {movement.kind === 'society_balance'
+                  ? 'Kept for the society'
+                  : `Carried to ${movement.to_event?.name ?? 'another event'}`}
+              </Body>
+              <Caption>
+                {[
+                  movement.decider?.profiles?.full_name
+                    ? `Decided by ${movement.decider.profiles.full_name}`
+                    : null,
+                  movement.decided_at ? formatDate(movement.decided_at.slice(0, 10)) : null,
+                  movement.note,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </Caption>
+            </View>
+            <Body>{formatMoney(movement.amount, currency)}</Body>
+          </View>
+        ))}
       </Card>
     </>
   );

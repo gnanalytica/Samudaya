@@ -148,10 +148,10 @@ export default async function ManageEventPage(
     stats.fundRaised,
     stats.fundPending,
     stats.fundTarget,
-    stats.fundCarried,
+    stats.fundCarriedIn,
   );
   const funded = bar.confirmed;
-  const held = inTheFund(stats.fundRaised, stats.fundCarried);
+  const held = inTheFund(stats.fundRaised, stats.fundCarriedIn);
   const money = eventMoney(stats);
   const today = todayIn(community.timezone);
   const closed = event.status === 'completed';
@@ -270,15 +270,15 @@ export default async function ManageEventPage(
                   className="mt-2"
                 />
                 <CarriedIn movements={carriedIn} currency={community.currency} />
-                {stats.fundCarried < 0 ? (
+                {stats.fundMovedOut > 0 ? (
                   <p className="text-ink-subtle mt-2 text-xs">
-                    {`${formatMoney(-stats.fundCarried, community.currency)} of this event's money was carried elsewhere.`}
+                    {`${formatMoney(stats.fundMovedOut, community.currency)} of this event's money was handed on when it closed.`}
                   </p>
                 ) : null}
                 {!closed ? (
                   <p className="text-ink-subtle mt-1 text-xs">
                     {formatMoney(
-                      stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarried),
+                      stillNeeded(stats.fundTarget, stats.fundRaised, stats.fundCarriedIn),
                       community.currency,
                     )}{' '}
                     still to raise.

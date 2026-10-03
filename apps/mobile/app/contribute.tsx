@@ -123,12 +123,12 @@ function ChooseEvent() {
             <Caption>Pick what you’re paying for.</Caption>
             {open.map((event) => {
               const target = event.stats?.fundTarget ?? event.fund_target;
-              const held = inTheFund(event.stats?.fundRaised ?? 0, event.stats?.fundCarried ?? 0);
+              const held = inTheFund(event.stats?.fundRaised ?? 0, event.stats?.fundCarriedIn ?? 0);
               const bar = fundBarSegments(
                 event.stats?.fundRaised ?? 0,
                 event.stats?.fundPending ?? 0,
                 target,
-                event.stats?.fundCarried ?? 0,
+                event.stats?.fundCarriedIn ?? 0,
               );
               return (
                 <Pressable

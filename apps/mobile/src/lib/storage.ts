@@ -115,6 +115,28 @@ export async function uploadFile(
   return { path: data.path };
 }
 
+/** Whether a stored file is a photo, from its name, so it can open in place. */
+export function isStoredImage(value: string): boolean {
+  return /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(value.split('?')[0] ?? value);
+}
+
+/**
+ * A short-lived link to a stored file, for showing it inside the app. Older
+ * rows may hold a plain link, which is returned as is; RLS refuses a signed
+ * link to a file the viewer may not see.
+ */
+export async function storedFileUrl(
+  bucket: Bucket,
+  value: string,
+): Promise<{ url: string } | { error: string }> {
+  if (/^https?:\/\//i.test(value)) return { url: value };
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(value, 300);
+  if (error || !data?.signedUrl) {
+    return { error: bucket === 'bills' ? 'Bill not available.' : 'Screenshot not available.' };
+  }
+  return { url: data.signedUrl };
+}
+
 /**
  * Opens a stored bill or screenshot. Older rows may hold a plain link, which
  * opens as is; anything else is a storage path that needs a short-lived signed

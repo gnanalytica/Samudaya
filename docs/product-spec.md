@@ -221,6 +221,13 @@ phone, reached from Me. Both read the same two views and narrow them with the
 same filters from `@samudaya/core`, so the two cannot drift into disagreeing
 about what "money in" means.
 
+Money the committee moves is in it too, as two rows per movement (`kind =
+'transfer'`): one on the side it left — a closed event, or the society balance
+— and one on the side it arrived. So one event's rows add up to what it holds,
+and the society balance has a ledger of its own. Society-wide the two rows
+cancel, so the list and `society_money`'s totals leave them out: carrying money
+to the next event is not money collected, and keeping it is not money spent.
+
 - **Money out** names the vendor, the amount, the approver and the bill.
 - **Money in** names the payer and their flat, and nothing else about them — no
   phone, no email. Who gave how much is what a contribution list has always
@@ -313,11 +320,15 @@ The amount is never typed. `allocate_surplus()` takes the whole of what is left,
 because the figure is what the ledger says and a box to type it in is an
 invitation to a typo in the one number nobody is checking.
 
-Money moved across is its own number on an event — `fund_carried` — and is
-**never** folded into `fund_raised`: "sixty flats contributed ₹30,000" and "the
-committee moved ₹10,000 across from last year" are different sentences and only
-one of them is a contribution. The fund bar draws it as its own segment, first,
-and what the event still asks residents for comes down by the same amount.
+Money moved across is its own number on an event — `fund_carried_in`, and
+`fund_moved_out` for what a closed event handed on (`fund_carried` is the two
+netted) — and is **never** folded into `fund_raised`: "sixty flats contributed
+₹30,000" and "the committee moved ₹10,000 across from last year" are different
+sentences and only one of them is a contribution. Money carried in counts in
+what the event collected, and what the event still asks residents for comes
+down by the same amount. What it handed on is the spent bar's second segment
+and a Moved on figure of its own, so a closed event's card ends where its money
+did.
 
 The society balance has a way back out (`spend_society_balance()`), because the
 third answer would otherwise be a one-way door: a society that always kept its

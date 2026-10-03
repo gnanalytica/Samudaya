@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import {
   CAMPAIGN_EMOJI,
+  isCommentReaction,
   joinActivitySchema,
   paymentEvidenceProblem,
   reportPaymentSchema,
@@ -427,9 +428,53 @@ export async function deleteComment(formData: FormData): Promise<void> {
   revalidateComment(slug, formData);
 }
 
+/**
+ * Puts a face on a comment, or takes it off again if the reader had already
+ * put that one there. Anybody in the society may react to any comment, their
+ * own included; the policies decide, and the database holds the list of faces.
+ */
+export async function toggleReaction(input: {
+  slug: string;
+  commentId: string;
+  emoji: string;
+  eventSlug?: string;
+}): Promise<{ error?: string }> {
+  const context = await requireCommunity(input.slug);
+  if (!isCommentReaction(input.emoji) || !uuid.safeParse(input.commentId).success) {
+    return { error: 'That reaction could not be added.' };
+  }
+
+  const supabase = await getSupabase();
+  const { data: removed, error: removeError } = await supabase
+    .from('comment_reactions')
+    .delete()
+    .eq('comment_id', input.commentId)
+    .eq('membership_id', context.membership.id)
+    .eq('emoji', input.emoji)
+    .select('comment_id');
+  if (removeError) return { error: friendlyDbError(removeError) };
+
+  if (!removed?.length) {
+    const { error } = await supabase.from('comment_reactions').insert({
+      comment_id: input.commentId,
+      community_id: context.community.id,
+      membership_id: context.membership.id,
+      emoji: input.emoji,
+    });
+    // Two quick taps race; the second finding the first already there is fine.
+    if (error && error.code !== '23505') return { error: friendlyDbError(error) };
+  }
+
+  revalidateThread(input.slug, input.eventSlug ?? '');
+  return {};
+}
+
 /** Threads live on an event page and on the suggestions page; refresh both. */
 function revalidateComment(slug: string, formData: FormData) {
-  const eventSlug = String(formData.get('event') ?? '');
+  revalidateThread(slug, String(formData.get('event') ?? ''));
+}
+
+function revalidateThread(slug: string, eventSlug: string) {
   if (eventSlug) revalidatePath(`/app/${slug}/events/${eventSlug}`);
   revalidatePath(`/app/${slug}/suggest`, 'page');
   revalidatePath(`/app/${slug}/events`, 'layout');

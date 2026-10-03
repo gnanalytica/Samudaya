@@ -9,6 +9,7 @@ import {
   allocateSurplusSchema,
   fundMovementLine,
   holdingNote,
+  movedOnSummary,
   nextEditionDate,
   nextEditionName,
   spendBalanceSchema,
@@ -231,5 +232,26 @@ describe('where the balance is', () => {
     expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.name === null)).toBe(true);
     expect(UNPUBLISHED_EVENT).toMatch(/not published/);
+  });
+});
+
+describe('what a closed event handed on', () => {
+  it('sums it up in a few words for the Moved on figure', () => {
+    expect(movedOnSummary([{ kind: 'society_balance' }])).toBe('Kept for the society');
+    expect(movedOnSummary([{ kind: 'next_event', to_event: { name: 'Diwali 2026' } }])).toBe(
+      'Carried to Diwali 2026',
+    );
+    expect(
+      movedOnSummary([
+        { kind: 'next_event', to_event: { name: 'Diwali 2026' } },
+        { kind: 'next_edition', to_event: { name: 'Ganesh 2027' } },
+      ]),
+    ).toBe('Carried to other events');
+    expect(
+      movedOnSummary([
+        { kind: 'society_balance' },
+        { kind: 'next_event', to_event: { name: 'Diwali 2026' } },
+      ]),
+    ).toBe('Kept for the society and carried on');
   });
 });

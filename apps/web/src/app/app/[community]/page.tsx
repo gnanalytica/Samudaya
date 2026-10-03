@@ -120,7 +120,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
     s?.fundRaised ?? 0,
     s?.fundPending ?? 0,
     s?.fundTarget ?? 0,
-    s?.fundCarried ?? 0,
+    s?.fundCarriedIn ?? 0,
   );
   const funded = bar.confirmed;
   const firstName = profile?.full_name?.split(' ')[0];
@@ -130,7 +130,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
   const balance = await getSocietyBalance(community.id);
   // What the fund holds, carried money included: the card's headline, and the
   // bar's solid part. Where carried money came from is a row on the event.
-  const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0);
+  const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarriedIn ?? 0);
   // Every idea in the society, an event's as much as its own: a vote you have
   // not cast is a vote you have not cast, and this used to count only half of
   // them because the other half lived on their event's page.
@@ -374,7 +374,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                   cs?.fundRaised ?? 0,
                   0,
                   cs?.fundTarget ?? 0,
-                  cs?.fundCarried ?? 0,
+                  cs?.fundCarriedIn ?? 0,
                 ).confirmed;
                 const note = fundKey(0, cs?.fundPending ?? 0, community.currency).pending;
                 return (
@@ -392,7 +392,7 @@ export default async function DashboardPage(props: PageProps<'/app/[community]'>
                       </span>
                       <span className="text-ink-subtle mt-0.5 block text-xs">
                         {formatMoney(
-                          inTheFund(cs?.fundRaised ?? 0, cs?.fundCarried ?? 0),
+                          inTheFund(cs?.fundRaised ?? 0, cs?.fundCarriedIn ?? 0),
                           community.currency,
                         )}{' '}
                         of {formatMoney(cs?.fundTarget ?? 0, community.currency)}

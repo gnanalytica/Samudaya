@@ -75,6 +75,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     payments,
     eventType,
     carriedIn,
+    movedFrom,
   ] = await Promise.all([
     supabase.from('event_stats').select('*').eq('event_id', event.id).maybeSingle(),
     supabase
@@ -123,6 +124,7 @@ export async function fetchEventDetail(communityId: string, slug: string, member
           .maybeSingle()
       : Promise.resolve({ data: null }),
     fetchCarriedInto(event.id),
+    fetchMovedFrom(event.id),
   ]);
 
   const counts = new Map(
@@ -143,6 +145,9 @@ export async function fetchEventDetail(communityId: string, slug: string, member
     myPayments: payments.data ?? [],
     // Every sum the committee moved behind this event, and who moved it.
     carriedIn,
+    // And what the event handed on when it closed: kept for the society, or
+    // carried to another event.
+    movedFrom,
     // Residents see suggestions open for voting, plus their own awaiting the
     // committee. Staff and committee see everything still in play.
     suggestions: await withTallies(suggestions.data ?? [], membershipId),
@@ -282,10 +287,25 @@ export async function fetchCarriedInto(eventId: string) {
   const { data } = await supabase
     .from('fund_movements')
     .select(
-      'id, kind, amount, decided_at, from_event:events!fund_movements_from_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+      'id, kind, amount, decided_at, paid_to, proof_path, from_event:events!fund_movements_from_event_id_fkey(name), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
     )
     .eq('to_event_id', eventId)
     .order('decided_at', { ascending: true });
+  return data ?? [];
+}
+
+/**
+ * What one event handed on after it closed, newest first, with where it went
+ * and who decided it: the closed event's own record of its leftover.
+ */
+export async function fetchMovedFrom(eventId: string) {
+  const { data } = await supabase
+    .from('fund_movements')
+    .select(
+      'id, kind, amount, note, decided_at, to_event:events!fund_movements_to_event_id_fkey(name, slug), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+    )
+    .eq('from_event_id', eventId)
+    .order('decided_at', { ascending: false });
   return data ?? [];
 }
 

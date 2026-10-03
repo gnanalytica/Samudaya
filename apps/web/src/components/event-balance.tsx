@@ -10,22 +10,29 @@ export function balanceText(balance: number, currency: string): string {
 }
 
 /**
- * The Fund card's three tiles, which add up on screen: what this event
- * collected, less what it spent, is its balance. Collected includes money the
- * committee carried in — once it arrives it is this event's to spend — and
- * never the society's balance or another event's.
+ * The Fund card's tiles, which add up on screen: what this event collected,
+ * less what it spent, is its balance. Collected includes money the committee
+ * carried in — once it arrives it is this event's to spend — and never the
+ * society's balance or another event's.
+ *
+ * Once a closed event has handed its leftover on, that is a fourth tile, so
+ * the sum still works: collected, less spent, less moved on, is what is left.
  */
 export function EventMoneyTiles({
   money,
   currency,
+  movedTo,
   className,
 }: {
   money: EventMoney;
   currency: string;
+  /** Where the moved money went, in a few words (movedOnSummary). */
+  movedTo?: string;
   className?: string;
 }) {
+  const moved = money.movedOut > 0;
   return (
-    <StatTiles className={className}>
+    <StatTiles className={className} four={moved}>
       <StatTile
         label="Collected"
         value={formatMoney(money.collected, currency)}
@@ -36,6 +43,13 @@ export function EventMoneyTiles({
         }
       />
       <StatTile label="Spent" value={formatMoney(money.spent, currency)} hint="Approved bills" />
+      {moved ? (
+        <StatTile
+          label="Moved on"
+          value={formatMoney(money.movedOut, currency)}
+          hint={movedTo ?? 'Handed on when it closed'}
+        />
+      ) : null}
       <StatTile
         label="Balance"
         value={balanceText(money.balance, currency)}
@@ -43,8 +57,8 @@ export function EventMoneyTiles({
         hint={
           money.overBy > 0
             ? 'Spent more than collected'
-            : money.movedOut > 0
-              ? `Collected less spent, after ${formatMoney(money.movedOut, currency)} moved on`
+            : moved
+              ? 'Collected less spent and moved on'
               : 'Collected less spent'
         }
       />
@@ -90,10 +104,18 @@ export function EventBalanceCard({
           <p className="text-ink-muted text-sm">
             {formatMoney(money.spent, currency)} spent of {formatMoney(money.collected, currency)}{' '}
             collected
+            {money.movedOut > 0
+              ? `, ${formatMoney(money.movedOut, currency)} moved on when it closed`
+              : ''}
           </p>
         </div>
-        <SpendBar percent={money.spentPercent} over={over} />
-        <SpendKey spent={money.spent} balance={money.balance} currency={currency} />
+        <SpendBar percent={money.spentPercent} movedPercent={money.movedPercent} over={over} />
+        <SpendKey
+          spent={money.spent}
+          movedOut={money.movedOut}
+          balance={money.balance}
+          currency={currency}
+        />
         {over ? (
           <p className="text-danger text-sm">
             Somebody paid the difference out of their own pocket.{' '}

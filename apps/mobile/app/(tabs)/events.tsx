@@ -131,10 +131,10 @@ export default function Events() {
             item.stats?.fundRaised ?? 0,
             item.stats?.fundPending ?? 0,
             target,
-            item.stats?.fundCarried ?? 0,
+            item.stats?.fundCarriedIn ?? 0,
           );
           const funded = fundBar.confirmed;
-          const held = inTheFund(item.stats?.fundRaised ?? 0, item.stats?.fundCarried ?? 0);
+          const held = inTheFund(item.stats?.fundRaised ?? 0, item.stats?.fundCarriedIn ?? 0);
           return (
             <Pressable
               accessibilityRole="button"

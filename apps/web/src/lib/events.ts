@@ -239,6 +239,23 @@ export const getCarriedInto = cache(async (eventId: string) => {
   return data ?? [];
 });
 
+/**
+ * What one event handed on after it closed — kept for the society or carried
+ * to another event — newest first, with who decided it: the closed event's
+ * own record of where its leftover went.
+ */
+export const getMovedFrom = cache(async (eventId: string) => {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from('fund_movements')
+    .select(
+      'id, kind, amount, note, decided_at, to_event:events!fund_movements_to_event_id_fkey(name, slug), decider:memberships!fund_movements_decided_by_fkey(profiles(full_name))',
+    )
+    .eq('from_event_id', eventId)
+    .order('decided_at', { ascending: false });
+  return data ?? [];
+});
+
 /** Events a surplus can be carried into: still open, and not the one it came from. */
 export const getOpenEvents = cache(async (communityId: string, exceptId: string) => {
   const supabase = await getSupabase();

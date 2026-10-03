@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
   LEDGER_FILTERS,
+  SOCIETY_BALANCE_LEDGER,
   filterLedger,
+  isSocietyBalanceRow,
+  isSocietySpending,
   ledgerEvidence,
   ledgerFilterFrom,
   ledgerMeta,
+  ledgerScopes,
   ledgerTitle,
+  ledgerTotals,
   ledgerFlat,
   type LedgerEntry,
   type LedgerRow,
@@ -180,5 +185,156 @@ describe('the evidence behind a row', () => {
     // neighbour gets null here — no button, rather than a button that fails.
     expect(ledgerEvidence(entry({ document_url: null }))).toBeNull();
     expect(ledgerEvidence(entry({ document_url: '' }))).toBeNull();
+  });
+});
+
+/**
+ * Money the committee moved: each movement is two rows in the ledger, one on
+ * the side it left and one on the side it arrived. An event's ledger needs
+ * both of its own to add up to what it holds; the society-wide list needs
+ * neither, because they cancel and say nothing about money collected or spent.
+ */
+describe('money moved between events and the society balance', () => {
+  // Challenge handed ₹6,990 to Velocity Vipers; Vipers kept ₹44,490 for the
+  // society when it closed; the society balance paid a repair.
+  const moved: (LedgerRow & { id: string; amount: number; event_name?: string | null })[] = [
+    {
+      id: 'pay-vipers',
+      direction: 'in',
+      event_slug: 'vipers',
+      event_id: 'v',
+      kind: 'payment',
+      amount: 237500,
+      event_name: 'Velocity Vipers',
+    },
+    {
+      id: 'bill-vipers',
+      direction: 'out',
+      event_slug: 'vipers',
+      event_id: 'v',
+      kind: 'bill',
+      amount: -200000,
+      event_name: 'Velocity Vipers',
+    },
+    {
+      id: 'from-challenge',
+      direction: 'out',
+      event_slug: 'challenge',
+      event_id: 'c',
+      kind: 'transfer',
+      amount: -6990,
+      event_name: 'Challenge',
+    },
+    {
+      id: 'into-vipers',
+      direction: 'in',
+      event_slug: 'vipers',
+      event_id: 'v',
+      kind: 'transfer',
+      amount: 6990,
+      event_name: 'Velocity Vipers',
+    },
+    {
+      id: 'from-vipers',
+      direction: 'out',
+      event_slug: 'vipers',
+      event_id: 'v',
+      kind: 'transfer',
+      amount: -44490,
+      event_name: 'Velocity Vipers',
+    },
+    {
+      id: 'into-society',
+      direction: 'in',
+      event_slug: null,
+      event_id: null,
+      kind: 'transfer',
+      amount: 44490,
+    },
+    {
+      id: 'repair',
+      direction: 'out',
+      event_slug: null,
+      event_id: null,
+      kind: 'society_spending',
+      amount: -500,
+    },
+    // Carried into a draft the reader may not see: no slug, but an event all the same.
+    {
+      id: 'into-draft',
+      direction: 'in',
+      event_slug: null,
+      event_id: 'd',
+      kind: 'transfer',
+      amount: 100,
+    },
+  ];
+
+  it('leaves them out of the society-wide list, where the two sides cancel', () => {
+    expect(ids(filterLedger(moved, 'all', ''))).toEqual(['pay-vipers', 'bill-vipers', 'repair']);
+  });
+
+  it('keeps both of an event’s own in its ledger, so the ledger adds up to what it holds', () => {
+    const vipers = filterLedger(moved, 'all', 'vipers');
+    expect(ids(vipers)).toEqual(['pay-vipers', 'bill-vipers', 'into-vipers', 'from-vipers']);
+    expect(ledgerTotals(vipers)).toEqual({ in: 244490, out: 244490, left: 0 });
+  });
+
+  it('gives the society balance a ledger of its own: what it kept and what it spent', () => {
+    const society = filterLedger(moved, 'all', SOCIETY_BALANCE_LEDGER);
+    expect(ids(society)).toEqual(['into-society', 'repair']);
+    expect(ledgerTotals(society).left).toBe(43990);
+  });
+
+  it('never mistakes a row withheld from a draft for one of the society balance’s', () => {
+    expect(isSocietyBalanceRow({ direction: 'in', event_slug: null, event_id: 'd' })).toBe(false);
+    // Read without event_id at all, a row with no event is the society's.
+    expect(isSocietyBalanceRow({ direction: 'out', event_slug: null })).toBe(true);
+  });
+
+  it('offers the society balance first, then each event by name', () => {
+    expect(ledgerScopes(moved)).toEqual([
+      { value: SOCIETY_BALANCE_LEDGER, label: 'Society balance' },
+      { value: 'challenge', label: 'Challenge' },
+      { value: 'vipers', label: 'Velocity Vipers' },
+    ]);
+  });
+
+  it('can never collide with an event’s slug', () => {
+    expect(SOCIETY_BALANCE_LEDGER).not.toMatch(/^[a-z0-9-]+$/);
+  });
+
+  it('reads a movement by what the committee did, with the transfer screenshot', () => {
+    const payBack: LedgerEntry = {
+      direction: 'in',
+      event_slug: 'pongal',
+      kind: 'transfer',
+      counterpart: 'Society balance',
+      detail: 'Overspend paid back to Esha Patil',
+      payer_name: null,
+      unit_label: null,
+      method: 'Overspend paid back to Esha Patil',
+      document_url: 'c/society/esha.png',
+    };
+    expect(ledgerTitle(payBack)).toBe('Society balance');
+    expect(ledgerMeta(payBack)).toBe('Overspend paid back to Esha Patil');
+    expect(ledgerFlat(payBack)).toBeNull();
+    expect(ledgerEvidence(payBack)).toEqual({
+      bucket: 'bills',
+      label: 'View screenshot',
+      path: 'c/society/esha.png',
+    });
+    expect(isSocietySpending({ ...payBack, direction: 'out', event_slug: null })).toBe(false);
+  });
+
+  it('still knows the society’s own spending when the read carries no kind', () => {
+    expect(
+      isSocietySpending({
+        direction: 'out',
+        event_slug: null,
+        counterpart: 'Plumber',
+        detail: 'Leak',
+      }),
+    ).toBe(true);
   });
 });

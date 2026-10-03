@@ -201,12 +201,25 @@ export function FundKey({
  * Callers pass their own gap or border through `className`; twMerge lets those
  * win over the defaults here.
  */
-export function StatTiles({ children, className }: { children: ReactNode; className?: string }) {
+export function StatTiles({
+  children,
+  className,
+  four = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Four tiles: two by two on a phone, one row from a tablet up. */
+  four?: boolean;
+}) {
   return (
     <div
       className={cn(
-        'grid grid-cols-2 gap-3 sm:grid-cols-3',
-        '[&>*:nth-child(3)]:col-span-2 sm:[&>*:nth-child(3)]:col-span-1',
+        four
+          ? 'grid grid-cols-2 gap-3 sm:grid-cols-4'
+          : [
+              'grid grid-cols-2 gap-3 sm:grid-cols-3',
+              '[&>*:nth-child(3)]:col-span-2 sm:[&>*:nth-child(3)]:col-span-1',
+            ],
         className,
       )}
     >
@@ -253,9 +266,22 @@ export function StatTile({
  * approved bills as a share of what the event collected. A full bar in the
  * danger colour means the bills came to more than that, and somebody paid the
  * difference out of their own pocket.
+ *
+ * What the event handed on when it closed — kept for the society, or carried
+ * to another event — follows in a second colour, so a closed event's bar ends
+ * where its money did instead of showing room that is not there.
  */
-export function SpendBar({ percent, over = false }: { percent: number; over?: boolean }) {
+export function SpendBar({
+  percent,
+  movedPercent = 0,
+  over = false,
+}: {
+  percent: number;
+  movedPercent?: number;
+  over?: boolean;
+}) {
   const width = Math.min(100, Math.max(0, percent));
+  const moved = over ? 0 : Math.min(100 - width, Math.max(0, movedPercent));
   return (
     <div
       className="bg-surface-sunken flex h-[7px] overflow-hidden rounded-full"
@@ -264,24 +290,45 @@ export function SpendBar({ percent, over = false }: { percent: number; over?: bo
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label="Spent"
-      aria-valuetext={over ? 'More than was collected' : `${width}% of what was collected`}
+      aria-valuetext={
+        over
+          ? 'More than was collected'
+          : moved > 0
+            ? `${width}% of what was collected spent, ${moved}% moved on when it closed`
+            : `${width}% of what was collected`
+      }
     >
       <div
-        className={cn('bar-fill h-full rounded-full', over ? 'bg-danger' : 'bg-warning')}
+        className={cn(
+          'bar-fill h-full',
+          moved > 0 ? 'rounded-l-full' : 'rounded-full',
+          over ? 'bg-danger' : 'bg-warning',
+        )}
         style={{ width: `${width}%` }}
       />
+      {moved > 0 ? (
+        <div
+          className={cn('bar-fill bg-info h-full', width > 0 ? 'rounded-r-full' : 'rounded-full')}
+          style={{ width: `${moved}%` }}
+        />
+      ) : null}
     </div>
   );
 }
 
-/** The line under the spend bar: what was spent, and what is left or owed. */
+/**
+ * The line under the spend bar: what was spent, what was moved on when the
+ * event closed, and what is left or owed.
+ */
 export function SpendKey({
   spent,
+  movedOut = 0,
   balance,
   currency,
   className,
 }: {
   spent: number;
+  movedOut?: number;
   balance: number;
   currency: string;
   className?: string;
@@ -296,6 +343,12 @@ export function SpendKey({
         />
         {formatMoney(spent, currency)} spent
       </span>
+      {movedOut > 0 ? (
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden="true" className="bg-info inline-block h-2 w-3 rounded-sm" />
+          {formatMoney(movedOut, currency)} moved on
+        </span>
+      ) : null}
       <span className={over ? 'text-danger font-medium' : undefined}>
         {over
           ? `${formatMoney(-balance, currency)} more than was collected`
