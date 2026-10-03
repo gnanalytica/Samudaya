@@ -208,9 +208,10 @@ export const MCP_TOOLS: McpTool[] = [
     name: 'get_ledger',
     title: 'Get an event’s ledger',
     description:
-      'The full financial picture for one event: raised, spent, available, and every ' +
+      'The full financial picture for one event: raised, spent, available, every ' +
       'expense with its vendor, who requested it, who approved it and whether a bill is ' +
-      'attached. This is what residents see.',
+      'attached, and every movement of money into or out of it (carried in from a closed ' +
+      'event or the society balance, or handed on when it closed). This is what residents see.',
     scope: 'expenses:read',
     inputSchema: {
       type: 'object',

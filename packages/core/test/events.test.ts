@@ -101,6 +101,27 @@ describe('normalizeStats', () => {
     const stats = normalizeStats({ fund_raised: '132000.00' as unknown as number });
     expect(stats.fundRaised).toBe(132000);
   });
+
+  it('reads money carried in and moved on as two figures, not their net', () => {
+    const stats = normalizeStats({
+      fund_carried: '-37500.00' as unknown as number,
+      fund_carried_in: '6990.00' as unknown as number,
+      fund_moved_out: '44490.00' as unknown as number,
+    });
+    expect(stats.fundCarriedIn).toBe(6990);
+    expect(stats.fundMovedOut).toBe(44490);
+  });
+
+  it('falls back to the net figure for a row read before the two existed', () => {
+    expect(normalizeStats({ fund_carried: 6990 })).toMatchObject({
+      fundCarriedIn: 6990,
+      fundMovedOut: 0,
+    });
+    expect(normalizeStats({ fund_carried: -2000 })).toMatchObject({
+      fundCarriedIn: 0,
+      fundMovedOut: 2000,
+    });
+  });
 });
 
 describe('checklist seeding', () => {
@@ -168,6 +189,60 @@ describe('eventMoney', () => {
     expect(money.collected).toBe(5000);
     expect(money.movedOut).toBe(2000);
     expect(money.collected - money.spent - money.movedOut).toBe(money.balance);
+  });
+
+  it('counts what came in and what went on separately, not netted into one', () => {
+    // Velocity Vipers once it closed: ₹6,990 had come in from Challenge, and
+    // ₹44,490 was kept for the society. Netted, that read as "−₹37,500
+    // carried": the ₹6,990 fell out of what it collected.
+    const money = eventMoney({
+      fundRaised: 237500,
+      fundCarried: -37500,
+      fundCarriedIn: 6990,
+      fundMovedOut: 44490,
+      spent: 200000,
+      available: 0,
+    });
+    expect(money.carriedIn).toBe(6990);
+    expect(money.collected).toBe(244490);
+    expect(money.movedOut).toBe(44490);
+    expect(money.collected - money.spent - money.movedOut).toBe(money.balance);
+  });
+
+  it('draws what moved on as the bar’s second segment, filling it when nothing is left', () => {
+    const closed = eventMoney({
+      fundRaised: 237500,
+      fundCarried: -37500,
+      fundCarriedIn: 6990,
+      fundMovedOut: 44490,
+      spent: 200000,
+      available: 0,
+    });
+    expect(closed.spentPercent).toBe(82);
+    expect(closed.movedPercent).toBe(18);
+    // A third each rounds to 33 + 33: with nothing left the bar is still full.
+    const thirds = eventMoney({
+      fundRaised: 3000,
+      fundCarried: -2000,
+      fundCarriedIn: 0,
+      fundMovedOut: 2000,
+      spent: 1000,
+      available: 0,
+    });
+    expect(thirds.spentPercent + thirds.movedPercent).toBe(100);
+    // Something still left: the segment is its own share, and the bar is not full.
+    const partly = eventMoney({
+      fundRaised: 10000,
+      fundCarried: -2000,
+      fundCarriedIn: 0,
+      fundMovedOut: 2000,
+      spent: 5000,
+      available: 3000,
+    });
+    expect(partly.movedPercent).toBe(20);
+    expect(
+      eventMoney({ fundRaised: 5000, fundCarried: 0, spent: 1000, available: 4000 }).movedPercent,
+    ).toBe(0);
   });
 
   it('shows a full spent bar for spending with nothing collected, and an empty one for neither', () => {

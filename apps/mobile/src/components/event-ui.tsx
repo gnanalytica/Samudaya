@@ -47,23 +47,32 @@ export function Stripes({ color, style }: { color: string; style?: StyleProp<Vie
  * On a fund bar `percent` is what the fund holds and `pendingPercent` is what
  * is still to be confirmed, striped, both as shares of the event's target
  * (fundBarSegments). The value announced stays the confirmed figure.
+ *
+ * On a spend bar `nextPercent` is a second solid segment in a colour of its
+ * own: what a closed event handed on, after what it spent.
  */
 export function Meter({
   percent,
   pendingPercent = 0,
+  nextPercent = 0,
+  nextTone = 'info',
   tone = 'accent',
   label,
 }: {
   percent: number;
   /** Clamped to whatever the bar has left after the confirmed segment. */
   pendingPercent?: number;
-  tone?: 'accent' | 'success' | 'danger' | 'warning';
+  /** Clamped to whatever the bar has left after the first two. */
+  nextPercent?: number;
+  nextTone?: 'accent' | 'success' | 'danger' | 'warning' | 'info';
+  tone?: 'accent' | 'success' | 'danger' | 'warning' | 'info';
   label: string;
 }) {
   const { colors } = useTheme();
   const reduced = useReducedMotion();
   const clamped = Math.min(100, Math.max(0, percent));
   const pending = Math.min(100 - clamped, Math.max(0, pendingPercent));
+  const next = Math.min(100 - clamped - pending, Math.max(0, nextPercent));
   const fill = colors[tone];
   // The filled part grows from nothing as the bar arrives, on the native
   // thread; with reduced motion it is simply there.
@@ -83,7 +92,10 @@ export function Meter({
     animation.start();
     return () => animation.stop();
   }, [grow, reduced]);
-  const filled = clamped + pending;
+  const filled = clamped + pending + next;
+  // With a second colour after it, the container's own rounding draws the
+  // ends; rounding each segment would notch the bar where they meet.
+  const segmentRadius = next > 0 ? 0 : radius.pill;
   return (
     <View
       accessibilityRole="progressbar"
@@ -110,10 +122,22 @@ export function Meter({
             width: filled ? `${(clamped / filled) * 100}%` : 0,
             height: '100%',
             backgroundColor: fill,
-            borderRadius: radius.pill,
+            borderRadius: segmentRadius,
           }}
         />
-        {pending > 0 ? <Stripes color={fill} style={{ flex: 1, height: '100%' }} /> : null}
+        {pending > 0 ? (
+          <Stripes
+            color={fill}
+            style={
+              next > 0
+                ? { width: `${(pending / filled) * 100}%`, height: '100%' }
+                : { flex: 1, height: '100%' }
+            }
+          />
+        ) : null}
+        {next > 0 ? (
+          <View style={{ flex: 1, height: '100%', backgroundColor: colors[nextTone] }} />
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -217,13 +241,18 @@ export function KeyValue({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** The line under the spend bar: what was spent, and what is left or owed. */
+/**
+ * The line under the spend bar: what was spent, what was moved on when the
+ * event closed, and what is left or owed.
+ */
 export function SpendKey({
   spent,
+  movedOut = 0,
   balance,
   currency,
 }: {
   spent: number;
+  movedOut?: number;
   balance: number;
   currency: string;
 }) {
@@ -242,6 +271,12 @@ export function SpendKey({
         />
         <Caption>{formatMoney(spent, currency)} spent</Caption>
       </View>
+      {movedOut > 0 ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ width: 12, height: 8, borderRadius: 2, backgroundColor: colors.info }} />
+          <Caption>{formatMoney(movedOut, currency)} moved on</Caption>
+        </View>
+      ) : null}
       <Caption tone={over ? 'danger' : undefined}>
         {over
           ? `${formatMoney(-balance, currency)} more than was collected`
@@ -257,29 +292,53 @@ export function balanceText(balance: number, currency: string): string {
 }
 
 /**
- * The Fund card's three tiles, which add up: what this event collected —
- * carried-in money included, since it is this event's once it arrives — less
- * what it spent, is its balance. Where the collected figure came from is
- * spelt out underneath, because it is the one that surprises people.
+ * The Fund card's tiles, which add up: what this event collected — carried-in
+ * money included, since it is this event's once it arrives — less what it
+ * spent, is its balance. Where the collected figure came from is spelt out
+ * underneath, because it is the one that surprises people.
+ *
+ * Once a closed event has handed its leftover on, that is a fourth tile, two
+ * by two, so the sum still works: collected, less spent, less moved on, is
+ * what is left.
  */
-export function EventMoneyTiles({ money, currency }: { money: EventMoney; currency: string }) {
+export function EventMoneyTiles({
+  money,
+  currency,
+  movedTo,
+}: {
+  money: EventMoney;
+  currency: string;
+  /** Where the moved money went, in a few words (movedOnSummary). */
+  movedTo?: string;
+}) {
+  const moved = money.movedOut > 0;
+  const balance = (
+    <StatTile
+      label="Balance"
+      value={balanceText(money.balance, currency)}
+      tone={money.balance < 0 ? 'danger' : 'success'}
+    />
+  );
   return (
     <View style={{ gap: spacing.xs }}>
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <StatTile label="Collected" value={formatMoney(money.collected, currency)} />
         <StatTile label="Spent" value={formatMoney(money.spent, currency)} />
-        <StatTile
-          label="Balance"
-          value={balanceText(money.balance, currency)}
-          tone={money.balance < 0 ? 'danger' : 'success'}
-        />
+        {moved ? null : balance}
       </View>
+      {moved ? (
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <StatTile label="Moved on" value={formatMoney(money.movedOut, currency)} />
+          {balance}
+        </View>
+      ) : null}
       <Caption>
         {money.carriedIn > 0
           ? `Collected is ${formatMoney(money.fromResidents, currency)} from residents and ${formatMoney(money.carriedIn, currency)} carried in. `
           : ''}
-        Balance is collected less approved bills
-        {money.movedOut > 0 ? `, after ${formatMoney(money.movedOut, currency)} moved on` : ''}.
+        {moved
+          ? `Moved on: ${(movedTo ?? 'handed on when it closed').replace(/^./, (c) => c.toLowerCase())}. Balance is collected less approved bills and what moved on.`
+          : 'Balance is collected less approved bills.'}
       </Caption>
     </View>
   );
@@ -328,9 +387,22 @@ export function EventBalanceCard({
       <Caption>
         {formatMoney(money.spent, currency)} spent of {formatMoney(money.collected, currency)}{' '}
         collected
+        {money.movedOut > 0
+          ? `, ${formatMoney(money.movedOut, currency)} moved on when it closed`
+          : ''}
       </Caption>
-      <Meter percent={money.spentPercent} tone={over ? 'danger' : 'warning'} label="Spent" />
-      <SpendKey spent={money.spent} balance={money.balance} currency={currency} />
+      <Meter
+        percent={money.spentPercent}
+        nextPercent={over ? 0 : money.movedPercent}
+        tone={over ? 'danger' : 'warning'}
+        label="Spent"
+      />
+      <SpendKey
+        spent={money.spent}
+        movedOut={money.movedOut}
+        balance={money.balance}
+        currency={currency}
+      />
       {over ? (
         <Body muted>
           Somebody paid the difference out of their own pocket.

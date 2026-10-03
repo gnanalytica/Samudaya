@@ -2219,7 +2219,7 @@ select test.eq(
      from information_schema.columns
     where table_schema = 'public' and table_name = 'society_ledger'),
   'amount,community_id,confirmed_at,confirmed_by,counterpart,detail,direction,'
-  'document_url,event_id,event_name,event_slug,happened_at,id,membership_id,'
+  'document_url,event_id,event_name,event_slug,happened_at,id,kind,membership_id,'
   'method,payer_name,receipt_no,unit_label',
   'and the ledger carries a name, a flat and a method, never a way to contact anyone');
 
@@ -2794,11 +2794,14 @@ select 'dddddddd-0000-4000-8000-00000000000e',
 
 reset role;
 select test.act_as('99999999-9999-4999-8999-999999999999');
+-- Posted today, because the payments it should match were reported today: the
+-- matcher looks a fortnight either side of the line, so a fixed date here
+-- stopped matching anything once the calendar moved past it.
 select test.eq(
-  app.record_bank_lines('eeeeeeee-0000-4000-8000-0000000000aa', $j$[
-    {"posted_on": "2026-09-17", "amount": 2000,
-     "narration": "UPI/CR/799900022233/RIA MENON/HDFC/SMDA1104 GANESH"}
-  ]$j$),
+  app.record_bank_lines('eeeeeeee-0000-4000-8000-0000000000aa', jsonb_build_array(
+    jsonb_build_object(
+      'posted_on', current_date::text, 'amount', 2000,
+      'narration', 'UPI/CR/799900022233/RIA MENON/HDFC/SMDA1104 GANESH'))),
   1, 'a credit arrives naming the flat that sent it');
 
 reset role;
@@ -3400,7 +3403,8 @@ select test.eq(
 select test.eq(
   (select concat_ws(' | ', direction, amount::text, counterpart, detail, confirmed_by)
      from public.society_ledger
-    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001' and event_id is null),
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and kind = 'society_spending'),
   'out | -500.00 | Sri Ram Electricals | Gate motor repair | Esha Patil',
   'and sits in the ledger: who was paid, what for, and who recorded it');
 select test.eq(
@@ -3569,3 +3573,155 @@ select test.ok(
   not has_function_privilege('anon',
     'public.cover_overspend(uuid,numeric,text,text,text)', 'EXECUTE'),
   'nor pay anybody back from it');
+
+-- ---------------------------------------------------------------------------
+-- Money moved on is in the ledger
+-- ---------------------------------------------------------------------------
+-- Green Valley so far: Onam 2027 carried its ₹3,000 to Pongal 2027, Holi 2027
+-- kept its ₹2,000 for the society, the committee put ₹500 of that behind
+-- Pongal, and paid Esha back ₹1,000 of Pongal's overspend from the rest.
+
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.eq(
+  (select fund_carried_in from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f3'),
+  4500::numeric(12,2),
+  'an event counts everything carried into it: a leftover, the balance and a pay-back');
+select test.eq(
+  (select fund_moved_out from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f2'),
+  3000::numeric(12,2), 'and what it handed on when it closed, on its own');
+select test.eq(
+  (select fund_carried from public.event_stats
+    where event_id = 'cccccccc-0000-4000-8000-0000000000f2'),
+  -3000::numeric(12,2), 'while the net figure reads as it always did');
+
+select test.eq(
+  (select count(*) from public.society_ledger
+    where kind = 'transfer' and community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  8::bigint, 'every movement is in the ledger twice: where it left and where it arrived');
+select test.eq(
+  (select amount from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f2'),
+  -3000::numeric(12,2), 'a closed event''s ledger shows the money it handed on');
+select test.eq(
+  (select counterpart || ' · ' || detail from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f2'),
+  'Green Valley Pongal 2027 · Carried forward', 'named after where it went');
+select test.eq(
+  (select counterpart || ' · ' || detail from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f3'
+      and amount = 3000),
+  'Green Valley Onam 2027 · Carried in',
+  'and the next event''s shows it arriving, named after where it came from');
+select test.eq(
+  (select counterpart || ' · ' || detail from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f4'),
+  'Society balance · Kept for the society', 'a leftover the society kept says so');
+select test.eq(
+  (select detail || ' · ' || document_url from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f3'
+      and amount = 1000),
+  'Overspend paid back to Esha Patil · aaaaaaaa-0000-4000-8000-000000000001/society/esha.png',
+  'and a pay-back says who was paid, with the screenshot of the transfer');
+select test.eq(
+  (select confirmed_by from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f4'),
+  'Asha Menon', 'with the committee member who decided it');
+
+select test.eq(
+  (select count(*) from public.event_stats s
+    where s.community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and s.available is distinct from (
+        select coalesce(sum(l.amount), 0) from public.society_ledger l
+         where l.event_id = s.event_id)),
+  0::bigint, 'so every event''s ledger adds up to what it holds');
+select test.eq(
+  (select coalesce(sum(amount), 0) from public.society_ledger
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001' and event_id is null),
+  (select balance from public.society_balance
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  'and the society balance''s own rows add up to what it holds');
+
+select test.eq(
+  (select total_in from public.society_money
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  (select sum(amount) from public.society_ledger
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001' and kind = 'payment'),
+  'money collected society-wide is payments, not money moved between events');
+select test.eq(
+  (select total_out from public.society_money
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  (select -sum(amount) from public.society_ledger
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and kind in ('bill', 'society_spending')),
+  'and money spent is bills and the society''s own spending');
+select test.eq(
+  (select balance from public.society_money
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  (select sum(amount) from public.society_ledger
+    where community_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
+  'while the two sides of every movement cancel in the balance');
+
+-- A leftover carried into an event nobody has published yet: the rows stay,
+-- the name is the committee's until it is published.
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+insert into public.events (id, community_id, slug, name, starts_on, fund_target, created_by)
+values
+  ('cccccccc-0000-4000-8000-0000000000f5', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'gv-navratri-2027', 'Green Valley Navratri 2027', '2027-10-01', 5000,
+   '11111111-1111-4111-8111-111111111111'),
+  ('cccccccc-0000-4000-8000-0000000000f6', 'aaaaaaaa-0000-4000-8000-000000000001',
+   'gv-diwali-2027', 'Green Valley Diwali 2027', '2027-10-29', 5000,
+   '11111111-1111-4111-8111-111111111111');
+update public.events set status = 'published'
+ where id = 'cccccccc-0000-4000-8000-0000000000f5';
+
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+insert into public.contributions
+  (id, event_id, community_id, membership_id, amount, method, status, reference)
+select 'dddddddd-0000-4000-8000-0000000000f8', 'cccccccc-0000-4000-8000-0000000000f5',
+       m.community_id, m.id, 1200, 'upi', 'pending', '700000000009'
+  from public.memberships m where m.user_id = '33333333-3333-4333-8333-333333333333';
+
+reset role;
+select test.act_as('11111111-1111-4111-8111-111111111111');
+select public.review_contribution('dddddddd-0000-4000-8000-0000000000f8', true);
+update public.events set status = 'completed'
+ where id = 'cccccccc-0000-4000-8000-0000000000f5';
+select test.eq(
+  (select amount from public.allocate_surplus('cccccccc-0000-4000-8000-0000000000f5',
+     'next_event', 'cccccccc-0000-4000-8000-0000000000f6')),
+  1200::numeric(12,2), 'Navratri''s leftover goes behind Diwali, still a draft');
+select test.eq(
+  (select counterpart from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f5'),
+  'Green Valley Diwali 2027', 'the committee sees where it went');
+
+reset role;
+select test.act_as('33333333-3333-4333-8333-333333333333');
+select test.eq(
+  (select counterpart from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f5'),
+  'An event not published yet', 'a resident is not told the name of an unpublished event');
+select test.eq(
+  (select coalesce(event_slug, 'none') || ' · ' || coalesce(event_name, 'none')
+     from public.society_ledger
+    where kind = 'transfer' and event_id = 'cccccccc-0000-4000-8000-0000000000f6'),
+  'none · none', 'nor shown its slug on the row where the money arrived');
+select test.eq(
+  (select count(*) from public.event_stats s
+    where s.community_id = 'aaaaaaaa-0000-4000-8000-000000000001'
+      and s.available is distinct from (
+        select coalesce(sum(l.amount), 0) from public.society_ledger l
+         where l.event_id = s.event_id)),
+  0::bigint, 'and the rows still add up, draft included');
+
+reset role;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(
+  test.visible($q$select id from public.society_ledger where kind = 'transfer'$q$),
+  0::bigint, 'another society sees none of this one''s movements');

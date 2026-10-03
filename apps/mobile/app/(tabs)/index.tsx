@@ -121,12 +121,12 @@ export default function Home() {
     stats.fundRaised,
     stats.fundPending,
     stats.fundTarget,
-    stats.fundCarried,
+    stats.fundCarriedIn,
   );
   const funded = fundBar.confirmed;
   // What the fund holds, carried money included: the card's headline and the
   // bar's solid part. Where carried money came from is a row on the event.
-  const held = inTheFund(stats.fundRaised, stats.fundCarried);
+  const held = inTheFund(stats.fundRaised, stats.fundCarriedIn);
   const heldBySociety = data?.society.balance ?? 0;
   const balanceMovements = data?.society.movements ?? 0;
   const normalized = normalizeRole(role);

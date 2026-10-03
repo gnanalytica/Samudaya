@@ -66,13 +66,13 @@ export default async function ChooseWhatToSupport(props: PageProps<'/app/[commun
           <ul className="space-y-3">
             {open.map((event, index) => {
               const s = stats.get(event.id);
-              const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0);
+              const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarriedIn ?? 0);
               const target = s?.fundTarget ?? 0;
               const bar = fundBarSegments(
                 s?.fundRaised ?? 0,
                 s?.fundPending ?? 0,
                 target,
-                s?.fundCarried ?? 0,
+                s?.fundCarriedIn ?? 0,
               );
               const festival = festivalFor(types.get(event.event_type_id ?? ''), event.name);
               return (

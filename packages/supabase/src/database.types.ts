@@ -2654,6 +2654,8 @@ export type Database = {
           fund_pending: number | null
           pending_contributors: number | null
           fund_carried: number | null
+          fund_carried_in: number | null
+          fund_moved_out: number | null
         }
         Relationships: [
 
@@ -2716,6 +2718,7 @@ export type Database = {
           payer_name: string | null
           unit_label: string | null
           method: string | null
+          kind: string | null
         }
         Relationships: [
 

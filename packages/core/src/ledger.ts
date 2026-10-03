@@ -24,13 +24,51 @@ export type LedgerFilter = (typeof LEDGER_FILTERS)[number]['value'];
 export type LedgerRow = {
   direction: string | null;
   event_slug: string | null;
+  /**
+   * Null for the society balance's own rows. Kept when an event's name is
+   * withheld from the reader (a draft), so such a row is never mistaken for
+   * one of the society balance's.
+   */
+  event_id?: string | null;
+  /** payment, bill, society_spending or transfer. Absent on older reads. */
+  kind?: string | null;
 };
+
+/**
+ * The event filter's value for the society balance's own ledger: its spending,
+ * and money moved into or out of it. Event slugs are lowercase letters, digits
+ * and hyphens, so this can never be one.
+ */
+export const SOCIETY_BALANCE_LEDGER = '_society';
 
 /** The direction filter from a query string. Anything unknown means everything. */
 export function ledgerFilterFrom(value: unknown): LedgerFilter {
   return LEDGER_FILTERS.find((option) => option.value === value)?.value ?? 'all';
 }
 
+/**
+ * One side of money the committee moved: out of a closed event or the society
+ * balance, into another event or the society balance.
+ */
+export function isTransfer(row: Pick<LedgerRow, 'kind'>): boolean {
+  return row.kind === 'transfer';
+}
+
+/** A row of the society balance's own ledger rather than an event's. */
+export function isSocietyBalanceRow(row: LedgerRow): boolean {
+  return !row.event_slug && (row.event_id ?? null) === null;
+}
+
+/**
+ * The ledger narrowed by direction and by whose money it is.
+ *
+ * An event's ledger is everything that moved in or out of that event — the
+ * money the committee carried in or handed on when it closed as well as
+ * payments and bills — so its rows add up to what the event holds. The same
+ * goes for the society balance's. Society-wide, the two sides of a movement
+ * cancel and say nothing about money collected or spent, so they are left to
+ * the ledgers they belong to (and the Money page's list of where money moved).
+ */
 export function filterLedger<T extends LedgerRow>(
   rows: T[],
   direction: LedgerFilter,
@@ -38,9 +76,50 @@ export function filterLedger<T extends LedgerRow>(
 ): T[] {
   return rows.filter((row) => {
     if (direction !== 'all' && row.direction !== direction) return false;
-    if (eventSlug && row.event_slug !== eventSlug) return false;
-    return true;
+    if (eventSlug === SOCIETY_BALANCE_LEDGER) return isSocietyBalanceRow(row);
+    if (eventSlug) return row.event_slug === eventSlug;
+    return !isTransfer(row);
   });
+}
+
+/**
+ * Whose ledger the filter can show: the society balance's when it has any rows,
+ * then every event that has, by name.
+ */
+export function ledgerScopes(
+  rows: (LedgerRow & { event_name?: string | null })[],
+): { value: string; label: string }[] {
+  const events = new Map<string, string>();
+  let society = false;
+  for (const row of rows) {
+    if (row.event_slug) events.set(row.event_slug, row.event_name ?? row.event_slug);
+    else if (isSocietyBalanceRow(row)) society = true;
+  }
+  return [
+    ...(society ? [{ value: SOCIETY_BALANCE_LEDGER, label: 'Society balance' }] : []),
+    ...[...events.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label })),
+  ];
+}
+
+/**
+ * What a narrowed ledger adds up to. For one event, `left` is what the event
+ * holds; for the society balance, what the society is keeping.
+ */
+export function ledgerTotals(rows: { amount: number | string | null }[]): {
+  in: number;
+  out: number;
+  left: number;
+} {
+  let moneyIn = 0;
+  let moneyOut = 0;
+  for (const row of rows) {
+    const amount = Number(row.amount ?? 0);
+    if (amount >= 0) moneyIn += amount;
+    else moneyOut -= amount;
+  }
+  return { in: moneyIn, out: moneyOut, left: moneyIn - moneyOut };
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +168,7 @@ export type LedgerFlat = { label: string; known: boolean };
  * Money out is paid to a vendor, not by a flat, so it gets nothing.
  */
 export function ledgerFlat(row: LedgerEntry): LedgerFlat | null {
-  if (row.direction !== 'in') return null;
+  if (row.direction !== 'in' || isTransfer(row)) return null;
   const unit = row.unit_label ?? null;
   if (unit) return unit === ledgerTitle(row) ? null : { label: unit, known: true };
   // Only worth saying beside a name. A sponsor's payment is titled by how the
@@ -98,19 +177,22 @@ export function ledgerFlat(row: LedgerEntry): LedgerFlat | null {
 }
 
 /**
- * What goes under the name. How the money arrived for a payment, what the
- * money was for on a bill — `detail` carries the category out, and the flat
- * and method it used to carry in are their own fields now.
- */
-/**
  * Money the society spent from its own balance rather than an event's: a
  * repair, damage. It has no event, and says so instead of leaving a gap.
  */
 export function isSocietySpending(row: LedgerEntry): boolean {
+  if (row.kind) return row.kind === 'society_spending';
   return row.direction === 'out' && !row.event_slug;
 }
 
+/**
+ * What goes under the name. How the money arrived for a payment, what the
+ * money was for on a bill — `detail` carries the category out, and the flat
+ * and method it used to carry in are their own fields now. A movement says
+ * what the committee did: carried forward, kept for the society, paid back.
+ */
 export function ledgerMeta(row: LedgerEntry): string | null {
+  if (isTransfer(row)) return row.detail ?? null;
   return (row.direction === 'in' ? (row.method ?? null) : row.detail) ?? null;
 }
 
@@ -127,6 +209,10 @@ export function ledgerEvidence(
   row: LedgerEntry,
 ): { bucket: 'bills' | 'payment-proofs'; label: string; path: string } | null {
   if (!row.document_url) return null;
+  // A pay-back's screenshot of the transfer, which every member may open.
+  if (isTransfer(row)) {
+    return { bucket: 'bills', label: 'View screenshot', path: row.document_url };
+  }
   return row.direction === 'in'
     ? { bucket: 'payment-proofs', label: 'View screenshot', path: row.document_url }
     : { bucket: 'bills', label: 'View bill', path: row.document_url };

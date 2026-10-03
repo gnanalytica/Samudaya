@@ -60,10 +60,10 @@ export default async function ContributePage(
     stats.fundRaised,
     stats.fundPending,
     stats.fundTarget,
-    stats.fundCarried,
+    stats.fundCarriedIn,
   );
   const funded = bar.confirmed;
-  const held = inTheFund(stats.fundRaised, stats.fundCarried);
+  const held = inTheFund(stats.fundRaised, stats.fundCarriedIn);
 
   const suggested = Number.parseInt(typeof amount === 'string' ? amount : '', 10);
 

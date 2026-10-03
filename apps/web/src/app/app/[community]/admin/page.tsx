@@ -119,7 +119,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                 s?.fundRaised ?? 0,
                 s?.fundPending ?? 0,
                 s?.fundTarget ?? 0,
-                s?.fundCarried ?? 0,
+                s?.fundCarriedIn ?? 0,
               );
               const funded = bar.confirmed;
               return (
@@ -155,7 +155,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                     <div className="text-ink-muted mb-1.5 flex justify-between text-xs font-medium">
                       <span>
                         {formatMoney(
-                          inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0),
+                          inTheFund(s?.fundRaised ?? 0, s?.fundCarriedIn ?? 0),
                           community.currency,
                         )}{' '}
                         of {formatMoney(s?.fundTarget ?? 0, community.currency)} ·{' '}
@@ -165,7 +165,7 @@ export default async function ConsolePage(props: PageProps<'/app/[community]/adm
                     </div>
                     <FundBar percent={funded} pendingPercent={bar.pending} />
                     <FundKey
-                      confirmed={inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0)}
+                      confirmed={inTheFund(s?.fundRaised ?? 0, s?.fundCarriedIn ?? 0)}
                       pending={s?.fundPending ?? 0}
                       currency={community.currency}
                       className="mt-2"

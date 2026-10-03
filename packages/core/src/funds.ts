@@ -179,6 +179,26 @@ export function carriedFromLine(movement: CarriedInRow, currency = 'INR'): strin
 }
 
 /**
+ * Where an event's leftover went, in a few words for the Moved on figure:
+ * "Kept for the society", "Carried to Diwali 2026", or both.
+ */
+export function movedOnSummary(movements: Pick<FundMovementRow, 'kind' | 'to_event'>[]): string {
+  const kept = movements.some((movement) => movement.kind === 'society_balance');
+  const carried = [
+    ...new Set(
+      movements
+        .filter((movement) => movement.kind !== 'society_balance')
+        .map((movement) => movement.to_event?.name ?? 'another event'),
+    ),
+  ];
+  if (kept && carried.length) return 'Kept for the society and carried on';
+  if (kept) return 'Kept for the society';
+  if (carried.length === 1) return `Carried to ${carried[0]}`;
+  if (carried.length > 1) return 'Carried to other events';
+  return 'Handed on when it closed';
+}
+
+/**
  * The key under a fund bar: what its solid part is and what its striped part
  * is. The striped half only when something is waiting to be confirmed.
  *
@@ -207,7 +227,7 @@ export type Holding = {
   status: string | null;
   /** What the event holds: confirmed money in, plus carried in, less approved bills. */
   amount: number;
-  /** Carried across into (positive) or out of (negative) the event, net. */
+  /** Carried into the event by the committee. */
   carried: number;
 };
 
@@ -236,6 +256,8 @@ export function whereTheBalanceIs(
     event_id: string | null;
     available: number | string | null;
     fund_carried: number | string | null;
+    /** Gross, when the read has it; the net figure otherwise. */
+    fund_carried_in?: number | string | null;
   }[],
   events: {
     id: string;
@@ -259,7 +281,7 @@ export function whereTheBalanceIs(
           slug: event?.slug ?? null,
           status: event?.status ?? null,
           amount,
-          carried: Number(row.fund_carried ?? 0),
+          carried: Number(row.fund_carried_in ?? row.fund_carried ?? 0),
         },
       ];
     })

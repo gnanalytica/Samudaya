@@ -94,3 +94,71 @@ describe('the phone', () => {
     expect(phone('src', 'components', 'todo-queue.tsx')).toContain("pathname: '/admin/pay-back'");
   });
 });
+
+/**
+ * When an event closes, the committee keeps its leftover for the society or
+ * puts it behind another event. That money has to show up wherever the event's
+ * money does — its card, its bars, its ledger — or the event looks like it is
+ * still holding money it handed on.
+ */
+describe('money moved when an event closes', () => {
+  const event = read(...APP, 'events', '[event]', 'page.tsx');
+  const money = read(...APP, 'money', 'page.tsx');
+  const MOBILE = join(import.meta.dirname, '..', '..', 'mobile');
+  const phone = (...parts: string[]) => readFileSync(join(MOBILE, ...parts), 'utf8');
+  const phoneEvent = phone('app', 'event', '[slug].tsx');
+
+  it('drops the leftover banner, on both apps', () => {
+    for (const screen of [event, phoneEvent]) {
+      expect(screen).not.toContain('If money is left over');
+      expect(screen).not.toContain('Fixed before any money was collected');
+    }
+  });
+
+  it('draws what moved on as the spent bar’s second segment, with a key and a tile', () => {
+    expect(event).toContain('movedPercent={money.movedPercent}');
+    expect(event).toContain('movedOut={money.movedOut}');
+    expect(read('components', 'badges.tsx')).toContain('bg-info');
+    expect(read('components', 'event-balance.tsx')).toContain('label="Moved on"');
+    expect(phoneEvent).toContain('nextPercent={money.overBy > 0 ? 0 : money.movedPercent}');
+    expect(phone('src', 'components', 'event-ui.tsx')).toContain('label="Moved on"');
+  });
+
+  it('lists what the event handed on under where its money went', () => {
+    expect(event).toContain('getMovedFrom(event.id)');
+    expect(event).toContain("'Kept for the society'");
+    expect(phone('src', 'lib', 'events.ts')).toContain('fetchMovedFrom(event.id)');
+    expect(phoneEvent).toContain('data.movedFrom.map(');
+  });
+
+  it('puts the movements in an event’s ledger on the Money page, and gives the society balance one', () => {
+    for (const screen of [money, phone('app', '(tabs)', 'money.tsx')]) {
+      expect(screen).toContain("'id, kind, direction,");
+      expect(screen).toContain('ledgerScopes(rows)');
+      expect(screen).toContain('SOCIETY_BALANCE_LEDGER');
+    }
+  });
+
+  it('counts money carried in by the gross figure on every fund card, never the net one', () => {
+    const cards = [
+      read(...APP, 'page.tsx'),
+      read(...APP, 'events', 'page.tsx'),
+      read(...APP, 'contribute', 'page.tsx'),
+      read(...APP, 'events', '[event]', 'contribute', 'page.tsx'),
+      read(...APP, 'admin', 'page.tsx'),
+      read(...APP, 'admin', 'events', '[event]', 'page.tsx'),
+      event,
+      phoneEvent,
+      phone('app', '(tabs)', 'index.tsx'),
+      phone('app', '(tabs)', 'events.tsx'),
+      phone('app', 'contribute.tsx'),
+    ];
+    for (const card of cards) {
+      expect(card).not.toMatch(/\bfundCarried\b(?!In)/);
+    }
+  });
+
+  it('includes the movements in the API’s event ledger', () => {
+    expect(read('lib', 'api', 'resources.ts')).toContain('movements:');
+  });
+});

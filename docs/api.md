@@ -182,9 +182,12 @@ _Scope: `events:write`_ — accepts `status` (`todo`, `in_progress`, `done`,
 
 ### `GET /api/v1/events/{event}/ledger`
 
-_Scope: `expenses:read`_ — the money in one place: the event, its `stats`, and
+_Scope: `expenses:read`_ — the money in one place: the event, its `stats`,
 every expense the caller may see, with `vendor`, `paid_by`, `method`,
-`bill_url`, and the names of who requested and who approved it.
+`bill_url`, and the names of who requested and who approved it, and
+`movements`: every sum the committee moved into the event (a closed event's
+leftover, money from the society balance, an overspend paid back) or out of it
+when it closed, each with a `direction` of `in` or `out`.
 
 RLS decides that last part. A key acting as a resident sees **approved**
 expenses only; a committee key also sees pending and rejected ones.

@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import {
   ArrowLeft,
+  ArrowRightLeft,
   CalendarDays,
   Check,
   Clock,
-  Lock,
   MapPin,
   Receipt,
   Settings2,
@@ -15,7 +15,6 @@ import {
 } from 'lucide-react';
 import {
   COPY,
-  FUND_RULE_LABEL,
   can,
   correctionNote,
   countdown,
@@ -25,6 +24,7 @@ import {
   formatMoney,
   fundBarSegments,
   inTheFund,
+  movedOnSummary,
   practiceDatesLine,
   receiptRef,
 } from '@samudaya/core';
@@ -36,6 +36,7 @@ import {
   getCarriedInto,
   getEventStats,
   getExpenses,
+  getMovedFrom,
   getMyParticipation,
   getRegistrations,
   getSuggestions,
@@ -95,6 +96,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
     mine,
     myPayments,
     carriedIn,
+    movedFrom,
   ] = await Promise.all([
     getEventStats(event.id),
     getBudgetLines(event.id),
@@ -112,6 +114,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
       .eq('membership_id', membership.id)
       .order('paid_at', { ascending: false }),
     getCarriedInto(event.id),
+    getMovedFrom(event.id),
   ]);
 
   const base = `/app/${community.slug}`;
@@ -120,14 +123,14 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
     stats.fundRaised,
     stats.fundPending,
     stats.fundTarget,
-    stats.fundCarried,
+    stats.fundCarriedIn,
   );
   const funded = bar.confirmed;
   // What the fund holds, carried money included: what every fund card leads
   // with, against the event's target.
-  const held = inTheFund(stats.fundRaised, stats.fundCarried);
-  // Collected, spent and left, adding up: the Fund card's tiles and, for staff
-  // and the committee, the balance at the top of the page.
+  const held = inTheFund(stats.fundRaised, stats.fundCarriedIn);
+  // Collected, spent, moved on and left, adding up: the Fund card's tiles and,
+  // for staff and the committee, the balance at the top of the page.
   const money = eventMoney(stats);
   const open = event.status === 'published';
   const isCampaign = event.kind === 'campaign';
@@ -354,12 +357,18 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 />
                 {/* Money the committee carried in: a row each, with who moved it. */}
                 <CarriedIn movements={carriedIn} currency={community.currency} />
-                {/* What the approved bills have used of it, in its own colour. */}
+                {/* What the approved bills have used of it, in its own colour,
+                    then what was handed on when the event closed. */}
                 <div className="mt-4">
-                  <SpendBar percent={money.spentPercent} over={money.overBy > 0} />
+                  <SpendBar
+                    percent={money.spentPercent}
+                    movedPercent={money.movedPercent}
+                    over={money.overBy > 0}
+                  />
                 </div>
                 <SpendKey
                   spent={money.spent}
+                  movedOut={money.movedOut}
                   balance={money.balance}
                   currency={community.currency}
                   className="mt-2"
@@ -367,6 +376,7 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 <EventMoneyTiles
                   money={money}
                   currency={community.currency}
+                  movedTo={movedFrom.length ? movedOnSummary(movedFrom) : undefined}
                   className="mt-4 gap-2"
                 />
               </CardBody>
@@ -439,8 +449,8 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
             ) : null}
 
             <Card>
-              <CardHeader title={`Where the money went (${approved.length})`} />
-              {approved.length ? (
+              <CardHeader title={`Where the money went (${approved.length + movedFrom.length})`} />
+              {approved.length || movedFrom.length ? (
                 <>
                   <ul className="divide-border-base divide-y">
                     {approved.map((expense) => (
@@ -477,10 +487,73 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                         </span>
                       </li>
                     ))}
+                    {/* What was left when the event closed, and where the
+                        committee sent it: the last entries in its ledger, so
+                        the money is accounted for down to the last rupee. */}
+                    {movedFrom.map((movement) => (
+                      <li
+                        key={movement.id}
+                        className="flex items-start justify-between gap-3 px-5 py-3"
+                      >
+                        <div className="flex min-w-0 gap-2.5">
+                          <ArrowRightLeft
+                            className="text-info mt-0.5 size-4 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <div className="min-w-0">
+                            <p className="text-ink text-sm font-medium">
+                              {movement.kind === 'society_balance' ? (
+                                'Kept for the society'
+                              ) : movement.to_event?.slug ? (
+                                <>
+                                  Carried to{' '}
+                                  <Link
+                                    href={`${base}/events/${movement.to_event.slug}#money`}
+                                    className="underline underline-offset-2"
+                                  >
+                                    {movement.to_event.name}
+                                  </Link>
+                                </>
+                              ) : (
+                                `Carried to ${movement.to_event?.name ?? 'another event'}`
+                              )}
+                            </p>
+                            <p className="text-ink-subtle mt-0.5 text-xs">
+                              {[
+                                movement.decider?.profiles?.full_name
+                                  ? `Decided by ${movement.decider.profiles.full_name}`
+                                  : null,
+                                movement.decided_at
+                                  ? formatDate(movement.decided_at.slice(0, 10))
+                                  : null,
+                                movement.note,
+                              ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-ink shrink-0 text-sm font-semibold">
+                          {formatMoney(movement.amount, community.currency)}
+                        </span>
+                      </li>
+                    ))}
                   </ul>
-                  <div className="border-border-base bg-surface-sunken flex justify-between border-t px-5 py-3 text-sm font-semibold">
-                    <span className="text-ink">Total spent</span>
-                    <span className="text-ink">{formatMoney(stats.spent, community.currency)}</span>
+                  <div className="border-border-base bg-surface-sunken space-y-1 border-t px-5 py-3 text-sm font-semibold">
+                    <div className="flex justify-between">
+                      <span className="text-ink">Total spent</span>
+                      <span className="text-ink">
+                        {formatMoney(stats.spent, community.currency)}
+                      </span>
+                    </div>
+                    {money.movedOut > 0 ? (
+                      <div className="flex justify-between">
+                        <span className="text-ink">Moved on when it closed</span>
+                        <span className="text-ink">
+                          {formatMoney(money.movedOut, community.currency)}
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                 </>
               ) : (
@@ -519,17 +592,6 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 </ul>
               </Card>
             ) : null}
-
-            <div className="border-border-base bg-surface-sunken text-ink-muted flex gap-3 rounded-2xl border px-4 py-3 text-sm">
-              <Lock className="text-gold mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <div>
-                <span className="text-ink font-medium">If money is left over:</span>{' '}
-                {event.fund_rule_note ?? FUND_RULE_LABEL[event.fund_rule]}
-                <p className="text-ink-subtle mt-1 text-xs">
-                  Fixed before any money was collected.
-                </p>
-              </div>
-            </div>
           </section>
 
           {/* ----------------------------------------------------- activities */}

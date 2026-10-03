@@ -3,6 +3,7 @@ import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   LEDGER_FILTERS,
+  SOCIETY_BALANCE_LEDGER,
   UNPUBLISHED_EVENT,
   can,
   correctionNote,
@@ -14,11 +15,14 @@ import {
   fundMovementLine,
   holdingNote,
   isSocietySpending,
+  isTransfer,
   ledgerEvidence,
   ledgerFilterFrom,
   ledgerMeta,
   ledgerFlat,
+  ledgerScopes,
   ledgerTitle,
+  ledgerTotals,
   relativeTime,
   whereTheBalanceIs,
 } from '@samudaya/core';
@@ -202,7 +206,7 @@ function SocietyMoney() {
         supabase
           .from('society_ledger')
           .select(
-            'id, direction, happened_at, amount, counterpart, detail, payer_name, unit_label, method, receipt_no, document_url, confirmed_by, confirmed_at, event_slug, event_name',
+            'id, kind, direction, happened_at, amount, counterpart, detail, payer_name, unit_label, method, receipt_no, document_url, confirmed_by, confirmed_at, event_id, event_slug, event_name',
           )
           .eq('community_id', communityId)
           .order('happened_at', { ascending: false })
@@ -225,7 +229,9 @@ function SocietyMoney() {
         // The names come from events, which leaves drafts out for a resident.
         supabase
           .from('event_stats')
-          .select('event_id, available, fund_carried')
+          .select(
+            'event_id, available, fund_carried, fund_carried_in, fund_raised, spent, fund_moved_out',
+          )
           .eq('community_id', communityId),
         supabase
           .from('events')
@@ -260,6 +266,8 @@ function SocietyMoney() {
           eventStats.error || eventNames.error
             ? null
             : whereTheBalanceIs(eventStats.data ?? [], eventNames.data ?? []),
+        eventStats: eventStats.data ?? [],
+        eventNames: eventNames.data ?? [],
       };
     },
   );
@@ -292,11 +300,25 @@ function SocietyMoney() {
   const holdings = data?.holdings ?? null;
 
   // Built from the ledger rather than from events, so the filter only offers an
-  // event that has something in it.
-  const events = [...new Map(rows.map((row) => [row.event_slug, row.event_name])).entries()].filter(
-    ([value]) => value,
-  );
-  events.sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+  // event that has something in it — and the society balance, once it has rows
+  // of its own.
+  const scopes = ledgerScopes(rows);
+  const scope = scopes.find((option) => option.value === eventSlug);
+  // One event's ledger, or the society balance's, adds up to what it holds. An
+  // event's figures come from its own numbers, not the rows on screen, which
+  // stop at the newest 500; the society balance's rows are few. Same as the web.
+  const scopeTotals = (() => {
+    if (!scope || direction !== 'all') return null;
+    if (eventSlug === SOCIETY_BALANCE_LEDGER) return ledgerTotals(visible);
+    const id = (data?.eventNames ?? []).find((row) => row.slug === eventSlug)?.id;
+    const stats = (data?.eventStats ?? []).find((row) => row.event_id === id);
+    if (!stats) return ledgerTotals(visible);
+    return {
+      in: Number(stats.fund_raised ?? 0) + Number(stats.fund_carried_in ?? 0),
+      out: Number(stats.spent ?? 0) + Number(stats.fund_moved_out ?? 0),
+      left: Number(stats.available ?? 0),
+    };
+  })();
 
   return (
     <Screen>
@@ -435,22 +457,55 @@ function SocietyMoney() {
               ))}
             </ChipRow>
 
-            {events.length > 1 ? (
+            {scopes.length ? (
               <ChipRow>
                 <Chip
                   label="Every event"
                   selected={eventSlug === ''}
                   onPress={() => setEventSlug('')}
                 />
-                {events.map(([value, label]) => (
+                {scopes.map((option) => (
                   <Chip
-                    key={value ?? ''}
-                    label={String(label ?? value)}
-                    selected={eventSlug === value}
-                    onPress={() => setEventSlug(value ?? '')}
+                    key={option.value}
+                    label={option.label}
+                    selected={eventSlug === option.value}
+                    onPress={() => setEventSlug(option.value)}
                   />
                 ))}
               </ChipRow>
+            ) : null}
+
+            {/* What the narrowed ledger adds up to: in, out, and what is left
+                in that event or kept by the society. */}
+            {scope && scopeTotals ? (
+              <Card style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Caption>Money in</Caption>
+                  <Caption>+{formatMoney(scopeTotals.in, currency)}</Caption>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Caption>Money out</Caption>
+                  <Caption>−{formatMoney(scopeTotals.out, currency)}</Caption>
+                </View>
+                <View
+                  style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}
+                >
+                  <Text style={{ color: colors.ink, fontSize: 14, fontWeight: '700', flex: 1 }}>
+                    {eventSlug === SOCIETY_BALANCE_LEDGER
+                      ? 'Kept for the society'
+                      : `Left in ${scope.label}`}
+                  </Text>
+                  <Text
+                    style={{
+                      color: scopeTotals.left < 0 ? colors.danger : colors.ink,
+                      fontSize: 14,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {formatMoney(scopeTotals.left, currency)}
+                  </Text>
+                </View>
+              </Card>
             ) : null}
 
             {/* Staff and the committee spend the society's own balance from
@@ -465,7 +520,8 @@ function SocietyMoney() {
 
             <Caption>
               Confirmed payments in; approved bills and the society&rsquo;s own spending out.
-              Payments show here once confirmed.
+              Payments show here once confirmed. Pick an event to see the money the committee moved
+              in or out of it too.
             </Caption>
           </View>
         }
@@ -489,7 +545,7 @@ function SocietyMoney() {
             {totals?.last_movement_at ? (
               <Caption>Last movement {relativeTime(totals.last_movement_at)}.</Caption>
             ) : null}
-            {visible.length >= 500 ? <Caption>Showing the most recent 500.</Caption> : null}
+            {rows.length >= 500 ? <Caption>Showing the most recent 500.</Caption> : null}
           </View>
         }
         renderItem={({ item }) => {
@@ -498,6 +554,9 @@ function SocietyMoney() {
           const flat = ledgerFlat(item);
           const evidence = ledgerEvidence(item);
           const societySpending = isSocietySpending(item);
+          // Money the committee moved: this ledger's money arriving or
+          // leaving, never a payment from a resident or to a vendor.
+          const moved = isTransfer(item);
           return (
             <Card style={{ gap: spacing.xs, marginBottom: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
@@ -523,14 +582,26 @@ function SocietyMoney() {
                     ) : null}
                   </Body>
                   <Caption>
-                    {[ledgerMeta(item), when, societySpending ? 'from the society balance' : null]
+                    {[
+                      moved ? (incoming ? 'Moved in' : 'Moved out') : null,
+                      ledgerMeta(item),
+                      when,
+                      societySpending ? 'from the society balance' : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </Caption>
                   {item.confirmed_at ? (
                     <Caption>
-                      {incoming ? 'Confirmed' : societySpending ? 'Recorded' : 'Approved'} by{' '}
-                      {item.confirmed_by ?? 'the society'} · {relativeTime(item.confirmed_at)}
+                      {moved
+                        ? 'Decided'
+                        : incoming
+                          ? 'Confirmed'
+                          : societySpending
+                            ? 'Recorded'
+                            : 'Approved'}{' '}
+                      by {item.confirmed_by ?? (moved ? 'the committee' : 'the society')} ·{' '}
+                      {relativeTime(item.confirmed_at)}
                     </Caption>
                   ) : null}
                 </View>
@@ -539,7 +610,7 @@ function SocietyMoney() {
                     cannot separate the two. */}
                 <Text
                   style={{
-                    color: incoming ? colors.success : colors.ink,
+                    color: incoming && !moved ? colors.success : colors.ink,
                     fontSize: 14,
                     fontWeight: '600',
                   }}

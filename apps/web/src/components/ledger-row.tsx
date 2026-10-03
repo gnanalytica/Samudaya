@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { ArrowDownLeft, ArrowRightLeft, ArrowUpRight } from 'lucide-react';
 import {
   formatDate,
   formatMoney,
   isSocietySpending,
+  isTransfer,
   ledgerEvidence,
   ledgerMeta,
   ledgerFlat,
@@ -36,6 +37,11 @@ export type LedgerRowData = LedgerEntry & {
  * Green for money in, ink for money out, with the sign carrying the direction
  * too: colour alone is the pair that fails exactly the people who cannot
  * separate the two.
+ *
+ * Money the committee moved — a closed event's leftover kept for the society
+ * or carried to the next event, the society balance put behind an event —
+ * gets its own mark: it is this ledger's money arriving or leaving, never
+ * money collected from a resident or paid to a vendor.
  */
 export function LedgerRow({
   row,
@@ -47,6 +53,7 @@ export function LedgerRow({
   currency: string;
 }) {
   const incoming = row.direction === 'in';
+  const moved = isTransfer(row);
   const societySpending = isSocietySpending(row);
   const flat = ledgerFlat(row);
   const evidence = ledgerEvidence(row);
@@ -56,13 +63,21 @@ export function LedgerRow({
       <div className="flex min-w-0 gap-3">
         <span
           className={
-            incoming
-              ? 'bg-success/10 text-success mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
-              : 'bg-warning/10 text-warning mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
+            moved
+              ? 'bg-info/10 text-info mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
+              : incoming
+                ? 'bg-success/10 text-success mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
+                : 'bg-warning/10 text-warning mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full'
           }
           aria-hidden="true"
         >
-          {incoming ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}
+          {moved ? (
+            <ArrowRightLeft className="size-4" />
+          ) : incoming ? (
+            <ArrowDownLeft className="size-4" />
+          ) : (
+            <ArrowUpRight className="size-4" />
+          )}
         </span>
         <div className="min-w-0">
           {/* Name and flat together. The flat is a chip rather than more of the
@@ -74,7 +89,13 @@ export function LedgerRow({
             <span className="text-ink text-sm font-medium break-words">
               {ledgerTitle(row)}
               <span className="sr-only">
-                {incoming ? ' paid the society' : ' was paid by the society'}
+                {moved
+                  ? incoming
+                    ? ', money moved in'
+                    : ', money moved out'
+                  : incoming
+                    ? ' paid the society'
+                    : ' was paid by the society'}
               </span>
             </span>
             {flat ? (
@@ -109,8 +130,15 @@ export function LedgerRow({
           </p>
           {row.confirmed_at ? (
             <p className="text-ink-subtle mt-0.5 text-xs">
-              {incoming ? 'Confirmed' : societySpending ? 'Recorded' : 'Approved'} by{' '}
-              {row.confirmed_by ?? 'the society'} · {relativeTime(row.confirmed_at)}
+              {moved
+                ? 'Decided'
+                : incoming
+                  ? 'Confirmed'
+                  : societySpending
+                    ? 'Recorded'
+                    : 'Approved'}{' '}
+              by {row.confirmed_by ?? (moved ? 'the committee' : 'the society')} ·{' '}
+              {relativeTime(row.confirmed_at)}
             </p>
           ) : null}
           {/* Every row that has evidence offers it: the bill for money out, the
@@ -124,7 +152,7 @@ export function LedgerRow({
       </div>
       <span
         className={
-          incoming
+          incoming && !moved
             ? 'text-success shrink-0 text-sm font-semibold'
             : 'text-ink shrink-0 text-sm font-semibold'
         }

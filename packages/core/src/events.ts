@@ -173,6 +173,10 @@ export type EventStats = {
   pending_contributors: number | null;
   /** Moved across by the committee, net. Never part of fund_raised either. */
   fund_carried: number | null;
+  /** Carried into the event, gross: what fund_carried is made of, with the next. */
+  fund_carried_in: number | null;
+  /** Handed on after the event closed, gross. */
+  fund_moved_out: number | null;
 };
 
 /** Fills in zeroes so callers never have to null-check a total. */
@@ -192,6 +196,10 @@ export function normalizeStats(stats: Partial<EventStats> | null | undefined) {
     fundPending: Number(stats?.fund_pending ?? 0),
     pendingContributors: stats?.pending_contributors ?? 0,
     fundCarried: Number(stats?.fund_carried ?? 0),
+    // A row read before the two gross columns existed has only the net figure,
+    // which is right whenever money moved only one way.
+    fundCarriedIn: Number(stats?.fund_carried_in ?? Math.max(0, Number(stats?.fund_carried ?? 0))),
+    fundMovedOut: Number(stats?.fund_moved_out ?? Math.max(0, -Number(stats?.fund_carried ?? 0))),
   };
 }
 
@@ -202,11 +210,12 @@ export function fundedPercent(raised: number, target: number): number {
 }
 
 /**
- * The target less whatever the committee has carried into the event: what
- * residents between them are asked for. stillNeeded() starts from it.
+ * The target less whatever the committee has carried into the event
+ * (event_stats.fund_carried_in): what residents between them are asked for.
+ * stillNeeded() starts from it.
  *
- * Money carried out of an event (a negative net figure, on an event that gave
- * its surplus away) never raises what the event asked for.
+ * Money the event later handed on never raises what it asked for. A negative
+ * figure, from a reader still passing the net fund_carried, counts as none.
  */
 export function fundAsk(target: number, carriedIn = 0): number {
   return Math.max(0, target - Math.max(0, carriedIn));
@@ -214,12 +223,14 @@ export function fundAsk(target: number, carriedIn = 0): number {
 
 /**
  * What an event's fund holds: residents' confirmed payments, plus whatever the
- * committee carried into it. Carried money is money in the fund like any
- * other; it has a row in the event's money list saying where it came from, and
- * no line of its own on a card.
+ * committee carried into it (event_stats.fund_carried_in). Carried money is
+ * money in the fund like any other; it has a row in the event's money list
+ * saying where it came from, and no line of its own on a card.
  *
  * Money carried out of an event (its surplus given to another) is not taken
- * off here: it left after it was raised, the way a bill does.
+ * off here: it left after it was raised, the way a bill does. Which is why
+ * this takes the gross figure carried in and not the net one: an event that
+ * received ₹6,990 and later handed on ₹44,490 still collected the ₹6,990.
  */
 export function inTheFund(raised: number, carriedIn = 0): number {
   return raised + Math.max(0, carriedIn);
@@ -252,22 +263,26 @@ export function fundBarSegments(
 
 /**
  * An event's own money, as the Fund card's tiles show it: what it collected,
- * what it spent, and what is left, adding up on screen.
+ * what it spent, what it handed on, and what is left, adding up on screen.
  *
  * Collected is everything this event has to spend — residents' confirmed
  * payments plus whatever the committee carried in from a closed event or the
  * society balance. Carried money is this event's money once it arrives, so it
  * counts; the society's balance, and every other event's, never do.
  *
- * Balance is collected less approved bills (event_stats.available, the
- * database's own figure). Pending bills are not spending until they are
- * approved. Below zero, somebody paid the difference out of their own pocket,
- * and `overBy` is what they are owed.
+ * Moved on is what was left when the event closed and the committee kept it
+ * for the society or put it behind another event. It is not spending, and it
+ * is not still here.
+ *
+ * Balance is collected less approved bills less moved on
+ * (event_stats.available, the database's own figure). Pending bills are not
+ * spending until they are approved. Below zero, somebody paid the difference
+ * out of their own pocket, and `overBy` is what they are owed.
  */
 export type EventMoney = {
   fromResidents: number;
   carriedIn: number;
-  /** Money this event carried on to another after it closed. */
+  /** Handed on after the event closed: kept for the society or carried on. */
   movedOut: number;
   collected: number;
   spent: number;
@@ -275,16 +290,25 @@ export type EventMoney = {
   overBy: number;
   /** Spent as a share of collected, clamped for the spent bar. */
   spentPercent: number;
+  /**
+   * Moved on as a share of collected: the bar's second segment, after the
+   * spent one. When nothing is left the two fill the bar exactly, so rounding
+   * never draws a sliver of money that is not there.
+   */
+  movedPercent: number;
 };
 
 export function eventMoney(stats: {
   fundRaised: number;
+  /** Net, for a caller that has nothing better; the gross pair wins. */
   fundCarried: number;
+  fundCarriedIn?: number;
+  fundMovedOut?: number;
   spent: number;
   available: number;
 }): EventMoney {
-  const carriedIn = Math.max(0, stats.fundCarried);
-  const movedOut = Math.max(0, -stats.fundCarried);
+  const carriedIn = stats.fundCarriedIn ?? Math.max(0, stats.fundCarried);
+  const movedOut = stats.fundMovedOut ?? Math.max(0, -stats.fundCarried);
   const collected = stats.fundRaised + carriedIn;
   const spentPercent =
     collected > 0
@@ -292,6 +316,12 @@ export function eventMoney(stats: {
       : stats.spent > 0
         ? 100
         : 0;
+  const movedPercent =
+    movedOut <= 0 || collected <= 0
+      ? 0
+      : stats.available <= 0
+        ? 100 - spentPercent
+        : Math.min(100 - spentPercent, Math.round((movedOut / collected) * 100));
   return {
     fromResidents: stats.fundRaised,
     carriedIn,
@@ -301,6 +331,7 @@ export function eventMoney(stats: {
     balance: stats.available,
     overBy: Math.max(0, -stats.available),
     spentPercent,
+    movedPercent,
   };
 }
 

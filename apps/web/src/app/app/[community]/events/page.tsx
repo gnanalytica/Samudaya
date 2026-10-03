@@ -53,10 +53,10 @@ export default async function EventsPage(props: PageProps<'/app/[community]/even
       s?.fundRaised ?? 0,
       s?.fundPending ?? 0,
       s?.fundTarget ?? 0,
-      s?.fundCarried ?? 0,
+      s?.fundCarriedIn ?? 0,
     );
     const funded = bar.confirmed;
-    const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarried ?? 0);
+    const held = inTheFund(s?.fundRaised ?? 0, s?.fundCarriedIn ?? 0);
     // A list of events should look like a year, not like a spreadsheet: each
     // card leads with its own festival — its colour and what it is decorated
     // with — the way a calendar marks its days.
