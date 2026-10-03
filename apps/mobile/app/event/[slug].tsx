@@ -265,11 +265,22 @@ export default function EventDetail() {
         {has('vote') ? (
           <View {...sectionProps('vote')} style={{ gap: spacing.lg }}>
             {/* One target, so no picker: on an event's own page there is only
-                one thing a suggestion could be about. */}
+                one thing a suggestion could be about. Once the event is over,
+                that one thing is the society, for next time. */}
             <Suggestions
               rows={data.suggestions}
-              targets={[{ id: data.event.id, label: data.event.name }]}
-              open={open}
+              targets={
+                open
+                  ? [{ id: data.event.id, label: data.event.name }]
+                  : [{ id: null, label: 'The society' }]
+              }
+              open
+              suggestLabel={open ? undefined : 'SUGGEST AN IDEA FOR NEXT TIME'}
+              suggestHint={
+                open
+                  ? undefined
+                  : `${data.event.name} is over, so your idea goes to the society's Ideas.`
+              }
               onChange={changed}
             />
           </View>

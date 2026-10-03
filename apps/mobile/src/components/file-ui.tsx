@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { View } from 'react-native';
-import { Paperclip } from 'lucide-react-native';
+import { Image, Modal, Pressable, Text, View } from 'react-native';
+import { Paperclip, X } from 'lucide-react-native';
 import { Body, Button, Caption } from './ui';
 import { Chip, ChipRow, ErrorText } from './admin-ui';
 import {
+  isStoredImage,
   openStoredFile,
   pickFile,
+  storedFileUrl,
   type Bucket,
   type PickSource,
   type PickedFile,
 } from '../lib/storage';
-import { spacing } from '../lib/theme';
+import { minTapTarget, spacing } from '../lib/theme';
 import { useTheme } from '../lib/use-theme';
 
 /**
@@ -90,26 +92,89 @@ export function ViewFileButton({
   value: string | null | undefined;
   label: string;
 }) {
+  const { colors } = useTheme();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // A photo opens in a window over the screen; a PDF in the in-app browser,
+  // which draws it properly. Either way the person never leaves the app.
+  const [photo, setPhoto] = useState<string | null>(null);
   if (!value) return null;
+
+  const open = () => {
+    setBusy(true);
+    setError(null);
+    const opening = isStoredImage(value)
+      ? storedFileUrl(bucket, value).then((result) => {
+          if ('error' in result) return result.error;
+          setPhoto(result.url);
+          return null;
+        })
+      : openStoredFile(bucket, value);
+    void opening
+      .then((message) => setError(message))
+      .catch(() => setError('Could not open that file.'))
+      .finally(() => setBusy(false));
+  };
 
   return (
     <View style={{ gap: spacing.xs }}>
-      <Button
-        label={busy ? 'Opening…' : label}
-        variant="secondary"
-        loading={busy}
-        onPress={() => {
-          setBusy(true);
-          setError(null);
-          void openStoredFile(bucket, value)
-            .then((message) => setError(message))
-            .catch(() => setError('Could not open that file.'))
-            .finally(() => setBusy(false));
-        }}
-      />
+      <Button label={busy ? 'Opening…' : label} variant="secondary" loading={busy} onPress={open} />
       {error ? <Caption>{error}</Caption> : null}
+      <Modal
+        visible={photo !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhoto(null)}
+        statusBarTranslucent
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            justifyContent: 'center',
+            padding: spacing.lg,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: spacing.md,
+            }}
+          >
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>
+              {label.replace(/^View (\w)/, (_, first: string) => first.toUpperCase())}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              onPress={() => setPhoto(null)}
+              hitSlop={12}
+              style={{
+                minWidth: minTapTarget,
+                minHeight: minTapTarget,
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+              }}
+            >
+              <X color="#fff" size={22} strokeWidth={2} />
+            </Pressable>
+          </View>
+          {photo ? (
+            <Image
+              source={{ uri: photo }}
+              resizeMode="contain"
+              accessibilityLabel={label.replace(/^View /, '')}
+              style={{ flex: 1, width: '100%', backgroundColor: colors.surfaceSunken }}
+              onError={() => {
+                setPhoto(null);
+                setError('Could not show that file. Pull down to refresh and try again.');
+              }}
+            />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }

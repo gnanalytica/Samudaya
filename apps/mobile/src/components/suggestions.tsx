@@ -45,6 +45,8 @@ export function Suggestions({
   onChange,
   showEvent = false,
   emptyDescription = 'Suggestions the committee opens for voting appear here.',
+  suggestLabel = 'SUGGEST AN IDEA',
+  suggestHint,
 }: {
   rows: SuggestionRow[];
   targets: SuggestionTarget[];
@@ -54,6 +56,10 @@ export function Suggestions({
   /** Name the event each suggestion belongs to, and link through to it. */
   showEvent?: boolean;
   emptyDescription?: string;
+  /** Over the form: what is being suggested, and for what. */
+  suggestLabel?: string;
+  /** A line under it, when where the idea goes needs saying. */
+  suggestHint?: string;
 }) {
   const router = useRouter();
   const { viewRole: role, membershipId, activeCommunity } = useAuth();
@@ -192,7 +198,8 @@ export function Suggestions({
 
       {maySuggest ? (
         <View style={{ gap: spacing.sm }}>
-          <Caption>SUGGEST AN IDEA</Caption>
+          <Caption>{suggestLabel}</Caption>
+          {suggestHint ? <Caption>{suggestHint}</Caption> : null}
           {/* Only worth asking when there is a choice: on an event's own page
               there is exactly one answer and the picker would be furniture. */}
           {targets.length > 1 ? (

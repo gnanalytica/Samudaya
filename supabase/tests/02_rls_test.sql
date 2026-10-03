@@ -3725,3 +3725,119 @@ select test.act_as('77777777-7777-4777-8777-777777777777');
 select test.eq(
   test.visible($q$select id from public.society_ledger where kind = 'transfer'$q$),
   0::bigint, 'another society sees none of this one''s movements');
+
+-- ---------------------------------------------------------------------------
+-- A reply can be a face
+-- ---------------------------------------------------------------------------
+-- Ria says something under Hill Crest Diwali; anyone in Hill Crest can react,
+-- with one of the faces, once each, and take only their own back.
+
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+insert into public.comments (id, community_id, event_id, membership_id, body)
+select 'c0c0c0c0-0000-4000-8000-000000000001', e.community_id, e.id,
+       app.my_membership_id(e.community_id), 'Lanterns along the main road this year?'
+  from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+select 'c0c0c0c0-0000-4000-8000-000000000001', e.community_id,
+       app.my_membership_id(e.community_id), '🎉'
+  from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+select test.eq(test.visible('select 1 from public.comment_reactions'), 1::bigint,
+  'a member can react to a comment, their own included');
+
+reset role;
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+select 'c0c0c0c0-0000-4000-8000-000000000001', e.community_id,
+       app.my_membership_id(e.community_id), face
+  from public.events e, (values ('👍'), ('❤️')) as faces(face)
+ where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+select test.eq(test.visible('select 1 from public.comment_reactions'), 3::bigint,
+  'and so can a neighbour, with more than one face');
+select test.raises(
+  $q$insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+     select 'c0c0c0c0-0000-4000-8000-000000000001', e.community_id,
+            app.my_membership_id(e.community_id), '👍'
+       from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa'$q$,
+  'but each face only once');
+select test.raises(
+  $q$insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+     select 'c0c0c0c0-0000-4000-8000-000000000001', e.community_id,
+            app.my_membership_id(e.community_id), 'lol'
+       from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa'$q$,
+  'and only a face from the set, never text');
+select test.raises(
+  $q$insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+     select 'c0c0c0c0-0000-4000-8000-000000000001', m.community_id, m.id, '😂'
+       from public.memberships m where m.user_id = 'abababab-abab-4bab-8bab-abababababab'$q$,
+  'nor on somebody else''s behalf');
+
+-- Taking a face off: only your own.
+delete from public.comment_reactions where emoji = '🎉';
+reset role;
+select test.eq(
+  (select count(*) from public.comment_reactions
+    where comment_id = 'c0c0c0c0-0000-4000-8000-000000000001'),
+  3::bigint, 'a neighbour cannot take somebody else''s reaction off');
+select test.act_as('cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd');
+delete from public.comment_reactions where emoji = '❤️';
+reset role;
+select test.eq(
+  (select count(*) from public.comment_reactions
+    where comment_id = 'c0c0c0c0-0000-4000-8000-000000000001'),
+  2::bigint, 'but can take their own off');
+
+-- Staff are in the conversation, so they can react too.
+select test.act_as('99999999-9999-4999-8999-999999999999');
+insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+select 'c0c0c0c0-0000-4000-8000-000000000001', e.community_id,
+       app.my_membership_id(e.community_id), '🙏'
+  from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+select test.eq(test.visible('select 1 from public.comment_reactions'), 3::bigint,
+  'staff can react too');
+
+-- Reacting notifies nobody: a thumbs-up is not news.
+reset role;
+select test.eq(
+  (select count(*) from public.notifications
+    where data ->> 'comment_id' = 'c0c0c0c0-0000-4000-8000-000000000001'
+      and kind <> 'comment'),
+  0::bigint, 'and nobody is notified of a reaction');
+
+-- Another society sees none of it and cannot react. The ids are read here,
+-- as nobody in particular, because Gita cannot see Hill Crest's event to
+-- read them herself — and an insert that selects nothing proves nothing.
+create temporary table t_faces as
+select e.community_id as hill_crest,
+       (select m.id from public.memberships m
+         where m.user_id = '77777777-7777-4777-8777-777777777777' limit 1) as gita,
+       (select m.community_id from public.memberships m
+         where m.user_id = '77777777-7777-4777-8777-777777777777' limit 1) as green_valley
+  from public.events e where e.id = 'cccccccc-0000-4000-8000-0000000000aa';
+grant select on t_faces to authenticated;
+select test.act_as('77777777-7777-4777-8777-777777777777');
+select test.eq(test.visible('select 1 from public.comment_reactions'), 0::bigint,
+  'another society sees none of the reactions');
+select test.raises(
+  $q$insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+     select 'c0c0c0c0-0000-4000-8000-000000000001', hill_crest, gita, '👍' from t_faces$q$,
+  'nor reacts to a thread that is not theirs');
+select test.raises(
+  $q$insert into public.comment_reactions (comment_id, community_id, membership_id, emoji)
+     select 'c0c0c0c0-0000-4000-8000-000000000001', green_valley, gita, '👍' from t_faces$q$,
+  'even by filing the reaction under their own society');
+
+-- A comment that goes takes its reactions with it.
+reset role;
+select test.act_as('abababab-abab-4bab-8bab-abababababab');
+delete from public.comments where id = 'c0c0c0c0-0000-4000-8000-000000000001';
+reset role;
+select test.eq(
+  (select count(*) from public.comment_reactions
+    where comment_id = 'c0c0c0c0-0000-4000-8000-000000000001'),
+  0::bigint, 'and a withdrawn comment takes its reactions with it');
+
+select test.ok(
+  not has_table_privilege('anon', 'public.comment_reactions', 'SELECT')
+  and not has_table_privilege('anon', 'public.comment_reactions', 'INSERT'),
+  'a stranger can neither see a reaction nor leave one');

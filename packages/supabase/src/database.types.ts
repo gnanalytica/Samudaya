@@ -716,6 +716,52 @@ export type Database = {
           }
         ]
       }
+      comment_reactions: {
+        Row: {
+          comment_id: string
+          community_id: string
+          membership_id: string
+          emoji: string
+          created_at: string
+        }
+        Insert: {
+          comment_id: string
+          community_id: string
+          membership_id: string
+          emoji: string
+          created_at?: string
+        }
+        Update: {
+          comment_id?: string
+          community_id?: string
+          membership_id?: string
+          emoji?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_reactions_community_id_fkey"
+            columns: ["community_id"]
+            isOneToOne: false
+            referencedRelation: "communities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comment_reactions_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "memberships"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       comments: {
         Row: {
           id: string

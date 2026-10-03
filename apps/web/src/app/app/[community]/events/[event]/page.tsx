@@ -71,6 +71,7 @@ import { WhatsappGroupLink } from '@/components/whatsapp-group-link';
 import { eventTabsFor } from '@/components/event-tabs';
 import { SectionBar } from '@/components/section-bar';
 import { cancelRegistration } from '../actions';
+import { SocietySuggestionForm } from '../../suggest/suggest-form';
 import { RegisterForm, SuggestionForm } from './participation-forms';
 
 /**
@@ -716,9 +717,19 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
           {/* ---------------------------------------------------------- ideas */}
           {shown.has('vote') ? (
             <section id="vote" aria-labelledby="ideas-heading" className={SECTION}>
-              <h2 id="ideas-heading" className={HEADING}>
-                Ideas
-              </h2>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 id="ideas-heading" className={HEADING}>
+                  Ideas
+                </h2>
+                {/* Right where somebody lands on the section, not under a long
+                    list of things already being voted on. */}
+                {can(role, 'suggest') ? (
+                  <ButtonLink href="#suggest-idea" size="sm">
+                    <Sparkles className="size-4" aria-hidden="true" />
+                    Suggest an idea
+                  </ButtonLink>
+                ) : null}
+              </div>
               <SuggestionBoard
                 slug={slug}
                 eventSlug={event.slug}
@@ -728,15 +739,31 @@ export default async function EventDetailPage(props: PageProps<'/app/[community]
                 canApprove={canApprove}
                 emptyDescription="Suggestions the committee approves go to a vote here."
               />
-              {can(role, 'suggest') && event.status === 'published' ? (
-                <Card>
-                  <CardHeader
-                    title="Suggest an idea"
-                    description={`For ${event.name}. The committee reviews it first.`}
-                  />
-                  <CardBody>
-                    <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />
-                  </CardBody>
+              {can(role, 'suggest') ? (
+                <Card id="suggest-idea" className="scroll-mt-36 md:scroll-mt-16">
+                  {open ? (
+                    <>
+                      <CardHeader
+                        title="Suggest an idea"
+                        description={`For ${event.name}. The committee reviews it first, then everybody votes.`}
+                      />
+                      <CardBody>
+                        <SuggestionForm slug={slug} eventSlug={event.slug} eventId={event.id} />
+                      </CardBody>
+                    </>
+                  ) : (
+                    // An event that is over can still prompt an idea; it goes
+                    // to the society's own Ideas, for next time.
+                    <>
+                      <CardHeader
+                        title="Suggest an idea for next time"
+                        description={`${event.name} is over, so your idea goes to the society's Ideas. The committee reviews it first, then everybody votes.`}
+                      />
+                      <CardBody>
+                        <SocietySuggestionForm slug={slug} />
+                      </CardBody>
+                    </>
+                  )}
                 </Card>
               ) : null}
             </section>

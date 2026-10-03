@@ -51,9 +51,11 @@ describe('payment screenshots', () => {
 
 describe('the viewer is a button', () => {
   it('keeps a 44px tap target on web', () => {
-    const link = read('web', 'src', 'components', 'bill-link.tsx');
+    // The button lives with the window it opens (bill-link hands it the link).
+    const viewer = read('web', 'src', 'components', 'file-preview.tsx');
+    expect(read('web', 'src', 'components', 'bill-link.tsx')).toContain('<FilePreviewButton');
     // Both the card-sized and the in-table variant.
-    expect(count(link, 'pointer-coarse:min-h-11')).toBe(2);
+    expect(count(viewer, 'pointer-coarse:min-h-11')).toBe(2);
   });
 
   it('uses the 48px shared Button on mobile', () => {
